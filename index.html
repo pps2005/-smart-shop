@@ -6,95 +6,187 @@
 <meta name="theme-color" content="#4f46e5">
 <title>SMART SHOP</title>
 <style>
-:root{--bg:#f4f6fb;--card:#fff;--text:#0f172a;--mute:#64748b;--line:#e5e9f2;--pri:#4f46e5;--pri2:#7c3aed;--g:#16a34a;--b:#2563eb;--r:#dc2626;--k:#111827}
-[data-theme=dark]{--bg:#0b1020;--card:#151b2e;--text:#e8ecf6;--mute:#94a3b8;--line:#243049;--k:#475569}
+:root{--bg:#f4f6fb;--card:#fff;--text:#0f172a;--mute:#64748b;--line:#e5e9f2;--pri:#4f46e5;--pri2:#7c3aed;--g:#16a34a;--b:#2563eb;--r:#dc2626;--k:#1f2937;--star:#f59e0b}
+[data-theme=dark]{--bg:#0b1020;--card:#151b2e;--text:#e8ecf6;--mute:#94a3b8;--line:#243049;--k:#64748b}
 *{box-sizing:border-box;margin:0}
 body{font-family:system-ui,-apple-system,"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
-.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 12px;background:var(--card);border-bottom:1px solid var(--line)}
-.logo{font-weight:800;font-size:1.15rem;background:linear-gradient(90deg,var(--pri),var(--pri2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.ic{width:40px;height:40px;border-radius:12px;background:var(--bg);font-size:1.1rem}
-main{padding:16px 16px calc(100px + env(safe-area-inset-bottom,0px));max-width:1000px;margin:auto;animation:in .3s ease}
+#splash{position:fixed;inset:0;z-index:99;background:linear-gradient(135deg,var(--pri),var(--pri2));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;transition:opacity .4s}
+#splash.hide{opacity:0;pointer-events:none}
+#splash .sl{font-size:4rem;animation:pop 1s ease infinite alternate}
+#splash b{font-size:1.6rem;margin-top:10px;letter-spacing:1px}
+#splash .ld{width:140px;height:4px;border-radius:4px;background:rgba(255,255,255,.3);margin-top:22px;overflow:hidden}
+#splash .ld i{display:block;height:100%;background:#fff;animation:ld 1.5s ease forwards}
+@keyframes pop{from{transform:scale(.92)}to{transform:scale(1.08)}}
+@keyframes ld{from{width:0}to{width:100%}}
+.top{position:sticky;top:0;z-index:5;background:linear-gradient(135deg,var(--pri),var(--pri2));padding:calc(10px + env(safe-area-inset-top,0px)) 14px 12px;color:#fff}
+.tr{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.logo{font-weight:800;font-size:1.1rem}
+.ic{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.2);font-size:1.05rem}
+#sw{margin-top:10px}
+#sw input{width:100%;border:0;border-radius:12px;padding:11px 14px;font:inherit;background:#fff;color:#0f172a;outline:0}
+main{padding:14px 14px calc(96px + env(safe-area-inset-bottom,0px));max-width:1100px;margin:auto;animation:in .3s ease}
 @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-h2{font-size:1.3rem;margin-bottom:14px}
-.hero{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-radius:22px;padding:22px;margin-bottom:14px;box-shadow:0 10px 30px rgba(79,70,229,.3)}
-.hero small{opacity:.85}.hero b{display:block;font-size:2.2rem;margin-top:4px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
-.card small{color:var(--mute)}.card b{display:block;font-size:1.4rem;margin-top:4px}
-.st{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
-.st div{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 6px;text-align:center;font-size:.75rem;color:var(--mute)}
-.st i{display:block;width:14px;height:14px;border-radius:50%;margin:0 auto 6px}
-.st b{display:block;font-size:1.1rem;color:var(--text)}
-.note{background:var(--card);border:1px dashed var(--line);border-radius:16px;padding:14px;color:var(--mute);font-size:.9rem;line-height:1.5}
-.empty{text-align:center;padding:50px 20px}.empty span{font-size:3rem}.empty p{color:var(--mute);margin-top:8px}
+h2{font-size:1.2rem;margin:4px 0 12px}
+h3{font-size:1rem;margin-bottom:10px}
+.demo{background:#fef3c7;color:#92400e;border-radius:12px;padding:9px 12px;font-size:.8rem;margin-bottom:12px}
+.cats{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:none}
+.cats::-webkit-scrollbar{display:none}
+.cat{flex:0 0 66px;text-align:center;font-size:.72rem;color:var(--mute)}
+.cat span{display:flex;width:56px;height:56px;margin:0 auto 4px;border-radius:18px;background:var(--card);border:2px solid var(--line);align-items:center;justify-content:center;font-size:1.6rem}
+.cat.on{color:var(--pri);font-weight:700}.cat.on span{border-color:var(--pri);background:rgba(79,70,229,.1)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;scrollbar-width:none}
+.chip{flex:0 0 auto;padding:7px 13px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:.8rem;display:flex;align-items:center;gap:6px}
+.chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.chip.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pc{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-align:left;display:block;width:100%}
+.im{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:4rem;background:linear-gradient(135deg,rgba(79,70,229,.12),rgba(124,58,237,.12))}
+.dot{position:absolute;top:8px;right:8px;width:14px;height:14px;border-radius:50%;border:2px solid #fff}
+.tag{position:absolute;top:8px;left:8px;font-size:.65rem;background:#ef4444;color:#fff;border-radius:6px;padding:2px 6px;font-weight:700}
+.pi{padding:9px 10px 11px}
+.pn{font-size:.85rem;line-height:1.3;height:2.2em;overflow:hidden}
+.pr{color:var(--pri);font-weight:800;font-size:1.05rem;margin-top:4px}
+.pm{display:flex;justify-content:space-between;font-size:.7rem;color:var(--mute);margin-top:4px}
+.stars{color:var(--star);letter-spacing:1px;font-size:.78rem}.stars u{text-decoration:none;color:var(--line)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
+.grid .card{margin:0}
+.card small{color:var(--mute)}.card b.v{display:block;font-size:1.3rem;margin-top:3px}
+.hero{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-radius:20px;padding:18px;margin-bottom:12px}
+.hero small{opacity:.85}.hero b{display:block;font-size:2rem}
+.row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:.88rem}
+.row:first-of-type{border-top:0}.row .rk{width:24px;height:24px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700}
+.row .gr{flex:1}.lg{display:flex;flex-wrap:wrap;gap:10px;font-size:.78rem;color:var(--mute);margin-top:8px}
+.lg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+svg text{fill:var(--mute);font-size:10px}
+.empty{text-align:center;padding:40px 16px}.empty span{font-size:3rem}.empty p{color:var(--mute);margin-top:8px}
 .bot{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));z-index:6}
-.bot button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;font-size:.7rem;color:var(--mute)}
-.bot button span{font-size:1.3rem}.bot .on{color:var(--pri);font-weight:700}
+.bot button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;font-size:.72rem;color:var(--mute)}
+.bot button span{font-size:1.35rem}.bot .on{color:var(--pri);font-weight:700}
 .side{display:none}
-.sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9;display:none;align-items:flex-end}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9;display:none;align-items:flex-end}
 .sheet.show{display:flex}
-.sheet div{background:var(--card);width:100%;border-radius:22px 22px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom,0px))}
-.sheet button{display:block;width:100%;text-align:left;padding:14px;border-radius:12px;font-size:1rem}
+.sheet>div{background:var(--card);width:100%;max-height:85vh;overflow:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(22px + env(safe-area-inset-bottom,0px))}
+.sheet button.mi{display:block;width:100%;text-align:left;padding:14px;border-radius:12px;font-size:1rem}
+.kv{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);font-size:.9rem}
+.kv span:first-child{color:var(--mute)}
+@media(min-width:600px){.pg{grid-template-columns:repeat(3,1fr)}}
 @media(min-width:900px){
- .bot{display:none}
- .side{display:block;position:fixed;top:0;bottom:0;left:0;width:230px;background:var(--card);border-right:1px solid var(--line);padding:20px 12px}
- .side .logo{display:block;padding:0 10px 18px;font-size:1.3rem}
+ .bot{display:none}.pg{grid-template-columns:repeat(4,1fr)}.grid{grid-template-columns:repeat(4,1fr)}
+ .side{display:block;position:fixed;top:0;bottom:0;left:0;width:220px;background:var(--card);border-right:1px solid var(--line);padding:20px 12px;z-index:7}
+ .side .logo{display:block;padding:0 10px 18px;font-size:1.25rem;color:var(--pri)}
  .side button{display:block;width:100%;text-align:left;padding:12px;border-radius:12px;margin-bottom:4px;color:var(--mute)}
  .side .on{background:var(--bg);color:var(--pri);font-weight:700}
- .top{margin-left:230px}main{margin-left:230px;padding-bottom:40px;max-width:none;padding-right:30px}
- .grid{grid-template-columns:repeat(4,1fr)}
+ .top,main{margin-left:220px}main{max-width:none}
 }
 </style>
 </head>
 <body>
-<nav class="side" id="side"><span class="logo">🛍️ SMART SHOP</span></nav>
-<header class="top"><span class="logo">🛍️ SMART SHOP</span><button class="ic" id="theme">🌙</button></header>
+<div id="splash"><div class="sl">🛍️</div><b>SMART SHOP</b><div class="ld"><i></i></div></div>
+<nav class="side" id="side"></nav>
+<header class="top">
+ <div class="tr"><span class="logo">🛍️ SMART SHOP</span><button class="ic" id="theme">🌙</button></div>
+ <div id="sw"><input id="q" placeholder="🔍 ค้นหาชื่อสินค้าหรือรหัส เช่น PAN-001"></div>
+</header>
 <main id="view"></main>
 <nav class="bot" id="bot"></nav>
-<div class="sheet" id="sheet"><div id="more"></div></div>
+<div class="sheet" id="sheet"><div id="sbody"></div></div>
 <script>
-const M=[
-{id:'dash',i:'🏠',t:'Dashboard'},
-{id:'sell',i:'🛒',t:'ขายสินค้า',p:4},
-{id:'prod',i:'📦',t:'สินค้า',p:2},
-{id:'stock',i:'🏬',t:'คลังสินค้า',p:3},
-{id:'acc',i:'💰',t:'บัญชี',p:5},
-{id:'rep',i:'📊',t:'รายงาน',p:5},
-{id:'ai',i:'🤖',t:'AI Assistant',p:6},
-{id:'set',i:'⚙️',t:'ตั้งค่า',p:2}];
-let cur='dash';
+// ===== ข้อมูลตัวอย่าง (จะถูกแทนที่ด้วยฐานข้อมูลจริงในระยะที่ 2) =====
+const DEMO=true;
+const P=[
+{c:'PAN-001',n:'กางเกงยีนส์',cat:'กางเกง',cost:120,price:200,loc:{'หน้าร้าน':8,'บ้าน':12},st:'g',sold:64,e:'👖'},
+{c:'PAN-002',n:'กางเกงขาสั้น',cat:'กางเกง',cost:60,price:120,loc:{'หน้าร้าน':5,'บ้าน':2},st:'g',sold:22,e:'🩳'},
+{c:'SHI-001',n:'เสื้อยืดคอกลม',cat:'เสื้อ',cost:70,price:150,loc:{'หน้าร้าน':14,'บ้าน':6},st:'g',sold:120,e:'👕'},
+{c:'SHI-002',n:'เสื้อเชิ้ตลายสก็อต',cat:'เสื้อ',cost:110,price:229,loc:{'บ้าน':9},st:'b',sold:7,e:'👔'},
+{c:'BAG-001',n:'กระเป๋าสะพายข้าง',cat:'กระเป๋า',cost:150,price:329,loc:{'หน้าร้าน':3},st:'r',sold:3,e:'👜'},
+{c:'SHO-001',n:'รองเท้าผ้าใบ',cat:'รองเท้า',cost:220,price:459,loc:{'หน้าร้าน':0},st:'k',sold:55,e:'👟'},
+{c:'HAT-001',n:'หมวกแก๊ป',cat:'หมวก',cost:40,price:99,loc:{'หน้าร้าน':10,'บ้าน':4},st:'g',sold:31,e:'🧢'},
+{c:'TOY-001',n:'ตุ๊กตาหมี',cat:'ของเล่น',cost:90,price:189,loc:{'บ้าน':6},st:'b',sold:0,e:'🧸'}];
+const DAYS=['จ','อ','พ','พฤ','ศ','ส','อา'],SALES=[320,580,410,0,760,640,900];
+// =====================================================================
+const CATS=[['ทั้งหมด','🛍️'],['เสื้อ','👕'],['กางเกง','👖'],['กระเป๋า','👜'],['รองเท้า','👟'],['หมวก','🧢'],['ถุงเท้า','🧦'],['เครื่องประดับ','💍'],['ของเล่น','🧸']];
+const ST={g:['พร้อมขาย','--g'],b:['สำรอง','--b'],r:['เสีย','--r'],k:['หมด','--k']};
+const M=[{id:'prod',i:'🛍️',t:'สินค้า'},{id:'stock',i:'🏬',t:'คลัง'},{id:'dash',i:'📊',t:'Dashboard'},
+{id:'sell',i:'🛒',t:'ขายสินค้า',p:4},{id:'acc',i:'💰',t:'บัญชี',p:5},{id:'rep',i:'📈',t:'รายงาน',p:5},{id:'ai',i:'🤖',t:'AI Assistant',p:6},{id:'set',i:'⚙️',t:'ตั้งค่า',p:2}];
+let cur='prod',cat='ทั้งหมด',stf='all',q='';
 const $=id=>document.getElementById(id);
-function dash(){return `<h2>ภาพรวมร้าน</h2>
-<div class="hero"><small>ยอดขายวันนี้</small><b>฿0</b></div>
-<div class="grid">
-<div class="card"><small>ยอดขายเดือนนี้</small><b>฿0</b></div>
-<div class="card"><small>กำไรขั้นต้น</small><b>฿0</b></div>
-<div class="card"><small>กำไรหลังหักรายจ่าย</small><b>฿0</b></div>
-<div class="card"><small>จำนวนสินค้า</small><b>0</b></div></div>
-<div class="st">
-<div><i style="background:var(--g)"></i><b>0</b>พร้อมขาย</div>
-<div><i style="background:var(--b)"></i><b>0</b>สำรอง</div>
-<div><i style="background:var(--r)"></i><b>0</b>เสีย</div>
-<div><i style="background:var(--k)"></i><b>0</b>หมด</div></div>
-<div class="note">ℹ️ ตัวเลขเป็น 0 เพราะยังไม่ได้เชื่อมฐานข้อมูล จะแสดงข้อมูลจริงหลังทำระยะที่ 2</div>`}
-function page(m){return m.id==='dash'?dash():`<h2>${m.t}</h2><div class="card empty"><span>${m.i}</span><p>เมนูนี้จะเปิดใช้งานในระยะที่ ${m.p}</p></div>`}
+const fmt=n=>Number(n).toLocaleString('th-TH');
+const qty=p=>Object.values(p.loc).reduce((a,b)=>a+b,0);
+function rate(s){return s>=100?5:s>=50?4:s>=20?3:s>=5?2:s>=1?1:0}
+function stars(s){const n=rate(s);return `<span class="stars">${'★'.repeat(n)}<u>${'★'.repeat(5-n)}</u></span>`}
+const demoBar=()=>DEMO?'<div class="demo">🧪 ข้อมูลตัวอย่างสำหรับดูหน้าตาเท่านั้น จะหายไปเมื่อเชื่อมฐานข้อมูลจริง</div>':'';
+
+function prodPage(){
+ return demoBar()+`<div class="cats">${CATS.map(c=>`<button class="cat ${c[0]===cat?'on':''}" onclick="setCat('${c[0]}')"><span>${c[1]}</span>${c[0]}</button>`).join('')}</div>
+ <div class="chips"><button class="chip ${stf==='all'?'on':''}" onclick="setSt('all')">ทั้งหมด</button>${Object.keys(ST).map(k=>`<button class="chip ${stf===k?'on':''}" onclick="setSt('${k}')"><i style="background:var(${ST[k][1]})"></i>${ST[k][0]}</button>`).join('')}</div>
+ <div class="pg" id="grid"></div>`}
+function grid(){
+ const t=q.trim().toLowerCase();
+ const L=P.filter(p=>(cat==='ทั้งหมด'||p.cat===cat)&&(stf==='all'||p.st===stf)&&(!t||p.n.toLowerCase().includes(t)||p.c.toLowerCase().includes(t)));
+ $('grid').innerHTML=L.length?L.map(p=>`<button class="pc" onclick="detail('${p.c}')">
+  <div class="im">${p.e}${p.sold>=50?'<span class="tag">🔥 ขายดี</span>':''}<span class="dot" style="background:var(${ST[p.st][1]})"></span></div>
+  <div class="pi"><div class="pn">${p.n}</div><div class="pr">฿${fmt(p.price)}</div>
+  <div class="pm">${stars(p.sold)}<span>ขายแล้ว ${fmt(p.sold)}</span></div>
+  <div class="pm"><span>${p.c}</span><span>คงเหลือ ${qty(p)}</span></div></div></button>`).join(''):'<div class="card empty" style="grid-column:1/-1"><span>🔎</span><p>ไม่พบสินค้า</p></div>'}
+function setCat(c){cat=c;go('prod')}
+function setSt(s){stf=s;go('prod')}
+function detail(code){const p=P.find(x=>x.c===code);
+ $('sbody').innerHTML=`<div class="im" style="border-radius:16px;aspect-ratio:2/1">${p.e}</div><h2 style="margin-top:12px">${p.n}</h2>
+ <div style="margin-bottom:6px">${stars(p.sold)} <small style="color:var(--mute)">ขายแล้ว ${fmt(p.sold)} ชิ้น</small></div>
+ <div class="kv"><span>รหัสสินค้า</span><b>${p.c}</b></div><div class="kv"><span>ประเภท</span><span>${p.cat}</span></div>
+ <div class="kv"><span>ต้นทุน</span><span>฿${fmt(p.cost)}</span></div><div class="kv"><span>ราคาขายตั้งต้น</span><b>฿${fmt(p.price)}</b></div>
+ <div class="kv"><span>คงเหลือรวม</span><span>${qty(p)} ชิ้น</span></div>
+ <div class="kv"><span>ตำแหน่งจัดเก็บ</span><span>${Object.entries(p.loc).map(e=>e[0]+' '+e[1]).join(' · ')}</span></div>
+ <div class="kv"><span>สถานะ</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(${ST[p.st][1]});margin-right:6px"></i>${ST[p.st][0]}</span></div>`;
+ $('sheet').classList.add('show')}
+
+function stockPage(){
+ const locs={};P.forEach(p=>Object.entries(p.loc).forEach(([k,v])=>locs[k]=(locs[k]||0)+v));
+ const tv=P.reduce((a,p)=>a+qty(p)*p.cost,0);
+ return demoBar()+`<h2>คลังสินค้า</h2><div class="grid">
+ ${Object.entries(locs).map(([k,v])=>`<div class="card"><small>📍 ${k}</small><b class="v">${fmt(v)} ชิ้น</b></div>`).join('')}
+ <div class="card"><small>มูลค่าต้นทุนรวม</small><b class="v">฿${fmt(tv)}</b></div></div>
+ <div class="card"><h3>สินค้าทั้งหมด</h3>${P.map(p=>`<div class="row"><span style="font-size:1.5rem">${p.e}</span><div class="gr"><b>${p.c}</b> ${p.n}<br><small style="color:var(--mute)">${Object.entries(p.loc).map(e=>e[0]+' '+e[1]).join(' · ')}</small></div><div style="text-align:right"><b>${qty(p)}</b><br><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(${ST[p.st][1]})"></i></div></div>`).join('')}</div>`}
+
+function bars(){const W=320,H=150,mx=Math.max(...SALES,1),bw=26;
+ return `<svg viewBox="0 0 ${W} ${H+22}" width="100%">${SALES.map((v,i)=>{const h=v/mx*H*.85,x=10+i*(bw+18);
+ return `<rect x="${x}" y="${H-h}" width="${bw}" height="${h}" rx="6" style="fill:var(--pri)"/><text x="${x+bw/2}" y="${H-h-5}" text-anchor="middle">${v||''}</text><text x="${x+bw/2}" y="${H+15}" text-anchor="middle">${DAYS[i]}</text>`}).join('')}</svg>`}
+function donut(){const c={g:0,b:0,r:0,k:0};P.forEach(p=>c[p.st]+=1);const tot=P.length,C=2*Math.PI*40;let off=0;
+ const seg=Object.keys(c).map(k=>{const l=c[k]/tot*C,s=`<circle cx="60" cy="60" r="40" fill="none" stroke-width="18" style="stroke:var(${ST[k][1]})" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)"/>`;off+=l;return s}).join('');
+ return `<div style="display:flex;align-items:center;gap:14px"><svg viewBox="0 0 120 120" width="130">${seg}<text x="60" y="64" text-anchor="middle" style="font-size:16px;font-weight:700;fill:var(--text)">${tot}</text></svg>
+ <div class="lg" style="flex-direction:column;margin:0">${Object.keys(c).map(k=>`<span><i style="background:var(${ST[k][1]})"></i>${ST[k][0]} ${c[k]} รุ่น</span>`).join('')}</div></div>`}
+function dashPage(){
+ const rev=P.reduce((a,p)=>a+p.sold*p.price,0),gp=P.reduce((a,p)=>a+p.sold*(p.price-p.cost),0),items=P.reduce((a,p)=>a+qty(p),0);
+ const low=P.filter(p=>qty(p)<=3&&p.st!=='k').length,top=[...P].sort((a,b)=>b.sold-a.sold).slice(0,5);
+ return demoBar()+`<h2>ภาพรวมร้าน</h2><div class="hero"><small>ยอดขายวันนี้</small><b>฿${fmt(SALES[6])}</b></div>
+ <div class="grid"><div class="card"><small>ยอดขายสะสม</small><b class="v">฿${fmt(rev)}</b></div><div class="card"><small>กำไรขั้นต้น</small><b class="v">฿${fmt(gp)}</b></div>
+ <div class="card"><small>สินค้าในคลัง</small><b class="v">${fmt(items)} ชิ้น</b></div><div class="card"><small>ใกล้หมด</small><b class="v">${low} รุ่น</b></div></div>
+ <div class="card"><h3>📊 ยอดขาย 7 วันล่าสุด (บาท)</h3>${bars()}</div>
+ <div class="card"><h3>🎨 สถานะสินค้า</h3>${donut()}</div>
+ <div class="card"><h3>🏆 สินค้าขายดี</h3>${top.map((p,i)=>`<div class="row"><span class="rk">${i+1}</span><span style="font-size:1.4rem">${p.e}</span><div class="gr">${p.n}<br>${stars(p.sold)}</div><b>${fmt(p.sold)}</b></div>`).join('')}</div>`}
+function other(m){return `<h2>${m.t}</h2><div class="card empty"><span>${m.i}</span><p>เมนูนี้จะเปิดใช้งานในระยะที่ ${m.p}</p></div>`}
+
+function page(id){return id==='prod'?prodPage():id==='stock'?stockPage():id==='dash'?dashPage():other(M.find(x=>x.id===id))}
 function go(id){cur=id;$('sheet').classList.remove('show');
-$('view').innerHTML=page(M.find(x=>x.id===id));
-$('view').style.animation='none';$('view').offsetHeight;$('view').style.animation='';
-draw();window.scrollTo(0,0)}
+ $('sw').style.display=id==='prod'?'block':'none';
+ $('view').innerHTML=page(id);$('view').style.animation='none';$('view').offsetHeight;$('view').style.animation='';
+ if(id==='prod')grid();draw();if(id!=='prod'||!q)window.scrollTo(0,0)}
 function draw(){
-$('side').innerHTML='<span class="logo">🛍️ SMART SHOP</span>'+M.map(m=>`<button class="${m.id===cur?'on':''}" onclick="go('${m.id}')">${m.i}&nbsp; ${m.t}</button>`).join('');
-const main=M.slice(0,4),rest=M.slice(4);
-$('bot').innerHTML=main.map(m=>`<button class="${m.id===cur?'on':''}" onclick="go('${m.id}')"><span>${m.i}</span>${m.t.replace('สินค้า','').trim()||m.t}</button>`).join('')+`<button class="${rest.some(m=>m.id===cur)?'on':''}" onclick="$('sheet').classList.add('show')"><span>☰</span>เพิ่มเติม</button>`;
-$('more').innerHTML=rest.map(m=>`<button onclick="go('${m.id}')">${m.i}&nbsp; ${m.t}</button>`).join('')}
+ $('side').innerHTML='<span class="logo">🛍️ SMART SHOP</span>'+M.map(m=>`<button class="${m.id===cur?'on':''}" onclick="go('${m.id}')">${m.i}&nbsp; ${m.t}</button>`).join('');
+ const rest=M.slice(3);
+ $('bot').innerHTML=M.slice(0,3).map(m=>`<button class="${m.id===cur?'on':''}" onclick="go('${m.id}')"><span>${m.i}</span>${m.t}</button>`).join('')+
+ `<button class="${rest.some(m=>m.id===cur)?'on':''}" onclick="openMore()"><span>☰</span>เพิ่มเติม</button>`}
+function openMore(){$('sbody').innerHTML='<h3>เมนูเพิ่มเติม</h3>'+M.slice(3).map(m=>`<button class="mi" onclick="go('${m.id}')">${m.i}&nbsp; ${m.t}</button>`).join('');$('sheet').classList.add('show')}
 $('sheet').onclick=e=>{if(e.target.id==='sheet')$('sheet').classList.remove('show')};
+$('q').oninput=e=>{q=e.target.value;if(cur==='prod')grid()};
 function theme(t){document.documentElement.dataset.theme=t;$('theme').textContent=t==='dark'?'☀️':'🌙';try{localStorage.setItem('theme',t)}catch(e){}}
 $('theme').onclick=()=>theme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 let t0;try{t0=localStorage.getItem('theme')}catch(e){}
 theme(t0||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));
-go('dash');
+go('prod');
+setTimeout(()=>{$('splash').classList.add('hide');setTimeout(()=>$('splash').remove(),500)},1500);
 </script>
 </body>
 </html>
-
