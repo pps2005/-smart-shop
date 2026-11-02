@@ -1,16 +1,100 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SMART SHOP</title>
-  <style>
-    body { font-family: sans-serif; text-align: center; padding: 40px 16px; }
-    h1 { font-size: 2rem; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>SMART SHOP</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--text:#0f172a;--mute:#64748b;--line:#e5e9f2;--pri:#4f46e5;--pri2:#7c3aed;--g:#16a34a;--b:#2563eb;--r:#dc2626;--k:#111827}
+[data-theme=dark]{--bg:#0b1020;--card:#151b2e;--text:#e8ecf6;--mute:#94a3b8;--line:#243049;--k:#475569}
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 12px;background:var(--card);border-bottom:1px solid var(--line)}
+.logo{font-weight:800;font-size:1.15rem;background:linear-gradient(90deg,var(--pri),var(--pri2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.ic{width:40px;height:40px;border-radius:12px;background:var(--bg);font-size:1.1rem}
+main{padding:16px 16px calc(100px + env(safe-area-inset-bottom,0px));max-width:1000px;margin:auto;animation:in .3s ease}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h2{font-size:1.3rem;margin-bottom:14px}
+.hero{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-radius:22px;padding:22px;margin-bottom:14px;box-shadow:0 10px 30px rgba(79,70,229,.3)}
+.hero small{opacity:.85}.hero b{display:block;font-size:2.2rem;margin-top:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.card small{color:var(--mute)}.card b{display:block;font-size:1.4rem;margin-top:4px}
+.st{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.st div{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 6px;text-align:center;font-size:.75rem;color:var(--mute)}
+.st i{display:block;width:14px;height:14px;border-radius:50%;margin:0 auto 6px}
+.st b{display:block;font-size:1.1rem;color:var(--text)}
+.note{background:var(--card);border:1px dashed var(--line);border-radius:16px;padding:14px;color:var(--mute);font-size:.9rem;line-height:1.5}
+.empty{text-align:center;padding:50px 20px}.empty span{font-size:3rem}.empty p{color:var(--mute);margin-top:8px}
+.bot{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));z-index:6}
+.bot button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;font-size:.7rem;color:var(--mute)}
+.bot button span{font-size:1.3rem}.bot .on{color:var(--pri);font-weight:700}
+.side{display:none}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9;display:none;align-items:flex-end}
+.sheet.show{display:flex}
+.sheet div{background:var(--card);width:100%;border-radius:22px 22px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom,0px))}
+.sheet button{display:block;width:100%;text-align:left;padding:14px;border-radius:12px;font-size:1rem}
+@media(min-width:900px){
+ .bot{display:none}
+ .side{display:block;position:fixed;top:0;bottom:0;left:0;width:230px;background:var(--card);border-right:1px solid var(--line);padding:20px 12px}
+ .side .logo{display:block;padding:0 10px 18px;font-size:1.3rem}
+ .side button{display:block;width:100%;text-align:left;padding:12px;border-radius:12px;margin-bottom:4px;color:var(--mute)}
+ .side .on{background:var(--bg);color:var(--pri);font-weight:700}
+ .top{margin-left:230px}main{margin-left:230px;padding-bottom:40px;max-width:none;padding-right:30px}
+ .grid{grid-template-columns:repeat(4,1fr)}
+}
+</style>
 </head>
 <body>
-  <h1>🛍️ SMART SHOP</h1>
-  <p>เว็บไซต์ร้านค้าของฉันกำลังจะเกิดขึ้น</p>
+<nav class="side" id="side"><span class="logo">🛍️ SMART SHOP</span></nav>
+<header class="top"><span class="logo">🛍️ SMART SHOP</span><button class="ic" id="theme">🌙</button></header>
+<main id="view"></main>
+<nav class="bot" id="bot"></nav>
+<div class="sheet" id="sheet"><div id="more"></div></div>
+<script>
+const M=[
+{id:'dash',i:'🏠',t:'Dashboard'},
+{id:'sell',i:'🛒',t:'ขายสินค้า',p:4},
+{id:'prod',i:'📦',t:'สินค้า',p:2},
+{id:'stock',i:'🏬',t:'คลังสินค้า',p:3},
+{id:'acc',i:'💰',t:'บัญชี',p:5},
+{id:'rep',i:'📊',t:'รายงาน',p:5},
+{id:'ai',i:'🤖',t:'AI Assistant',p:6},
+{id:'set',i:'⚙️',t:'ตั้งค่า',p:2}];
+let cur='dash';
+const $=id=>document.getElementById(id);
+function dash(){return `<h2>ภาพรวมร้าน</h2>
+<div class="hero"><small>ยอดขายวันนี้</small><b>฿0</b></div>
+<div class="grid">
+<div class="card"><small>ยอดขายเดือนนี้</small><b>฿0</b></div>
+<div class="card"><small>กำไรขั้นต้น</small><b>฿0</b></div>
+<div class="card"><small>กำไรหลังหักรายจ่าย</small><b>฿0</b></div>
+<div class="card"><small>จำนวนสินค้า</small><b>0</b></div></div>
+<div class="st">
+<div><i style="background:var(--g)"></i><b>0</b>พร้อมขาย</div>
+<div><i style="background:var(--b)"></i><b>0</b>สำรอง</div>
+<div><i style="background:var(--r)"></i><b>0</b>เสีย</div>
+<div><i style="background:var(--k)"></i><b>0</b>หมด</div></div>
+<div class="note">ℹ️ ตัวเลขเป็น 0 เพราะยังไม่ได้เชื่อมฐานข้อมูล จะแสดงข้อมูลจริงหลังทำระยะที่ 2</div>`}
+function page(m){return m.id==='dash'?dash():`<h2>${m.t}</h2><div class="card empty"><span>${m.i}</span><p>เมนูนี้จะเปิดใช้งานในระยะที่ ${m.p}</p></div>`}
+function go(id){cur=id;$('sheet').classList.remove('show');
+$('view').innerHTML=page(M.find(x=>x.id===id));
+$('view').style.animation='none';$('view').offsetHeight;$('view').style.animation='';
+draw();window.scrollTo(0,0)}
+function draw(){
+$('side').innerHTML='<span class="logo">🛍️ SMART SHOP</span>'+M.map(m=>`<button class="${m.id===cur?'on':''}" onclick="go('${m.id}')">${m.i}&nbsp; ${m.t}</button>`).join('');
+const main=M.slice(0,4),rest=M.slice(4);
+$('bot').innerHTML=main.map(m=>`<button class="${m.id===cur?'on':''}" onclick="go('${m.id}')"><span>${m.i}</span>${m.t.replace('สินค้า','').trim()||m.t}</button>`).join('')+`<button class="${rest.some(m=>m.id===cur)?'on':''}" onclick="$('sheet').classList.add('show')"><span>☰</span>เพิ่มเติม</button>`;
+$('more').innerHTML=rest.map(m=>`<button onclick="go('${m.id}')">${m.i}&nbsp; ${m.t}</button>`).join('')}
+$('sheet').onclick=e=>{if(e.target.id==='sheet')$('sheet').classList.remove('show')};
+function theme(t){document.documentElement.dataset.theme=t;$('theme').textContent=t==='dark'?'☀️':'🌙';try{localStorage.setItem('theme',t)}catch(e){}}
+$('theme').onclick=()=>theme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+let t0;try{t0=localStorage.getItem('theme')}catch(e){}
+theme(t0||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));
+go('dash');
+</script>
 </body>
 </html>
+
