@@ -6,189 +6,238 @@
 <meta name="theme-color" content="#4f46e5">
 <title>SMART SHOP</title>
 <style>
-:root{--bg:#f4f6fb;--card:#fff;--text:#0f172a;--mute:#64748b;--line:#e5e9f2;--pri:#4f46e5;--pri2:#7c3aed;--g:#16a34a;--b:#2563eb;--r:#dc2626;--k:#1f2937;--star:#f59e0b}
-[data-theme=dark]{--bg:#0b1020;--card:#151b2e;--text:#e8ecf6;--mute:#94a3b8;--line:#243049;--k:#64748b}
+:root{--bg:#f4f6fb;--card:#fff;--text:#0f172a;--mute:#64748b;--line:#e5e9f2;--pri:#4f46e5;--pri2:#7c3aed;--green:#16a34a;--blue:#2563eb;--red:#dc2626;--black:#1f2937}
+[data-theme=dark]{--bg:#0b1020;--card:#151b2e;--text:#e8ecf6;--mute:#94a3b8;--line:#243049;--black:#94a3b8}
 *{box-sizing:border-box;margin:0}
 body{font-family:system-ui,-apple-system,"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
-#splash{position:fixed;inset:0;z-index:99;background:linear-gradient(135deg,var(--pri),var(--pri2));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;transition:opacity .4s}
+input,select,textarea{font:inherit;font-size:16px;color:var(--text)}
+svg{display:block}
+#splash{position:fixed;inset:0;z-index:300;background:linear-gradient(135deg,var(--pri),var(--pri2));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;transition:opacity .4s}
 #splash.hide{opacity:0;pointer-events:none}
 #splash .sl{font-size:4rem;animation:pop 1s ease infinite alternate}
-#splash b{font-size:1.6rem;margin-top:10px;letter-spacing:1px}
 #splash .ld{width:140px;height:4px;border-radius:4px;background:rgba(255,255,255,.3);margin-top:22px;overflow:hidden}
 #splash .ld i{display:block;height:100%;background:#fff;animation:ld 1.5s ease forwards}
 @keyframes pop{from{transform:scale(.92)}to{transform:scale(1.08)}}
 @keyframes ld{from{width:0}to{width:100%}}
 .top{position:sticky;top:0;z-index:5;background:linear-gradient(135deg,var(--pri),var(--pri2));padding:calc(10px + env(safe-area-inset-top,0px)) 14px 12px;color:#fff}
-.tr{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tr{display:flex;align-items:center;justify-content:space-between}
 .logo{font-weight:800;font-size:1.1rem}
-.ic{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.2);font-size:1.05rem}
+.ba{display:flex;gap:8px}
+.ic{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.2);display:grid;place-items:center;color:#fff}
 #sw{margin-top:10px}
-#sw input{width:100%;border:0;border-radius:12px;padding:11px 14px;font:inherit;background:#fff;color:#0f172a;outline:0}
-main{padding:14px 14px calc(96px + env(safe-area-inset-bottom,0px));max-width:1100px;margin:auto;animation:in .3s ease}
-@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-h2{font-size:1.2rem;margin:4px 0 12px}
-h3{font-size:1rem;margin-bottom:10px}
-.demo{background:#fef3c7;color:#92400e;border-radius:12px;padding:9px 12px;font-size:.8rem;margin-bottom:12px}
-.cats{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:none}
-.cats::-webkit-scrollbar{display:none}
+#sw input{width:100%;border:0;border-radius:12px;padding:11px 14px;background:#fff;color:#0f172a;outline:0}
+main{padding:14px 14px calc(100px + env(safe-area-inset-bottom,0px));max-width:1100px;margin:auto}
+h2{font-size:1.2rem;margin:4px 0 12px}h3{font-size:1rem;margin-bottom:10px}
+small{color:var(--mute)}
+.cats,.chips{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:none}
+.cats::-webkit-scrollbar,.chips::-webkit-scrollbar{display:none}
 .cat{flex:0 0 66px;text-align:center;font-size:.72rem;color:var(--mute)}
-.cat span{display:flex;width:56px;height:56px;margin:0 auto 4px;border-radius:18px;background:var(--card);border:2px solid var(--line);align-items:center;justify-content:center;font-size:1.6rem}
-.cat.on{color:var(--pri);font-weight:700}.cat.on span{border-color:var(--pri);background:rgba(79,70,229,.1)}
-.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;scrollbar-width:none}
+.cat span{display:grid;place-items:center;line-height:1;font-size:1.6rem;width:56px;height:56px;margin:0 auto 4px;border-radius:18px;background:var(--card);border:2px solid var(--line)}
+.cat.on{color:var(--pri);font-weight:700}.cat.on span{border-color:var(--pri)}
 .chip{flex:0 0 auto;padding:7px 13px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:.8rem;display:flex;align-items:center;gap:6px}
-.chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .chip.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.dt{display:inline-block;width:11px;height:11px;border-radius:50%;flex:0 0 11px}
 .pg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.pc{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-align:left;display:block;width:100%}
-.im{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:4rem;background:linear-gradient(135deg,rgba(79,70,229,.12),rgba(124,58,237,.12))}
-.dot{position:absolute;top:8px;right:8px;width:14px;height:14px;border-radius:50%;border:2px solid #fff}
-.tag{position:absolute;top:8px;left:8px;font-size:.65rem;background:#ef4444;color:#fff;border-radius:6px;padding:2px 6px;font-weight:700}
-.pi{padding:9px 10px 11px}
-.pn{font-size:.85rem;line-height:1.3;height:2.2em;overflow:hidden}
+.pc{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-align:left;width:100%;display:block}
+.im{position:relative;aspect-ratio:1;display:grid;place-items:center;background:linear-gradient(135deg,rgba(79,70,229,.12),rgba(124,58,237,.12));overflow:hidden}
+.im img,.th img{width:100%;height:100%;object-fit:cover}
+.em{font-size:3.4rem;line-height:1;display:grid;place-items:center}
+.im .dt{position:absolute;top:8px;right:8px;border:2px solid #fff;width:15px;height:15px}
+.pi{padding:9px 10px 11px}.pn{font-size:.85rem;line-height:1.3;height:2.2em;overflow:hidden}
 .pr{color:var(--pri);font-weight:800;font-size:1.05rem;margin-top:4px}
 .pm{display:flex;justify-content:space-between;font-size:.7rem;color:var(--mute);margin-top:4px}
-.stars{color:var(--star);letter-spacing:1px;font-size:.78rem}.stars u{text-decoration:none;color:var(--line)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
-.grid .card{margin:0}
-.card small{color:var(--mute)}.card b.v{display:block;font-size:1.3rem;margin-top:3px}
-.hero{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-radius:20px;padding:18px;margin-bottom:12px}
-.hero small{opacity:.85}.hero b{display:block;font-size:2rem}
-.row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:.88rem}
-.row:first-of-type{border-top:0}.row .rk{width:24px;height:24px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700}
-.row .gr{flex:1}.lg{display:flex;flex-wrap:wrap;gap:10px;font-size:.78rem;color:var(--mute);margin-top:8px}
-.lg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
-svg text{fill:var(--mute);font-size:10px}
-.empty{text-align:center;padding:40px 16px}.empty span{font-size:3rem}.empty p{color:var(--mute);margin-top:8px}
+.grid .card{margin:0}.card .v{display:block;font-size:1.3rem;margin-top:3px}
+.row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.row .gr{flex:1;font-size:.9rem}
+.th{width:48px;height:48px;border-radius:12px;overflow:hidden;display:grid;place-items:center;background:var(--bg);flex:0 0 48px}.th .em{font-size:1.7rem}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:.88rem}
+.kv span:first-child{color:var(--mute)}.kv span:last-child{text-align:right}
+.note{background:var(--card);border:1px dashed var(--line);border-radius:16px;padding:12px;color:var(--mute);font-size:.85rem}
+.empty{text-align:center;padding:40px 16px;color:var(--mute);grid-column:1/-1}
+.fab{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;display:grid;place-items:center;box-shadow:0 8px 20px rgba(79,70,229,.45);z-index:6}
 .bot{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));z-index:6}
-.bot button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;font-size:.72rem;color:var(--mute)}
-.bot button span{font-size:1.35rem}.bot .on{color:var(--pri);font-weight:700}
+.bot button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:.72rem;color:var(--mute)}
+.bot .on{color:var(--pri);font-weight:700}
 .side{display:none}
-.sheet{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9;display:none;align-items:flex-end}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20;display:none;align-items:flex-end}
 .sheet.show{display:flex}
-.sheet>div{background:var(--card);width:100%;max-height:85vh;overflow:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(22px + env(safe-area-inset-bottom,0px))}
-.sheet button.mi{display:block;width:100%;text-align:left;padding:14px;border-radius:12px;font-size:1rem}
-.kv{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);font-size:.9rem}
-.kv span:first-child{color:var(--mute)}
-@media(min-width:600px){.pg{grid-template-columns:repeat(3,1fr)}}
+.sheet>div{background:var(--card);width:100%;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(24px + env(safe-area-inset-bottom,0px))}
+.sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.sh h2{margin:0}
+.x{width:36px;height:36px;border-radius:50%;background:var(--bg);display:grid;place-items:center}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;font-weight:700;margin-top:10px}
+.btn.o{background:var(--bg);color:var(--text);border:1px solid var(--line)}.btn:disabled{opacity:.6}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:.8rem;color:var(--mute);margin-bottom:10px}
+label input,label select,label textarea,.two input{width:100%;margin-top:4px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);outline:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.lq{display:grid;grid-template-columns:1fr 1fr;gap:8px}.lq label{margin:0}
+.lk{color:var(--red);font-size:.8rem;margin-top:8px}
+.ph{display:grid;place-items:center;aspect-ratio:2/1;border:2px dashed var(--line);border-radius:16px;color:var(--mute);margin-bottom:12px;overflow:hidden;gap:4px;align-content:center}
+.ph img{width:100%;height:100%;object-fit:cover}
+.err{color:var(--red);font-size:.85rem;min-height:1.2em}
+.qrb{text-align:center}.qrb img{width:230px;max-width:70%;image-rendering:pixelated;border-radius:8px;background:#fff;padding:6px}
+#toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:12px;font-size:.85rem;z-index:400;display:none}
+#pa{display:none}
+@media print{body>*{display:none!important}body>#pa{display:block!important;text-align:center;padding:10mm}#pa img{image-rendering:pixelated}}
+@media(min-width:600px){.pg{grid-template-columns:repeat(3,1fr)}.sheet{align-items:center;justify-content:center}.sheet>div{max-width:480px;border-radius:22px}}
 @media(min-width:900px){
- .bot{display:none}.pg{grid-template-columns:repeat(4,1fr)}.grid{grid-template-columns:repeat(4,1fr)}
+ .bot{display:none}.pg{grid-template-columns:repeat(4,1fr)}.fab{bottom:24px}
  .side{display:block;position:fixed;top:0;bottom:0;left:0;width:220px;background:var(--card);border-right:1px solid var(--line);padding:20px 12px;z-index:7}
  .side .logo{display:block;padding:0 10px 18px;font-size:1.25rem;color:var(--pri)}
- .side button{display:block;width:100%;text-align:left;padding:12px;border-radius:12px;margin-bottom:4px;color:var(--mute)}
+ .side button{display:flex;gap:10px;align-items:center;width:100%;padding:12px;border-radius:12px;margin-bottom:4px;color:var(--mute)}
  .side .on{background:var(--bg);color:var(--pri);font-weight:700}
  .top,main{margin-left:220px}main{max-width:none}
 }
 </style>
 </head>
 <body>
-<div id="splash"><div class="sl">🛍️</div><b>SMART SHOP</b><div class="ld"><i></i></div></div>
+<div id="splash"><div class="sl">🛍️</div><b style="font-size:1.6rem;margin-top:10px">SMART SHOP</b><div class="ld"><i></i></div></div>
 <nav class="side" id="side"></nav>
 <header class="top">
- <div class="tr"><span class="logo">🛍️ SMART SHOP</span><button class="ic" id="theme">🌙</button></div>
- <div id="sw"><input id="q" placeholder="🔍 ค้นหาชื่อสินค้าหรือรหัส เช่น PAN-001"></div>
+ <div class="tr"><span class="logo">SMART SHOP</span><span class="ba"><button class="ic" id="theme" data-a="theme" aria-label="สลับธีม"></button><button class="ic" id="out" data-a="logout" aria-label="ออกจากระบบ"></button></span></div>
+ <div id="sw"><input id="q" placeholder="ค้นหาชื่อสินค้าหรือรหัส เช่น PAN-001" autocomplete="off"></div>
 </header>
 <main id="view"></main>
 <nav class="bot" id="bot"></nav>
 <div class="sheet" id="sheet"><div id="sbody"></div></div>
+<div id="pa"></div><div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script>
-// ===== ข้อมูลตัวอย่าง (จะถูกแทนที่ด้วยฐานข้อมูลจริงในระยะที่ 2) =====
-const DEMO=true;
-const P=[
-{c:'PAN-001',n:'กางเกงยีนส์',cat:'กางเกง',cost:120,price:200,loc:{'หน้าร้าน':8,'บ้าน':12},st:'g',sold:64,e:'👖'},
-{c:'PAN-002',n:'กางเกงขาสั้น',cat:'กางเกง',cost:60,price:120,loc:{'หน้าร้าน':5,'บ้าน':2},st:'g',sold:22,e:'🩳'},
-{c:'SHI-001',n:'เสื้อยืดคอกลม',cat:'เสื้อ',cost:70,price:150,loc:{'หน้าร้าน':14,'บ้าน':6},st:'g',sold:120,e:'👕'},
-{c:'SHI-002',n:'เสื้อเชิ้ตลายสก็อต',cat:'เสื้อ',cost:110,price:229,loc:{'บ้าน':9},st:'b',sold:7,e:'👔'},
-{c:'BAG-001',n:'กระเป๋าสะพายข้าง',cat:'กระเป๋า',cost:150,price:329,loc:{'หน้าร้าน':3},st:'r',sold:3,e:'👜'},
-{c:'SHO-001',n:'รองเท้าผ้าใบ',cat:'รองเท้า',cost:220,price:459,loc:{'หน้าร้าน':0},st:'k',sold:55,e:'👟'},
-{c:'HAT-001',n:'หมวกแก๊ป',cat:'หมวก',cost:40,price:99,loc:{'หน้าร้าน':10,'บ้าน':4},st:'g',sold:31,e:'🧢'},
-{c:'TOY-001',n:'ตุ๊กตาหมี',cat:'ของเล่น',cost:90,price:189,loc:{'บ้าน':6},st:'b',sold:0,e:'🧸'}];
-const DAYS=['จ','อ','พ','พฤ','ศ','ส','อา'],SALES=[320,580,410,0,760,640,900];
-// =====================================================================
-const CATS=[['ทั้งหมด','🛍️'],['เสื้อ','👕'],['กางเกง','👖'],['กระเป๋า','👜'],['รองเท้า','👟'],['หมวก','🧢'],['ถุงเท้า','🧦'],['เครื่องประดับ','💍'],['ของเล่น','🧸']];
-const ST={g:['พร้อมขาย','--g'],b:['สำรอง','--b'],r:['เสีย','--r'],k:['หมด','--k']};
-const M=[{id:'prod',i:'🛍️',t:'สินค้า'},{id:'stock',i:'🏬',t:'คลัง'},{id:'dash',i:'📊',t:'Dashboard'},
-{id:'sell',i:'🛒',t:'ขายสินค้า',p:4},{id:'acc',i:'💰',t:'บัญชี',p:5},{id:'rep',i:'📈',t:'รายงาน',p:5},{id:'ai',i:'🤖',t:'AI Assistant',p:6},{id:'set',i:'⚙️',t:'ตั้งค่า',p:2}];
-let cur='prod',cat='ทั้งหมด',stf='all',q='';
+const I={search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',back:'<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',cam:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',box:'<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',grid:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',chart:'<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',menu:'<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',cart:'<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',dollar:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',trend:'<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',chat:'<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',sliders:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>',dl:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',print:'<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',pin:'<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',qr:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v3M17 20h4"/>',img:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>'};
+const ic=(n,s=22)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
 const $=id=>document.getElementById(id);
-const fmt=n=>Number(n).toLocaleString('th-TH');
-const qty=p=>Object.values(p.loc).reduce((a,b)=>a+b,0);
-function rate(s){return s>=100?5:s>=50?4:s>=20?3:s>=5?2:s>=1?1:0}
-function stars(s){const n=rate(s);return `<span class="stars">${'★'.repeat(n)}<u>${'★'.repeat(5-n)}</u></span>`}
-const demoBar=()=>DEMO?'<div class="demo">🧪 ข้อมูลตัวอย่างสำหรับดูหน้าตาเท่านั้น จะหายไปเมื่อเชื่อมฐานข้อมูลจริง</div>':'';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n||0).toLocaleString('th-TH');
+const E={SHI:'👕',PAN:'👖',BAG:'👜',SHO:'👟',HAT:'🧢',SOC:'🧦',ACC:'💍',TOY:'🧸',OTH:'📦'};
+const ST={green:'พร้อมขาย',blue:'สำรอง',red:'เสีย',black:'หมด'};
+const M=[{id:'prod',i:'box',t:'สินค้า'},{id:'stock',i:'grid',t:'คลัง'},{id:'dash',i:'chart',t:'Dashboard'},{id:'sell',i:'cart',t:'ขายสินค้า',p:4},{id:'acc',i:'dollar',t:'บัญชี',p:5},{id:'rep',i:'trend',t:'รายงาน',p:5},{id:'ai',i:'chat',t:'AI Assistant',p:6},{id:'set',i:'sliders',t:'ตั้งค่า',p:3}];
+const S={sb:null,uid:null,ready:false,cats:[],locs:[],prods:[],imgs:{},cur:'prod',cat:'',stf:'all',loc:'all',q:''};
+const vq=v=>(v.stock_levels||[]).reduce((a,s)=>a+s.qty,0);
+const pq=p=>(p.variants||[]).reduce((a,v)=>a+vq(v),0);
+const lq=(v,id)=>((v.stock_levels||[]).find(s=>s.location_id===id)||{qty:0}).qty;
+const vname=v=>[v.size,v.pattern].filter(Boolean).join(' · ')||'ไม่ระบุไซส์/ลาย';
+const thumb=p=>S.imgs[p.image_path]?`<img src="${S.imgs[p.image_path]}" alt="">`:`<span class="em">${E[p.categories&&p.categories.prefix]||'📦'}</span>`;
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',2600)}
+function openSheet(h){$('sbody').innerHTML=h;$('sheet').classList.add('show')}
+function closeSheet(){$('sheet').classList.remove('show')}
+const head=t=>`<div class="sh"><h2>${t}</h2><button class="x" data-a="close" aria-label="ปิด">${ic('x',18)}</button></div>`;
+
+async function load(){
+ const R=await Promise.all([S.sb.from('categories').select('*').order('created_at'),S.sb.from('locations').select('*').order('created_at'),
+  S.sb.from('products').select('*,categories(name,prefix),variants(id,size,pattern,stock_levels(qty,location_id))').order('created_at',{ascending:false})]);
+ if(R.some(r=>r.error)){toast('โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชหน้า');return}
+ S.cats=R[0].data;S.locs=R[1].data;S.prods=R[2].data;
+ const need=S.prods.filter(p=>p.image_path&&!S.imgs[p.image_path]).map(p=>p.image_path);
+ if(need.length){const r=await S.sb.storage.from('product-images').createSignedUrls(need,3600);(r.data||[]).forEach(o=>{if(o.signedUrl)S.imgs[o.path]=o.signedUrl})}
+ S.ready=true;render();openHash();
+}
+function filt(){const t=S.q.trim().toLowerCase();return S.prods.filter(p=>(!S.cat||p.category_id===S.cat)&&(S.stf==='all'||p.status===S.stf)&&(!t||p.name.toLowerCase().includes(t)||p.code.toLowerCase().includes(t)))}
+const stChips=()=>`<div class="chips"><button class="chip ${S.stf==='all'?'on':''}" data-a="st" data-v="all">ทุกสถานะ</button>${Object.keys(ST).map(k=>`<button class="chip ${S.stf===k?'on':''}" data-a="st" data-v="${k}"><i class="dt" style="background:var(--${k})"></i>${ST[k]}</button>`).join('')}</div>`;
+const emptyBox=`<div class="empty">ยังไม่มีสินค้า<br>กดปุ่ม + เพื่อเพิ่มสินค้าชิ้นแรก</div>`;
 
 function prodPage(){
- return demoBar()+`<div class="cats">${CATS.map(c=>`<button class="cat ${c[0]===cat?'on':''}" onclick="setCat('${c[0]}')"><span>${c[1]}</span>${c[0]}</button>`).join('')}</div>
- <div class="chips"><button class="chip ${stf==='all'?'on':''}" onclick="setSt('all')">ทั้งหมด</button>${Object.keys(ST).map(k=>`<button class="chip ${stf===k?'on':''}" onclick="setSt('${k}')"><i style="background:var(${ST[k][1]})"></i>${ST[k][0]}</button>`).join('')}</div>
- <div class="pg" id="grid"></div>`}
-function grid(){
- const t=q.trim().toLowerCase();
- const L=P.filter(p=>(cat==='ทั้งหมด'||p.cat===cat)&&(stf==='all'||p.st===stf)&&(!t||p.n.toLowerCase().includes(t)||p.c.toLowerCase().includes(t)));
- $('grid').innerHTML=L.length?L.map(p=>`<button class="pc" onclick="detail('${p.c}')">
-  <div class="im">${p.e}${p.sold>=50?'<span class="tag">🔥 ขายดี</span>':''}<span class="dot" style="background:var(${ST[p.st][1]})"></span></div>
-  <div class="pi"><div class="pn">${p.n}</div><div class="pr">฿${fmt(p.price)}</div>
-  <div class="pm">${stars(p.sold)}<span>ขายแล้ว ${fmt(p.sold)}</span></div>
-  <div class="pm"><span>${p.c}</span><span>คงเหลือ ${qty(p)}</span></div></div></button>`).join(''):'<div class="card empty" style="grid-column:1/-1"><span>🔎</span><p>ไม่พบสินค้า</p></div>'}
-function setCat(c){cat=c;go('prod')}
-function setSt(s){stf=s;go('prod')}
-function detail(code){const p=P.find(x=>x.c===code);
- $('sbody').innerHTML=`<div class="im" style="border-radius:16px;aspect-ratio:2/1">${p.e}</div><h2 style="margin-top:12px">${p.n}</h2>
- <div style="margin-bottom:6px">${stars(p.sold)} <small style="color:var(--mute)">ขายแล้ว ${fmt(p.sold)} ชิ้น</small></div>
- <div class="kv"><span>รหัสสินค้า</span><b>${p.c}</b></div><div class="kv"><span>ประเภท</span><span>${p.cat}</span></div>
- <div class="kv"><span>ต้นทุน</span><span>฿${fmt(p.cost)}</span></div><div class="kv"><span>ราคาขายตั้งต้น</span><b>฿${fmt(p.price)}</b></div>
- <div class="kv"><span>คงเหลือรวม</span><span>${qty(p)} ชิ้น</span></div>
- <div class="kv"><span>ตำแหน่งจัดเก็บ</span><span>${Object.entries(p.loc).map(e=>e[0]+' '+e[1]).join(' · ')}</span></div>
- <div class="kv"><span>สถานะ</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(${ST[p.st][1]});margin-right:6px"></i>${ST[p.st][0]}</span></div>`;
- $('sheet').classList.add('show')}
+ return `<div class="cats"><button class="cat ${!S.cat?'on':''}" data-a="cat" data-v=""><span>${ic('grid',24)}</span>ทั้งหมด</button>${S.cats.map(c=>`<button class="cat ${S.cat===c.id?'on':''}" data-a="cat" data-v="${c.id}"><span>${E[c.prefix]||'📦'}</span>${esc(c.name)}</button>`).join('')}</div>${stChips()}<div class="pg" id="lst"></div><button class="fab" data-a="add" aria-label="เพิ่มสินค้า">${ic('plus',28)}</button>`}
+function list(){const L=filt();$('lst').innerHTML=L.length?L.map(p=>`<button class="pc" data-a="open" data-v="${esc(p.code)}"><div class="im">${thumb(p)}<i class="dt" style="background:var(--${p.status})"></i></div><div class="pi"><div class="pn">${esc(p.name)}</div><div class="pr">฿${fmt(p.base_price)}</div><div class="pm"><span>${esc(p.code)}</span><span>คงเหลือ ${pq(p)}</span></div></div></button>`).join(''):(S.prods.length?'<div class="empty">ไม่พบสินค้า</div>':emptyBox)}
 
 function stockPage(){
- const locs={};P.forEach(p=>Object.entries(p.loc).forEach(([k,v])=>locs[k]=(locs[k]||0)+v));
- const tv=P.reduce((a,p)=>a+qty(p)*p.cost,0);
- return demoBar()+`<h2>คลังสินค้า</h2><div class="grid">
- ${Object.entries(locs).map(([k,v])=>`<div class="card"><small>📍 ${k}</small><b class="v">${fmt(v)} ชิ้น</b></div>`).join('')}
- <div class="card"><small>มูลค่าต้นทุนรวม</small><b class="v">฿${fmt(tv)}</b></div></div>
- <div class="card"><h3>สินค้าทั้งหมด</h3>${P.map(p=>`<div class="row"><span style="font-size:1.5rem">${p.e}</span><div class="gr"><b>${p.c}</b> ${p.n}<br><small style="color:var(--mute)">${Object.entries(p.loc).map(e=>e[0]+' '+e[1]).join(' · ')}</small></div><div style="text-align:right"><b>${qty(p)}</b><br><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(${ST[p.st][1]})"></i></div></div>`).join('')}</div>`}
+ const L=S.locs,tot=id=>S.prods.reduce((a,p)=>a+(p.variants||[]).reduce((b,v)=>b+(id?lq(v,id):vq(v)),0),0);
+ const sh=S.loc==='all'?L:L.filter(l=>l.id===S.loc);
+ const rows=filt().filter(p=>S.loc==='all'||(p.variants||[]).some(v=>lq(v,S.loc)>0));
+ return `<h2>คลังสินค้า</h2><div class="grid"><div class="card"><small>รวมทุกที่</small><b class="v">${fmt(tot())} ชิ้น</b></div>${L.map(l=>`<div class="card"><small>${esc(l.name)}</small><b class="v">${fmt(tot(l.id))} ชิ้น</b></div>`).join('')}</div>
+ <div class="chips"><button class="chip ${S.loc==='all'?'on':''}" data-a="loc" data-v="all">${ic('pin',14)} ทุกที่</button>${L.map(l=>`<button class="chip ${S.loc===l.id?'on':''}" data-a="loc" data-v="${l.id}">${esc(l.name)}</button>`).join('')}</div>${stChips()}
+ ${rows.map(p=>`<div class="card"><button class="row" style="width:100%;text-align:left;padding-top:0" data-a="open" data-v="${esc(p.code)}"><div class="th">${thumb(p)}</div><div class="gr"><b>${esc(p.code)}</b> ${esc(p.name)}<br><small>รวม ${pq(p)} ชิ้น</small></div><i class="dt" style="background:var(--${p.status})"></i></button>${(p.variants||[]).map(v=>`<div class="kv"><span>${esc(vname(v))}</span><span>${sh.map(l=>esc(l.name)+' '+lq(v,l.id)).join(' · ')}</span></div>`).join('')}</div>`).join('')||(S.prods.length?'<div class="empty">ไม่พบสินค้า</div>':emptyBox)}
+ <div class="note">ยอดขายของแต่ละชิ้นจะแสดงเมื่อเปิดระบบขาย (ระยะที่ 4)</div>`}
 
-function bars(){const W=320,H=150,mx=Math.max(...SALES,1),bw=26;
- return `<svg viewBox="0 0 ${W} ${H+22}" width="100%">${SALES.map((v,i)=>{const h=v/mx*H*.85,x=10+i*(bw+18);
- return `<rect x="${x}" y="${H-h}" width="${bw}" height="${h}" rx="6" style="fill:var(--pri)"/><text x="${x+bw/2}" y="${H-h-5}" text-anchor="middle">${v||''}</text><text x="${x+bw/2}" y="${H+15}" text-anchor="middle">${DAYS[i]}</text>`}).join('')}</svg>`}
-function donut(){const c={g:0,b:0,r:0,k:0};P.forEach(p=>c[p.st]+=1);const tot=P.length,C=2*Math.PI*40;let off=0;
- const seg=Object.keys(c).map(k=>{const l=c[k]/tot*C,s=`<circle cx="60" cy="60" r="40" fill="none" stroke-width="18" style="stroke:var(${ST[k][1]})" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)"/>`;off+=l;return s}).join('');
- return `<div style="display:flex;align-items:center;gap:14px"><svg viewBox="0 0 120 120" width="130">${seg}<text x="60" y="64" text-anchor="middle" style="font-size:16px;font-weight:700;fill:var(--text)">${tot}</text></svg>
- <div class="lg" style="flex-direction:column;margin:0">${Object.keys(c).map(k=>`<span><i style="background:var(${ST[k][1]})"></i>${ST[k][0]} ${c[k]} รุ่น</span>`).join('')}</div></div>`}
 function dashPage(){
- const rev=P.reduce((a,p)=>a+p.sold*p.price,0),gp=P.reduce((a,p)=>a+p.sold*(p.price-p.cost),0),items=P.reduce((a,p)=>a+qty(p),0);
- const low=P.filter(p=>qty(p)<=3&&p.st!=='k').length,top=[...P].sort((a,b)=>b.sold-a.sold).slice(0,5);
- return demoBar()+`<h2>ภาพรวมร้าน</h2><div class="hero"><small>ยอดขายวันนี้</small><b>฿${fmt(SALES[6])}</b></div>
- <div class="grid"><div class="card"><small>ยอดขายสะสม</small><b class="v">฿${fmt(rev)}</b></div><div class="card"><small>กำไรขั้นต้น</small><b class="v">฿${fmt(gp)}</b></div>
- <div class="card"><small>สินค้าในคลัง</small><b class="v">${fmt(items)} ชิ้น</b></div><div class="card"><small>ใกล้หมด</small><b class="v">${low} รุ่น</b></div></div>
- <div class="card"><h3>📊 ยอดขาย 7 วันล่าสุด (บาท)</h3>${bars()}</div>
- <div class="card"><h3>🎨 สถานะสินค้า</h3>${donut()}</div>
- <div class="card"><h3>🏆 สินค้าขายดี</h3>${top.map((p,i)=>`<div class="row"><span class="rk">${i+1}</span><span style="font-size:1.4rem">${p.e}</span><div class="gr">${p.n}<br>${stars(p.sold)}</div><b>${fmt(p.sold)}</b></div>`).join('')}</div>`}
-function other(m){return `<h2>${m.t}</h2><div class="card empty"><span>${m.i}</span><p>เมนูนี้จะเปิดใช้งานในระยะที่ ${m.p}</p></div>`}
+ const c={green:0,blue:0,red:0,black:0};S.prods.forEach(p=>c[p.status]++);
+ const n=S.prods.length,C=2*Math.PI*40;let off=0;
+ const seg=n?Object.keys(c).map(k=>{const l=c[k]/n*C,s=`<circle cx="60" cy="60" r="40" fill="none" stroke-width="18" style="stroke:var(--${k})" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)"/>`;off+=l;return s}).join(''):'<circle cx="60" cy="60" r="40" fill="none" stroke-width="18" style="stroke:var(--line)"/>';
+ const val=S.prods.reduce((a,p)=>a+pq(p)*Number(p.current_cost),0),low=S.prods.filter(p=>p.status!=='black'&&pq(p)<=3).length;
+ return `<h2>ภาพรวมร้าน</h2><div class="grid"><div class="card"><small>จำนวนรุ่น</small><b class="v">${fmt(n)}</b></div><div class="card"><small>สินค้ารวม</small><b class="v">${fmt(S.prods.reduce((a,p)=>a+pq(p),0))} ชิ้น</b></div><div class="card"><small>มูลค่าต้นทุนรวม</small><b class="v">฿${fmt(val)}</b></div><div class="card"><small>ใกล้หมด (≤3 ชิ้น)</small><b class="v">${low} รุ่น</b></div></div>
+ <div class="card"><h3>สถานะสินค้า</h3><div style="display:flex;align-items:center;gap:16px"><svg viewBox="0 0 120 120" width="130">${seg}<text x="60" y="66" text-anchor="middle" style="font-size:20px;font-weight:700;fill:var(--text)">${n}</text></svg><div>${Object.keys(c).map(k=>`<div style="font-size:.85rem;margin:4px 0"><i class="dt" style="background:var(--${k});margin-right:6px"></i>${ST[k]} ${c[k]} รุ่น</div>`).join('')}</div></div></div>
+ <div class="note">ยอดขายและกำไรจะแสดงที่นี่เมื่อเปิดระบบขาย (ระยะที่ 4)</div>`}
+const other=m=>`<h2>${m.t}</h2><div class="card empty">${ic(m.i,44)}<p style="margin-top:10px">เร็ว ๆ นี้ (ระยะที่ ${m.p})</p></div>`;
 
-function page(id){return id==='prod'?prodPage():id==='stock'?stockPage():id==='dash'?dashPage():other(M.find(x=>x.id===id))}
-function go(id){cur=id;$('sheet').classList.remove('show');
- $('sw').style.display=id==='prod'?'block':'none';
- $('view').innerHTML=page(id);$('view').style.animation='none';$('view').offsetHeight;$('view').style.animation='';
- if(id==='prod')grid();draw();if(id!=='prod'||!q)window.scrollTo(0,0)}
-function draw(){
- $('side').innerHTML='<span class="logo">🛍️ SMART SHOP</span>'+M.map(m=>`<button class="${m.id===cur?'on':''}" onclick="go('${m.id}')">${m.i}&nbsp; ${m.t}</button>`).join('');
- const rest=M.slice(3);
- $('bot').innerHTML=M.slice(0,3).map(m=>`<button class="${m.id===cur?'on':''}" onclick="go('${m.id}')"><span>${m.i}</span>${m.t}</button>`).join('')+
- `<button class="${rest.some(m=>m.id===cur)?'on':''}" onclick="openMore()"><span>☰</span>เพิ่มเติม</button>`}
-function openMore(){$('sbody').innerHTML='<h3>เมนูเพิ่มเติม</h3>'+M.slice(3).map(m=>`<button class="mi" onclick="go('${m.id}')">${m.i}&nbsp; ${m.t}</button>`).join('');$('sheet').classList.add('show')}
-$('sheet').onclick=e=>{if(e.target.id==='sheet')$('sheet').classList.remove('show')};
-$('q').oninput=e=>{q=e.target.value;if(cur==='prod')grid()};
-function theme(t){document.documentElement.dataset.theme=t;$('theme').textContent=t==='dark'?'☀️':'🌙';try{localStorage.setItem('theme',t)}catch(e){}}
-$('theme').onclick=()=>theme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+function render(){
+ const id=S.cur;$('sw').style.display=(id==='prod'||id==='stock')?'block':'none';
+ $('view').innerHTML=!S.ready?'<div class="empty">กำลังโหลดข้อมูล...</div>':id==='prod'?prodPage():id==='stock'?stockPage():id==='dash'?dashPage():other(M.find(x=>x.id===id));
+ if(S.ready&&id==='prod')list();
+ $('side').innerHTML='<span class="logo">SMART SHOP</span>'+M.map(m=>`<button class="${m.id===id?'on':''}" data-a="go" data-v="${m.id}">${ic(m.i,20)}${m.t}</button>`).join('');
+ $('bot').innerHTML=M.slice(0,3).map(m=>`<button class="${m.id===id?'on':''}" data-a="go" data-v="${m.id}">${ic(m.i)}${m.t}</button>`).join('')+`<button class="${M.slice(3).some(m=>m.id===id)?'on':''}" data-a="more">${ic('menu')}เพิ่มเติม</button>`;
+}
+function go(id){S.cur=id;closeSheet();render();window.scrollTo(0,0)}
+
+function detail(code){
+ const p=S.prods.find(x=>x.code===code);if(!p)return toast('ไม่พบสินค้า '+code);
+ const vs=p.variants||[];
+ openSheet(head(esc(p.name))+`<div class="im" style="border-radius:16px;aspect-ratio:16/10">${thumb(p)}</div>
+ <div class="kv"><span>รหัสสินค้า</span><b>${esc(p.code)}</b></div><div class="kv"><span>ประเภท</span><span>${esc(p.categories&&p.categories.name)}</span></div>
+ <div class="kv"><span>ต้นทุน</span><span>฿${fmt(p.current_cost)}</span></div><div class="kv"><span>ราคาขายตั้งต้น</span><b>฿${fmt(p.base_price)}</b></div>
+ <div class="kv"><span>สถานะ</span><span><i class="dt" style="background:var(--${p.status});margin-right:6px"></i>${ST[p.status]}</span></div>
+ <div class="kv"><span>คงเหลือรวม</span><b>${pq(p)} ชิ้น</b></div>
+ ${p.description?`<div class="kv"><span>รายละเอียด</span><span>${esc(p.description)}</span></div>`:''}
+ <h3 style="margin-top:14px">แยกตามไซส์/ลาย</h3>${vs.map(v=>`<div class="kv"><span>${esc(vname(v))}</span><span>${S.locs.map(l=>esc(l.name)+' '+lq(v,l.id)).join(' · ')}</span></div>`).join('')}
+ <button class="btn" data-a="qr" data-v="${esc(p.code)}">${ic('qr',20)} QR Code สินค้า</button>`)}
+
+function qrUrl(code){const q=qrcode(0,'M');q.addData(location.origin+location.pathname+'#p='+encodeURIComponent(code));q.make();return q.createDataURL(8,3)}
+function qrSheet(code){
+ const p=S.prods.find(x=>x.code===code);if(!p)return;let u;
+ try{u=qrUrl(code)}catch(e){return toast('สร้าง QR ไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่')}
+ openSheet(head('QR Code')+`<div class="qrb"><img src="${u}" alt="QR"><h3 style="margin-top:10px">${esc(code)}</h3><small>${esc(p.name)}</small></div>
+ <div class="btns"><button class="btn" data-a="dl" data-v="${esc(code)}">${ic('dl',20)} ดาวน์โหลด</button><button class="btn o" data-a="pr" data-v="${esc(code)}">${ic('print',20)} พิมพ์</button></div>`)}
+function dl(code){
+ const p=S.prods.find(x=>x.code===code),im=new Image();
+ im.onload=()=>{const w=im.width,c=document.createElement('canvas');c.width=w;c.height=w+90;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,w+90);x.drawImage(im,0,0);x.fillStyle='#000';x.textAlign='center';x.font='bold 34px sans-serif';x.fillText(code,w/2,w+38);x.font='24px sans-serif';x.fillText(p.name.slice(0,26),w/2,w+72);c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='QR-'+code+'.png';a.click()})};
+ im.src=qrUrl(code)}
+function pr(code){const p=S.prods.find(x=>x.code===code);$('pa').innerHTML=`<img src="${qrUrl(code)}" style="width:55mm"><div><b>${esc(code)}</b></div><div>${esc(p.name)}</div>`;setTimeout(()=>window.print(),200)}
+function openHash(){const m=location.hash.match(/^#p=(.+)$/);if(m&&S.ready)detail(decodeURIComponent(m[1]))}
+window.addEventListener('hashchange',openHash);
+
+const vrow=()=>`<div class="vr card"><div class="two"><input class="vs" placeholder="ไซส์ เช่น M"><input class="vp" placeholder="ลาย/สี เช่น ลายดอก"></div><div class="lq">${S.locs.map(l=>`<label>จำนวน ${esc(l.name)}<input type="number" inputmode="numeric" min="0" placeholder="0" data-l="${l.id}"></label>`).join('')}</div><button type="button" class="lk" data-a="delrow">ลบแถวนี้</button></div>`;
+function addSheet(){
+ openSheet(head('เพิ่มสินค้า')+`<label class="ph" id="phl" for="pf">${ic('cam',34)}<span>ถ่ายรูป / เลือกรูปสินค้า</span></label><input type="file" id="pf" accept="image/*" style="display:none">
+ <label>ชื่อสินค้า<input id="fn" placeholder="เช่น กางเกงยีนส์"></label>
+ <label>ประเภท<select id="fc"><option value="">เลือกประเภท</option>${S.cats.map(c=>`<option value="${c.id}">${esc(c.name)} (${c.prefix})</option>`).join('')}</select></label>
+ <div class="two"><label>ต้นทุน (บาท)<input id="fcost" type="number" inputmode="decimal" min="0"></label><label>ราคาขายตั้งต้น<input id="fp" type="number" inputmode="decimal" min="0"></label></div>
+ <label>รายละเอียดเพิ่มเติม<textarea id="fd" rows="2"></textarea></label>
+ <h3>ไซส์ / ลาย และจำนวน</h3><small>ถ้าไม่มีไซส์/ลาย เว้นว่างไว้ แล้วใส่จำนวนอย่างเดียว</small><div id="vrs" style="margin-top:8px">${vrow()}</div>
+ <button type="button" class="btn o" data-a="row">${ic('plus',18)} เพิ่มไซส์/ลาย</button><div class="err" id="er"></div><button class="btn" id="sv" data-a="save">บันทึกสินค้า</button>`);
+ $('pf').onchange=e=>{const f=e.target.files[0];if(f)$('phl').innerHTML=`<img src="${URL.createObjectURL(f)}" alt="">`}}
+function shrink(f){return new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?ok(b):no(),'image/jpeg',.8)};im.onerror=no;im.src=u})}
+async function save(){
+ const er=m=>$('er').textContent=m,btn=$('sv');er('');
+ const name=$('fn').value.trim(),cat=$('fc').value,cost=parseFloat($('fcost').value),price=parseFloat($('fp').value);
+ if(!name||!cat||isNaN(cost)||isNaN(price)||cost<0||price<0)return er('กรอกชื่อ ประเภท ต้นทุน และราคาให้ครบ');
+ const vs=[...document.querySelectorAll('.vr')].map(r=>{const st={};r.querySelectorAll('[data-l]').forEach(i=>{const n=parseInt(i.value);if(n>0)st[i.dataset.l]=n});return{size:r.querySelector('.vs').value,pattern:r.querySelector('.vp').value,stock:st}});
+ if(!vs.some(v=>Object.keys(v.stock).length))return er('ใส่จำนวนสินค้าอย่างน้อย 1 ช่อง');
+ if(price<cost&&!confirm('ราคาขายต่ำกว่าต้นทุน ยืนยันบันทึก?'))return;
+ btn.disabled=true;btn.textContent='กำลังบันทึก...';let path=null;
+ try{
+  const f=$('pf').files[0];
+  if(f){path=S.uid+'/'+Date.now()+'.jpg';const u=await S.sb.storage.from('product-images').upload(path,await shrink(f),{contentType:'image/jpeg'});if(u.error){path=null;throw u.error}}
+  const r=await S.sb.rpc('create_product',{p_category_id:cat,p_name:name,p_cost:cost,p_price:price,p_description:$('fd').value.trim()||null,p_image_path:path,p_variants:vs});
+  if(r.error){if(path)S.sb.storage.from('product-images').remove([path]);throw r.error}
+  await load();qrSheet(r.data.code);toast('บันทึกแล้ว รหัส '+r.data.code);
+ }catch(e){btn.disabled=false;btn.textContent='บันทึกสินค้า';er(/duplicate|variants_unique/i.test(e.message||'')?'มีไซส์/ลายซ้ำกันในสินค้านี้':'บันทึกไม่สำเร็จ: '+(e.message||e))}
+}
+
+const A={go:v=>go(v),cat:v=>{S.cat=v;render()},st:v=>{S.stf=v;render()},loc:v=>{S.loc=v;render()},open:v=>detail(v),qr:v=>qrSheet(v),dl:v=>dl(v),pr:v=>pr(v),add:()=>S.ready&&addSheet(),row:()=>$('vrs').insertAdjacentHTML('beforeend',vrow()),
+ delrow:(v,t)=>{if(document.querySelectorAll('.vr').length>1)t.closest('.vr').remove()},save:()=>save(),close:()=>closeSheet(),
+ more:()=>openSheet(head('เมนูเพิ่มเติม')+M.slice(3).map(m=>`<button class="row" style="width:100%;padding:14px 4px" data-a="go" data-v="${m.id}">${ic(m.i,22)}${m.t}</button>`).join('')),
+ theme:()=>theme(document.documentElement.dataset.theme==='dark'?'light':'dark'),logout:()=>{if(confirm('ออกจากระบบ?'))S.sb.auth.signOut()}};
+document.addEventListener('click',e=>{if(e.target.id==='sheet')return closeSheet();const t=e.target.closest('[data-a]');if(t&&A[t.dataset.a])A[t.dataset.a](t.dataset.v,t)});
+$('q').oninput=e=>{S.q=e.target.value;if(!S.ready)return;S.cur==='prod'?list():render()};
+function theme(t){document.documentElement.dataset.theme=t;$('theme').innerHTML=ic(t==='dark'?'sun':'moon',20);try{localStorage.setItem('theme',t)}catch(e){}}
+$('out').innerHTML=ic('back',22);
 let t0;try{t0=localStorage.getItem('theme')}catch(e){}
 theme(t0||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));
-go('prod');
+window.App={start(sb,u){if(S.uid===u.id&&S.ready)return;S.sb=sb;S.uid=u.id;load()},stop(){S.ready=false;S.uid=null;S.prods=[];S.imgs={};closeSheet();render()}};
+render();
 setTimeout(()=>{$('splash').classList.add('hide');setTimeout(()=>$('splash').remove(),500)},1500);
 </script>
- <script src="auth.js"></script>
-
+<script src="auth.js"></script>
 </body>
 </html>
