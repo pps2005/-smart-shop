@@ -26,7 +26,7 @@
   var UST = { occupied: ['มีผู้เช่า', 'g'], vacant: ['ห้องว่าง', 'a'], maintenance: ['ซ่อมบำรุง', 'k'] };
   var KIND = { repair: 'ค่าซ่อม', equipment: 'ค่าอุปกรณ์', labor: 'ค่าช่าง', other: 'อื่น ๆ' };
   var MTH = { cash: 'เงินสด', transfer: 'โอนเงิน', other: 'อื่น ๆ' };
-  var R = { loaded: false, loading: false, err: '', props: [], units: [], leases: [], pays: [], costs: [], pf: 'all', sf: 'all' };
+  var R = { loaded: false, loading: false, err: '', props: [], units: [], leases: [], pays: [], costs: [], rec: [], pf: 'all', sf: 'all' };
   var busy = false, meth = 'cash', kind = 'repair', dueTouched = false;
 
   // ===== วันที่ =====
@@ -63,7 +63,7 @@
   // ===== ข้อมูล =====
   function resetR() {
     R.loaded = false; R.loading = false; R.err = '';
-    R.props = []; R.units = []; R.leases = []; R.pays = []; R.costs = [];
+    R.props = []; R.units = []; R.leases = []; R.pays = []; R.costs = []; R.rec = [];
   }
   async function loadRent() {
     if (!S.sb || R.loading) return;
@@ -76,10 +76,12 @@
         S.sb.from('units').select('*').order('name'),
         S.sb.from('leases').select('*,tenants(name,phone)'),
         S.sb.from('rent_payments').select('*').eq('cancelled', false).order('period', { ascending: false }),
-        S.sb.from('unit_costs').select('*').order('paid_on', { ascending: false }).order('created_at', { ascending: false })
+        S.sb.from('unit_costs').select('*').order('paid_on', { ascending: false }).order('created_at', { ascending: false }),
+        S.sb.from('rent_receipts').select('*').eq('cancelled', false).order('paid_on', { ascending: false }).order('created_at', { ascending: false })
       ]);
       for (var i = 0; i < x.length; i++) if (x[i].error) throw x[i].error;
-      R.props = x[0].data; R.units = x[1].data; R.leases = x[2].data; R.pays = x[3].data; R.costs = x[4].data;
+      R.props = x[0].data; R.units = x[1].data; R.leases = x[2].data; R.pays = x[3].data; R.costs = x[4].data; R.rec = x[5].data;
+      R.leases.forEach(ledger);
       R.loaded = true;
     } catch (ex) { R.err = 'โหลดข้อมูลไม่สำเร็จ: ' + (ex.message || ex); }
     R.loading = false;
@@ -96,28 +98,46 @@
     var l = R.leases.find(function (x) { return x.id === r.lease_id; });
     return l ? l.unit_id : null;
   }
+  function recsOf(lid) { return R.rec.filter(function (x) { return x.lease_id === lid; }); }
+  function r2(n) { return Math.round(n * 100) / 100; }
+  // จ่ายตัดงวดเก่าสุดก่อน (FIFO) ยอดที่ยังไม่จ่ายจึงทบไปงวดถัดไปโดยอัตโนมัติ
+  function ledger(l) {
+    var rs = rowsOf(l.id).slice().sort(function (a, b) { return a.period < b.period ? -1 : 1; });
+    var T = recsOf(l.id).reduce(function (a, x) { return a + Number(x.amount); }, 0);
+    rs.forEach(function (r) {
+      var o = Number(r.amount), p = Math.min(T, o);
+      r._paid = r2(p); r._left = r2(o - p); T = r2(T - p);
+    });
+    return rs;
+  }
+  function sum(a, k) { return a.reduce(function (t, x) { return t + x[k]; }, 0); }
   function unitOver(u) {
     var ids = R.leases.filter(function (l) { return l.unit_id === u.id; }).map(function (l) { return l.id; });
     var td = today();
-    return R.pays.filter(function (r) { return ids.indexOf(r.lease_id) > -1 && !r.paid_on && eff(r) < td; });
+    return R.pays.filter(function (r) { return ids.indexOf(r.lease_id) > -1 && r._left > 0 && eff(r) < td; });
   }
-  function focus(l) {
-    var rs = rowsOf(l.id).slice().sort(function (a, b) { return a.period < b.period ? -1 : 1; });
-    var t = tm();
-    var late = rs.find(function (r) { return !r.paid_on && r.period <= t; });
-    if (late) return late;
-    var cm = rs.find(function (r) { return r.period === t; });
-    if (cm) return cm;
-    return rs.find(function (r) { return !r.paid_on; }) || rs[rs.length - 1] || null;
+  // งวดปัจจุบันของสัญญา: ถ้ามีงวดถึงกำหนดแล้วยังไม่ครบ ให้รวมยอดค้างยกมา ถ้าไม่มี ให้แสดงงวดถัดไปงวดเดียว
+  function cur(l) {
+    var rs = ledger(l), td = today();
+    var due = rs.filter(function (r) { return r._left > 0 && eff(r) <= td; });
+    var left = r2(sum(rs, '_left'));
+    if (due.length) {
+      var c = due[due.length - 1], pay = r2(sum(due, '_left'));
+      return { row: c, n: rs.indexOf(c) + 1, total: rs.length, pay: pay, carry: r2(pay - c._left), left: left };
+    }
+    var f = rs.find(function (r) { return r._left > 0; });
+    if (f) return { row: f, n: rs.indexOf(f) + 1, total: rs.length, pay: f._left, carry: 0, left: left };
+    return { row: null, total: rs.length, pay: 0, carry: 0, left: 0 };
   }
   function rstat(r) {
-    if (r.paid_on) return { t: 'จ่ายแล้ว', c: 'g' };
-    var n = diff(today(), eff(r));
-    if (n < 0) return { t: 'เลยกำหนด ' + (-n) + ' วัน', c: 'r' };
-    if (n === 0) return { t: 'ครบกำหนดวันนี้', c: 'a' };
-    if (n <= 3) return { t: 'อีก ' + n + ' วันครบกำหนด', c: 'a' };
-    return { t: 'ยังไม่ถึงกำหนด', c: 'b' };
+    if (r._left <= 0) return { t: 'จ่ายแล้ว', c: 'g' };
+    var n = diff(today(), eff(r)), part = r._paid > 0 ? ' · จ่ายบางส่วน' : '';
+    if (n < 0) return { t: 'เลยกำหนด ' + (-n) + ' วัน' + part, c: 'r' };
+    if (n === 0) return { t: 'ครบกำหนดวันนี้' + part, c: 'a' };
+    if (n <= 3) return { t: 'อีก ' + n + ' วันครบกำหนด' + part, c: 'a' };
+    return { t: 'ยังไม่ถึงกำหนด' + part, c: 'b' };
   }
+  function termTxt(l) { return l.term_months ? (l.term_months % 12 === 0 ? (l.term_months / 12) + ' ปี' : l.term_months + ' เดือน') : 'ไม่กำหนด'; }
 
   // ===== หน้าหลัก =====
   function card(u) {
@@ -127,11 +147,14 @@
       '</b><span class="bd ' + st[1] + '">' + st[0] + '</span></div>';
     if (l) {
       h += '<div style="margin-top:6px">' + esc((l.tenants || {}).name) + '</div>';
-      var r = focus(l);
-      if (r) {
-        var s = rstat(r);
-        h += '<div class="s"><span class="bd ' + s.c + '">' + s.t + '</span><small>งวด ' + ml(r.period) +
-          ' · ครบกำหนด ' + fd(eff(r)) + (r.postponed_to ? ' (เลื่อนจาก ' + fd(r.due_date) + ')' : '') + '</small></div>';
+      var c = cur(l);
+      if (c.row) {
+        var s = rstat(c.row);
+        h += '<div class="s"><span class="bd ' + s.c + '">' + s.t + '</span><small>งวด ' + c.n + '/' + c.total + ' · ' + ml(c.row.period) +
+          ' · ครบกำหนด ' + fd(eff(c.row)) + '</small></div><div class="s"><b>ต้องจ่าย ฿' + fmt(c.pay) + '</b>' +
+          (c.carry > 0 ? '<small class="over">รวมค้างยกมา ฿' + fmt(c.carry) + '</small>' : '') + '</div>';
+      } else if (c.total) {
+        h += '<div class="s"><span class="bd g">จ่ายครบทุกงวดแล้ว</span></div>';
       } else {
         h += '<div class="s"><small>เริ่มสัญญา ' + fd(l.start_date) + '</small></div>';
       }
@@ -161,8 +184,8 @@
     });
     var t = tm(), td = today(), cnt = 0, paid = 0, exp = 0, got = 0, od = 0, oda = 0;
     R.pays.forEach(function (r) {
-      if (r.period === t) { cnt++; exp += Number(r.amount); if (r.paid_on) { paid++; got += Number(r.amount); } }
-      if (!r.paid_on && eff(r) < td) { od++; oda += Number(r.amount); }
+      if (r.period === t) { cnt++; exp += Number(r.amount); got += r._paid; if (r._left <= 0) paid++; }
+      if (r._left > 0 && eff(r) < td) { od++; oda += r._left; }
     });
     h += '<div class="grid">' +
       '<div class="card"><small>ห้องทั้งหมด</small><b class="v">' + n + '</b></div>' +
@@ -218,8 +241,13 @@
   function rowBtn(r) {
     var s = rstat(r);
     return '<button class="row" style="width:100%;text-align:left" data-a="rrow" data-v="' + r.id + '"><div class="gr">' +
-      ml(r.period) + '<br><small>ครบกำหนด ' + fd(eff(r)) + ' · ฿' + fmt(r.amount) + '</small></div>' +
+      ml(r.period) + '<br><small>ครบกำหนด ' + fd(eff(r)) + ' · ฿' + fmt(r.amount) + (r._paid > 0 && r._left > 0 ? ' · ค้าง ฿' + fmt(r._left) : '') + '</small></div>' +
       '<span class="bd ' + s.c + '">' + s.t + '</span></button>';
+  }
+  function recRow(x) {
+    return '<div class="kv"><span>' + fd(x.paid_on) + ' · ' + (MTH[x.method] || '') +
+      (x.note ? '<br><small>' + esc(x.note) + '</small>' : '') + '</span><span><b>฿' + fmt(x.amount) + '</b> ' +
+      '<button class="bd r" style="margin-left:6px" data-a="rdelrec" data-v="' + x.id + '">ลบ</button></span></div>';
   }
 
   function unitSheet(id) {
@@ -232,26 +260,31 @@
     h += kv2('ค่าเช่าตั้งต้น', '฿' + fmt(u.default_rent));
 
     if (l) {
-      var tn = l.tenants || {};
+      var tn = l.tenants || {}, c = cur(l), rs = ledger(l), last = rs[rs.length - 1];
       h += '<h3 style="margin-top:14px">ผู้เช่า</h3>' + kv2('ชื่อ', esc(tn.name)) +
         (tn.phone ? kv2('โทร', '<a href="tel:' + esc(tn.phone) + '" style="color:var(--pri)">' + esc(tn.phone) + '</a>') : '') +
-        kv2('เริ่มสัญญา', fd(l.start_date)) + kv2('ค่าเช่า', '฿' + fmt(l.rent) + ' / เดือน') +
+        kv2('เริ่มสัญญา', fd(l.start_date)) + kv2('ระยะสัญญา', termTxt(l)) +
+        (l.term_months && last ? kv2('ครบสัญญา (งวดสุดท้าย)', fd(eff(last))) : '') +
+        kv2('ค่าเช่า', '฿' + fmt(l.rent) + ' / เดือน') +
         kv2('เงินมัดจำ', '฿' + fmt(l.deposit) + (l.deposit_paid_on ? ' (รับ ' + fd(l.deposit_paid_on) + ')' : '')) +
         kv2('ครบกำหนดทุกวันที่', l.due_day);
-      var r = focus(l);
-      if (r) {
-        var s = rstat(r);
-        h += '<h3 style="margin-top:14px">ค่าเช่า ' + ml(r.period) + '</h3>' +
+      if (c.row) {
+        var s = rstat(c.row);
+        h += '<h3 style="margin-top:14px">ค่าเช่างวดที่ ' + c.n + (c.total ? ' / ' + c.total : '') + ' · ' + ml(c.row.period) + '</h3>' +
           '<div class="kv"><span>สถานะ</span><span class="bd ' + s.c + '">' + s.t + '</span></div>' +
-          kv2('จำนวนเงิน', '฿' + fmt(r.amount)) + kv2('ครบกำหนด', fd(r.due_date)) +
-          (r.postponed_to ? kv2('เลื่อนเป็นวันที่', fd(r.postponed_to)) : '') +
-          (r.paid_on ? kv2('จ่ายเมื่อ', fd(r.paid_on)) : '') +
-          '<button class="btn" data-a="rrow" data-v="' + r.id + '">' + (r.paid_on ? 'ดูรายละเอียดงวดนี้' : 'บันทึกจ่าย / เลื่อนวัน') + '</button>';
+          kv2('ค่าเช่างวดนี้', '฿' + fmt(c.row.amount)) +
+          (c.carry > 0 ? '<div class="kv"><span>ค้างยกมาจากงวดก่อน</span><b class="over">฿' + fmt(c.carry) + '</b></div>' : '') +
+          (c.row._paid > 0 ? kv2('จ่ายแล้วในงวดนี้', '฿' + fmt(c.row._paid)) : '') +
+          '<div class="kv"><span><b>ต้องจ่ายตอนนี้</b></span><b>฿' + fmt(c.pay) + '</b></div>' +
+          kv2('ครบกำหนด', fd(c.row.due_date)) + (c.row.postponed_to ? kv2('เลื่อนเป็นวันที่', fd(c.row.postponed_to)) : '') +
+          '<button class="btn" data-a="rrow" data-v="' + c.row.id + '">รับเงิน / เลื่อนวัน</button>';
+      } else if (c.total) {
+        h += '<div class="note" style="margin-top:12px">จ่ายครบทุกงวดตามสัญญาแล้ว</div>';
       } else {
         h += '<div class="note" style="margin-top:12px">ยังไม่มีงวดค่าเช่า</div>';
       }
-      var hs = rowsOf(l.id).slice(0, 6);
-      if (hs.length) h += '<h3 style="margin-top:14px">ประวัติค่าเช่า</h3>' + hs.map(rowBtn).join('');
+      var rc = recsOf(l.id).slice(0, 5);
+      if (rc.length) h += '<h3 style="margin-top:14px">ประวัติรับเงิน</h3>' + rc.map(recRow).join('');
       h += '<button class="btn o" data-a="rend" data-v="' + l.id + '">ย้ายออก</button>';
     } else if (u.status === 'vacant') {
       h += '<div class="btns"><button class="btn" data-a="rlease" data-v="' + u.id + '">ทำสัญญาเช่า</button>' +
@@ -263,14 +296,9 @@
     var old = unitOver(u).filter(function (r) { return !l || r.lease_id !== l.id; });
     if (old.length) h += '<div class="hr"></div><h3 class="over">ค้างจ่ายจากผู้เช่าเดิม</h3>' + old.map(rowBtn).join('');
 
-    var cs = R.costs.filter(function (c) { return c.unit_id === u.id; });
-    var ct = cs.reduce(function (a, c) { return a + Number(c.amount); }, 0);
-    h += '<div class="hr"></div><h3>ค่าซ่อมบำรุง / อุปกรณ์</h3>' +
-      (cs.length ? kv2('รวมทั้งหมด', '฿' + fmt(ct)) + cs.slice(0, 5).map(function (c) {
-        return '<div class="kv"><span>' + fd(c.paid_on) + ' · ' + (KIND[c.kind] || '') +
-          (c.note ? '<br><small>' + esc(c.note) + '</small>' : '') + '</span><b>฿' + fmt(c.amount) + '</b></div>';
-      }).join('') : '<small>ยังไม่มีรายการ</small>') +
-      '<button class="btn o" data-a="rcost" data-v="' + u.id + '">+ บันทึกค่าซ่อมบำรุง</button>' +
+    var ct = R.costs.filter(function (c) { return c.unit_id === u.id; }).reduce(function (a, c) { return a + Number(c.amount); }, 0);
+    h += '<div class="hr"></div><button class="row" style="width:100%;text-align:left;padding:14px 4px" data-a="rcosts" data-v="' + u.id + '">' +
+      '<div class="gr">ค่าซ่อมบำรุง / อุปกรณ์<br><small>รวม ฿' + fmt(ct) + '</small></div><span>›</span></button>' +
       '<button class="btn o" data-a="redu" data-v="' + u.id + '">แก้ไขชื่อ / ชั้น / ค่าเช่าตั้งต้น</button>';
     openSheet(h);
   }
@@ -386,6 +414,12 @@
       '<label>ชื่อผู้เช่า<input id="zt" placeholder="ชื่อ-นามสกุล"></label>' +
       '<label>เบอร์โทร (ไม่บังคับ)<input id="zph" type="tel" inputmode="tel"></label>' +
       '<label>วันเริ่มสัญญา<input id="zs" type="date" value="' + t + '"></label>' +
+      '<label>ระยะสัญญา (ไม่เกิน 3 ปี)<select id="zterm">' + (function () {
+        var o = '';
+        for (var m = 1; m <= 36; m++) o += '<option value="' + m + '"' + (m === 12 ? ' selected' : '') + '>' +
+          (m % 12 === 0 ? (m / 12) + ' ปี (' + m + ' เดือน)' : m + ' เดือน') + '</option>';
+        return o;
+      })() + '</select></label>' +
       '<label>ค่าเช่าต่อเดือน (บาท)<input id="zr" type="number" inputmode="decimal" min="0" value="' + (u.default_rent || '') + '"></label>' +
       '<label>เงินมัดจำ (บาท)<input id="zd" type="number" inputmode="decimal" min="0" value="0"></label>' +
       '<label>วันที่รับเงินมัดจำ<input id="zdp" type="date" value="' + t + '"></label>' +
@@ -405,12 +439,12 @@
     if (!s || !f) return er('เลือกวันที่ให้ครบ');
     if (f < s) return er('วันครบกำหนดงวดแรกต้องไม่ก่อนวันเริ่มสัญญา');
     if (isNaN(rent) || rent < 0 || dep < 0) return er('ตรวจสอบจำนวนเงิน');
-    if (!confirm('ทำสัญญากับ ' + name + '\nค่าเช่า ฿' + fmt(rent) + ' / เดือน\nมัดจำ ฿' + fmt(dep) +
+    if (!confirm('ทำสัญญากับ ' + name + '\nค่าเช่า ฿' + fmt(rent) + ' / เดือน\nระยะสัญญา ' + $('zterm').value + ' เดือน\nมัดจำ ฿' + fmt(dep) +
       '\nงวดแรกครบกำหนด ' + fd(f) + '\nยืนยัน?')) return;
     busy = true; $('zgo').disabled = true; $('zgo').textContent = 'กำลังบันทึก...';
     var r = await S.sb.rpc('start_lease', {
       p_unit_id: id, p_tenant_name: name, p_tenant_phone: $('zph').value,
-      p_start: s, p_first_due: f, p_rent: rent, p_deposit: dep, p_deposit_paid_on: dpd
+      p_start: s, p_first_due: f, p_rent: rent, p_deposit: dep, p_deposit_paid_on: dpd, p_term_months: parseInt($('zterm').value)
     });
     busy = false;
     if (r.error) {
@@ -445,7 +479,7 @@
     await loadRent(); unitSheet(l.unit_id); toast('ย้ายออกแล้ว ห้องอยู่ในสถานะซ่อมบำรุง');
   };
 
-  // ===== งวดค่าเช่า: จ่าย / เลื่อน =====
+  // ===== งวดค่าเช่า: รับเงิน (แบ่งจ่ายได้) / เลื่อน / ลบ =====
   A.rmeth = function (v) {
     meth = v;
     document.querySelectorAll('.md .chip').forEach(function (c) { c.classList.toggle('on', c.dataset.v === v); });
@@ -454,72 +488,108 @@
     var r = R.pays.find(function (x) { return x.id === id; });
     if (!r) return;
     var l = R.leases.find(function (x) { return x.id === r.lease_id; });
-    var u = l && unit(l.unit_id), s = rstat(r);
+    var u = l && unit(l.unit_id), s = rstat(r), c = cur(l);
+    var isCur = c.row && c.row.id === r.id;
     meth = 'cash';
     var h = head('ค่าเช่า ' + ml(r.period)) + kv2('ห้อง', esc(uname(u))) +
-      kv2('ผู้เช่า', esc(l && l.tenants ? l.tenants.name : '')) + kv2('จำนวนเงิน', '฿' + fmt(r.amount)) +
+      kv2('ผู้เช่า', esc(l && l.tenants ? l.tenants.name : '')) + kv2('ค่าเช่างวดนี้', '฿' + fmt(r.amount)) +
+      (r._paid > 0 ? kv2('จ่ายแล้ว', '฿' + fmt(r._paid)) : '') +
+      (r._left > 0 ? '<div class="kv"><span>ค้างอยู่</span><b class="over">฿' + fmt(r._left) + '</b></div>' : '') +
       kv2('ครบกำหนด', fd(r.due_date)) + (r.postponed_to ? kv2('เลื่อนเป็นวันที่', fd(r.postponed_to)) : '') +
       '<div class="kv"><span>สถานะ</span><span class="bd ' + s.c + '">' + s.t + '</span></div>';
-    if (r.paid_on) {
-      h += kv2('วันที่จ่าย', fd(r.paid_on)) + kv2('วิธีจ่าย', MTH[r.method] || '-') +
-        (r.note ? kv2('หมายเหตุ', esc(r.note)) : '') +
-        '<div class="err" id="zer"></div><button class="btn o" data-a="runpay" data-v="' + r.id + '">แก้เป็นยังไม่จ่าย</button>';
+    if (r._left <= 0) {
+      h += '<div class="note" style="margin-top:10px">งวดนี้จ่ายครบแล้ว ถ้าบันทึกผิด ให้ลบรายการรับเงินในหน้าห้อง</div>';
+    } else if (!isCur) {
+      h += '<div class="note" style="margin-top:10px">งวดนี้ยังไม่ถึงคิว ระบบจะตัดเงินงวดเก่าสุดก่อนเสมอ</div>';
     } else {
-      h += '<h3 style="margin-top:14px">บันทึกการจ่าย</h3>' +
-        '<label>วันที่จ่าย<input id="zpd" type="date" value="' + today() + '"></label>' +
+      h += '<h3 style="margin-top:14px">รับเงินค่าเช่า</h3>' +
+        (c.carry > 0 ? '<div class="note">รวมยอดค้างยกมา ฿' + fmt(c.carry) + ' แล้ว</div>' : '') +
+        '<label>จำนวนที่รับ (บาท) · ต้องจ่ายตอนนี้ ฿' + fmt(c.pay) +
+        '<input id="zpa2" type="number" inputmode="decimal" min="0" value="' + c.pay + '"></label>' +
+        '<small>จ่ายบางส่วนได้ ยอดที่เหลือจะทบไปงวดถัดไป</small>' +
+        '<label>วันที่รับเงิน<input id="zpd" type="date" value="' + today() + '"></label>' +
         '<div class="mth md">' + Object.keys(MTH).map(function (k) {
           return '<button type="button" class="chip ' + (k === meth ? 'on' : '') + '" data-a="rmeth" data-v="' + k + '">' + MTH[k] + '</button>';
         }).join('') + '</div>' +
         '<label>หมายเหตุ (ไม่บังคับ)<input id="zpm"></label>' +
-        '<button class="btn" data-a="rpay" data-v="' + r.id + '">บันทึกว่าจ่ายแล้ว</button>' +
+        '<div class="err" id="zer"></div><button class="btn" data-a="rpay" data-v="' + l.id + '">บันทึกรับเงิน</button>' +
         '<div class="hr"></div><h3>เลื่อนวันครบกำหนด</h3>' +
         '<label>เลื่อนเป็นวันที่<input id="zpp" type="date" value="' + addDays(eff(r), 7) + '"></label>' +
         '<button class="btn o" data-a="rpost" data-v="' + r.id + '">เลื่อนวันครบกำหนด</button>' +
-        (r.postponed_to ? '<button class="btn o" data-a="rpostclr" data-v="' + r.id + '">ยกเลิกการเลื่อน (กลับเป็น ' + fd(r.due_date) + ')</button>' : '') +
-        '<div class="err" id="zer"></div>';
+        (r.postponed_to ? '<button class="btn o" data-a="rpostclr" data-v="' + r.id + '">ยกเลิกการเลื่อน (กลับเป็น ' + fd(r.due_date) + ')</button>' : '');
     }
     openSheet(h);
   }
   A.rrow = function (id) { rowSheet(id); };
 
-  async function updRow(id, patch, okMsg, onlyUnpaid) {
+  async function updRow(id, patch, okMsg) {
     if (busy) return;
     var row = R.pays.find(function (x) { return x.id === id; });
     var uid = row ? uidOfRow(row) : null;
     busy = true;
-    var q = S.sb.from('rent_payments').update(patch).eq('id', id);
-    if (onlyUnpaid) q = q.is('paid_on', null);
-    var r = await q.select('id');
+    var r = await S.sb.from('rent_payments').update(patch).eq('id', id).select('id');
     busy = false;
     if (r.error || !r.data || !r.data.length) {
       var e = $('zer');
-      if (e) e.textContent = 'บันทึกไม่สำเร็จ' + (r.error ? ': ' + r.error.message : ' (รายการนี้อาจถูกเปลี่ยนไปแล้ว)');
+      if (e) e.textContent = 'บันทึกไม่สำเร็จ' + (r.error ? ': ' + r.error.message : '');
       return;
     }
     await loadRent();
     if (uid) unitSheet(uid); else closeSheet();
     toast(okMsg);
   }
-  A.rpay = function (id) {
-    var d = $('zpd').value;
-    if (!d) { $('zer').textContent = 'เลือกวันที่จ่าย'; return; }
-    var patch = { paid_on: d, method: meth }, n = $('zpm').value.trim();
-    if (n) patch.note = n;
-    return updRow(id, patch, 'บันทึกการจ่ายแล้ว', true);
+  A.rpay = async function (lid) {
+    if (busy) return;
+    var l = R.leases.find(function (x) { return x.id === lid; });
+    var c = l && cur(l), amt = parseFloat($('zpa2').value), d = $('zpd').value;
+    if (!c || !c.row) return;
+    if (!(amt > 0)) { $('zer').textContent = 'ใส่จำนวนเงินที่รับ'; return; }
+    if (!d) { $('zer').textContent = 'เลือกวันที่รับเงิน'; return; }
+    if (amt > c.left + 0.005) { $('zer').textContent = 'เกินยอดค้างทั้งสัญญา (฿' + fmt(c.left) + ')'; return; }
+    if (amt < c.pay - 0.005 && !confirm('รับบางส่วน ฿' + fmt(amt) + ' จาก ฿' + fmt(c.pay) + '\nยอดที่เหลือ ฿' + fmt(c.pay - amt) + ' จะทบไปงวดถัดไป\nยืนยัน?')) return;
+    busy = true;
+    var n = $('zpm').value.trim();
+    var r = await S.sb.from('rent_receipts').insert({ lease_id: lid, amount: r2(amt), paid_on: d, method: meth, note: n || null });
+    busy = false;
+    if (r.error) { $('zer').textContent = 'บันทึกไม่สำเร็จ: ' + r.error.message; return; }
+    await loadRent(); unitSheet(l.unit_id); toast('บันทึกรับเงินแล้ว');
+  };
+  A.rdelrec = async function (id) {
+    if (busy) return;
+    var x = R.rec.find(function (k) { return k.id === id; });
+    if (!x) return;
+    if (!confirm('ลบรายการรับเงิน ฿' + fmt(x.amount) + ' (' + fd(x.paid_on) + ') ?\nงวดค่าเช่าจะกลับเป็นค้างจ่ายตามยอดที่ลบ')) return;
+    busy = true;
+    var r = await S.sb.from('rent_receipts').update({ cancelled: true }).eq('id', id).select('id');
+    busy = false;
+    if (r.error || !r.data || !r.data.length) return toast('ลบไม่สำเร็จ');
+    var l = R.leases.find(function (k) { return k.id === x.lease_id; });
+    await loadRent(); if (l) unitSheet(l.unit_id); toast('ลบรายการรับเงินแล้ว');
   };
   A.rpost = function (id) {
     var r = R.pays.find(function (x) { return x.id === id; }), d = $('zpp').value;
-    if (!d) { $('zer').textContent = 'เลือกวันที่ที่จะเลื่อนไป'; return; }
-    if (d <= r.due_date) { $('zer').textContent = 'ต้องเลื่อนไปหลังวันครบกำหนดเดิม (' + fd(r.due_date) + ')'; return; }
-    return updRow(id, { postponed_to: d }, 'เลื่อนเป็น ' + fd(d) + ' แล้ว', true);
+    if (!d) { $('zer') && ($('zer').textContent = 'เลือกวันที่ที่จะเลื่อนไป'); return toast('เลือกวันที่ที่จะเลื่อนไป'); }
+    if (d <= r.due_date) return toast('ต้องเลื่อนไปหลังวันครบกำหนดเดิม (' + fd(r.due_date) + ')');
+    return updRow(id, { postponed_to: d }, 'เลื่อนเป็น ' + fd(d) + ' แล้ว');
   };
-  A.rpostclr = function (id) { return updRow(id, { postponed_to: null }, 'ยกเลิกการเลื่อนแล้ว', true); };
-  A.runpay = function (id) {
-    if (!confirm('แก้รายการนี้เป็น "ยังไม่จ่าย" ใช่หรือไม่?')) return;
-    return updRow(id, { paid_on: null, method: null }, 'แก้เป็นยังไม่จ่ายแล้ว', false);
+  A.rpostclr = function (id) { return updRow(id, { postponed_to: null }, 'ยกเลิกการเลื่อนแล้ว'); };
+
+  // ===== ค่าซ่อมบำรุง (แยกจากหน้าผู้เช่า) =====
+  A.rcosts = function (id) {
+    var u = unit(id);
+    if (!u) return;
+    var cs = R.costs.filter(function (c) { return c.unit_id === id; });
+    var ct = cs.reduce(function (a, c) { return a + Number(c.amount); }, 0);
+    openSheet(head('ค่าซ่อมบำรุง') + noteBox(uname(u)) + kv2('รวมทั้งหมด', '฿' + fmt(ct)) +
+      (cs.length ? cs.slice(0, 30).map(function (c) {
+        return '<div class="kv"><span>' + fd(c.paid_on) + ' · ' + (KIND[c.kind] || '') +
+          (c.note ? '<br><small>' + esc(c.note) + '</small>' : '') + '</span><b>฿' + fmt(c.amount) + '</b></div>';
+      }).join('') : '<div class="note">ยังไม่มีรายการ</div>') +
+      '<button class="btn" data-a="rcost" data-v="' + id + '">+ บันทึกค่าซ่อมบำรุง</button>' +
+      '<div class="btns"><button class="btn o" data-a="dcosts" data-v="' + id + '">ลบรายการ</button>' +
+      '<button class="btn o" data-a="runit" data-v="' + id + '">กลับหน้าห้อง</button></div>');
   };
 
-  // ===== ค่าซ่อมบำรุง =====
   A.rkind = function (v) {
     kind = v;
     document.querySelectorAll('.kd .chip').forEach(function (c) { c.classList.toggle('on', c.dataset.v === v); });
@@ -549,11 +619,16 @@
     });
     busy = false;
     if (r.error) { $('zgo').disabled = false; $('zer').textContent = 'บันทึกไม่สำเร็จ: ' + r.error.message; return; }
-    await loadRent(); unitSheet(id); toast('บันทึกค่าซ่อมบำรุงแล้ว');
+    await loadRent(); A.rcosts(id); toast('บันทึกค่าซ่อมบำรุงแล้ว');
   };
 
   if (window.App && window.App.stop) {
     var _stop = window.App.stop;
     window.App.stop = function () { resetR(); _stop(); };
   }
+  window.SSRent = {
+    R: R, cur: cur, eff: eff, today: today, diff: diff, fd: fd, uname: uname, unit: unit, rowsOf: rowsOf,
+    ensure: function () { if (S.sb && !R.loaded && !R.loading) return loadRent(); },
+    reload: function () { return loadRent(); }
+  };
 })();
