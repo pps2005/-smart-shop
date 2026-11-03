@@ -50,10 +50,15 @@
   function ymd(d) { return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); }
   function fdate(s) { return new Date(s + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }); }
 
+  function cityName() { try { return localStorage.getItem('ss_city') || 'กรุงเทพฯ'; } catch (e) { return 'กรุงเทพฯ'; } }
+  function lowThr() { try { return parseInt(localStorage.getItem('ss_low')) || 3; } catch (e) { return 3; } }
+  window.SSAlerts = { resetWeather: function () { W.data = null; W.at = 0; } };
   function weatherLoad() {
     if (W.busy || (W.data && Date.now() - W.at < 3600000)) return Promise.resolve();
     W.busy = true;
-    return fetch('https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.5&daily=weathercode,temperature_2m_max,precipitation_probability_max,precipitation_sum&timezone=Asia%2FBangkok&forecast_days=3')
+    var C = { 'กรุงเทพฯ': [13.75, 100.5], 'เชียงใหม่': [18.79, 98.98], 'ขอนแก่น': [16.44, 102.83], 'นครราชสีมา': [14.97, 102.1], 'ชลบุรี': [13.36, 100.98], 'ภูเก็ต': [7.88, 98.39], 'หาดใหญ่': [7.01, 100.47], 'อุดรธานี': [17.41, 102.79] };
+    var c = C[cityName()] || C['กรุงเทพฯ'];
+    return fetch('https://api.open-meteo.com/v1/forecast?latitude=' + c[0] + '&longitude=' + c[1] + '&daily=weathercode,temperature_2m_max,precipitation_probability_max,precipitation_sum&timezone=Asia%2FBangkok&forecast_days=3')
       .then(function (r) { return r.json(); })
       .then(function (j) { W.data = j.daily; W.at = Date.now(); W.err = false; })
       .catch(function () { W.err = true; })
@@ -83,10 +88,10 @@
     // --- สต๊อก ---
     var P = (S.prods || []), pqty = function (p) { return (p.variants || []).reduce(function (a, v) { return a + (v.stock_levels || []).reduce(function (b, x) { return b + x.qty; }, 0); }, 0); };
     var out = P.filter(function (p) { return p.status !== 'black' && pqty(p) === 0; });
-    var low = P.filter(function (p) { return p.status !== 'black' && pqty(p) > 0 && pqty(p) <= 3; });
+    var low = P.filter(function (p) { return p.status !== 'black' && pqty(p) > 0 && pqty(p) <= lowThr(); });
     var bad = P.filter(function (p) { return p.status === 'red'; });
     if (out.length) A1.push({ lv: 'r', t: 'สินค้าหมดสต๊อก ' + out.length + ' รุ่น', s: out.slice(0, 3).map(function (p) { return p.code; }).join(', ') + (out.length > 3 ? ' ...' : ''), go: 'go', v: 'stock', o: 3 });
-    if (low.length) A1.push({ lv: 'a', t: 'สินค้าใกล้หมด ' + low.length + ' รุ่น (เหลือไม่เกิน 3 ชิ้น)', s: low.slice(0, 3).map(function (p) { return p.code + ' เหลือ ' + pqty(p); }).join(', ') + (low.length > 3 ? ' ...' : ''), go: 'go', v: 'stock', o: 4 });
+    if (low.length) A1.push({ lv: 'a', t: 'สินค้าใกล้หมด ' + low.length + ' รุ่น (เหลือไม่เกิน ' + lowThr() + ' ชิ้น)', s: low.slice(0, 3).map(function (p) { return p.code + ' เหลือ ' + pqty(p); }).join(', ') + (low.length > 3 ? ' ...' : ''), go: 'go', v: 'stock', o: 4 });
     if (bad.length) A1.push({ lv: 'a', t: 'สินค้าเสีย/มีปัญหา ' + bad.length + ' รุ่น', s: bad.slice(0, 3).map(function (p) { return p.code; }).join(', '), go: 'go', v: 'stock', o: 5 });
     A1.sort(function (a, b) { return a.o - b.o; });
 
@@ -112,7 +117,7 @@
     }
     if (!R || !R.R.loaded) h += '<div class="ai"><div><small>กำลังตรวจค่าเช่า...</small></div></div>';
     h += A1.length ? A1.map(item).join('') : '<div class="ai g"><div><b>ไม่มีเรื่องเร่งด่วนจากร้านและค่าเช่า</b></div></div>';
-    h += '<h4>สภาพอากาศ 3 วัน (กรุงเทพฯ)</h4>';
+    h += '<h4>สภาพอากาศ 3 วัน (' + cityName() + ')</h4>';
     h += W.err ? '<div class="ai"><div><small>ดึงพยากรณ์อากาศไม่ได้ในตอนนี้</small></div></div>'
       : !W.data ? '<div class="ai"><div><small>กำลังโหลดพยากรณ์...</small></div></div>'
       : (wx.length ? wx.map(item).join('') : '<div class="ai g"><div><b>อากาศปกติ 3 วันข้างหน้า</b></div></div>');

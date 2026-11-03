@@ -147,7 +147,8 @@
       '</b><span class="bd ' + st[1] + '">' + st[0] + '</span></div>';
     if (l) {
       h += '<div style="margin-top:6px">' + esc((l.tenants || {}).name) + '</div>';
-      var c = cur(l);
+      var c = cur(l), lr = recsOf(l.id)[0];
+      h += '<div class="s"><small>' + (lr ? 'จ่ายล่าสุด ' + fd(lr.paid_on) + ' · ฿' + fmt(lr.amount) : 'ยังไม่เคยรับเงินค่าเช่า') + '</small></div>';
       if (c.row) {
         var s = rstat(c.row);
         h += '<div class="s"><span class="bd ' + s.c + '">' + s.t + '</span><small>งวด ' + c.n + '/' + c.total + ' · ' + ml(c.row.period) +
@@ -264,6 +265,7 @@
       h += '<h3 style="margin-top:14px">ผู้เช่า</h3>' + kv2('ชื่อ', esc(tn.name)) +
         (tn.phone ? kv2('โทร', '<a href="tel:' + esc(tn.phone) + '" style="color:var(--pri)">' + esc(tn.phone) + '</a>') : '') +
         kv2('เริ่มสัญญา', fd(l.start_date)) + kv2('ระยะสัญญา', termTxt(l)) +
+        kv2('จ่ายล่าสุด', recsOf(l.id)[0] ? fd(recsOf(l.id)[0].paid_on) + ' · ฿' + fmt(recsOf(l.id)[0].amount) : 'ยังไม่เคยรับเงิน') +
         (l.term_months && last ? kv2('ครบสัญญา (งวดสุดท้าย)', fd(eff(last))) : '') +
         kv2('ค่าเช่า', '฿' + fmt(l.rent) + ' / เดือน') +
         kv2('เงินมัดจำ', '฿' + fmt(l.deposit) + (l.deposit_paid_on ? ' (รับ ' + fd(l.deposit_paid_on) + ')' : '')) +
