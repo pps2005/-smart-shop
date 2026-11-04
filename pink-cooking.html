@@ -25,7 +25,7 @@
   /* หน้าเลือกเมนู */
   #menu .wrap { flex: 1; overflow-y: auto; padding: 4px 14px 24px; }
   .hero { display: grid; grid-template-columns: 200px 1fr; gap: 14px; align-items: center; background: var(--card); border: 2px solid var(--line); border-radius: 26px; padding: 10px 16px 10px 10px; box-shadow: 0 6px 24px rgba(255,95,162,.15); }
-  .hero canvas { width: 200px; height: 220px; display: block; }
+  #heroCv { width: 200px; height: 220px; display: block; }
   .bubble { background: #fff; border: 2px solid var(--line); border-radius: 20px; padding: 12px 16px; font-size: 20px; position: relative; }
   .bubble::before { content: ''; position: absolute; left: -12px; top: 26px; border: 10px solid transparent; border-right-color: var(--line); border-left: 0; }
   .hero .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
@@ -101,7 +101,9 @@
     .monWrap { min-height: auto; position: sticky; top: 0; z-index: 4; background: var(--soft); padding-bottom: 6px; } .mon { flex: none; aspect-ratio: 16 / 11; }
     .sub { min-height: 64px; } #subTh { font-size: 18px; }
     .side { overflow: visible; }
-    .hero { grid-template-columns: 130px 1fr; } .hero canvas { width: 130px; height: 160px; }
+    .hero { grid-template-columns: 110px 1fr; } #heroCv { width: 110px; height: 150px; }
+    .kitchens button { width: 64px; } .kitchens canvas { height: 36px; }
+    header h1 small { display: none; }
     .bubble { font-size: 17px; }
     #host.pip { width: 96px; height: 96px; }
     .badge { font-size: 12px; padding: 4px 8px; }
@@ -210,7 +212,13 @@ const voice = () => ({ lang: 'zh-CN', voiceName: set.voiceName, pitch: set.pitch
 // ---------- ภาพ ----------
 const SHEET = new Image(); SHEET.src = 'pink-sheet.jpg';
 const K = 2; // ภาพ pink-sheet.jpg ขยาย 2 เท่าจากพิกัดใน SHOTS
-const sheetReady = new Promise(r => { SHEET.onload = r; SHEET.onerror = r; });
+const missing = [];
+const sheetReady = new Promise(r => { SHEET.onload = r; SHEET.onerror = () => { missing.push('pink-sheet.jpg'); warn(); r(); }; });
+function warn() {
+  let w = document.getElementById('warnImg');
+  if (!w) { w = document.createElement('div'); w.id = 'warnImg'; w.style.cssText = 'margin:0 14px 10px;padding:12px 14px;border-radius:16px;background:#fff3cd;border:2px solid #f0c36d;font-size:16px;line-height:1.5'; document.querySelector('#menu .wrap').prepend(w); }
+  w.textContent = '⚠️ หารูปไม่เจอ: ' + missing.join(', ') + ' — ตรวจว่าอัปขึ้น GitHub ไว้ที่เดียวกับ index.html และชื่อไฟล์ตรงเป๊ะ (ไม่มี (1) หรือ .jpeg)';
+}
 const PINK = {
   eye1: { x: 0.4252, y: 0.3248, w: 0.1395, h: 0.0662, blink: true },
   eye2: { x: 0.1599, y: 0.2906, w: 0.1327, h: 0.0598, blink: true },
@@ -247,7 +255,7 @@ const host = new Puppet($('host'), PINK, {
     const s = Math.min(W / iw, H / ih); return { s, x: (W - iw * s) / 2 + W * 0.12, y: H - ih * s };
   },
 });
-Promise.all([heroPuppet.setImage('pink-host.jpg'), host.setImage('pink-host.jpg')]).catch(() => {});
+Promise.all([heroPuppet.setImage('pink-host.jpg'), host.setImage('pink-host.jpg')]).catch(() => { missing.push('pink-host.jpg'); warn(); });
 
 // ---------- จอฉาก (มุมกล้อง) ----------
 const scv = $('scene'), sg = scv.getContext('2d');
