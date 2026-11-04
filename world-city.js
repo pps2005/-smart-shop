@@ -61,6 +61,14 @@
       font: '"PingFang SC","Noto Sans SC",system-ui', temple: 'pagoda', lm: 'pearl', lmc: [8, 9], flagC: ['#de2910', '#de2910', '#de2910', '#de2910', '#de2910'], cnflag: 1 }
   };
   W.CITIES = THEMES;
+  /* ชื่อสถานี/ร้านตามเมืองหลวงจริง (สถานีอ้างอิงชื่อย่านจริง ตำแหน่งในเกมเป็นแบบจำลอง) */
+  var XT = {
+    bkk: { st2: ['BTS สยาม', 'BTS อโศก'], mrt: ['MRT สุขุมวิท', 'MRT สีลม', 'MRT ลุมพินี'], convName: 'ร้านสะดวกซื้อ 24 ชม.', hotelName: 'GRAND RIVERSIDE HOTEL' },
+    tyo: { st2: ['渋谷 Shibuya', '新宿 Shinjuku'], mrt: ['銀座 Ginza', '表参道 Omotesando', '上野 Ueno'], convName: 'コンビニ 24h', hotelName: 'TOKYO GRAND HOTEL' },
+    sel: { st2: ['강남 Gangnam', '홍대입구 Hongik'], mrt: ['명동 Myeongdong', '시청 City Hall', '잠실 Jamsil'], convName: '편의점 24시', hotelName: 'SEOUL GRAND HOTEL' },
+    sha: { st2: ['人民广场 People\'s Sq', '陆家嘴 Lujiazui'], mrt: ['南京东路 Nanjing Rd', '静安寺 Jing\'an', '徐家汇 Xujiahui'], convName: '便利店 24小时', hotelName: 'BUND GRAND HOTEL' },
+  };
+  Object.keys(XT).forEach(function (k) { if (THEMES[k]) Object.assign(THEMES[k], XT[k]); });
   var cur = 'bkk'; try { var sv = localStorage.getItem('ss_city'); if (sv && THEMES[sv]) cur = sv; } catch (e) {}
 
   /* ---------- ตัวช่วย ---------- */
@@ -253,6 +261,67 @@
     for (var i = 0; i < (big ? 40 : 26); i++) { var x = R(x0 + 3, x1 - 3), z = R(z0 + 3, z1 - 3); if (Math.abs(x - mx) < 13 && Math.abs(z - mz) < 10) continue; tree(x, z); }
     sign(TH.N.park, x0 + 6, 2.2, z1 + .1, 0, 7, '#2f7d32', '#fff', true);
   }
+  /* ---------- สถานที่ใหม่: ร้านสะดวกซื้อ · โรงแรมหรู · สวนสนุก · บริษัทจัดหางาน ---------- */
+  var XN = { conv: 'ร้านสะดวกซื้อ 24 ชม.', hotel: 'โรงแรมหรู', park2: 'สวนสนุก', agency: 'บริษัทจัดหางาน' };
+  var DOOR = { conv: [0, 1], hotel: [0, 1], park2: [0, 1], agency: [0, 1], mall: [0, -7], school: [0, 1], hosp: [0, 1], market: [0, 1] };
+  var CONV = { bkk: ['#0f8a4a', '#f47b20'], tyo: ['#1e6fb8', '#36a852'], sel: ['#5a2d82', '#f2a93b'], sha: ['#d6262f', '#f2c94c'] };
+  function conv(x0, x1, z0, z1) {
+    pad(x0, x1, z0, z1, 0x9ca3af);
+    var cx = (x0 + x1) / 2, w = 18, d = 13, z = z1 - d / 2 - 9, col = CONV[cur] || CONV.bkk;
+    put('box', cx, .16, z, w, 4.2, d, 0xf3f4f6, 0, true);
+    put('box', cx, 4.36, z, w + .6, .7, d + .6, parseInt(col[0].slice(1), 16));
+    put('box', cx, .16, z + d / 2 + .02, w - 1.2, 3.1, .12, 0x9fd3ef);                  /* หน้ากระจก */
+    put('box', cx, 3.26, z + d / 2 + .05, w, .9, .2, parseInt(col[1].slice(1), 16));
+    sign((TH.convName || XN.conv), cx, 3.7, z + d / 2 + .2, 0, 10, col[0], '#ffffff', true);
+    for (var i = 0; i < 5; i++) put('box', x0 + 6 + i * 5, .16, z1 - 3, 2, 1.4, 4, P(TH.car));
+    house2(x0, x1, z0, z0 + (z1 - z0) * .45);
+  }
+  function house2(x0, x1, z0, z1) { for (var i = 0; i < 3; i++) { var w = (x1 - x0 - 8) / 3, x = x0 + 4 + w * (i + .5), h = R(7, 12), c = P(TH.wall); put('win', x, .16, (z0 + z1) / 2, w - 3, h, z1 - z0 - 6, c, 0, true); put('roof', x, .16 + h, (z0 + z1) / 2, w - 2.4, 3, z1 - z0 - 5, P(TH.roof)); } }
+  function hotel(x0, x1, z0, z1) {
+    pad(x0, x1, z0, z1, 0xd6d3cc);
+    var cx = (x0 + x1) / 2, cz = (z0 + z1) / 2 - 4, h = 92;
+    put('win', cx, .16, cz, 40, 12, 30, 0xe7dccb, 0, true);                                /* โพเดียม */
+    put('win', cx, 12.16, cz - 2, 24, h, 18, 0xd8c7a8, 0, true);                            /* ทาวเวอร์ */
+    put('box', cx, 12.16 + h, cz - 2, 26, 2.4, 20, 0xb08d57);
+    put('cyl', cx, 14.56 + h, cz - 2, 6, 5, 6, 0xb08d57);
+    put('box', cx, .16, z1 - 8.5, 16, .5, 10, 0x6b7280);                                    /* ทางรถเข้า */
+    put('box', cx, 5.16, z1 - 9.5, 18, .6, 8, 0x1f2937);                                    /* หลังคาหน้าล็อบบี้ */
+    [-7, 7].forEach(function (a) { put('cyl', cx + a, .16, z1 - 6, .6, 5, .6, 0xb08d57); });
+    put('water', cx + 14, .1, z1 - 10, 8, .3, 5, 0x5cc8e8);
+    bigSign(TH.hotelName || 'GRAND HOTEL', cx, 9, cz + 15.2, 0, 22, '#3b2a14', '#f5d27a');
+    for (var t = 0; t < 8; t++) tree(x0 + 4 + t * ((x1 - x0 - 8) / 7), z1 - 2, .9, 'palm');
+  }
+  function funpark(x0, x1, z0, z1) {
+    pad(x0, x1, z0, z1, TH.grass);
+    var cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    /* ชิงช้าสวรรค์ */
+    var wh = new T.Group(), R0 = 16, mat = new T.MeshLambertMaterial({ color: 0xf8fafc });
+    var rim = new T.Mesh(new T.TorusGeometry(R0, .45, 8, 48), mat); wh.add(rim);
+    for (var i = 0; i < 16; i++) {
+      var a = i / 16 * Math.PI * 2, sp = new T.Mesh(new T.BoxGeometry(.25, R0 * 2, .25), mat); sp.rotation.z = a; wh.add(sp);
+      var cab = new T.Mesh(new T.BoxGeometry(1.8, 1.8, 1.8), new T.MeshLambertMaterial({ color: [0xef4444, 0xf59e0b, 0x22c55e, 0x3b82f6, 0xa855f7, 0xec4899][i % 6] }));
+      cab.position.set(Math.cos(a) * R0, Math.sin(a) * R0 - 1.4, 0); wh.add(cab);
+    }
+    wh.position.set(cx - 14, R0 + 3, cz); CITY.add(wh); W.WHEEL = wh;
+    [-1, 1].forEach(function (s2) { var leg = new T.Mesh(new T.BoxGeometry(.6, R0 + 4, .6), new T.MeshLambertMaterial({ color: 0x94a3b8 })); leg.position.set(cx - 14 + s2 * 5, (R0 + 3) / 2, cz); leg.rotation.z = s2 * .3; CITY.add(leg); });
+    addCol(cx - 14, cz, 14, 4);
+    /* รถไฟเหาะ (ราง) */
+    var pts = []; for (var k = 0; k <= 64; k++) { var u = k / 64 * Math.PI * 2; pts.push(new T.Vector3(cx + 12 + Math.cos(u) * 14, 6 + Math.sin(u * 3) * 4 + 4, cz + Math.sin(u) * 9)); }
+    var tube = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts, true), 140, .35, 6, true), new T.MeshLambertMaterial({ color: 0xef4444 })); CITY.add(tube);
+    for (var q = 0; q < 12; q++) { var u2 = q / 12 * Math.PI * 2, hh = 6 + Math.sin(u2 * 3) * 4 + 4; put('box', cx + 12 + Math.cos(u2) * 14, 0, cz + Math.sin(u2) * 9, .4, hh, .4, 0xe5e7eb); }
+    /* ม้าหมุน */
+    put('cyl', cx + 2, .16, z1 - 14, 9, 1, 9, 0xfde68a, 0, true); put('cone', cx + 2, 4.2, z1 - 14, 10, 3, 10, 0xec4899); put('cyl', cx + 2, 1.16, z1 - 14, .5, 3, .5, 0xf8fafc);
+    put('box', cx, .16, z1 - 1.5, 22, 5, 1.2, 0x7c3aed, 0, false);
+    bigSign(XN.park2 + ' 🎡', cx, 6.4, z1 - .8, 0, 18, '#7c3aed', '#ffffff');
+  }
+  function agency(x0, x1, z0, z1) {
+    pad(x0, x1, z0, z1, 0x9ca3af);
+    var cx = (x0 + x1) / 2, cz = (z0 + z1) / 2 - 2;
+    put('win', cx, .16, cz, 30, 28, 22, 0xdbe4ee, 0, true); put('box', cx, 28.16, cz, 31, 1.2, 23, 0x2563eb);
+    put('box', cx, .16, cz + 11.1, 8, 3.2, .2, 0x9fd3ef);
+    bigSign('💼 ' + XN.agency, cx, 7, cz + 11.25, 0, 20, '#1d4ed8', '#ffffff');
+    for (var t = 0; t < 5; t++) tree(x0 + 5 + t * 9, z1 - 3, .8);
+  }
   function mall(x0, x1, z0, z1, ry) {
     pad(x0, x1, z0, z1, 0x9ca3af);
     var w = x1 - x0 - 6, d = z1 - z0 - 14, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2 - 3;
@@ -437,6 +506,22 @@
     put('box', 0, RAIL_H + 1.2, RAIL_Z, 46, .6, 14, 0xe5e7eb); put('box', 0, RAIL_H + 6.4, RAIL_Z, 50, .6, 16, TH.rail[0]);
     [-23, 23].forEach(function (a) { put('box', a, RAIL_H + 1.2, RAIL_Z - 6.6, .4, 5.2, .4, 0x9ca3af); put('box', a, RAIL_H + 1.2, RAIL_Z + 6.6, .4, 5.2, .4, 0x9ca3af); });
     bigSign(TH.N.station, 0, RAIL_H + 4.8, RAIL_Z + 7.1, 0, 16, hx(TH.rail[0]));
+    W.STATIONS = [{ n: TH.N.station, x: 0, z: RAIL_Z + 10, line: 'sky' }];
+    [-276, 276].forEach(function (sx, i) {
+      put('box', sx, RAIL_H + 1.2, RAIL_Z, 40, .6, 13, 0xe5e7eb); put('box', sx, RAIL_H + 6.4, RAIL_Z, 44, .6, 15, TH.rail[0]);
+      put('box', sx + 16, 0, RAIL_Z + 9, 4, RAIL_H + 1.2, 3, 0xcbd5e1, 0, true);
+      var nm = (TH.st2 || ['สถานีฝั่งตะวันตก', 'สถานีฝั่งตะวันออก'])[i];
+      bigSign(nm, sx, RAIL_H + 4.8, RAIL_Z + 6.6, 0, 14, hx(TH.rail[0]));
+      W.STATIONS.push({ n: nm, x: sx + 16, z: RAIL_Z + 12, line: 'sky' });
+    });
+    /* รถไฟใต้ดิน: ทางลง 3 จุด */
+    [[-206, 136], [136, 206], [276, -66]].forEach(function (p, i) {
+      var x = p[0] + 9, z = p[1] + 9;
+      put('box', x, 0, z, 4, 2.6, 6, 0x1e3a8a, 0, true); put('box', x, 2.6, z, 4.6, .3, 6.6, 0x0f172a);
+      var nm = (TH.mrt || ['ใต้ดิน · สถานีเหนือ', 'ใต้ดิน · สถานีกลาง', 'ใต้ดิน · สถานีใต้'])[i];
+      sign('Ⓜ ' + nm, x, 3.4, z + 3.4, 0, 6, '#1e3a8a', '#ffffff', true);
+      W.STATIONS.push({ n: nm, x: x, z: z + 5, line: 'metro' });
+    });
     var g = new T.Group(); for (var i = 0; i < 4; i++) {
       var c = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: TH.rail[1] })); c.scale.set(17, 3.4, 3.2); c.position.set(i * 18, RAIL_H + 2.9, 0); g.add(c);
       var st = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: TH.rail[0] })); st.scale.set(17.1, .7, 3.3); st.position.set(i * 18, RAIL_H + 2.3, 0); g.add(st);
@@ -465,6 +550,7 @@
   }
   function bridgeY(ax, x, z) { return ax === 'z' && z > RV0 - 1 && z < RV1 + 1 ? .36 : 0; }
   W.cityStep = function (dt, t) {
+    if (W.WHEEL) W.WHEEL.rotation.z += dt * .08;
     if (!CITY || !VM || W.V && W.V.mode !== 'ext') return;
     var d = VM.d, i, v, x, z, ry, y;
     for (i = 0; i < VEH.length; i++) {
@@ -494,7 +580,7 @@
   /* ---------- สร้างทั้งเมือง ---------- */
   /* แปลงว่างสำหรับตึกเช่าจากหน้าอสังหา (world-rent.js สร้างตึกลงที่นี่ตามลำดับ) */
   var RENT_KEYS = ['4,6', '7,6', '6,4', '5,3', '3,4', '8,5', '4,9', '7,8', '2,6', '9,8', '6,2', '2,3', '9,4', '5,9', '3,2', '8,3', '1,6', '10,6', '6,9', '6,1'];
-  var SPECIAL = { '7,4': 'mall', '4,8': 'school', '9,3': 'school', '8,7': 'hosp', '3,7': 'temple', '6,8': 'park', '10,8': 'park', '5,7': 'market', '10,5': 'stadium', '4,4': 'parkS' };
+  var SPECIAL = { '5,4': 'conv', '7,5': 'conv', '4,7': 'conv', '8,6': 'conv', '2,8': 'conv', '9,2': 'conv', '2,2': 'hotel', '1,9': 'park2', '9,6': 'agency', '7,4': 'mall', '4,8': 'school', '9,3': 'school', '8,7': 'hosp', '3,7': 'temple', '6,8': 'park', '10,8': 'park', '5,7': 'market', '10,5': 'stadium', '4,4': 'parkS' };
   function build() {
     TH = THEMES[cur]; rng = mul(TH.seed); geos(); BUF = {}; GRID = {}; NSIGN = 0; HILL = null;
     CITY = new T.Group(); CITY.name = 'city';
@@ -508,8 +594,12 @@
       if (Math.abs(SP[iz] - RAIL_Z) < 1 || Math.abs(SP[iz + 1] - RAIL_Z) < 1) { if (Math.abs(SP[iz + 1] - RAIL_Z) < 1) z1 -= 3; else z0 += 3; }
       var ri = RENT_KEYS.indexOf(key);
       if (ri >= 0) { pad(x0, x1, z0, z1, TH.lot); W.RENT_LOTS.push({ i: ri, key: key, x0: x0, x1: x1, z0: z0, z1: z1 }); for (var tt = 0; tt < 4; tt++) tree(R(x0 + 2, x1 - 2), rng() < .5 ? z0 + 2 : z1 - 2, .8); continue; }
-      if (sp) W.POI.push({ t: sp === 'parkS' ? 'park' : sp, n: TH.N[sp === 'parkS' ? 'park' : sp] || sp, x: (x0 + x1) / 2, z: (z0 + z1) / 2 });
+      if (sp) { var pt = sp === 'parkS' ? 'park' : sp, cxp = (x0 + x1) / 2, czp = (z0 + z1) / 2; W.POI.push({ t: pt, n: TH.N[pt] || XN[pt] || sp, x: cxp, z: czp, door: DOOR[pt] ? { x: cxp + DOOR[pt][0], z: z1 + DOOR[pt][1] } : null, key: key }); }
       if (TH.lmc[0] === ix && TH.lmc[1] === iz) { W.POI.push({ t: 'landmark', n: 'แลนด์มาร์ก', x: (x0 + x1) / 2, z: (z0 + z1) / 2 }); landmark(x0, x1, z0, z1); }
+      else if (sp === 'conv') conv(x0, x1, z0, z1);
+      else if (sp === 'hotel') hotel(x0, x1, z0, z1);
+      else if (sp === 'park2') funpark(x0, x1, z0, z1);
+      else if (sp === 'agency') agency(x0, x1, z0, z1);
       else if (sp === 'mall') mall(x0, x1, z0, z1);
       else if (sp === 'school') school(x0, x1, z0, z1);
       else if (sp === 'hosp') hospital(x0, x1, z0, z1);
@@ -532,7 +622,7 @@
   function dispose() {
     if (!CITY) return; SC.remove(CITY);
     CITY.traverse(function (o) { if (o.isInstancedMesh) { o.dispose && o.dispose(); } else if (o.isMesh) { if (o.geometry && !Object.keys(GEO).some(function (k) { return GEO[k] === o.geometry; })) o.geometry.dispose(); if (o.material && o.material.map && !Object.keys(TEXC).some(function (k) { return TEXC[k] === o.material.map; })) o.material.map.dispose(); if (o.material && !Object.keys(MAT).some(function (k) { return MAT[k] === o.material; })) o.material.dispose(); } });
-    CITY = null; VM = null; PM = null; TRAIN = null; BOATS = []; Object.keys(TEXC).forEach(function (k) { TEXC[k].dispose(); delete TEXC[k]; });
+    CITY = null; VM = null; PM = null; TRAIN = null; BOATS = []; W.WHEEL = null; Object.keys(TEXC).forEach(function (k) { TEXC[k].dispose(); delete TEXC[k]; });
   }
   W.buildCity = function (sc, three) { T = three || window.THREE; SC = sc; try { build(); } catch (e) { console.error('city build', e); } };
   W.setCity = function (id) {

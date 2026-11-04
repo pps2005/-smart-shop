@@ -17,7 +17,9 @@
   function E(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
   function mul(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-  function bkk() { var d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })); return d; }
+  var TZ = { bkk: 'Asia/Bangkok', tyo: 'Asia/Tokyo', sel: 'Asia/Seoul', sha: 'Asia/Shanghai' };
+  function bkk() { var id = W.cityId ? W.cityId() : 'bkk'; return new Date(new Date().toLocaleString('en-US', { timeZone: TZ[id] || 'Asia/Bangkok' })); }
+  W.cityNow = bkk;
   function hm() { var d = bkk(); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
   function say(t) { if (typeof toast === 'function') toast(t); }
 
@@ -87,13 +89,19 @@
     coach: { t: 'โค้ชกีฬา', ic: '🏃', col: 0x2c6fb8, hat: 0xffffff, names: ['โค้ชเบียร์', 'โค้ชหมี'], place: 'สนามกีฬา' },
     keeper: { t: 'เจ้าหน้าที่ศาสนสถาน', ic: '🛕', col: 0xf2c037, hat: 0x3b2418, names: ['พี่ธรรม', 'ลุงศักดิ์'], place: 'วัด/ศาลเจ้า' },
     guide: { t: 'ไกด์นำเที่ยว', ic: '🗺️', col: 0x3a86d4, hat: 0xff5fa2, names: ['พี่โอ๊ต', 'พี่ปุ้ย'], place: 'แลนด์มาร์ก' },
+    clerk: { t: 'พนักงานร้านสะดวกซื้อ', ic: '🏪', col: 0x0f8a4a, hat: 0xf47b20, shop: 'conv', names: ['น้องมิว', 'น้องเจ', 'พี่ก้อย'], place: 'ร้านสะดวกซื้อ' },
+    reception: { t: 'พนักงานต้อนรับโรงแรม', ic: '🛎️', col: 0x3b2a14, hat: 0xb08d57, names: ['คุณพลอย', 'คุณกันต์'], place: 'โรงแรม' },
+    parkstaff: { t: 'พนักงานสวนสนุก', ic: '🎡', col: 0x7c3aed, hat: 0xfacc15, names: ['พี่เมย์', 'พี่บอส'], place: 'สวนสนุก' },
+    recruiter: { t: 'ฝ่ายจัดหางาน', ic: '💼', col: 0x1d4ed8, hat: 0x111827, names: ['คุณนิด', 'คุณภพ'], place: 'บริษัทจัดหางาน' },
+    rider: { t: 'ไรเดอร์', ic: '🛵', col: 0x16a34a, hat: 0x16a34a, names: ['พี่วิน', 'พี่หนุ่ม', 'พี่ปั๊ม'], place: 'ริมถนน' },
     manager: { t: 'นิติบุคคลตึก', ic: '🧑‍💼', col: 0x334155, hat: 0x111827, names: ['คุณปรีชา', 'คุณวรรณ', 'คุณเอก'], place: 'ล็อบบี้ตึก' },
   };
-  var POI_ROLE = { school: ['teacher', 'guard'], hosp: ['nurse', 'guard'], mall: ['staff', 'guard'], market: ['market', 'vendor'], park: ['gardener', 'vendor'], stadium: ['coach'], station: ['station', 'barista'], temple: ['keeper'], landmark: ['guide', 'vendor'] };
+  var POI_ROLE = { conv: ['clerk', 'rider'], hotel: ['reception', 'guard'], park2: ['parkstaff', 'vendor'], agency: ['recruiter'], school: ['teacher', 'guard'], hosp: ['nurse', 'guard'], mall: ['staff', 'guard'], market: ['market', 'vendor'], park: ['gardener', 'vendor'], stadium: ['coach'], station: ['station', 'barista'], temple: ['keeper'], landmark: ['guide', 'vendor'] };
   var POI_TH = { school: 'โรงเรียน', hosp: 'โรงพยาบาล', mall: 'ห้าง', market: 'ตลาด', temple: 'วัด', park: 'สวน', stadium: 'สนามกีฬา', station: 'สถานีรถไฟฟ้า', landmark: 'แลนด์มาร์ก', cafe: 'ร้านกาแฟ', rent: 'ตึกเช่า' };
   var MENUS = {
     cafe: [['อเมริกาโน่', 45, '☕'], ['ลาเต้', 55, '☕'], ['คาปูชิโน่', 55, '☕'], ['มอคค่า', 60, '🍫'], ['ชาไทย', 45, '🧋'], ['ชาเขียวมัทฉะ', 60, '🍵'], ['โกโก้', 50, '🍫'], ['น้ำมะนาวโซดา', 40, '🍋'], ['ครัวซองต์', 55, '🥐'], ['บราวนี่', 50, '🍫'], ['เค้กส้ม', 65, '🍰'], ['แซนด์วิชแฮมชีส', 69, '🥪']],
     food: [['ข้าวมันไก่', 50, '🍗'], ['กะเพราหมูสับไข่ดาว', 60, '🍳'], ['ก๋วยเตี๋ยวต้มยำ', 50, '🍜'], ['ข้าวผัดกุ้ง', 60, '🍤'], ['ผัดไทย', 55, '🍜'], ['ส้มตำไทย', 45, '🥗'], ['หมูปิ้ง+ข้าวเหนียว', 35, '🍢'], ['น้ำเปล่า', 10, '💧']],
+    conv: [['ข้าวกล่องเข้าไมโครเวฟ', 45, '🍱'], ['แซนด์วิช', 35, '🥪'], ['ซาลาเปา', 20, '🥟'], ['ไส้กรอกย่าง', 25, '🌭'], ['โอนิกิริ', 25, '🍙'], ['นมเย็น', 15, '🥛'], ['น้ำดื่ม', 7, '💧'], ['กาแฟกระป๋อง', 20, '🥫'], ['ขนมมันฝรั่ง', 20, '🍟'], ['ไอศกรีม', 25, '🍦']],
     fruit: [['มะม่วง (กก.)', 60, '🥭'], ['ส้ม (กก.)', 50, '🍊'], ['กล้วยหอม (หวี)', 40, '🍌'], ['แตงโม (ลูก)', 45, '🍉'], ['สับปะรด (ลูก)', 35, '🍍'], ['ผักรวม (กำ)', 20, '🥬']],
   };
   var OPT = { cafe: { size: [['S', 0], ['M', 10], ['L', 20]], sweet: ['0%', '25%', '50%', '100%'], temp: ['ร้อน', 'เย็น', 'ปั่น'] } };
@@ -107,6 +115,7 @@
     var cap = new T.Mesh(new T.CylinderGeometry(.27, .29, .14, 12), new T.MeshLambertMaterial({ color: r.hat })); cap.position.y = 2.1; g.add(cap);
     var a1 = new T.Mesh(new T.BoxGeometry(.16, .7, .18), body); a1.position.set(-.4, 1.25, 0); var a2 = a1.clone(); a2.position.x = .4; g.add(a1, a2);
     g.userData.parts = { body: b, head: h, a1: a1, a2: a2 };
+    g.scale.setScalar(.78);   /* สูงประมาณ 1.7 ม. เท่าคนจริง */
     return g;
   }
   function kiosk(kind, x, z) {
@@ -124,9 +133,12 @@
     G.add(g); if (W.cityCol) W.cityCol(x, z, 3.6, 1.6);
     return g;
   }
+  var SPL = [-416, -346, -276, -206, -136, -66, 0, 66, 136, 206, 276, 346, 416];
+  function onRoad(x, z) { for (var i = 0; i < SPL.length; i++) if (Math.abs(x - SPL[i]) < 7.2 || Math.abs(z - SPL[i]) < 7.2) return true; return false; }
+  W.onRoad = onRoad;
   function freeSpot(x, z, tries) {
-    var dirs = [[0, 0], [0, 4], [0, -4], [4, 0], [-4, 0], [6, 6], [-6, 6], [6, -6], [-6, -6], [0, 9], [9, 0]];
-    for (var i = 0; i < dirs.length; i++) { var a = x + dirs[i][0], b = z + dirs[i][1]; if (!W.cityHit || !W.cityHit(a, b, .9)) return [a, b]; }
+    var dirs = [[0, 0], [0, 4], [0, -4], [4, 0], [-4, 0], [6, 6], [-6, 6], [6, -6], [-6, -6], [0, 9], [9, 0], [0, -9], [-9, 0], [12, 0], [0, 12], [-12, 0], [0, -12]];
+    for (var i = 0; i < dirs.length; i++) { var a = x + dirs[i][0], b = z + dirs[i][1]; if (!onRoad(a, b) && (!W.cityHit || !W.cityHit(a, b, .9))) return [a, b]; }
     return null;
   }
   function addNPC(role, x, z, face, extra) {
@@ -138,7 +150,7 @@
     var wd = document.getElementById('wd');
     if (wd && W.tagAdd) {
       var e = document.createElement('div'); e.className = 'wtag wnpc'; e.textContent = r.ic + ' ' + npc.name;
-      wd.appendChild(e); W.tagAdd(e, g, 2.6, 'ext'); npc.tag = e;
+      wd.appendChild(e); W.tagAdd(e, g, 2.1, 'ext'); npc.tag = e;
     }
     NPCS.push(npc); return npc;
   }
@@ -231,7 +243,7 @@
   function talk(n) {
     ensurePop(); cur = n;
     n.g.rotation.y = W.pc ? Math.atan2(W.pc.position.x - n.x, W.pc.position.z - n.z) : n.g.rotation.y;
-    var chips = (n.r.shop ? ['🛒 ดูเมนู/สั่ง'] : []).concat(n.role === 'manager' ? ['มีห้องว่างไหม', '🛗 ขึ้นลิฟต์'] : []).concat(CHIPS);
+    var chips = (n.r.shop ? ['🛒 ดูเมนู/สั่ง'] : []).concat(n.role === 'manager' ? ['มีห้องว่างไหม', '🛗 ขึ้นลิฟต์'] : []).concat(W.lifeChips ? W.lifeChips(n) : []).concat(CHIPS);
     pop.innerHTML = '<div class="wlh"><span class="wla">' + n.r.ic + '</span><div><b>' + E(n.name) + '</b><small>' + E(n.r.t) + ' · ' + E(n.r.place) + '</small></div><button data-l="x">✕</button></div>' +
       '<div class="wll" id="wll"></div><div class="wlc">' + chips.map(function (c) { return '<button data-l="chip">' + E(c) + '</button>'; }).join('') + '</div>' +
       '<div class="wli"><input id="wlq" placeholder="พิมพ์คุยกับ ' + E(n.name) + '…" autocomplete="off"><button data-l="send">➤</button></div>';
@@ -245,6 +257,7 @@
   }
   function showMenu(n) {
     var M = MENUS[n.r.shop]; if (!M) return;
+    if (W.isOpen && !W.isOpen(n.r.shop)) { bubble('n', polite(n, 'ขอโทษครับ/ค่ะ ตอนนี้ร้านปิดแล้ว เปิดอีกที ' + W.hoursTxt(n.r.shop))); return; }
     var l = document.getElementById('wll'); if (!l) return;
     var d = document.createElement('div'); d.className = 'wlmenu';
     d.innerHTML = M.map(function (m, i) { return '<button data-l="item" data-i="' + i + '"><span>' + m[2] + '</span>' + E(m[0]) + '<b>฿' + m[1] + '</b></button>'; }).join('');
@@ -265,6 +278,7 @@
   function confirmOrder() {
     var n = cur, c = cartSel; if (!c) return;
     var extra = n.r.shop === 'cafe' ? ({ S: 0, M: 10, L: 20 }[c.size] || 0) : 0, price = c.m[1] + extra;
+    if (W.onBuy && W.onBuy({ name: c.m[0], ic: c.m[2], price: price }) === false) { bubble('n', polite(n, 'เงินในกระเป๋าไม่พอนะครับ/คะ ลองไปหางานทำที่บริษัทจัดหางานดูไหม')); cartSel = null; return; }
     var desc = c.m[0] + (n.r.shop === 'cafe' && extra >= 0 && !/ครัวซองต์|บราวนี่|เค้ก|แซนด์วิช/.test(c.m[0]) ? ' ' + c.temp + ' ' + c.size + ' หวาน ' + c.sweet : '');
     bubble('u', 'ขอ ' + desc);
     bubble('n', polite(n, 'รับ' + desc + ' ทั้งหมด ฿' + price + ' ครับ/ค่ะ รอสักครู่นะ'));
@@ -284,7 +298,7 @@
     var a = t.dataset.l;
     if (a === 'x') { pop.classList.remove('on'); cur = null; }
     else if (a === 'send') sendQ();
-    else if (a === 'chip') { var tx = t.textContent; if (/ดูเมนู/.test(tx)) { bubble('u', 'ขอดูเมนูหน่อย'); showMenu(cur); } else if (/ลิฟต์/.test(tx)) { if (cur.extra.rent) enter(cur.extra.rent); } else sendQ(tx); }
+    else if (a === 'chip') { var tx = t.textContent; if (W.lifeChip && W.lifeChip(cur, tx)) return; if (/ดูเมนู/.test(tx)) { bubble('u', 'ขอดูเมนูหน่อย'); showMenu(cur); } else if (/ลิฟต์/.test(tx)) { if (cur.extra.rent) enter(cur.extra.rent); } else sendQ(tx); }
     else if (a === 'item') chooseItem(+t.dataset.i);
     else if (a === 'opt') { cartSel[t.dataset.k] = t.dataset.v; t.parentNode.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b === t); }); }
     else if (a === 'confirm') { t.parentNode.querySelectorAll('button').forEach(function (b) { b.disabled = true; }); confirmOrder(); }
@@ -409,10 +423,10 @@
     // NPC ตามสถานที่
     (W.POI || []).forEach(function (q) {
       var roles = POI_ROLE[q.t]; if (!roles) return;
-      roles.forEach(function (r, i) { addNPC(r, q.x + (i ? -6 : 6), q.z + 30, Math.PI); });
+      roles.forEach(function (r, i) { var dz = q.door ? q.door.z + 2 : q.z + 24; addNPC(r, (q.door ? q.door.x : q.x) + (i ? -4 : 4), dz, 0); });
     });
     // ร้านกาแฟ / รถเข็นอาหาร / แผงผลไม้ ริมถนนรอบร้าน
-    [[40, 72, 'cafe'], [-72, 40, 'food'], [72, -40, 'cafe'], [-40, -72, 'fruit'], [140, 72, 'food'], [-140, -72, 'cafe'], [210, 140, 'cafe'], [-210, 140, 'food']].forEach(function (s) {
+    [[40, 76, 'cafe'], [-76, 40, 'food'], [76, -40, 'cafe'], [-40, -76, 'fruit'], [150, 76, 'food'], [-150, -76, 'cafe'], [222, 150, 'cafe'], [-222, 150, 'food']].forEach(function (s) {
       var sp = freeSpot(s[0], s[1]); if (!sp) return;
       kiosk(s[2], sp[0], sp[1]);
       addNPC(s[2] === 'cafe' ? 'barista' : s[2] === 'food' ? 'vendor' : 'market', sp[0], sp[1] - 1.6, Math.PI);
@@ -521,4 +535,8 @@
     applyDay(); proximity();
   }, 1000);
   W.lifeTalk = function (i) { if (NPCS[i]) talk(NPCS[i]); };
+  W.lifeNPCs = function () { return NPCS; };
+  W.lifeAnswer = function (n, q) { return answer(n, q); };
+  W.lifeBubble = function (who, t) { bubble(who, t); };
+  W.lifeClose = function () { if (pop) pop.classList.remove('on'); cur = null; };
 })();
