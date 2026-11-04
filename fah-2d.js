@@ -169,7 +169,7 @@ export class Puppet {
       try {
         const d = g.getImageData(Math.max(0, x | 0), Math.max(0, y | 0), Math.max(1, w | 0), Math.max(1, h | 0)).data;
         let r = 0, gg = 0, b = 0, n = 0;
-        for (let i = 0; i < d.length; i += 4) { const L = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; if (L > 150) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; } }
+        for (let i = 0; i < d.length; i += 4) { const L = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; if (L > 175 && d[i] >= d[i + 2] && d[i] - d[i + 1] < 70) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; } }
         return n ? [r / n, gg / n, b / n] : [248, 210, 222];
       } catch (e) { return [248, 210, 222]; }
     };

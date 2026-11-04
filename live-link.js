@@ -2,11 +2,12 @@
 // โหลดเป็นไฟล์สุดท้ายใน index.html · วิธียกเลิก: ลบ <script src="live-link.js">
 (function () {
   if (typeof M === 'undefined' || typeof go !== 'function') return;
-  var PAGES = { live: 'ai-live.html', avatar: 'avatar-studio.html' };
+  var PAGES = { live: 'ai-live.html', avatar: 'avatar-studio.html', cook: 'pink-cooking.html' };
   if (!M.some(function (m) { return m.id === 'live'; })) {
     M.push({ id: 'live', i: 'chat', t: 'AI Live 🎙️' });
     M.push({ id: 'avatar', i: 'sliders', t: 'แต่งตัวน้องฟ้า 👗' });
   }
+  if (!M.some(function (m) { return m.id === 'cook'; })) M.push({ id: 'cook', i: 'chat', t: 'ครัวน้องพิ้งค์ 🍳' });
 
   // เปิดหน้าไลฟ์ซ้อนบนเว็บเดิม (เว็บหลักยังทำงานอยู่ข้างหลัง สมอง/ข้อมูลร้านใช้ร่วมกันได้)
   var css = document.createElement('style');
