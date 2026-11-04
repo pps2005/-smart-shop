@@ -123,7 +123,7 @@
     '#wpmap .card{position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:520px;margin:auto;background:#fff;color:#0f172a;border-radius:18px;padding:14px;box-shadow:0 4px 18px rgba(0,0,0,.25);display:none}#wpmap .card.on{display:block}',
     '#wpmap .card .row{display:flex;gap:8px;margin-top:10px}#wpmap .card .row button{flex:1;padding:11px 6px;border-radius:22px;border:1px solid #dadce0;background:#fff;font-weight:700;color:#1a73e8}#wpmap .card .row button.pri{background:#1a73e8;color:#fff;border-color:#1a73e8}',
     '#wpfade{position:fixed;inset:0;z-index:2002;background:#000;opacity:0;pointer-events:none;transition:opacity .45s;display:grid;place-items:center;color:#fff;font-size:1.2rem;font-weight:700}',
-    'body.ss-game .wkpi,body.ss-game .wact,body.ss-game .wpan,body.ss-game .wtabs,body.ss-game .wleft,body.ss-game .wright,body.ss-game .wtag.wb{display:none!important}',
+    '#wd:has(#wchat.on) #wpact,#wd:has(#wchat.on) #wpdo{display:none!important}','body.ss-game .wkpi,body.ss-game .wact,body.ss-game .wpan,body.ss-game .wtabs,body.ss-game .wleft,body.ss-game .wright,body.ss-game .wtag.wb{display:none!important}',
     '@media(max-width:700px){#wpact{right:62px}#wphud{width:150px;padding:8px}#wpmini{width:130px;height:130px}#wpact{grid-template-columns:repeat(2,52px);gap:7px}#wpact button{width:52px;height:52px;font-size:1.3rem}}'
   ].join('');
   document.head.appendChild(css);
@@ -499,7 +499,7 @@
     else if (a === 'buy') { if (W.onBuy({ name: d.n, ic: d.i, price: +d.c }) === false) say('💸 เงินไม่พอ'); else say('🛍️ ซื้อ ' + d.i + ' ' + d.n + ' ฿' + d.c + ' แล้ว (อยู่ในกระเป๋า)'); }
     else if (a === 'shx') closeSheet();
     else if (a === 'navx') { nav(null); if (DEL) { DEL = null; W.speedMul = 1; say('ยกเลิกออเดอร์แล้ว'); } }
-    else if (a === 'ui') { ST.ui = !ST.ui; document.body.classList.toggle('ss-game', !ST.ui); save(); say(ST.ui ? '👁 แสดงแผงข้อมูลร้าน' : '🎮 โหมดเล่นเกม: ซ่อนแผงที่ไม่จำเป็นแล้ว'); }
+    else if (a === 'ui') { if (W.hideAll) { ST.ui = true; save(); W.hideAll(true); } else { ST.ui = !ST.ui; document.body.classList.toggle('ss-game', !ST.ui); save(); say(ST.ui ? '👁 แสดงแผงข้อมูลร้าน' : '🎮 โหมดเล่นเกม: ซ่อนแผงที่ไม่จำเป็นแล้ว'); } }
   }
   function taxi(x, z, n, f) {
     if (ST.money < f) return say('💸 เงินไม่พอจ่ายค่าแท็กซี่');
