@@ -20,3 +20,9 @@
 ## ข้อควรระวัง
 - ห้ามเปลี่ยน business logic (ราคา/สต๊อก/บัญชี) โดยไม่ได้รับอนุญาต
 - add-on ใช้การ override `render`/`A.*` ซ้อนกัน ลำดับ script ใน index.html สำคัญ
+
+## ระบบกล้อง (เพิ่มล่าสุด)
+- `world-cam.js` — โหมดกล้อง: orbit (เดิม) / walk (Free Roam เดินระดับสายตา, เข้า-ออกตึก, บุคคลที่ 3 กด V) / free / spec (◀▶ ตามตึก-ห้อง-คน) / debug (HUD+wireframe F). ปรับ ความเร็ว/FOV/ความไว ได้ (เก็บ localStorage `ss_cam`). ภายในมีผนัง+ช่องประตู+ชนเฟอร์นิเจอร์ (`W.intBlocked`), แผ่นเขียว "ทางออก" ที่กลางทางเดิน
+- `world-camui.js` — เมนู 🎥 มุมกล้อง, เมนู 👁 แสดง/ซ่อนกล่อง (เก็บ `ss_ui`), ปุ่ม –/+ ย่อมุมกล่อง, แถบพับขอบล่าง, โหมดโล่ง (H), จอยสติ๊กมือถือ, ▲▼, แถบ Spectator
+- ลำดับ script ใน index.html: world-3d → world-int → world-cam → world-ui → world-camui
+- คีย์ลัด: WASD/ลูกศร, Shift, Q/E, V, F, C(เมนูกล้อง), H(โหมดโล่ง), Esc(กลับมุมสูง)

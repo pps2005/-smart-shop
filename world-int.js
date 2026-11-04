@@ -3,6 +3,8 @@
 (function () {
   'use strict';
   var W = window.SSW, U = W.u, T, IS, RW = W.RW, RD = W.RD, rooms = {}, NP = [], PK = [], lights = {}, cur = { x: 0, z: 0, d: 90, el: 1.05, init: false }, foc = { room: 'all' }, sayT = 2, TK = [];
+  var BL = [], PLI = null;
+  function addBlock(g, x, z, w, d, ry) { var r = Math.abs(Math.round((ry || 0) / (Math.PI / 2))) % 2, t; if (r) { t = w; w = d; d = t; } var cx = g.position.x + x, cz = g.position.z + z; BL.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 }); }
   var mat = U.mat, emi = U.emi, box = U.box, cyl = U.cyl, sph = U.sph, plane = U.plane, cvs = U.cvs, pick = U.pick, rnd = U.rnd;
 
   /* ---------- พื้นผิว ---------- */
@@ -33,18 +35,18 @@
   function chair(g, x, z, ry, c) { var o = G(g, x, z, ry); cyl(o, .12, .12, .8, 0, .4, 0, 0x2a2f3a, 8); box(o, 1, .18, 1, 0, .95, 0, c || 0x39404f); box(o, 1, 1.05, .16, 0, 1.5, .45, c || 0x39404f); box(o, 1.1, .1, 1.1, 0, .05, 0, 0x20242d); return o; }
   function monitor(o, x, y, z, c, k) { box(o, .14, .5, .14, x, y + .25, z, 0x20242d); box(o, 1.5, .95, .1, x, y + 1, z, 0x151a24); var s = new T.Mesh(new T.PlaneGeometry(1.36, .82), new T.MeshBasicMaterial({ map: screenTex(c, k) })); s.position.set(x, y + 1, z + .06); o.add(s); }
   function desk(g, x, z, ry, o) {
-    o = o || {}; var d = G(g, x, z, ry), w = o.w || 3.4; box(d, w, .16, 1.7, 0, 1.4, 0, o.c || 0x7a4a2a); box(d, .16, 1.35, 1.5, -w / 2 + .15, .68, 0, 0x4a2c18); box(d, .16, 1.35, 1.5, w / 2 - .15, .68, 0, 0x4a2c18); box(d, w - .3, 1, .12, 0, .85, -.7, 0x3c2414);
+    o = o || {}; var d = G(g, x, z, ry), w = o.w || 3.4; addBlock(g, x, z, w, 1.8, ry); box(d, w, .16, 1.7, 0, 1.4, 0, o.c || 0x7a4a2a); box(d, .16, 1.35, 1.5, -w / 2 + .15, .68, 0, 0x4a2c18); box(d, .16, 1.35, 1.5, w / 2 - .15, .68, 0, 0x4a2c18); box(d, w - .3, 1, .12, 0, .85, -.7, 0x3c2414);
     monitor(d, o.m == null ? 0 : o.m, 1.48, -.35, o.sc || '#5eead4', Math.floor(x + z)); if (o.m2 != null) monitor(d, o.m2, 1.48, -.35, '#f9a8d4', 5);
     box(d, .9, .06, .35, 0, 1.5, .35, 0x2a2f3a, 1); box(d, .35, .24, .3, w / 2 - .5, 1.58, .4, 0xe5e7eb, 1); cyl(d, .13, .13, .26, -w / 2 + .5, 1.6, .45, 0xf8fafc, 10);
     var cx = x + Math.sin(ry || 0) * 1.9, cz = z + Math.cos(ry || 0) * 1.9; chair(g, cx, cz, ry || 0, o.cc);
     return { x: x + Math.sin(ry || 0) * 1.62, z: z + Math.cos(ry || 0) * 1.62, ry: (ry || 0) + Math.PI };
   }
-  function shelf(g, x, z, ry, w, h) { var o = G(g, x, z, ry); w = w || 4; h = h || 4.2; box(o, w, h, .8, 0, h / 2, 0, 0x3a2416); var p = new T.Mesh(new T.PlaneGeometry(w - .3, h - .3), new T.MeshBasicMaterial({ map: booksTex(), color: 0xbbbbbb })); p.position.set(0, h / 2, .42); o.add(p); return o; }
-  function cabinet(g, x, z, ry) { var o = G(g, x, z, ry); box(o, 1.7, 2.8, 1.2, 0, 1.4, 0, 0x6b7280); for (var i = 0; i < 3; i++) { box(o, 1.5, .8, .08, 0, .5 + i * .9, .62, 0x4b5563); box(o, .5, .08, .06, 0, .6 + i * .9, .68, 0xe5e7eb, 1); } return o; }
+  function shelf(g, x, z, ry, w, h) { var o = G(g, x, z, ry); w = w || 4; h = h || 4.2; addBlock(g, x, z, w, .9, ry); box(o, w, h, .8, 0, h / 2, 0, 0x3a2416); var p = new T.Mesh(new T.PlaneGeometry(w - .3, h - .3), new T.MeshBasicMaterial({ map: booksTex(), color: 0xbbbbbb })); p.position.set(0, h / 2, .42); o.add(p); return o; }
+  function cabinet(g, x, z, ry) { var o = G(g, x, z, ry); addBlock(g, x, z, 1.8, 1.3, ry); box(o, 1.7, 2.8, 1.2, 0, 1.4, 0, 0x6b7280); for (var i = 0; i < 3; i++) { box(o, 1.5, .8, .08, 0, .5 + i * .9, .62, 0x4b5563); box(o, .5, .08, .06, 0, .6 + i * .9, .68, 0xe5e7eb, 1); } return o; }
   function plant(g, x, z, s) { s = s || 1; var o = G(g, x, z); cyl(o, .6 * s, .45 * s, .9 * s, 0, .45 * s, 0, 0xc2693a, 10); for (var i = 0; i < 6; i++) { var a = i / 6 * 6.28; sph(o, .55 * s, Math.cos(a) * .5 * s, 1.4 * s + (i % 2) * .3, Math.sin(a) * .5 * s, pick([0x2f8f4e, 0x3aa45c, 0x278048])); } sph(o, .7 * s, 0, 2 * s, 0, 0x3aa45c); return o; }
   function floorLamp(g, x, z, c) { var o = G(g, x, z); cyl(o, .35, .35, .12, 0, .06, 0, 0x20242d, 10); cyl(o, .06, .06, 3.6, 0, 1.8, 0, 0x20242d, 6); cyl(o, .5, .75, .9, 0, 3.7, 0, emi(c || 0xffc27a, .95), 12); glow(g, x, z, 7); return o; }
-  function sofa(g, x, z, ry, c) { var o = G(g, x, z, ry); box(o, 4.2, .8, 1.7, 0, .6, 0, c); box(o, 4.2, 1.3, .5, 0, 1.4, -.75, c); [-1, 1].forEach(function (a) { box(o, .5, 1.1, 1.7, a * 2.05, .95, 0, c); }); return o; }
-  function table(g, x, z, w, d, h, c, ry) { var o = G(g, x, z, ry); box(o, w, .15, d, 0, h, 0, c || 0x7a4a2a); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (a) { box(o, .18, h, .18, a[0] * (w / 2 - .2), h / 2, a[1] * (d / 2 - .2), 0x3c2414); }); return o; }
+  function sofa(g, x, z, ry, c) { var o = G(g, x, z, ry); addBlock(g, x, z, 4.4, 1.8, ry); box(o, 4.2, .8, 1.7, 0, .6, 0, c); box(o, 4.2, 1.3, .5, 0, 1.4, -.75, c); [-1, 1].forEach(function (a) { box(o, .5, 1.1, 1.7, a * 2.05, .95, 0, c); }); return o; }
+  function table(g, x, z, w, d, h, c, ry) { var o = G(g, x, z, ry); addBlock(g, x, z, w, d, ry); box(o, w, .15, d, 0, h, 0, c || 0x7a4a2a); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (a) { box(o, .18, h, .18, a[0] * (w / 2 - .2), h / 2, a[1] * (d / 2 - .2), 0x3c2414); }); return o; }
   function rug(g, x, z, w, d, c, k) { var m = new T.MeshStandardMaterial({ map: rugTex(c, 'rug' + k), roughness: 1 }), p = new T.Mesh(new T.PlaneGeometry(w, d), m); p.rotation.x = -Math.PI / 2; p.position.set(x, .04, z); p.receiveShadow = true; g.add(p); return p; }
   function board(g, x, y, z, w, h, ry, tex) { var o = G(g, x, 0, ry); o.position.z = z; box(o, w + .3, h + .3, .12, 0, y, 0, 0xe5e7eb); var p = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: tex })); p.position.set(0, y, .08); o.add(p); return o; }
   function chart() { return cvs(160, 96, function (g) { g.fillStyle = '#f8fafc'; g.fillRect(0, 0, 160, 96); g.strokeStyle = '#cbd5e1'; for (var i = 1; i < 5; i++) { g.beginPath(); g.moveTo(10, i * 18); g.lineTo(150, i * 18); g.stroke(); } g.strokeStyle = '#16a34a'; g.lineWidth = 3; g.beginPath(); g.moveTo(12, 78); [[40, 60], [70, 66], [100, 36], [130, 28], [150, 14]].forEach(function (p) { g.lineTo(p[0], p[1]); }); g.stroke(); g.fillStyle = '#ef4444'; for (i = 0; i < 6; i++) g.fillRect(14 + i * 24, 86 - (i * 7 % 18 + 6), 10, i * 7 % 18 + 6); }, 'chart'); }
@@ -58,9 +60,9 @@
     }, 'cal' + td);
   }
   function tvTex(txt, c, k) { return cvs(128, 72, function (g) { var r = g.createLinearGradient(0, 0, 128, 72); r.addColorStop(0, '#0b1730'); r.addColorStop(1, '#16315f'); g.fillStyle = r; g.fillRect(0, 0, 128, 72); g.fillStyle = c; g.fillRect(0, 54, 128, 18); g.fillStyle = '#fff'; g.font = 'bold 13px system-ui'; g.textAlign = 'left'; g.fillText(txt, 6, 66); g.fillStyle = 'rgba(255,255,255,.5)'; for (var i = 0; i < 4; i++) g.fillRect(8, 10 + i * 8, 50 + (i * k) % 40, 3); g.fillStyle = c; g.fillRect(80, 12, 38, 30); }, 'tv' + txt + k); }
-  function rack(g, x, z, ry) { var o = G(g, x, z, ry); [-1.6, 1.6].forEach(function (a) { box(o, .12, 3.2, .12, a, 1.6, 0, 0xcbd5e1); box(o, .12, .12, 1.2, a, .06, 0, 0xcbd5e1); }); box(o, 3.4, .1, .1, 0, 3.1, 0, 0xcbd5e1); var cs = [0xf97316, 0x3b82f6, 0xf472b6, 0x22c55e, 0xfacc15, 0xa78bfa, 0xef4444]; for (var i = 0; i < 9; i++) box(o, .3, 1.7 + Math.random() * .4, .8, -1.4 + i * .35, 2.1, 0, cs[i % cs.length]); return o; }
-  function stockRack(g, x, z, ry, w) { var o = G(g, x, z, ry); w = w || 4.4; [-1, 1].forEach(function (a) { box(o, .16, 5, 1.4, a * w / 2, 2.5, 0, 0x3b82f6); }); for (var l = 0; l < 4; l++) { box(o, w, .14, 1.4, 0, .7 + l * 1.25, 0, 0xf97316); for (var i = 0; i < 3; i++) box(o, .95 + Math.random() * .3, .85, .95, -w / 2 + .85 + i * 1.4, 1.2 + l * 1.25, 0, pick([0xd9ae72, 0xd9ae72, 0xe8c48a, 0x93c5fd])); } return o; }
-  function counter(g, x, z, w) { var o = G(g, x, z); box(o, w, 1.5, 1.6, 0, .75, 0, 0x3f4756); box(o, w + .2, .14, 1.8, 0, 1.55, 0, 0xe5e7eb); box(o, .9, .5, .7, -w / 4, 1.85, 0, 0x20242d); var s = new T.Mesh(new T.PlaneGeometry(.7, .35), new T.MeshBasicMaterial({ map: screenTex('#86efac', 3) })); s.position.set(-w / 4, 1.95, .36); s.rotation.x = -.3; o.add(s); return o; }
+  function rack(g, x, z, ry) { var o = G(g, x, z, ry); addBlock(g, x, z, 3.6, 1, ry); [-1.6, 1.6].forEach(function (a) { box(o, .12, 3.2, .12, a, 1.6, 0, 0xcbd5e1); box(o, .12, .12, 1.2, a, .06, 0, 0xcbd5e1); }); box(o, 3.4, .1, .1, 0, 3.1, 0, 0xcbd5e1); var cs = [0xf97316, 0x3b82f6, 0xf472b6, 0x22c55e, 0xfacc15, 0xa78bfa, 0xef4444]; for (var i = 0; i < 9; i++) box(o, .3, 1.7 + Math.random() * .4, .8, -1.4 + i * .35, 2.1, 0, cs[i % cs.length]); return o; }
+  function stockRack(g, x, z, ry, w) { var o = G(g, x, z, ry); w = w || 4.4; addBlock(g, x, z, w + .3, 1.5, ry); [-1, 1].forEach(function (a) { box(o, .16, 5, 1.4, a * w / 2, 2.5, 0, 0x3b82f6); }); for (var l = 0; l < 4; l++) { box(o, w, .14, 1.4, 0, .7 + l * 1.25, 0, 0xf97316); for (var i = 0; i < 3; i++) box(o, .95 + Math.random() * .3, .85, .95, -w / 2 + .85 + i * 1.4, 1.2 + l * 1.25, 0, pick([0xd9ae72, 0xd9ae72, 0xe8c48a, 0x93c5fd])); } return o; }
+  function counter(g, x, z, w) { var o = G(g, x, z); addBlock(g, x, z, w + .2, 1.8, 0); box(o, w, 1.5, 1.6, 0, .75, 0, 0x3f4756); box(o, w + .2, .14, 1.8, 0, 1.55, 0, 0xe5e7eb); box(o, .9, .5, .7, -w / 4, 1.85, 0, 0x20242d); var s = new T.Mesh(new T.PlaneGeometry(.7, .35), new T.MeshBasicMaterial({ map: screenTex('#86efac', 3) })); s.position.set(-w / 4, 1.95, .36); s.rotation.x = -.3; o.add(s); return o; }
   function wallDeco(g, d) {
     box(g, RW - .2, .14, .1, 0, .6, -RD / 2 + .06, emi(d.c, .9), 1);
     var nm = new T.Mesh(new T.PlaneGeometry(7, 1.3), new T.MeshBasicMaterial({ map: neon(d.n, W.hex(d.c)), transparent: true })); nm.position.set(0, 4.15, -RD / 2 + .04); g.add(nm);
@@ -131,8 +133,18 @@
       var g = new T.Group(); g.position.set(d.rx, 0, d.rz); IS.add(g); rooms[d.k] = g; var S = [];
       var fl = d.k === 'sec' ? tatami('tat') : d.k === 'stock' ? tiles('#3a414e', 'tstock') : d.k === 'news' ? tiles('#232a3d', 'tnews') : wood(d.k === 'prod' || d.k === 'sales' ? '#7a5234' : '#5b3a24', d.k === 'prod' || d.k === 'sales' ? '#6a4529' : '#4a2e1b', 'w' + (d.k === 'prod' || d.k === 'sales' ? 1 : 0));
       var f = new T.Mesh(new T.PlaneGeometry(RW, RD), new T.MeshStandardMaterial({ map: fl, roughness: .7 })); f.rotation.x = -Math.PI / 2; f.receiveShadow = true; g.add(f);
-      box(g, RW + .5, 5, .5, 0, 2.5, -RD / 2 - .25, d.k === 'sec' ? 0x4a3a2c : wallM); box(g, .5, 5, RD, -RW / 2 - .25, 2.5, 0, d.k === 'sec' ? 0x4a3a2c : wallM2); if (d.rc[0] === 3) box(g, .5, 5, RD, RW / 2 + .25, 2.5, 0, wallM2);
-      if (d.rc[1] === 0) { box(g, RW, .14, .16, 0, 1.1, RD / 2, 0x151a24); box(g, RW, .9, .06, 0, .6, RD / 2, mat(0x9fc8ff, { transparent: true, opacity: .22, roughness: .1 }), 1); }
+      var wc = d.k === 'sec' ? 0x4a3a2c : null, WM = wc || wallM, WM2 = wc || wallM2, HG = 1.8;
+      function wallX(x0, x1, z, th, m, gap) {   /* ผนังแนวแกน x มีช่องประตูกึ่งกลางถ้า gap */
+        if (!gap) { box(g, x1 - x0, 5, th, (x0 + x1) / 2, 2.5, z, m); addBlock(g, (x0 + x1) / 2, z, x1 - x0, th, 0); return; }
+        [[x0, -HG], [HG, x1]].forEach(function (a) { box(g, a[1] - a[0], 5, th, (a[0] + a[1]) / 2, 2.5, z, m); addBlock(g, (a[0] + a[1]) / 2, z, a[1] - a[0], th, 0); }); box(g, HG * 2, 1.4, th, 0, 4.3, z, m);
+      }
+      function wallZ(z0, z1, x, th, m, gap) {
+        if (!gap) { box(g, th, 5, z1 - z0, x, 2.5, (z0 + z1) / 2, m); addBlock(g, x, (z0 + z1) / 2, th, z1 - z0, 0); return; }
+        [[z0, -HG], [HG, z1]].forEach(function (a) { box(g, th, 5, a[1] - a[0], x, 2.5, (a[0] + a[1]) / 2, m); addBlock(g, x, (a[0] + a[1]) / 2, th, a[1] - a[0], 0); }); box(g, th, 1.4, HG * 2, x, 4.3, 0, m);
+      }
+      wallX(-RW / 2 - .5, RW / 2 + .5, -RD / 2 - .25, .5, WM, d.rc[1] === 1);
+      wallZ(-RD / 2, RD / 2, -RW / 2 - .25, .5, WM2, d.rc[0] > 0); if (d.rc[0] === 3) wallZ(-RD / 2, RD / 2, RW / 2 + .25, .5, WM2, false);
+      if (d.rc[1] === 0) { box(g, RW, .14, .16, 0, 1.1, RD / 2, 0x151a24); [[-RW / 2, -HG], [HG, RW / 2]].forEach(function (a) { box(g, a[1] - a[0], .9, .06, (a[0] + a[1]) / 2, .6, RD / 2, mat(0x9fc8ff, { transparent: true, opacity: .22, roughness: .1 }), 1); addBlock(g, (a[0] + a[1]) / 2, RD / 2, a[1] - a[0], .3, 0); }); }
       wallDeco(g, d); RB[d.k](g, d, S);
       // ตัวละคร
       var st = d.staff, ti = 0, seats = S.filter(function (s) { return s; });
@@ -148,7 +160,14 @@
       });
       d.room = g;
     });
-    W.INT = { npcs: NP };
+    var ep = new T.Mesh(new T.PlaneGeometry(5.2, 3.6), new T.MeshBasicMaterial({ map: cvs(256, 176, function (g) { g.fillStyle = 'rgba(16,185,129,.28)'; g.fillRect(0, 0, 256, 176); g.strokeStyle = '#34d399'; g.lineWidth = 6; g.strokeRect(6, 6, 244, 164); g.fillStyle = '#d1fae5'; g.font = 'bold 40px system-ui,"Noto Sans Thai"'; g.textAlign = 'center'; g.fillText('🚪 ทางออก', 128, 100); }, 'exitpad'), transparent: true, depthWrite: false }));
+    ep.rotation.x = -Math.PI / 2; ep.position.set(0, .08, 0); IS.add(ep);
+    var bm = new T.Mesh(new T.CylinderGeometry(1.8, 1.8, 7, 20, 1, true), new T.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: .13, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide })); bm.position.set(0, 3.5, 0); IS.add(bm);
+    PLI = W.mkChar({ hair: 0x7cc3ff, top: 0x93c5fd, f: 1, long: 1, bow: 0x60a5fa, s: .86 }); PLI.visible = false; IS.add(PLI); W.PLI = PLI;
+    var FP = [], wm2 = mat(0x3a3f4d, { roughness: .95 }), cm2 = new T.MeshBasicMaterial({ color: 0x3b4254 });
+    function fp(w, h, d, x, y, z, m) { var o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.visible = false; o.receiveShadow = true; IS.add(o); FP.push(o); }
+    fp(72.6, 5, .5, 0, 2.5, 15.75, wm2); fp(.5, 5, 5, -36.25, 2.5, 0, wm2); fp(.5, 5, 5, 36.25, 2.5, 0, wm2); fp(72.6, .3, 31.5, 0, 5.1, 0, cm2);
+    W.INT = { npcs: NP, scene: IS, blockers: BL, fpOnly: FP };
   };
 
   /* ---------- กล้อง/ลูป ---------- */
@@ -158,17 +177,23 @@
     if (room === 'all') return Math.max(RW * 4 * 1.22 / (2 * t * a * fw / w), (RD * 2 + 8) * 1.0 / (2 * t * fh / h), 50);
     return Math.max(16.5 / (2 * t * fh / h), RW * 1.2 / (2 * t * a * fw / w), 22);
   }
+  W.intBlocked = function (x, z, R) {
+    R = R == null ? .55 : R; if (x < -35.3 || x > 35.3 || z < -15.1 || z > 15.2) return true;
+    for (var i = 0; i < BL.length; i++) { var b = BL[i]; if (x > b.x0 - R && x < b.x1 + R && z > b.z0 - R && z < b.z1 + R) return true; } return false;
+  };
+  W.roomAt = function (x, z) { var c = Math.floor((x + 36) / RW), r = z < -2.5 ? 0 : z > 2.5 ? 1 : -1; if (r < 0 || c < 0 || c > 3) return null; var k = null; W.D.forEach(function (d) { if (d.rc[0] === c && d.rc[1] === r) k = d.k; }); return k; };
   W.intFocus = function (room, instant) { foc.room = room; if (instant) cur.init = false; };
   W.intPick = function () { return PK; };
-  W.intFrame = function (dt, t, a, w, h) {
+  W.intFrame = function (dt, t, a, w, h, free) {
     var V = W.V, rm = foc.room, d = W.BD[rm], tx = d ? d.rx : 0, tz = d ? d.rz + .8 : 0, td = distFor(rm, w, h), el = rm === 'all' ? 1.08 : .98, I = insets(w, h);
-    W.pc.setViewOffset(w, h, -(I.l - I.r) / 2, -(I.t - I.b) / 2, w, h);
-    if (!cur.init) { cur.x = tx; cur.z = tz; cur.d = td * 1.15; cur.el = el; cur.init = true; }
+    if (free) { var cp = W.pc.position; tx = cp.x; tz = cp.z; cur.init = false; if (W.pc.fov !== W.CAM.fov) { W.pc.fov = W.CAM.fov; W.pc.updateProjectionMatrix(); } }
+    else { if (W.pc.fov !== 38) { W.pc.fov = 38; W.pc.updateProjectionMatrix(); } W.pc.setViewOffset(w, h, -(I.l - I.r) / 2, -(I.t - I.b) / 2, w, h); }
+    if (!cur.init && !free) { cur.x = tx; cur.z = tz; cur.d = td * 1.15; cur.el = el; cur.init = true; }
     var k = Math.min(1, dt * 4); cur.x += (tx - cur.x) * k; cur.z += (tz - cur.z) * k; cur.d += (td - cur.d) * k; cur.el += (el - cur.el) * k;
-    var dd = cur.d * V.dz, yaw = V.yaw;
-    W.pc.position.set(cur.x + Math.sin(yaw) * Math.cos(cur.el) * dd, Math.sin(cur.el) * dd + .5, cur.z + Math.cos(yaw) * Math.cos(cur.el) * dd); W.pc.lookAt(cur.x, 1.2, cur.z);
+    if (!free) { var dd = cur.d * V.dz, yaw = V.yaw;
+      W.pc.position.set(cur.x + Math.sin(yaw) * Math.cos(cur.el) * dd, Math.sin(cur.el) * dd + .5, cur.z + Math.cos(yaw) * Math.cos(cur.el) * dd); W.pc.lookAt(cur.x, 1.2, cur.z); }
     // แสง
-    var ov = rm === 'all'; lights.amb.intensity += ((ov ? .95 : .55) - lights.amb.intensity) * k; lights.dl.castShadow = !ov;
+    var ov = rm === 'all' && !free; lights.amb.intensity += ((ov ? .95 : .55) - lights.amb.intensity) * k; lights.dl.castShadow = !ov;
     lights.dl.position.set(tx + 8, 18, tz + 10); lights.dl.target.position.set(tx, 0, tz);
     lights.p1.position.set(tx - 4, 4.2, tz + 1); lights.p2.position.set(tx + 4.5, 4.2, tz + 2); lights.p1.intensity = ov ? .15 : .85; lights.p2.intensity = ov ? .15 : .6;
     NP.forEach(function (n) { stepNpc(n, dt, t); });

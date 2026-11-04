@@ -286,19 +286,21 @@
       EX.ag.forEach(function (n) { stepExt(n, dt, t); });
       if (EX.core) { EX.core.rotation.y = t * .6; EX.core.position.y = 4 + Math.sin(t * 1.6) * .25; }
       EX.sec && pose(EX.sec, t, 'wave');
-      W.D.forEach(function (d, i) { var p = d.g.userData.pin; p.position.y = d.top - 2.2 + Math.sin(t * 2 + i) * .35; p.rotation.y = t * 1.1; d.sign.rotation.y = V.th; var s = V.sel === d.k; d.g.userData.pm.emissiveIntensity = s ? 1.4 : .55; });
+      W.D.forEach(function (d, i) { var p = d.g.userData.pin; p.position.y = d.top - 2.2 + Math.sin(t * 2 + i) * .35; p.rotation.y = t * 1.1; if (V.cam === 'orbit') d.sign.rotation.y = V.th; var s = V.sel === d.k; d.g.userData.pm.emissiveIntensity = s ? 1.4 : .55; });
       if (EX.sel && V.sel) { EX.sel.visible = true; EX.sel.scale.setScalar(1 + Math.sin(t * 4) * .015); }
+      if (V.cam !== 'orbit' && W.camStep) { W.camStep(dt, t, w, h); cam = pc; scn = EX.sc; }
+      else {
       V.th += (V.thT - V.th) * Math.min(1, dt * 6); V.cx += (V.tx - V.cx) * Math.min(1, dt * 5); V.cz += (V.tz - V.cz) * Math.min(1, dt * 5);
       var a = w / h, vh = Math.max(66, 84 / Math.max(a, .55)) / V.zoom, el = .64, R = 120; cam = oc; scn = EX.sc;
       oc.left = -vh * a / 2; oc.right = vh * a / 2; oc.top = vh / 2; oc.bottom = -vh / 2; oc.updateProjectionMatrix();
-      oc.position.set(V.cx + Math.sin(V.th) * Math.cos(el) * R, Math.sin(el) * R, V.cz + Math.cos(V.th) * Math.cos(el) * R); oc.lookAt(V.cx, 0, V.cz);
-    } else if (W.intFrame) { var r = W.intFrame(dt, t, w / h, w, h); cam = pc; scn = r; }
+      oc.position.set(V.cx + Math.sin(V.th) * Math.cos(el) * R, Math.sin(el) * R, V.cz + Math.cos(V.th) * Math.cos(el) * R); oc.lookAt(V.cx, 0, V.cz); }
+    } else if (W.intFrame) { var fr = V.cam !== 'orbit' && W.camStep; if (fr) W.camStep(dt, t, w, h); var r = W.intFrame(dt, t, w / h, w, h, !!fr); cam = pc; scn = r; }
     if (scn) rd.render(scn, cam);
     // ป้ายลอย (DOM)
     NT.forEach(function (o) {
       var ok = o.mode === V.mode && (!o.room || o.room === V.room || V.room === 'all' && o.room === '*');
       if (!ok || !o.obj || (o.show && !o.show())) { if (o.on !== false) { o.el.style.display = 'none'; o.on = false; } return; }
-      var v = (o.v || (o.v = new T.Vector3())); o.obj.getWorldPosition(v); v.y += o.dy; v.project(cam);
+      var v = (o.v || (o.v = new T.Vector3())); o.obj.getWorldPosition(v); v.y += o.dy; if (V.cam !== 'orbit' && cam.position.distanceTo(v) > (V.mode === 'ext' ? 46 : 30)) { if (o.on !== false) { o.el.style.display = 'none'; o.on = false; } return; } v.project(cam);
       if (v.z > 1 || v.x < -1.2 || v.x > 1.2 || v.y < -1.2 || v.y > 1.2) { if (o.on !== false) { o.el.style.display = 'none'; o.on = false; } return; }
       if (o.on !== true) { o.el.style.display = ''; o.on = true; }
       o.el.style.transform = 'translate(' + ((v.x * .5 + .5) * w).toFixed(1) + 'px,' + ((-v.y * .5 + .5) * h).toFixed(1) + 'px) translate(-50%,-100%)';
@@ -325,7 +327,7 @@
     rd = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }); rd.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); rd.shadowMap.enabled = true; rd.shadowMap.type = T.PCFSoftShadowMap;
     el.insertBefore(rd.domElement, el.firstChild); W.canvas = rd.domElement;
     oc = new T.OrthographicCamera(-1, 1, 1, -1, -300, 500); pc = new T.PerspectiveCamera(38, 1, .5, 500); ray = new T.Raycaster(); W.pc = pc; W.rd = rd;
-    buildExt(); if (W.buildInt) W.buildInt(T); bind(); ready = true; requestAnimationFrame(frame); return true;
+    buildExt(); W.EXS = EX.sc; W.EX = EX; if (W.buildInt) W.buildInt(T); bind(); ready = true; requestAnimationFrame(frame); return true;
   };
   W.ready = function () { return ready; };
   W.setMode = function (m, room) {
@@ -333,6 +335,7 @@
     V.fade = 1; var wd = document.getElementById('wd'); if (wd) wd.classList.add('wfade');
     setTimeout(function () {
       V.mode = m; if (m === 'int') { V.room = room || 'all'; V.yaw = 0; V.dz = 1; if (W.intFocus) W.intFocus(V.room, true); }
+      if (V.cam !== 'orbit' && W.spawn) W.spawn(m, V.room);
       if (wd) { wd.classList.toggle('wint', m === 'int'); wd.classList.toggle('wext', m === 'ext'); }
       if (W.cb.mode) W.cb.mode(m, V.room);
       setTimeout(function () { if (wd) wd.classList.remove('wfade'); }, 60);
@@ -357,22 +360,23 @@
     c.addEventListener('pointermove', function (e) {
       var p = ps[e.pointerId]; if (!p) return; var n = Object.keys(ps).length, dx = e.clientX - p.x, dy = e.clientY - p.y; mv += Math.abs(dx) + Math.abs(dy);
       if (n === 1) {
-        if (V.mode === 'ext') {
+        if (V.cam !== 'orbit' && W.camLook) W.camLook(dx, dy);
+        else if (V.mode === 'ext') {
           var a = cw / ch, vh = Math.max(66, 84 / Math.max(a, .55)) / V.zoom, k = vh / ch, sn = Math.sin(.64);
           V.tx += -Math.cos(V.th) * dx * k + (-Math.sin(V.th)) * dy * k / sn; V.tz += Math.sin(V.th) * dx * k + (-Math.cos(V.th)) * dy * k / sn;
           V.tx = Math.max(-60, Math.min(60, V.tx)); V.tz = Math.max(-60, Math.min(60, V.tz)); V.cx = V.tx; V.cz = V.tz;
         } else V.yaw = Math.max(-.9, Math.min(.9, V.yaw - dx * .006));
       }
       p.x = e.clientX; p.y = e.clientY;
-      if (n === 2) { var ks = Object.keys(ps), p1 = ps[ks[0]], p2 = ps[ks[1]], d = Math.hypot(p1.x - p2.x, p1.y - p2.y); if (pd) W.zoomBy(d / pd); pd = d; }
+      if (n === 2) { var ks = Object.keys(ps), p1 = ps[ks[0]], p2 = ps[ks[1]], d = Math.hypot(p1.x - p2.x, p1.y - p2.y); if (pd && V.cam === 'orbit') W.zoomBy(d / pd); pd = d; }
     });
     c.addEventListener('pointerup', function (e) { var one = Object.keys(ps).length === 1; if (ps[e.pointerId] && one && mv < 8) tap(e); delete ps[e.pointerId]; pd = 0; });
     c.addEventListener('pointercancel', function (e) { delete ps[e.pointerId]; pd = 0; });
-    c.addEventListener('wheel', function (e) { e.preventDefault(); W.zoomBy(Math.exp(-e.deltaY * .0012)); }, { passive: false });
+    c.addEventListener('wheel', function (e) { e.preventDefault(); if (V.cam !== 'orbit' && W.camWheel) W.camWheel(e.deltaY); else W.zoomBy(Math.exp(-e.deltaY * .0012)); }, { passive: false });
   }
   function tap(e) {
     var r = rd.domElement.getBoundingClientRect(), v = new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    ray.setFromCamera(v, V.mode === 'ext' ? oc : pc);
+    ray.setFromCamera(v, V.mode === 'ext' && V.cam === 'orbit' ? oc : pc);
     var list = V.mode === 'ext' ? EX.pick : (W.intPick ? W.intPick() : []), h = ray.intersectObjects(list, true)[0];
     if (!h) { if (V.mode === 'ext' && V.sel) W.select(null); return; }
     var o = h.object, hit = null; while (o) { if (o.userData && (o.userData.sec || o.userData.k)) { hit = o; break; } o = o.parent; }
