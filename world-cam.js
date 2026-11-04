@@ -27,6 +27,20 @@
     return false;
   }
   function blocked(x, z) { return V.mode === 'ext' ? extBlocked(x, z, .7) : W.intBlocked(x, z, .55, lvl()); }
+  /* กล้องบุคคลที่ 3: ไล่จากตัวละครไปหาตำแหน่งกล้อง หยุดก่อนชนผนัง/สิ่งกีดขวาง */
+  function camHit(x, z) { return V.mode === 'ext' ? extBlocked(x, z, .35) : W.intBlocked(x, z, .3, lvl()); }
+  function safeCam(px, pz, tx, tz) {
+    var dx = tx - px, dz = tz - pz, L = Math.hypot(dx, dz), n = Math.max(1, Math.ceil(L / .15)), k = 1;
+    for (var i = 1; i <= n; i++) { if (camHit(px + dx * i / n, pz + dz * i / n)) { k = Math.max(0, (i - 2) / n); break; } }
+    return { x: px + dx * k, z: pz + dz * k, k: k };
+  }
+  /* ไม่ให้กล้องทะลุเพดาน/พื้นชั้น 2 */
+  function clampY(x, z, y) {
+    if (V.mode !== 'int') return y;
+    var ax = Math.abs(x), az = Math.abs(z), top = 9.1;
+    if (lvl() === 0 && ax >= 24 && ax <= 50 && az < 4.8) top = (W.PY || 4.2) - .35;
+    return Math.min(y, top);
+  }
 
   /* ---------- วางตัว / สลับโหมด ---------- */
   function say(h) { if (h !== hint) { hint = h; if (W.cb.hint) W.cb.hint(h); } }
@@ -58,7 +72,7 @@
     }
   }
   W.setCam = function (c) {
-    T = window.THREE; if (c !== 'orbit' && c !== 'walk' && c !== 'free') c = 'orbit';
+    T = window.THREE; if (c !== 'orbit' && c !== 'walk') c = 'orbit'; /* เอา Free Camera ออกแล้ว */
     var from = V.cam; if (c === from) return;
     V.cam = c; busy = false; K = {}; IN.f = IN.s = IN.u = 0;
     if (from === 'orbit') fromOrbit(c);
@@ -142,12 +156,18 @@
 
     /* วางกล้อง */
     var third = walk && CAM.third, cpitch = Math.cos(P.pitch), dirx = -Math.sin(P.yaw) * cpitch, diry = Math.sin(P.pitch), dirz = -Math.cos(P.yaw) * cpitch;
+    /* near plane เล็กตอนเดิน เพื่อไม่ให้ภาพทะลุผนังเมื่อยืนชิดกำแพง */
+    var nr = walk ? .08 : .5; if (pc.near !== nr) { pc.near = nr; pc.updateProjectionMatrix(); }
     if (third && CAM.selfie) {
       /* กล้องอยู่ด้านหน้าตัวละคร มองกลับมาที่ใบหน้า */
       var D = 4.2, hx = P.x, hy = P.y - .45, hz = P.z;
-      pc.position.set(hx - Math.sin(P.yaw) * D * Math.cos(.15 + P.pitch * .5), Math.max(.8, hy + .5 + Math.sin(.15 + P.pitch * .5) * D * .3), hz - Math.cos(P.yaw) * D * Math.cos(.15 + P.pitch * .5)); pc.lookAt(hx, hy, hz);
+      var sp1 = safeCam(hx, hz, hx - Math.sin(P.yaw) * D * Math.cos(.15 + P.pitch * .5), hz - Math.cos(P.yaw) * D * Math.cos(.15 + P.pitch * .5));
+      pc.position.set(sp1.x, clampY(hx, hz, Math.max(.8, hy + .5 + Math.sin(.15 + P.pitch * .5) * D * .3 * sp1.k)), sp1.z); pc.lookAt(hx, hy, hz);
     } else {
-      if (third) { var D2 = 4.6; pc.position.set(P.x - dirx * D2, Math.max(.7, P.y - diry * D2 + .6), P.z - dirz * D2); }
+      if (third) {
+        var D2 = 4.6, sp2 = safeCam(P.x, P.z, P.x - dirx * D2, P.z - dirz * D2);
+        pc.position.set(sp2.x, clampY(P.x, P.z, Math.max(.7, P.y - diry * D2 * sp2.k + .6)), sp2.z);
+      }
       else pc.position.set(P.x, P.y, P.z);
       pc.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
     }

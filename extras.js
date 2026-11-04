@@ -288,7 +288,7 @@
             '</span></div>';
         }).join('') + '</div>';
     }).join('') : '<div class="empty">ยังไม่มีรายจ่ายในเดือนนี้<br>กดปุ่ม "บันทึกรายจ่าย" ด้านบน</div>';
-    return h + '<div class="note" style="margin-top:12px">กำไรสุทธิใน Dashboard จะหักรายจ่ายเหล่านี้ให้อัตโนมัติ</div>';
+    return h + '<div class="note" style="margin-top:12px">ระบบจะหักรายจ่ายเหล่านี้ออกจากกำไรในรายงานให้อัตโนมัติ</div>';
   }
   function accRender() {
     if (S.uid !== X.uid) { X.uid = S.uid; X.loaded = false; X.rows = []; }
@@ -350,9 +350,10 @@
     if (!confirm('ยกเลิกรายจ่ายนี้?\nรายการจะไม่ถูกนับในบัญชี (ยังเก็บประวัติไว้)')) return;
     X.busy = true;
     var r = await S.sb.from('expenses').update({ voided_at: new Date().toISOString(), void_reason: 'ลงผิด/ยกเลิก' })
-      .eq('id', id).is('voided_at', null);
+      .eq('id', id).is('voided_at', null).select('id');
     X.busy = false;
     if (r.error) return toast('ยกเลิกไม่สำเร็จ: ' + r.error.message);
+    if (!r.data || !r.data.length) { toast('รายการนี้ถูกยกเลิกไปแล้ว หรือไม่มีสิทธิ์แก้ไข'); return reload(); }
     toast('ยกเลิกรายจ่ายแล้ว');
     reload();
   };

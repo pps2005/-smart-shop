@@ -12,12 +12,14 @@
   var UL = { kpi: 'การ์ดตัวเลขด้านบน', act: 'กล่องงาน/ทางลัด (ซ้ายล่าง)', left: 'แผงข้อมูลฝ่าย (ซ้าย)', right: 'ฟีด/กิจกรรม (ขวา)', tabs: 'แถบเลือกห้อง', top: 'แถบค้นหา/เมนูด้านบน', tags: 'ป้ายชื่อลอย', dock: 'แถบปุ่มด้านล่าง' };
   var ui = { kpi: 1, act: 1, left: 1, right: 1, tabs: 1, top: 1, tags: 1, dock: 1, mn: {} }, snap = null, clean = null;
   try { var sv = JSON.parse(localStorage.getItem('ss_ui') || 'null'); if (sv) { UIK.forEach(function (k) { if (sv[k] === 0 || sv[k] === 1) ui[k] = sv[k]; }); ui.mn = sv.mn || {}; } } catch (e) {}
-  function save() { try { localStorage.setItem('ss_ui', JSON.stringify(ui)); } catch (e) {} }
+  /* เหลือเฉพาะ 3 ส่วนที่ผู้ใช้เลือก: แถบค้นหาด้านบน · ป้ายชื่อลอย · แถบปุ่มด้านล่าง — ที่เหลือซ่อนถาวร */
+  var MK = ['top', 'tags', 'dock'], OFF = ['kpi', 'act', 'left', 'right', 'tabs'];
+  OFF.forEach(function (k) { ui[k] = 0; });
+  function save() { OFF.forEach(function (k) { ui[k] = 0; }); try { localStorage.setItem('ss_ui', JSON.stringify(ui)); } catch (e) {} }
 
   var MODES = [
     ['orbit', '🧭', 'มุมสูง', 'ดีฟอลต์ · หมุน/ซูมดูภาพรวม'],
-    ['walk', '🚶', 'Free Roam · เดินระดับสายตา', 'เดินในเมือง เข้าตึก เดินระหว่างห้อง ขึ้นชั้น 2'],
-    ['free', '🕊️', 'Free Camera · บินอิสระ', 'ลอยไปได้ทุกทิศ ปรับความเร็วเองได้']
+    ['walk', '🚶', 'Free Roam · เดินระดับสายตา', 'เดินในเมือง เข้าตึก เดินระหว่างห้อง ขึ้นชั้น 2']
   ];
 
   function css() {
@@ -50,6 +52,7 @@
   var camMenu, uiMenu, bn, hintEl, spec, hud, joy, knob, bnT = 0, mnBtns = {};
 
   function apply() {
+    OFF.forEach(function (k) { ui[k] = 0; });
     UIK.forEach(function (k) { WD.classList.toggle('h-' + k, !ui[k]); });
     WD.classList.toggle('cam-x', V.cam !== 'orbit'); WD.classList.toggle('cam-w', V.cam === 'walk'); WD.classList.toggle('cam-v', V.cam === 'free');
     Object.keys(mnBtns).forEach(function (id) { var p = WD.querySelector('#' + id); if (p) p.classList.toggle('mn', !!ui.mn[id]); });
@@ -83,13 +86,13 @@
   }
   function menuUI() {
     var h = '<h3>👁 แสดง / ซ่อนกล่อง<button data-x="1" aria-label="ปิด">✕</button></h3>';
-    UIK.forEach(function (k) { h += '<label class="wtg"><span>' + UL[k] + '</span><input type="checkbox" data-u="' + k + '"' + (ui[k] ? ' checked' : '') + '></label>'; });
+    MK.forEach(function (k) { h += '<label class="wtg"><span>' + UL[k] + '</span><input type="checkbox" data-u="' + k + '"' + (ui[k] ? ' checked' : '') + '></label>'; });
     h += '<div class="wbr"><button data-z="clean">' + (clean ? '↩︎ คืนค่า' : '🧼 โหมดโล่ง (ซ่อนทั้งหมด)') + '</button><button class="p" data-z="all">แสดงทั้งหมด</button></div>' +
       '<div class="wsl" style="margin-top:12px"><span>เคล็ดลับ: กด <b>–</b> ที่มุมกล่องเพื่อย่อ · แตะแถบเล็กที่ขอบล่างเพื่อพับ/เปิดแถบปุ่ม · กด H เพื่อโหมดโล่ง</span></div>';
     uiMenu.innerHTML = h;
     uiMenu.querySelectorAll('input[data-u]').forEach(function (i) { i.onchange = function () { ui[i.dataset.u] = i.checked ? 1 : 0; clean = null; save(); apply(); }; });
     uiMenu.querySelector('[data-z=clean]').onclick = toggleClean;
-    uiMenu.querySelector('[data-z=all]').onclick = function () { UIK.forEach(function (k) { ui[k] = 1; }); ui.mn = {}; clean = null; save(); apply(); menuUI(); };
+    uiMenu.querySelector('[data-z=all]').onclick = function () { MK.forEach(function (k) { ui[k] = 1; }); ui.mn = {}; clean = null; save(); apply(); menuUI(); };
   }
   function toggleClean() {
     if (clean) { UIK.forEach(function (k) { ui[k] = clean[k]; }); clean = null; }
