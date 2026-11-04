@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   var W = window.SSW = window.SSW || {};
-  var CS = 26, RW = 18, RD = 13, RZ = 9;
+  var CS = 26, RW = 26, RD = 19, RZ = 14;
   W.CS = CS; W.RW = RW; W.RD = RD; W.RZ = RZ;
 
   /* ---------- ฝ่ายทั้งหมด ---------- */
