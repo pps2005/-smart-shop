@@ -488,9 +488,13 @@
 
   /* ---------- เริ่มทำงาน ---------- */
   function loadThree(cb) {
-    if (window.THREE) return cb(); var s = document.createElement('script'); s.src = 'three.min.js?v=128'; s.onload = cb;
-    s.onerror = function () { var s2 = document.createElement('script'); s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; s2.onload = cb; s2.onerror = function () { $$('#wgl').innerHTML = '<div style="padding:90px 20px;text-align:center">โหลด 3D ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วรีเฟรช</div>'; }; document.head.appendChild(s2); };
-    document.head.appendChild(s);
+    if (window.THREE) return cb();
+    /* ลองไฟล์ในเว็บก่อน (three_min.js / three.min.js) แล้วค่อยใช้ CDN */
+    var src = ['three_min.js?v=128', 'three.min.js?v=128', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'], i = 0;
+    (function next() {
+      if (i >= src.length) { $$('#wgl').innerHTML = '<div style="padding:90px 20px;text-align:center">โหลด 3D ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วรีเฟรช</div>'; return; }
+      var s = document.createElement('script'); s.src = src[i++]; s.onload = function () { if (window.THREE) cb(); else next(); }; s.onerror = next; document.head.appendChild(s);
+    })();
   }
   function boot() {
     if (started) return; started = true;

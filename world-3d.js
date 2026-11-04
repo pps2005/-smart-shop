@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   var W = window.SSW = window.SSW || {};
-  var CS = 26, RW = 26, RD = 19, RZ = 14;
+  var CS = 44, RW = 26, RD = 19, RZ = 14;
   W.CS = CS; W.RW = RW; W.RD = RD; W.RZ = RZ;
 
   /* ---------- ฝ่ายทั้งหมด ---------- */
@@ -221,38 +221,35 @@
     var sc = EX.sc = new T.Scene(); sc.background = new T.Color(0xe6edf7);
     sc.add(new T.HemisphereLight(0xf4f8ff, 0xaebdd6, .62));
     var sun = new T.DirectionalLight(0xfff8ee, .62); sun.position.set(46, 90, 34); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -.0005; sun.shadow.radius = 3;
-    var sh = sun.shadow.camera; sh.left = -64; sh.right = 64; sh.top = 64; sh.bottom = -64; sh.near = 10; sh.far = 220; sc.add(sun);
-    var gt = cvs(128, 128, function (g) { g.fillStyle = '#eef2f9'; g.fillRect(0, 0, 128, 128); g.strokeStyle = '#dfe6f1'; g.lineWidth = 2; g.strokeRect(0, 0, 128, 128); }, 'gground'); gt.wrapS = gt.wrapT = T.RepeatWrapping; gt.repeat.set(70, 70);
-    var gr = new T.Mesh(new T.PlaneGeometry(500, 500), new T.MeshStandardMaterial({ map: gt, roughness: 1 })); gr.rotation.x = -Math.PI / 2; gr.receiveShadow = true; sc.add(gr);
+    var sh = sun.shadow.camera; sh.left = -64; sh.right = 64; sh.top = 64; sh.bottom = -64; sh.near = 10; sh.far = 260; sc.add(sun); sc.add(sun.target); EX.sun = sun;
+    var gt = cvs(128, 128, function (g) { g.fillStyle = '#eef2f9'; g.fillRect(0, 0, 128, 128); g.strokeStyle = '#dfe6f1'; g.lineWidth = 2; g.strokeRect(0, 0, 128, 128); }, 'gground'); gt.wrapS = gt.wrapT = T.RepeatWrapping; gt.repeat.set(36, 36);
+    var gr = new T.Mesh(new T.PlaneGeometry(CS * 3 + 6, CS * 3 + 6), new T.MeshStandardMaterial({ map: gt, roughness: 1 })); gr.rotation.x = -Math.PI / 2; gr.position.y = .01; gr.receiveShadow = true; sc.add(gr);
     // ถนน
-    var rt = cvs(128, 64, function (g) { g.fillStyle = '#cdd6e4'; g.fillRect(0, 0, 128, 64); g.fillStyle = '#b4c1d6'; g.fillRect(0, 0, 128, 3); g.fillRect(0, 61, 128, 3); g.fillStyle = '#ffffff'; g.fillRect(8, 30, 56, 4); }, 'road'); rt.wrapS = rt.wrapT = T.RepeatWrapping; rt.repeat.set(112 / 8, 1);
-    var rm = new T.MeshStandardMaterial({ map: rt, roughness: .9 }), RDS = [-39, -13, 13, 39];
+    var rt = cvs(128, 64, function (g) { g.fillStyle = '#cdd6e4'; g.fillRect(0, 0, 128, 64); g.fillStyle = '#b4c1d6'; g.fillRect(0, 0, 128, 3); g.fillRect(0, 61, 128, 3); g.fillStyle = '#ffffff'; g.fillRect(8, 30, 56, 4); }, 'road'); rt.wrapS = rt.wrapT = T.RepeatWrapping; rt.repeat.set(CS * 3 / 8, 1);
+    var rm = new T.MeshStandardMaterial({ map: rt, roughness: .9 }), RDS = [-1.5 * CS, -.5 * CS, .5 * CS, 1.5 * CS], RL = CS * 3; W.RDS = RDS;
     RDS.forEach(function (r) {
-      var a = new T.Mesh(new T.PlaneGeometry(112, 6), rm); a.rotation.x = -Math.PI / 2; a.position.set(0, .03, r); a.receiveShadow = true; sc.add(a);
-      var b = new T.Mesh(new T.PlaneGeometry(112, 6), rm); b.rotation.x = -Math.PI / 2; b.rotation.z = Math.PI / 2; b.position.set(r, .035, 0); b.receiveShadow = true; sc.add(b);
+      var a = new T.Mesh(new T.PlaneGeometry(RL, 6), rm); a.rotation.x = -Math.PI / 2; a.position.set(0, .03, r); a.receiveShadow = true; sc.add(a);
+      var b = new T.Mesh(new T.PlaneGeometry(RL, 6), rm); b.rotation.x = -Math.PI / 2; b.rotation.z = Math.PI / 2; b.position.set(r, .035, 0); b.receiveShadow = true; sc.add(b);
       lampsAlong(sc, r);
     });
     // เส้นสีฟ้าเหมือน conveyor ในวิดีโอ
-    [-13, 13].forEach(function (r) { box(sc, 112, .05, .3, 0, .08, r - 2.5, emi(0x4f8ff7, .25), 1); box(sc, .3, .05, 112, r - 2.5, .09, 0, emi(0x4f8ff7, .25), 1); });
+    [-CS / 2, CS / 2].forEach(function (r) { box(sc, RL, .05, .3, 0, .08, r - 2.5, emi(0x4f8ff7, .25), 1); box(sc, .3, .05, RL, r - 2.5, .09, 0, emi(0x4f8ff7, .25), 1); });
     // อาคาร
     W.D.forEach(function (d) { var b = building(d); sc.add(b); EX.pick.push(b); });
     // ลานกลาง
     var pz = new T.Group(); sc.add(pz); cyl(pz, 8.5, 8.7, .3, 0, .15, 0, 0xffffff, 40); cyl(pz, 7, 7, .35, 0, .18, 0, 0xe8eff9, 40); cyl(pz, 1.6, 2, 1.4, 0, 1, 0, 0xffffff, 6);
     var core = new T.Group(); core.position.y = 4; pz.add(core); box(core, 2.1, 2.1, 2.1, 0, 0, 0, emi(0x3b82f6, .55)); box(core, 1.0, 1.0, 1.0, 0, 0, 0, emi(0xffffff, .8)); EX.core = core;
     for (var a = 0; a < 6; a++) { var an = a / 6 * Math.PI * 2; tree(pz, Math.cos(an) * 6.2, Math.sin(an) * 6.2, .8); }
-    // รั้วริมที่ดิน
-    for (var i = -3; i <= 3; i++) { box(sc, .16, 1.6, .16, i * 8, .8, -60, 0xc5d0e0, 1); box(sc, .16, 1.6, .16, 60, .8, i * 8, 0xc5d0e0, 1); }
-    box(sc, 112, .1, .1, 0, 1.3, -60, 0xc5d0e0, 1); box(sc, .1, .1, 112, 60, 1.3, 0, 0xc5d0e0, 1);
-    for (i = 0; i < 40; i++) { var tx = rnd(-75, 75), tz = rnd(-75, 75); if (Math.abs(tx) < 58 && Math.abs(tz) < 58) continue; tree(sc, tx, tz, rnd(.9, 1.5)); }
+    // (รั้ว/ต้นไม้รอบที่ดินเดิมถูกแทนด้วยเมือง world-city.js)
     // ยานพาหนะ
-    [[0xf97316, 'x', -13 + 1.5, 1, 7], [0x3b82f6, 'x', 13 - 1.5, -1, 8], [0x3b82f6, 'z', 13 + 1.5, 1, 6.5], [0xf97316, 'z', -13 - 1.5, -1, 6]].forEach(function (a) {
+    [[0xf97316, 'x', -CS / 2 + 1.5, 1, 7], [0x3b82f6, 'x', CS / 2 - 1.5, -1, 8], [0x3b82f6, 'z', CS / 2 + 1.5, 1, 6.5], [0xf97316, 'z', -CS / 2 - 1.5, -1, 6]].forEach(function (a) {
       var tk = truck(a[0]); sc.add(tk); EX.ag.push({ k: 'veh', g: tk, ax: a[1], ln: a[2], p: rnd(-50, 50), dir: a[3], sp: a[4] });
     });
     [0xffffff, 0x3b82f6, 0xcbd5e1, 0xffffff, 0x60a5fa].forEach(function (cl, i) { var cr = car(cl), ax = i % 2 ? 'x' : 'z', r = RDS[i % 4], dr = i % 3 ? 1 : -1; sc.add(cr); EX.ag.push({ k: 'veh', g: cr, ax: ax, ln: r + (dr > 0 ? 1.4 : -1.4), p: rnd(-50, 50), dir: dr, sp: rnd(8, 11) }); });
     // รถโฟล์คลิฟท์ + คนเดิน
     var sd = W.BD.stock, f1 = forklift(); sc.add(f1); EX.ag.push({ k: 'fork', g: f1, x0: sd.x - 6, x1: sd.x + 6, z: sd.z + 10.2, p: 0, dir: 1, sp: 2.2, load: pallet(f1, 1.6, 0, 0, 2) });
     var cols = [[0xff8fc7, 0xf9a8d4], [0xb79cff, 0xc7d2fe], [0x7de0c3, 0xa7f3d0], [0xf3d27a, 0xfde68a], [0x7cc3ff, 0xbfdbfe], [0x5b3a29, 0xfed7aa], [0x222233, 0xcbd5e1]];
-    for (i = 0; i < 14; i++) {
+    for (var i = 0; i < 14; i++) {
       var cc = cols[i % cols.length], ch = mkChar({ hair: cc[0], top: cc[1], bot: pick([0x6b7fd6, 0x475569, 0x94a3b8]), f: i % 3 !== 2, bow: i % 2 ? 0xf472b6 : 0x60a5fa, s: .62 }); sc.add(ch);
       var ax = i % 2 ? 'x' : 'z', rr = RDS[Math.floor(i / 2) % 4];
       EX.ag.push({ k: 'ppl', g: ch, ax: ax, ln: rr + (i % 4 < 2 ? -3.7 : 3.7), p: rnd(-50, 50), dir: i % 2 ? 1 : -1, sp: rnd(1.4, 2.2), ph: rnd(0, 6) });
@@ -262,8 +259,9 @@
     sf.userData.sec = true; sf.traverse(function (o) { o.userData.sec = true; }); EX.sec = sf; EX.pick.push(sf);
     // วงเลือก
     var sel = new T.Group(); [[1, 0], [-1, 0]].forEach(function (a) { box(sel, .5, .3, 17.5, a[0] * 9, 0, 1.5, emi(0x3b82f6, 1), 1); }); [[1, 0], [-1, 0]].forEach(function (a) { box(sel, 18.5, .3, .5, 0, 0, 1.5 + a[0] * 8.7, emi(0x3b82f6, 1), 1); }); sel.visible = false; sel.position.y = .4; sc.add(sel); EX.sel = sel;
+    if (W.buildCity) W.buildCity(sc, T);
   }
-  function lampsAlong(sc, r) { [-45, -15, 15, 45].forEach(function (t) { lamp(sc, t, r + 3.7); lamp(sc, r + 3.7, t); }); }
+  function lampsAlong(sc, r) { [-55, -33, -11, 11, 33, 55].forEach(function (t) { lamp(sc, t, r + 3.7); lamp(sc, r + 3.7, t); }); }
 
   /* ---------- กล้อง/ควบคุม/ลูปหลัก ---------- */
   var V = { mode: 'ext', th: Math.PI / 4, thT: Math.PI / 4, zoom: 1, cx: 0, cz: 8, tx: 0, tz: 8, sel: null, room: 'all', yaw: 0, dz: 1, fade: 0 };
@@ -284,6 +282,8 @@
     var cam, scn;
     if (V.mode === 'ext') {
       EX.ag.forEach(function (n) { stepExt(n, dt, t); });
+      if (W.cityStep) W.cityStep(dt, t);
+      if (EX.sun) { var fc = V.cam !== 'orbit' && W.camInfo ? W.camInfo() : { x: V.cx, z: V.cz }; EX.sun.target.position.set(fc.x, 0, fc.z); EX.sun.position.set(fc.x + 46, 90, fc.z + 34); }
       if (EX.core) { EX.core.rotation.y = t * .6; EX.core.position.y = 4 + Math.sin(t * 1.6) * .25; }
       EX.sec && pose(EX.sec, t, 'wave');
       W.D.forEach(function (d, i) { var p = d.g.userData.pin; p.position.y = d.top - 2.2 + Math.sin(t * 2 + i) * .35; p.rotation.y = t * 1.1; if (V.cam === 'orbit') d.sign.rotation.y = V.th; var s = V.sel === d.k; d.g.userData.pm.emissiveIntensity = s ? 1.4 : .55; });
@@ -309,10 +309,10 @@
   function stepExt(n, dt, t) {
     var g = n.g;
     if (n.k === 'veh') {
-      n.p += n.dir * n.sp * dt; if (n.p > 62) n.p = -62; if (n.p < -62) n.p = 62;
+      var E = CS * 1.5 + 4; n.p += n.dir * n.sp * dt; if (n.p > E) n.p = -E; if (n.p < -E) n.p = E;
       if (n.ax === 'x') { g.position.set(n.p, 0, n.ln); g.rotation.y = n.dir > 0 ? 0 : Math.PI; } else { g.position.set(n.ln, 0, n.p); g.rotation.y = n.dir > 0 ? -Math.PI / 2 : Math.PI / 2; }
     } else if (n.k === 'ppl') {
-      n.p += n.dir * n.sp * dt; if (n.p > 60) n.p = -60; if (n.p < -60) n.p = 60;
+      var E2 = CS * 1.5 + 2; n.p += n.dir * n.sp * dt; if (n.p > E2) n.p = -E2; if (n.p < -E2) n.p = E2;
       if (n.ax === 'x') { g.position.set(n.p, .25, n.ln); g.rotation.y = n.dir > 0 ? Math.PI / 2 : -Math.PI / 2; } else { g.position.set(n.ln, .25, n.p); g.rotation.y = n.dir > 0 ? 0 : Math.PI; }
       pose(g, t + n.ph, 'walk'); g.position.y = .25 + Math.abs(Math.sin((t + n.ph) * 9)) * .05;
     } else if (n.k === 'fork') {
@@ -326,7 +326,7 @@
     T = window.THREE; if (!T || ready) return false; host = el; BX = new T.BoxGeometry(1, 1, 1);
     rd = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }); rd.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); rd.shadowMap.enabled = true; rd.shadowMap.type = T.PCFSoftShadowMap;
     el.insertBefore(rd.domElement, el.firstChild); W.canvas = rd.domElement;
-    oc = new T.OrthographicCamera(-1, 1, 1, -1, -300, 500); pc = new T.PerspectiveCamera(38, 1, .5, 500); ray = new T.Raycaster(); W.pc = pc; W.rd = rd;
+    oc = new T.OrthographicCamera(-1, 1, 1, -1, -1500, 2500); pc = new T.PerspectiveCamera(38, 1, .5, 1100); ray = new T.Raycaster(); W.pc = pc; W.rd = rd;
     buildExt(); W.EXS = EX.sc; W.EX = EX; if (W.buildInt) W.buildInt(T); bind(); ready = true; requestAnimationFrame(frame); return true;
   };
   W.ready = function () { return ready; };
@@ -347,7 +347,7 @@
     if (W.cb.select) W.cb.select(k);
   };
   W.recenter = function () { V.tx = 0; V.tz = 8; V.zoom = 1; V.thT = Math.PI / 4; V.sel = null; EX.sel.visible = false; if (W.cb.select) W.cb.select(null); };
-  W.zoomBy = function (f) { if (V.mode === 'ext') V.zoom = Math.max(.55, Math.min(3.2, V.zoom * f)); else V.dz = Math.max(.55, Math.min(1.7, V.dz / f)); };
+  W.zoomBy = function (f) { if (V.mode === 'ext') V.zoom = Math.max(W.ZMIN || .55, Math.min(3.2, V.zoom * f)); else V.dz = Math.max(.55, Math.min(1.7, V.dz / f)); };
   W.rotateBy = function (a) { if (V.mode === 'ext') V.thT += a; else V.yaw = Math.max(-.9, Math.min(.9, V.yaw + a)); };
   W.focusRoom = function (k) { V.room = k; if (W.intFocus) W.intFocus(k); if (W.cb.room) W.cb.room(k); };
   W.extObj = function (k) { return W.BD[k] && W.BD[k].g; };
@@ -364,7 +364,7 @@
         else if (V.mode === 'ext') {
           var a = cw / ch, vh = Math.max(66, 84 / Math.max(a, .55)) / V.zoom, k = vh / ch, sn = Math.sin(.64);
           V.tx += -Math.cos(V.th) * dx * k + (-Math.sin(V.th)) * dy * k / sn; V.tz += Math.sin(V.th) * dx * k + (-Math.cos(V.th)) * dy * k / sn;
-          V.tx = Math.max(-60, Math.min(60, V.tx)); V.tz = Math.max(-60, Math.min(60, V.tz)); V.cx = V.tx; V.cz = V.tz;
+          var PL = (W.LIM || 80) - 20; V.tx = Math.max(-PL, Math.min(PL, V.tx)); V.tz = Math.max(-PL, Math.min(PL, V.tz)); V.cx = V.tx; V.cz = V.tz;
         } else V.yaw = Math.max(-.9, Math.min(.9, V.yaw - dx * .006));
       }
       p.x = e.clientX; p.y = e.clientY;

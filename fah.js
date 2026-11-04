@@ -44,12 +44,20 @@
     }
     if (/ฉันชื่ออะไร|ผมชื่ออะไร|จำชื่อ.*ได้ไหม|รู้จักฉันไหม/.test(s)) return MEM.name ? 'จำได้สิคะ ' + you() + ' ไงคะ 😊' : ask('name', 'ฟ้ายังไม่รู้ชื่อเลยค่ะ 🥺 บอกฟ้าได้ไหมคะ ว่าให้เรียกว่าอะไรดี?');
 
-    if (/เสียง/.test(s) && /เปลี่ยน|ปรับ|ตั้ง|ไม่ชอบ|เล็ก|แหลม|ทุ้ม/.test(s)) { setTimeout(openVoice, 50); return 'ปรับเสียงฟ้าได้เลยค่ะ 🎀 ฟ้าเปิดหน้าตั้งค่าเสียงให้แล้วนะคะ'; }
+    if (/เสียง/.test(s) && /เปลี่ยน|ปรับ|ตั้ง|ไม่ชอบ|เล็ก|แหลม|ทุ้ม/.test(s)) { setTimeout(openVoice, 50); return 'ปรับเสียงฟ้าได้เลยค่ะ 🎀 เลือกโทนตามอารมณ์ได้ด้วยนะคะ ฟ้าเปิดหน้าตั้งค่าให้แล้วค่า'; }
     if (/^(ปิดเสียง|เงียบ|หยุดพูด)/.test(s)) { VO.on = false; vsave(); syncBtn(); return 'ได้ค่ะ ฟ้าจะพิมพ์อย่างเดียวนะคะ 🤫 กดปุ่ม 🔈 ด้านบนเพื่อเปิดเสียงได้เลย'; }
     if (/^(เปิดเสียง|พูดหน่อย|พูดได้ไหม)/.test(s)) { VO.on = true; vsave(); syncBtn(); return 'เปิดเสียงแล้วค่ะ ได้ยินฟ้าไหมคะ' + youShort() + ' 🎀'; }
     if (/อากาศ|ฝน|ร้อนไหม|หนาวไหม|พายุ/.test(s)) return pick(['ฟ้ายังดูพยากรณ์อากาศให้ไม่ได้นะคะ 🥺 ลองเปิดแอปพยากรณ์อากาศดูก่อนน้า ถ้าฝนตกอย่าลืมเก็บของหน้าร้านด้วยนะคะ ☔', 'เรื่องฝนฟ้าอากาศฟ้าเช็กให้ไม่ได้ค่ะ 😅 แต่ถ้าออกไปข้างนอก พกร่มไว้ก่อนอุ่นใจกว่านะคะ']);
     if (/ซีรีส์|ซีรี่ย์|หนัง|ดูการ์ตูน|อนิเมะ|เพลง|ฟังเพลง|เกม|เล่นเกม/.test(s)) { var hb = /ซีรี/.test(s) ? 'ดูซีรีส์' : /หนัง|การ์ตูน|อนิเมะ/.test(s) ? 'ดูหนัง' : /เพลง/.test(s) ? 'ฟังเพลง' : 'เล่นเกม';
       return pick(['ว้าว ' + hb + 'อยู่เหรอคะ 😆 ฟ้าก็ชอบนะ ', 'ดีจังเลยค่ะ ได้' + hb + 'พักผ่อนบ้าง 🍿 ']) + ask('tell', 'เรื่องไหนสนุกสุดคะ เล่าให้ฟ้าฟังหน่อย'); }
+    /* เปลี่ยนเมืองในแมพ */
+    var CMAP = [[/กรุงเทพ|บางกอก/, 'bkk'], [/โตเกียว|ญี่ปุ่น/, 'tyo'], [/โซล|เกาหลี/, 'sel'], [/เซี่ยงไฮ้|จีน/, 'sha']], W2 = window.SSW;
+    if (W2 && W2.setCity && (/(เปลี่ยน|สลับ|ไป|พาไป|อยากไป|ขอ).*(เมือง|แมพ|ประเทศ)|(เมือง|แมพ).*(ไหน|อื่น)/.test(s) || CMAP.some(function (c) { return c[0].test(s) && /ไป|เมือง|แมพ|เปลี่ยน/.test(s); }))) {
+      var hit = CMAP.find(function (c) { return c[0].test(s); });
+      if (hit) { var th = W2.CITIES[hit[1]]; setTimeout(function () { W2.setCity(hit[1]); }, 300); return pick(['ไปกันเลยค่า ' + th.flag + ' ยินดีต้อนรับสู่' + th.name + '!', 'ได้เลยค่ะ ' + th.flag + ' ฟ้าพาไป' + th.name + 'แล้วนะคะ ลองเดินเที่ยวดูได้เลย ✨']); }
+      var b = document.querySelector('#wctl [aria-label="เปลี่ยนเมือง"]'); if (b) setTimeout(function () { b.click(); }, 200);
+      return 'มีให้เลือก 4 เมืองค่ะ 🇹🇭 กรุงเทพฯ · 🇯🇵 โตเกียว · 🇰🇷 โซล · 🇨🇳 เซี่ยงไฮ้ ฟ้าเปิดหน้าเลือกเมืองให้แล้วนะคะ หรือพิมพ์ "ไปโตเกียว" ก็ได้ค่า';
+    }
     /* ตอบต่อจากคำถามที่ฟ้าเพิ่งถาม */
     var pend = MEM.pend; MEM.pend = ''; msave();
     if (pend && !BIZ.test(s)) {
@@ -133,15 +141,44 @@
   }
 
   /* ---------- 2) เสียง ---------- */
-  var PRE = {
-    cute: { n: '🎀 น่ารัก (16–20 ปี)', p: 1.45, r: 1.07 },
-    bright: { n: '✨ สดใสร่าเริง', p: 1.3, r: 1.15 },
-    soft: { n: '🌸 นุ่มนวล อ่อนโยน', p: 1.2, r: 0.93 },
-    normal: { n: '🙂 เสียงปกติของเครื่อง', p: 1, r: 1 }
-  };
-  var VO = { on: true, pre: 'cute', p: 1.45, r: 1.07, vol: 1, voice: '', note: true };
-  try { var v0 = JSON.parse(localStorage.getItem('ss_voice') || 'null'); if (v0) Object.assign(VO, v0); } catch (e) {}
+  /* เสียงหลักตั้งตามคลิปตัวอย่าง (เสียงสูง สดใส ขึ้นลงเยอะ แบบตัวละครเกม/อนิเมะ)
+     ระดับเสียงคลิปตัวอย่างราว 330–400 Hz ส่วนเสียงผู้หญิงไทยในมือถือราว 210 Hz → ยกโทนขึ้น ~1.65 เท่า */
+  var DEF = { base: 1.65, rate: 1.12, auto: true,
+    emo: { happy: { p: .12, r: 1.06 }, excited: { p: .22, r: 1.14 }, shy: { p: .08, r: .93 }, sad: { p: -.25, r: .86 }, worry: { p: -.1, r: .96 }, calm: { p: -.06, r: 1 }, sleepy: { p: -.3, r: .8 } } };
+  var EMO = [
+    ['happy', '😊', 'ดีใจ / ร่าเริง', 'เย้ ดีใจด้วยนะคะพี่ วันนี้ขายดีมากเลยค่า'],
+    ['excited', '🤩', 'ตื่นเต้น / ว้าว', 'ว้าว จริงเหรอคะ สุดยอดไปเลยค่า'],
+    ['shy', '🙈', 'เขินอาย / ออดอ้อน', 'อุ๊ย ชมแบบนี้ฟ้าเขินเลยนะคะ'],
+    ['sad', '🥺', 'เศร้า / ปลอบใจ', 'งื้อ ไม่เป็นไรนะคะ ฟ้าอยู่ตรงนี้นะ'],
+    ['worry', '😟', 'เป็นห่วง / เตือน', 'พี่คะ ของใกล้หมดแล้วนะคะ ต้องรีบเติมแล้วค่ะ'],
+    ['calm', '🙂', 'ปกติ / รายงานข้อมูล', 'ยอดขายวันนี้ ห้าร้อยบาท จากสองรายการค่ะ'],
+    ['sleepy', '😴', 'ง่วง / ราตรีสวัสดิ์', 'ดึกแล้วนะคะ ไปนอนพักผ่อนเถอะค่ะ ราตรีสวัสดิ์'] ];
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  var VO = { ver: 2, on: true, vol: 1, voice: '', note: true, base: DEF.base, rate: DEF.rate, auto: true, emo: clone(DEF.emo) };
+  try {
+    var v0 = JSON.parse(localStorage.getItem('ss_voice') || 'null');
+    if (v0) { ['on', 'vol', 'voice', 'note'].forEach(function (k) { if (v0[k] != null) VO[k] = v0[k]; });
+      if (v0.ver === 2) { ['base', 'rate', 'auto'].forEach(function (k) { if (v0[k] != null) VO[k] = v0[k]; }); if (v0.emo) Object.keys(DEF.emo).forEach(function (k) { if (v0.emo[k]) VO.emo[k] = v0.emo[k]; }); } }
+  } catch (e) {}
   function vsave() { try { localStorage.setItem('ss_voice', JSON.stringify(VO)); } catch (e) {} }
+
+  /* อ่านอารมณ์จากประโยค */
+  function mood(t) {
+    if (/😴|🌙|ราตรี|ไปนอน|ง่วง|ฝันดี/.test(t)) return 'sleepy';
+    if (/🙈|💕|เขิน|อุ๊ย|ฮึฮึ|ชมแบบนี้|น่ารักจัง/.test(t)) return 'shy';
+    if (/🥺|🫂|งื้อ|โอ๋|เสียใจ|เป็นห่วงเลย|ไม่เป็นไรนะ|ท้อ|เหนื่อย|ขอโทษ/.test(t)) return 'sad';
+    if (/⚠️|ใกล้หมด|ค้าง|อย่าลืม|ถึงเวลา|ระวัง|ต้องรีบ|เกินกำหนด|ไม่สำเร็จ/.test(t)) return 'worry';
+    if (/🎉|🤩|ว้าว|สุดยอด|เย้|เจ๋ง|ปัง|ตื่นเต้น|จริงเหรอ|!{1,}/.test(t)) return 'excited';
+    if (/😊|😆|😄|✨|🌸|ดีใจ|ดีจัง|ยินดี|สวัสดี|ค่า~|ขา~|ค้า~|555|ฮ่า/.test(t)) return 'happy';
+    if (/฿|\d|บาท|ชิ้น|รายการ|รุ่น|สรุป/.test(t)) return 'calm';
+    return '';
+  }
+  /* แบ่งเป็นประโยค เพื่อให้เสียงขึ้นลงตามอารมณ์แต่ละช่วง (คลิปตัวอย่างโทนเสียงขึ้นลงกว้าง) */
+  function chunks(raw) {
+    var parts = String(raw || '').replace(/\s+\.\s+/g, '\n').replace(/([!?！？~]|ค่ะ|คะ|ค่า|น้า|นะคะ)\s+/g, '$1\n').split('\n'), out = [];
+    parts.forEach(function (p) { p = p.trim(); if (!p) return; if (out.length && (out[out.length - 1].length < 10 || p.length < 6)) out[out.length - 1] += ' ' + p; else out.push(p); });
+    return out.slice(0, 6);
+  }
   var SY = window.speechSynthesis, voices = [];
   function loadVoices() { if (!SY) return; voices = SY.getVoices() || []; }
   if (SY) { loadVoices(); try { SY.addEventListener('voiceschanged', loadVoices); } catch (e) { SY.onvoiceschanged = loadVoices; } }
@@ -164,12 +201,21 @@
     Array.prototype.forEach.call(c.querySelectorAll('br,li,.kv,div'), function (b) { b.insertAdjacentText('beforebegin', ' . '); });
     return c.textContent.replace(/(\s*\.\s*){2,}/g, ' . ').replace(/^\s*\.\s*/, '');
   }
-  function say(text, force) {
-    if (!SY || (!VO.on && !force)) return; var t = toSpeech(text); if (!t) return;
+  function say(text, force, fixed) {
+    if (!SY || (!VO.on && !force)) return;
+    var all = chunks(text).map(function (c) { return { raw: c, t: toSpeech(c) }; }).filter(function (c) { return c.t; }); if (!all.length) return;
+    var whole = fixed || mood(String(text)) || 'happy', budget = 260;
     try {
-      SY.cancel(); var u = new SpeechSynthesisUtterance(t), v = chooseVoice();
-      u.lang = 'th-TH'; if (v) u.voice = v; u.pitch = Math.max(0, Math.min(2, VO.p)); u.rate = Math.max(.5, Math.min(2, VO.r)); u.volume = VO.vol;
-      SY.speak(u);
+      SY.cancel(); var v = chooseVoice();
+      all.forEach(function (c, i) {
+        if (budget <= 0) return; var t = c.t.slice(0, budget); budget -= t.length;
+        var em = fixed || (VO.auto ? (mood(c.raw) || whole) : 'calm'), m = VO.emo[em] || { p: 0, r: 1 };
+        var jit = i === 0 ? .03 : (Math.random() - .5) * .1, q = /[?？]|ไหม|มั้ย|หรอ|เหรอ|คะ$/.test(c.raw) ? .08 : 0;
+        var u = new SpeechSynthesisUtterance(t);
+        u.lang = 'th-TH'; if (v) u.voice = v;
+        u.pitch = Math.max(0, Math.min(2, VO.base + m.p + jit + q)); u.rate = Math.max(.5, Math.min(2, VO.rate * m.r)); u.volume = VO.vol;
+        SY.speak(u);
+      });
     } catch (e) { console.warn('fah speak', e); }
   }
   /* iPhone ต้องแตะหน้าจอก่อน 1 ครั้งถึงจะพูดได้ */
@@ -221,6 +267,10 @@
     '.fvp .tg{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line,#e5e9f2);margin-top:12px;font-weight:700}.fvp .tg span{flex:1}.fvp .tg input{width:22px;height:22px;accent-color:#ec4899}',
     '.fvp .go{width:100%;min-height:56px;border-radius:16px;background:linear-gradient(135deg,#f472b6,#ec4899);color:#fff;font-weight:800;font-size:1.1rem;margin-top:14px}',
     '.fvp .cl{display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line,#e5e9f2)}.fvp .cl span{flex:1;min-width:0;overflow-wrap:anywhere}.fvp .cl label,.fvp .cl button{padding:8px 10px;border-radius:10px;border:1px solid var(--line,#e5e9f2);font-size:.85rem;background:var(--bg,#f4f6fb);color:inherit;cursor:pointer;white-space:nowrap}',
+    '.fvp .fch{padding:14px;border-radius:16px;background:linear-gradient(135deg,rgba(244,114,182,.16),rgba(167,139,250,.16));border:1px solid rgba(236,72,153,.3)}.fvp .fch b{display:block;font-size:1.05rem}.fvp .fch small{display:block;color:var(--mute,#64748b);margin-top:2px}.fvp .fch .go{margin-top:10px}',
+    '.fvp .fem{margin-top:4px}.fvp .er{padding:10px 0;border-top:1px solid var(--line,#e5e9f2)}.fvp .eh{display:flex;align-items:center;font-weight:700}.fvp .eh span{flex:1}.fvp .eh button{width:40px;height:36px;border-radius:10px;background:var(--bg,#f4f6fb);border:1px solid var(--line,#e5e9f2)}',
+    '.fvp .es{display:flex;align-items:center;gap:8px}.fvp .es small{width:30px;color:var(--mute,#64748b)}.fvp .es input{flex:1}.fvp .es b{width:48px;text-align:right;font-size:.85rem}',
+    '.fvp .rs{width:100%;min-height:46px;border-radius:14px;border:1px solid var(--line,#e5e9f2);background:var(--bg,#f4f6fb);font-weight:700;margin-top:8px;color:var(--text,#0f172a)}',
     '.fvp .nt{font-size:.85rem;color:var(--mute,#64748b);line-height:1.5;margin-top:10px}'
   ].join('');
   document.head.appendChild(css);
@@ -230,22 +280,32 @@
   function openVoice() {
     loadVoices(); if (!panel) return;
     var th = thVoices(), cur = chooseVoice();
+    var row = function (id, label, min, max, step, val, show) { return '<div class="rw"><div><span>' + label + '</span><b id="' + id + 'v">' + show + '</b></div><input type="range" id="' + id + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '"></div>'; };
     var h = '<div><h3>🎀 เสียงน้องฟ้า<button data-fx="x" aria-label="ปิด">✕</button></h3>' +
-      '<div class="pr">' + Object.keys(PRE).map(function (k) { return '<button data-fp="' + k + '" class="' + (VO.pre === k ? 'on' : '') + '">' + PRE[k].n + '</button>'; }).join('') + '</div>' +
-      '<div class="rw"><div><span>โทนเสียง <small>(ต่ำ ↔ สูง/เด็กลง)</small></span><b id="fpv">' + VO.p.toFixed(2) + '</b></div><input type="range" id="fp" min="0.5" max="2" step="0.05" value="' + VO.p + '"></div>' +
-      '<div class="rw"><div><span>ความเร็วพูด</span><b id="frv">' + VO.r.toFixed(2) + '</b></div><input type="range" id="fr" min="0.6" max="1.6" step="0.05" value="' + VO.r + '"></div>' +
-      '<div class="rw"><div><span>ความดัง</span><b id="fvv">' + Math.round(VO.vol * 100) + '%</b></div><input type="range" id="fv" min="0.1" max="1" step="0.05" value="' + VO.vol + '"></div>' +
+      '<div class="fch"><b>✨ ฟ้า · สดใสแบบตัวละครเกม</b><small>ตั้งตามคลิปตัวอย่าง: เสียงสูง ใส ร่าเริง ขึ้นลงตามอารมณ์</small><button class="go" data-fx="test">▶️ ฟังเสียงฟ้า</button></div>' +
+      row('fb', 'ระดับเสียงหลัก <small>(ต่ำ ↔ สูง/เด็กลง)</small>', 1, 2, .01, VO.base, VO.base.toFixed(2)) +
+      row('fr', 'ความเร็วพูด', .7, 1.5, .01, VO.rate, VO.rate.toFixed(2)) +
+      row('fv', 'ความดัง', .1, 1, .05, VO.vol, Math.round(VO.vol * 100) + '%') +
+      '<label class="tg"><span>🎭 เปลี่ยนโทนตามอารมณ์อัตโนมัติ<small style="display:block;font-weight:500;color:var(--mute,#64748b)">ดีใจเสียงสูงขึ้น · เศร้า/ง่วงเสียงต่ำและช้าลง</small></span><input type="checkbox" id="fau"' + (VO.auto ? ' checked' : '') + '></label>' +
+      '<div class="fem">' + EMO.map(function (e) { var m = VO.emo[e[0]]; return '<div class="er"><div class="eh"><span>' + e[1] + ' ' + e[2] + '</span><button data-fe="' + e[0] + '" aria-label="ฟังอารมณ์ ' + e[2] + '">▶️</button></div>' +
+        '<div class="es"><small>โทน</small><input type="range" data-ep="' + e[0] + '" min="-0.6" max="0.35" step="0.01" value="' + m.p + '"><b>' + (m.p >= 0 ? '+' : '') + m.p.toFixed(2) + '</b></div>' +
+        '<div class="es"><small>เร็ว</small><input type="range" data-er="' + e[0] + '" min="0.6" max="1.4" step="0.01" value="' + m.r + '"><b>' + m.r.toFixed(2) + '×</b></div></div>'; }).join('') + '</div>' +
+      '<button class="rs" data-fx="reset">↺ คืนค่าเสียงฟ้าเริ่มต้น</button>' +
       '<div class="rw"><div><span>เสียงในเครื่อง</span></div>' + (th.length ? '<select id="fs">' + th.map(function (v) { return '<option value="' + E_(v.voiceURI) + '"' + (cur && cur.voiceURI === v.voiceURI ? ' selected' : '') + '>' + E_(v.name) + '</option>'; }).join('') + '</select>' : '<div class="nt">เครื่องนี้ยังไม่มีเสียงภาษาไทย · iPhone: ตั้งค่า → การช่วยการเข้าถึง → เนื้อหาที่พูด → เสียง → ไทย แล้วดาวน์โหลดเสียงผู้หญิง (เช่น Kanya)</div>') + '</div>' +
-      '<button class="go" data-fx="test">▶️ ทดลองฟังเสียง</button>' +
       '<label class="tg"><span>🔊 พูดคำตอบในแชท</span><input type="checkbox" id="fon"' + (VO.on ? ' checked' : '') + '></label>' +
       '<label class="tg" style="margin-top:0"><span>🔔 พูดตอนเลขาเตือนงาน</span><input type="checkbox" id="fnt"' + (VO.note ? ' checked' : '') + '></label>' +
-      '<h3 style="margin-top:16px;font-size:1rem">🎙️ ใช้เสียงจากแอปแปลงเสียง</h3><div class="nt" style="margin:0 0 6px">อัดเสียงในแอปแปลงเสียง แล้วบันทึกเป็นไฟล์เสียง (m4a / mp3 / wav) จากนั้นกด "เลือกไฟล์" ด้านล่าง · คำตอบอื่น ๆ ยังใช้เสียงของเครื่องที่ปรับไว้ด้านบน</div>' +
+      '<h3 style="margin-top:16px;font-size:1rem">🎙️ คลิปเสียงที่อัดเอง</h3><div class="nt" style="margin:0 0 6px">อัดเสียงตัวเอง (หรือจากแอปแปลงเสียง) เป็นไฟล์ m4a / mp3 / wav แล้วเลือกไฟล์ด้านล่าง · ใช้ได้ 3 จุด คำตอบอื่นยังเป็นเสียงฟ้าด้านบน</div>' +
       Object.keys(SLOTS).map(function (k) { return '<div class="cl"><span>' + SLOTS[k] + (CLIP[k] ? ' ✅' : '') + '</span>' + (CLIP[k] ? '<button data-fc="play" data-k="' + k + '">▶️</button><button data-fc="del" data-k="' + k + '">ลบ</button>' : '') + '<label>เลือกไฟล์<input type="file" accept="audio/*" data-k="' + k + '" hidden></label></div>'; }).join('') +
-      '<div class="nt">เสียงจากเครื่องฟรี แต่ความเป็นธรรมชาติขึ้นกับเสียงที่มีในมือถือ · เสียงเด็กผู้หญิงที่สมจริงมากกว่านี้ต้องใช้บริการเสียง AI แบบเสียเงิน</div></div>';
+      '<div class="nt">ใช้เสียงในมือถือ (ฟรี) แล้วปรับโทนให้ใกล้คลิปตัวอย่าง · ความใสของเสียงขึ้นกับเสียงไทยที่มีในเครื่อง</div></div>';
     panel.innerHTML = h; panel.classList.add('on');
     var g = function (id) { return panel.querySelector('#' + id); };
-    g('fp').oninput = function () { VO.p = +this.value; VO.pre = ''; g('fpv').textContent = VO.p.toFixed(2); mark(); vsave(); };
-    g('fr').oninput = function () { VO.r = +this.value; VO.pre = ''; g('frv').textContent = VO.r.toFixed(2); mark(); vsave(); };
+    g('fb').oninput = function () { VO.base = +this.value; g('fbv').textContent = VO.base.toFixed(2); vsave(); };
+    g('fr').oninput = function () { VO.rate = +this.value; g('frv').textContent = VO.rate.toFixed(2); vsave(); };
+    g('fau').onchange = function () { VO.auto = this.checked; vsave(); };
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-ep],[data-er]'), function (r) {
+      r.oninput = function () { var k = r.dataset.ep || r.dataset.er, m = VO.emo[k], b = r.nextElementSibling; if (r.dataset.ep) { m.p = +r.value; b.textContent = (m.p >= 0 ? '+' : '') + m.p.toFixed(2); } else { m.r = +r.value; b.textContent = m.r.toFixed(2) + '×'; } vsave(); };
+      r.onchange = function () { var k = r.dataset.ep || r.dataset.er; var e = EMO.find(function (x) { return x[0] === k; }); say(e[3], true, k); };
+    });
     g('fv').oninput = function () { VO.vol = +this.value; g('fvv').textContent = Math.round(VO.vol * 100) + '%'; vsave(); };
     if (g('fs')) g('fs').onchange = function () { VO.voice = this.value; vsave(); say('สวัสดีค่ะ ฟ้าเองนะคะ', true); };
     g('fon').onchange = function () { VO.on = this.checked; vsave(); syncBtn(); };
@@ -253,7 +313,6 @@
     Array.prototype.forEach.call(panel.querySelectorAll('input[type=file]'), function (inp) {
       inp.onchange = function () { var f = inp.files && inp.files[0]; if (!f) return; if (f.size > 3e6) { alertBox('ไฟล์ใหญ่เกินไป (ไม่เกิน 3MB · คลิปสั้น ๆ 2–5 วินาทีกำลังดี)'); return; } putClip(inp.dataset.k, f); setTimeout(openVoice, 200); };
     });
-    function mark() { Array.prototype.forEach.call(panel.querySelectorAll('[data-fp]'), function (b) { b.classList.toggle('on', b.dataset.fp === VO.pre); }); }
   }
   function alertBox(t) { if (typeof window.toast === 'function') window.toast(t); }
 
@@ -270,8 +329,9 @@
       if (e.target === panel) { panel.classList.remove('on'); return; }
       var b = e.target.closest('button'); if (!b) return;
       if (b.dataset.fx === 'x') panel.classList.remove('on');
-      if (b.dataset.fx === 'test') say(pick(['สวัสดีค่ะ' + youShort() + ' ฟ้าเองนะคะ วันนี้ให้ฟ้าช่วยอะไรดีคะ', 'ค่า~ ยอดขายวันนี้ดีมากเลยนะคะ เก่งที่สุดเลย', youShort() + 'คะ ถึงเวลาโทรตามค่าเช่าแล้วนะคะ']), true);
-      if (b.dataset.fp) { var p = PRE[b.dataset.fp]; VO.pre = b.dataset.fp; VO.p = p.p; VO.r = p.r; vsave(); openVoice(); say('สวัสดีค่ะ ฟ้าเองนะคะ', true); }
+      if (b.dataset.fx === 'test') say('สวัสดีค่า ' + youShort() + ' ฟ้าเองนะคะ! วันนี้ให้ฟ้าช่วยอะไรดีคะ? ว้าว ยอดขายดีมากเลยค่า', true);
+      if (b.dataset.fe) { var e = EMO.find(function (x) { return x[0] === b.dataset.fe; }); say(e[3], true, e[0]); }
+      if (b.dataset.fx === 'reset') { VO.base = DEF.base; VO.rate = DEF.rate; VO.auto = true; VO.emo = clone(DEF.emo); vsave(); openVoice(); say('สวัสดีค่า ฟ้ากลับมาเป็นเสียงเดิมแล้วนะคะ', true); }
       if (b.dataset.fc === 'play') { var a = new Audio(CLIP[b.dataset.k]); a.volume = VO.vol; a.play(); }
       if (b.dataset.fc === 'del') { putClip(b.dataset.k, null); setTimeout(openVoice, 100); }
     });

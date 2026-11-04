@@ -22,7 +22,8 @@
 
   /* ---------- ชน/ขอบเขต ---------- */
   function extBlocked(x, z, R) {
-    if (Math.abs(x) > 95 || Math.abs(z) > 95) return true;
+    var LM = W.LIM || 95; if (Math.abs(x) > LM || Math.abs(z) > LM) return true;
+    if (W.cityHit && W.cityHit(x, z, R)) return true;
     for (var i = 0; i < W.D.length; i++) { var d = W.D[i]; if (Math.abs(x - d.x) < d.w / 2 + R && Math.abs(z - d.z) < d.p / 2 + R) return true; }
     return false;
   }
@@ -112,7 +113,7 @@
     if (pc.fov !== CAM.fov) { pc.fov = CAM.fov; pc.updateProjectionMatrix(); }
     var walk = V.cam === 'walk';
     if (W.INT) { var fv = I && walk; W.INT.fpOnly.forEach(function (m) { m.visible = fv; }); W.INT.up.visible = I; }
-    if (!I) { if (!fog) fog = new T.Fog(0xe9eef7, 110, 260); sc.fog = walk ? fog : null; if (sc.background && sc.background.isColor) fog.color.copy(sc.background); }
+    if (!I) { if (!fog) fog = new T.Fog(0xe9eef7, 170, 560); sc.fog = walk ? fog : null; if (sc.background && sc.background.isColor) fog.color.copy(sc.background); }
     if (!PLE && W.EXS) { PLE = W.mkChar({ hair: 0x7cc3ff, top: 0x93c5fd, f: 1, long: 1, bow: 0x60a5fa, s: .86 }); PLE.visible = false; W.EXS.add(PLE); }
     var av = I ? W.PLI : PLE; if (PLE && (I || !walk || !CAM.third)) PLE.visible = false; if (W.PLI && (!I || !walk || !CAM.third)) W.PLI.visible = false;
 
@@ -131,7 +132,7 @@
         if (I) { P.g = W.intGround(P.x, P.z, lvl()); P.y = EYE_I + P.g; } else { P.g = 0; P.y = EYE_E; }
       } else {
         P.x += dx; P.z += dz; P.y += dy;
-        if (I) { P.x = clamp(P.x, -58, 58); P.z = clamp(P.z, -30, 30); P.y = clamp(P.y, .6, 22); } else { P.x = clamp(P.x, -110, 110); P.z = clamp(P.z, -110, 110); P.y = clamp(P.y, .6, 140); }
+        if (I) { P.x = clamp(P.x, -58, 58); P.z = clamp(P.z, -30, 30); P.y = clamp(P.y, .6, 22); } else { var LM2 = (W.LIM || 110); P.x = clamp(P.x, -LM2, LM2); P.z = clamp(P.z, -LM2, LM2); P.y = clamp(P.y, .6, 140); }
       }
     }
 
