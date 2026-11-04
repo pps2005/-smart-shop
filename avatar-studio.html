@@ -3,323 +3,327 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>แต่งตัวน้องฟ้า · Avatar Studio</title>
+<title>แต่งตัวน้องฟ้า · Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&display=swap" rel="stylesheet">
-<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Itim&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #170e2a; --panel: #22153b; --card: #2c1d4a; --line: rgba(190,150,255,0.35); --text: #f6efff; --muted: #c4b3e6; --accent: #a77bff; --accent2: #ff7fbf; }
+  :root { --a: #b48cff; --b: #ff8fd0; --bg: #170b2e; --line: rgba(205,170,255,.75); --text: #fbf6ff; --muted: #d6c6f2; --card: rgba(255,255,255,.06); }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: 'Mitr', system-ui, sans-serif; }
-  body { display: grid; grid-template-columns: 1fr 440px; height: 100vh; height: 100dvh; overflow: hidden; }
-  button { font-family: inherit; cursor: pointer; color: var(--text); }
-  .view { position: relative; background: radial-gradient(circle at 50% 35%, #4a2c86, #1a0f30 70%); overflow: hidden; }
-  #c { width: 100%; height: 100%; display: block; touch-action: none; }
-  .top { position: absolute; left: 14px; right: 14px; top: max(12px, env(safe-area-inset-top)); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .top h1 { margin: 0 auto 0 4px; font-size: 22px; font-weight: 600; }
-  .chip { padding: 9px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: rgba(20,10,40,0.6); font-size: 16px; text-decoration: none; color: var(--text); }
-  .chip.pri { background: linear-gradient(135deg, var(--accent), var(--accent2)); border: 0; }
-  .test { position: absolute; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 0 10px; }
-  .test button { padding: 9px 12px; font-size: 15px; border-radius: 12px; border: 1px solid var(--line); background: rgba(20,10,40,0.65); }
-  .zoom { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 6px; }
-  .zoom button { width: 48px; height: 48px; border-radius: 14px; border: 1.5px solid var(--line); background: rgba(20,10,40,0.65); font-size: 18px; }
-  #say { position: absolute; left: 50%; transform: translateX(-50%); bottom: 76px; font-size: 19px; padding: 8px 16px; border-radius: 14px; background: rgba(10,4,22,0.75); display: none; text-align: center; max-width: 90%; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: 'Itim', 'Fredoka', system-ui, sans-serif; }
+  button, input, select, textarea { font-family: inherit; color: var(--text); }
+  body { display: grid; grid-template-columns: 1fr 430px; height: 100vh; height: 100dvh; overflow: hidden; }
+  .ttl { font-family: 'Fredoka', 'Itim', sans-serif; font-weight: 600; }
+  .view { position: relative; overflow: hidden; }
+  #bg { position: absolute; inset: -40px; background: center / cover no-repeat; filter: blur(22px) brightness(.5) saturate(1.3); }
+  #c { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .top { position: absolute; left: 12px; right: 12px; top: max(12px, env(safe-area-inset-top)); display: flex; gap: 8px; align-items: center; z-index: 3; }
+  .top h1 { margin: 0 auto 0 4px; font-size: 22px; text-shadow: 0 2px 8px #000; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 14px; border: 2px solid var(--line); background: rgba(26,12,52,.7); font-size: 16px; text-decoration: none; color: var(--text); }
+  .chip.pri { background: linear-gradient(135deg, var(--a), var(--b)); border: 0; color: #fff; }
+  .test { position: absolute; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 0 10px; z-index: 3; }
+  .test button { padding: 8px 12px; font-size: 15px; border-radius: 14px; border: 1.5px solid var(--line); background: rgba(26,12,52,.72); }
+  #hintBar { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); z-index: 3; padding: 8px 14px; border-radius: 14px; background: rgba(26,12,52,.85); border: 2px solid var(--b); font-size: 15px; display: none; text-align: center; max-width: 90%; }
 
-  .panel { background: var(--panel); display: flex; flex-direction: column; min-height: 0; border-left: 1.5px solid var(--line); }
-  .presets { display: flex; gap: 6px; overflow-x: auto; padding: 12px 12px 6px; flex-shrink: 0; }
-  .presets button { flex-shrink: 0; padding: 9px 13px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); font-size: 15px; }
-  .tabs { display: flex; gap: 4px; overflow-x: auto; padding: 6px 12px; flex-shrink: 0; }
-  .tabs button { flex-shrink: 0; padding: 10px 14px; font-size: 16px; border-radius: 12px; border: 0; background: transparent; color: var(--muted); }
-  .tabs button.on { background: var(--accent); color: #fff; }
-  .body { flex: 1; overflow-y: auto; padding: 6px 14px 20px; }
-  .item { background: var(--card); border-radius: 16px; padding: 12px 14px; margin-bottom: 10px; }
-  .item > label { display: block; font-size: 16px; margin-bottom: 8px; color: var(--muted); }
+  .panel { background: linear-gradient(180deg, #24123f, #1a0c30); border-left: 2px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  .tabs { display: flex; gap: 4px; overflow-x: auto; padding: 12px 10px 8px; flex-shrink: 0; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { flex: 0 0 auto; padding: 10px 13px; font-size: 16px; border-radius: 14px; border: 0; background: transparent; color: var(--muted); }
+  .tabs button.on { background: linear-gradient(135deg, var(--a), var(--b)); color: #fff; }
+  .body { flex: 1; overflow-y: auto; padding: 4px 14px 20px; }
+  .item { background: var(--card); border: 1.5px solid rgba(205,170,255,.25); border-radius: 18px; padding: 12px 14px; margin-bottom: 10px; }
+  .item > label, .lbl { display: block; font-size: 16px; margin-bottom: 8px; color: var(--muted); }
   .opts { display: flex; flex-wrap: wrap; gap: 6px; }
-  .opts button { padding: 10px 13px; font-size: 16px; border-radius: 12px; border: 1.5px solid var(--line); background: rgba(255,255,255,0.04); }
-  .opts button.on { border-color: var(--accent2); background: rgba(255,127,191,0.2); }
-  .sw { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .sw button { width: 38px; height: 38px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.25); }
-  .sw button.on { border-color: #fff; box-shadow: 0 0 0 3px var(--accent2); }
-  .sw input[type=color] { width: 44px; height: 40px; border: 0; background: none; padding: 0; }
+  .opts button { padding: 10px 13px; font-size: 16px; border-radius: 14px; border: 1.5px solid var(--line); background: rgba(255,255,255,.04); }
+  .opts button.on { border-color: var(--b); background: rgba(255,143,208,.22); }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .grid button { aspect-ratio: 1; font-size: 28px; border-radius: 14px; border: 1.5px solid rgba(205,170,255,.35); background: rgba(255,255,255,.04); }
   .tog { display: flex; justify-content: space-between; align-items: center; font-size: 17px; }
-  .tog input { width: 26px; height: 26px; accent-color: var(--accent2); }
-  input[type=range] { width: 100%; accent-color: var(--accent2); height: 30px; }
+  .tog input { width: 26px; height: 26px; accent-color: var(--b); }
+  input[type=range] { width: 100%; accent-color: var(--b); height: 30px; }
   .rv { float: right; color: var(--text); }
-  textarea, input[type=text], select { width: 100%; font: inherit; font-size: 17px; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--line); background: rgba(0,0,0,0.25); color: var(--text); }
+  textarea, input[type=text], select { width: 100%; font-size: 17px; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--line); background: rgba(0,0,0,.25); }
   textarea { min-height: 90px; resize: vertical; }
-  .act { width: 100%; padding: 12px; font-size: 17px; border-radius: 14px; border: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
-  .foot { display: flex; gap: 6px; padding: 10px 12px max(10px, env(safe-area-inset-bottom)); border-top: 1.5px solid var(--line); flex-shrink: 0; }
-  .foot button { flex: 1; padding: 11px 6px; font-size: 15px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); }
-  #toast { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); background: #2f9e6a; padding: 8px 16px; border-radius: 12px; font-size: 16px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 9; }
-  .note { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .act { width: 100%; padding: 12px; font-size: 17px; border-radius: 14px; border: 0; color: #fff; background: linear-gradient(135deg, var(--a), var(--b)); margin-top: 4px; }
+  .act.alt { background: rgba(255,255,255,.08); border: 1.5px solid var(--line); }
+  .note { font-size: 14px; color: var(--muted); line-height: 1.55; }
+  .themes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .themes button { padding: 8px 2px; border-radius: 14px; border: 2px solid transparent; font-size: 13px; background: rgba(255,255,255,.05); }
+  .themes button i { display: block; height: 26px; border-radius: 10px; margin-bottom: 4px; }
+  .themes button.on { border-color: #fff; }
+  .foot { display: flex; gap: 6px; padding: 10px 12px max(10px, env(safe-area-inset-bottom)); border-top: 2px solid var(--line); flex-shrink: 0; }
+  .foot button { flex: 1; padding: 11px 4px; font-size: 15px; border-radius: 14px; border: 1.5px solid var(--line); background: rgba(255,255,255,.06); }
+  #toast { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); background: #2f9e6a; padding: 8px 16px; border-radius: 12px; font-size: 16px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 9; }
 
   @media (max-width: 900px), (orientation: portrait) {
-    body { grid-template-columns: 1fr; grid-template-rows: 46vh 1fr; }
-    .panel { border-left: 0; border-top: 1.5px solid var(--line); }
+    body { grid-template-columns: 1fr; grid-template-rows: 48vh 1fr; }
+    .panel { border-left: 0; border-top: 2px solid var(--line); }
     .test { display: none; }
-    #say { bottom: 14px; }
+    .top h1 { font-size: 18px; }
   }
 </style>
 </head>
 <body>
 <div class="view">
+  <div id="bg"></div>
   <canvas id="c"></canvas>
   <div class="top">
-    <h1>👗 แต่งตัวน้องฟ้า</h1>
-    <a class="chip pri" href="ai-live.html">🎙️ ไปหน้า AI Live</a>
+    <button class="chip" id="btnBack">⬅</button>
+    <h1 class="ttl">👗 แต่งตัวน้องฟ้า</h1>
+    <a class="chip pri" id="lnkLive" href="ai-live.html">🎙️ AI Live</a>
   </div>
-  <div class="zoom">
-    <button id="zIn" title="ซูมหน้า">🔍</button>
-    <button id="zOut" title="ทั้งตัว">🧍</button>
-    <button id="spin" title="หมุนอัตโนมัติ">🔄</button>
-  </div>
+  <div id="hintBar"></div>
   <div class="test">
-    <button data-g="wave" data-e="happy">👋 โบกมือ</button>
-    <button data-g="paw" data-e="wink">🐾 เหมียว</button>
-    <button data-g="heart" data-e="shy">💜 หัวใจ</button>
-    <button data-g="point" data-e="wink">👉 ชี้</button>
-    <button data-g="think" data-e="neutral">🤔 คิด</button>
-    <button data-g="cheer" data-e="happy">🎉 เย้</button>
-    <button data-g="nod" data-e="sad">😢 เศร้า</button>
-    <button data-g="nod" data-e="angry">😠 งอน</button>
+    <button data-e="happy" data-m="hop">😊 ดีใจ</button>
+    <button data-e="wink" data-m="tilt">😉 วิ้งค์</button>
+    <button data-e="love" data-m="heart">💜 หัวใจ</button>
+    <button data-e="shy" data-m="wiggle">😳 เขิน</button>
+    <button data-e="sad" data-m="sink">😢 เศร้า</button>
+    <button data-e="angry" data-m="shake">😠 งอน</button>
+    <button data-e="surprised" data-m="hop">😲 ตกใจ</button>
+    <button data-talk="1">🗣️ พูด</button>
+    <button data-blink="1">😌 กะพริบตา</button>
   </div>
-  <div id="say"></div>
 </div>
 
 <div class="panel">
-  <div class="presets" id="presets"></div>
   <div class="tabs" id="tabs"></div>
   <div class="body" id="body"></div>
   <div class="foot">
     <button id="bExport">📤 ส่งออก</button>
     <button id="bImport">📥 นำเข้า</button>
-    <button id="bRandom">🎲 สุ่ม</button>
     <button id="bReset">↺ รีเซ็ต</button>
   </div>
 </div>
-<div id="toast">บันทึกแล้ว ✓</div>
-<input type="file" id="file" accept="application/json" hidden>
+<div id="toast"></div>
+<input type="file" id="fImg" accept="image/*" hidden>
+<input type="file" id="fJson" accept="application/json" hidden>
 
 <script type="module">
-import { THREE, FahAvatar, DEFAULT_CONFIG, PRESETS, mergeConfig, loadAvatarConfig, saveAvatarConfig, createRenderer, addLights } from './fah-avatar.js';
+import { Puppet, DEFAULT, THEMES, FX, STICKERS, merge, loadCfg, saveCfg, imageURL, saveImage, shrinkImage, speak, voices } from './fah-2d.js';
 
 const $ = id => document.getElementById(id);
-let cfg = loadAvatarConfig();
+const EMBED = new URLSearchParams(location.search).has('embed') && window.parent !== window;
+const PARENT = (() => { try { return EMBED && window.parent.SSLive ? window.parent.SSLive : null; } catch (e) { return null; } })();
+let cfg = loadCfg();
+const puppet = new Puppet($('c'), cfg);
 
-// ---------- ฉาก ----------
-const canvas = $('c');
-const renderer = createRenderer(canvas);
-const scene = new THREE.Scene();
-addLights(scene);
-const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-const avatar = new FahAvatar(cfg); scene.add(avatar.root);
-const floor = new THREE.Mesh(new THREE.CircleGeometry(0.75, 48), new THREE.MeshBasicMaterial({ color: 0x8f63e8, transparent: true, opacity: 0.25 }));
-floor.rotation.x = -Math.PI / 2; floor.position.y = -0.06; scene.add(floor);
-const ring = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.76, 64), new THREE.MeshBasicMaterial({ color: 0xff9fd6, transparent: true, opacity: 0.6 }));
-ring.rotation.x = -Math.PI / 2; ring.position.y = -0.055; scene.add(ring);
-
-const views = { full: { y: 1.05, z: 5.0, look: 1.0 }, face: { y: 1.58, z: 2.0, look: 1.52 } };
-let view = 'full', camCur = { ...views.full };
-let rotY = 0, rotV = 0, autoSpin = false, drag = null;
-
-function resize() {
-  const r = canvas.parentElement.getBoundingClientRect();
-  renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+function applyTheme() {
+  const t = THEMES[cfg.theme] || THEMES.purple, r = document.documentElement.style;
+  r.setProperty('--a', t.a); r.setProperty('--b', t.b); r.setProperty('--bg', t.bg); r.setProperty('--line', t.line);
 }
-new ResizeObserver(resize).observe(canvas.parentElement); resize();
+async function loadImg() { const u = await imageURL(cfg); await puppet.setImage(u); $('bg').style.backgroundImage = `url("${u}")`; }
+applyTheme(); loadImg();
 
-canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX }; canvas.setPointerCapture(e.pointerId); autoSpin = false; });
-canvas.addEventListener('pointermove', e => { if (!drag) return; rotV = (e.clientX - drag.x) * 0.012; rotY += rotV; drag.x = e.clientX; });
-canvas.addEventListener('pointerup', () => { drag = null; });
-$('zIn').onclick = () => view = 'face';
-$('zOut').onclick = () => view = 'full';
-$('spin').onclick = () => autoSpin = !autoSpin;
+let saveT;
+function changed(rebuild = true) {
+  if (rebuild) puppet.setConfig(cfg);
+  applyTheme();
+  clearTimeout(saveT); saveT = setTimeout(() => { if (saveCfg(cfg)) toast('บันทึกแล้ว ✓ มีผลกับหน้า AI Live'); }, 400);
+}
+function toast(t, bad) { const e = $('toast'); e.textContent = t; e.style.background = bad ? '#c0392b' : '#2f9e6a'; e.style.opacity = 1; clearTimeout(e._t); e._t = setTimeout(() => e.style.opacity = 0, 1800); }
 
-const clock = new THREE.Clock();
-renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.05);
-  if (autoSpin) rotY += dt * 0.6; else if (!drag) { rotV *= 0.92; rotY += rotV; }
-  avatar.root.rotation.y = rotY;
-  const v = views[view];
-  for (const k of ['y', 'z', 'look']) camCur[k] += (v[k] - camCur[k]) * Math.min(1, dt * 5);
-  camera.position.set(0, camCur.y, camCur.z); camera.lookAt(0, camCur.look, 0);
-  avatar.update(dt); renderer.render(scene, camera);
+// ---------- ปุ่มทดสอบ ----------
+document.querySelectorAll('.test button').forEach(b => b.onclick = () => {
+  if (b.dataset.talk) { puppet.talk(true); setTimeout(() => puppet.talk(false), 2200); return; }
+  if (b.dataset.blink) { puppet.s.blinkPh = 0.6; return; }
+  puppet.emotion(b.dataset.e, 3); puppet.motion(b.dataset.m);
 });
-document.querySelectorAll('.test button').forEach(b => b.onclick = () => { avatar.gesture(b.dataset.g); avatar.setEmotion(b.dataset.e, 3); });
+$('btnBack').onclick = () => { if (PARENT) PARENT.close(); else location.href = 'index.html'; };
+if (EMBED) $('lnkLive').href = 'ai-live.html?embed=1';
 
-// ---------- ตัวเลือก ----------
-const HAIR = ['#2c1a3d', '#151018', '#5a3420', '#3b2418', '#d9a35b', '#f3e1a0', '#f3c3dc', '#8fd3ff', '#b9a5ff', '#e8e8ef', '#c0392b', '#3c8d6e'];
-const EYES = ['#9a5cff', '#4f8cff', '#21b5c4', '#3fbf6f', '#f2b134', '#e0552a', '#ff4f93', '#c0392b', '#6b4a33', '#7f8c9a'];
-const SKIN = ['#fff1ea', '#ffe9df', '#f8d9c4', '#efc4a4', '#d9a37f', '#b07a56'];
-const CLOTH = ['#1f1a2b', '#22305e', '#ffffff', '#1c1a22', '#fff6ea', '#a67cff', '#ff6fa8', '#7fd3ff', '#3fbf6f', '#f5c542', '#c0392b', '#8e8e9a'];
-const LANGS = [['ja-JP', 'ญี่ปุ่น 🇯🇵'], ['ko-KR', 'เกาหลี 🇰🇷'], ['zh-CN', 'จีน 🇨🇳'], ['en-US', 'อังกฤษ 🇺🇸'], ['th-TH', 'ไทย 🇹🇭']];
-const SAMPLE = {
-  'ja-JP': ['こんにちは！ファーだよ、今日もよろしくね！', 'สวัสดีค่ะ! ฟ้าเองนะ วันนี้ก็ฝากตัวด้วยนะคะ!'],
-  'ko-KR': ['안녕하세요! 저는 파예요, 오늘도 잘 부탁해요!', 'สวัสดีค่ะ! ฟ้าเองนะ วันนี้ก็ฝากตัวด้วยนะคะ!'],
-  'zh-CN': ['大家好！我是小芳，今天也请多多关照！', 'สวัสดีค่ะ! ฟ้าเองนะ วันนี้ก็ฝากตัวด้วยนะคะ!'],
-  'en-US': ["Hi! I'm Fah, nice to see you today!", 'สวัสดีค่ะ! ฟ้าเองนะ ดีใจที่ได้เจอวันนี้!'],
-  'th-TH': ['สวัสดีค่ะ ฟ้าเองนะคะ วันนี้ก็ฝากตัวด้วยนะคะ', ''],
-};
+// ---------- ลากบนภาพ (ตำแหน่งตา/ปาก · สติกเกอร์) ----------
+let tab = 0, faceKey = 'eye1', drag = null;
+const C = $('c');
+C.addEventListener('pointerdown', e => {
+  const r = C.getBoundingClientRect(), p = puppet.toImg(e.clientX - r.left, e.clientY - r.top);
+  const name = TABS[tab].id;
+  if (name === 'face') {
+    let hit = null;
+    for (const k of ['mouth', 'eye1', 'eye2']) { const b = cfg[k]; if (p.x >= b.x - 0.02 && p.x <= b.x + b.w + 0.02 && p.y >= b.y - 0.02 && p.y <= b.y + b.h + 0.02) { hit = k; break; } }
+    if (hit) { faceKey = hit; renderBody(); }
+    const b = cfg[faceKey];
+    drag = { k: 'face', ox: p.x - b.x, oy: p.y - b.y };
+    if (!hit) { b.x = p.x - b.w / 2; b.y = p.y - b.h / 2; drag.ox = b.w / 2; drag.oy = b.h / 2; }
+  } else if (name === 'stk') {
+    let best = -1, bd = 1e9;
+    cfg.stickers.forEach((s, i) => { const d = Math.hypot((p.x - s.x) * puppet.iw, (p.y - s.y) * puppet.ih); if (d < s.s * puppet.iw * 0.7 && d < bd) { bd = d; best = i; } });
+    puppet.selSticker = best; renderBody();
+    if (best >= 0) drag = { k: 'stk', i: best, ox: p.x - cfg.stickers[best].x, oy: p.y - cfg.stickers[best].y };
+  } else return;
+  C.setPointerCapture(e.pointerId);
+});
+C.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const r = C.getBoundingClientRect(), p = puppet.toImg(e.clientX - r.left, e.clientY - r.top);
+  if (drag.k === 'face') { const b = cfg[faceKey]; b.x = p.x - drag.ox; b.y = p.y - drag.oy; puppet.cfg[faceKey] = { ...b }; }
+  else { const s = cfg.stickers[drag.i]; s.x = p.x - drag.ox; s.y = p.y - drag.oy; puppet.cfg.stickers = cfg.stickers; }
+});
+C.addEventListener('pointerup', () => { if (drag) { drag = null; changed(); } });
+
+// ---------- แท็บ ----------
+const COLOR_PRESETS = [
+  ['ต้นฉบับ', { hue: 0, sat: 100, bri: 100, con: 100 }], ['โทนชมพู', { hue: 40, sat: 115, bri: 104, con: 100 }],
+  ['โทนฟ้า', { hue: -45, sat: 110, bri: 104, con: 100 }], ['โทนมิ้นต์', { hue: -110, sat: 95, bri: 105, con: 100 }],
+  ['โทนอบอุ่น', { hue: 110, sat: 90, bri: 106, con: 98 }], ['สว่างใส', { hue: 0, sat: 110, bri: 115, con: 92 }],
+  ['ซีเปีย', { hue: 150, sat: 45, bri: 105, con: 95 }],
+];
+const FX_LABEL = { hearts: '💜 หัวใจ', sparkle: '✨ ประกาย', paws: '🐾 รอยเท้าแมว', notes: '🎵 โน้ตเพลง', sakura: '🌸 ซากุระ', snow: '❄️ หิมะ', none: 'ไม่มี' };
+const SAMPLE = { 'ja-JP': ['こんにちは！ファーだよ、今日もよろしくね！', 'สวัสดีค่ะ! ฟ้าเองนะ วันนี้ก็ฝากตัวด้วยนะคะ!'], 'th-TH': ['สวัสดีค่ะ ฟ้าเองนะคะ วันนี้ก็ฝากตัวด้วยนะคะ', ''], 'ko-KR': ['안녕하세요! 오늘도 잘 부탁해요!', 'สวัสดีค่ะ! วันนี้ก็ฝากตัวด้วยนะ'], 'zh-CN': ['大家好！今天也请多多关照！', 'สวัสดีค่ะ! วันนี้ก็ฝากตัวด้วยนะ'], 'en-US': ["Hi! I'm Fah, nice to see you!", 'สวัสดีค่ะ! ฟ้าเองนะ ดีใจที่ได้เจอ!'] };
 
 const TABS = [
-  { name: '💇 ผม', items: [
-    { k: 'hairStyle', l: 'ทรงผม', t: 'opt', o: [['long', 'ยาวสลวย'], ['twintail', 'ทวินเทล'], ['ponytail', 'หางม้า'], ['bob', 'บ็อบ'], ['short', 'สั้น']] },
-    { k: 'bangs', l: 'หน้าม้า', t: 'opt', o: [['side', 'ปัดข้าง'], ['straight', 'เต็มหน้า'], ['split', 'แสกกลาง']] },
-    { k: 'hairColor', l: 'สีผม', t: 'color', s: HAIR },
-    { k: 'ahoge', l: 'ผมชี้ด้านบน (อะโฮเงะ)', t: 'tog' },
-  ] },
-  { name: '😊 หน้า', items: [
-    { k: 'eyeColor', l: 'สีตา', t: 'color', s: EYES },
-    { k: 'eyeShape', l: 'ทรงตา', t: 'opt', o: [['round', 'ตากลมโต'], ['sharp', 'ตาคม'], ['sleepy', 'ตาง่วง']] },
-    { k: 'eyeSize', l: 'ขนาดตา', t: 'range', min: 0.8, max: 1.25, step: 0.01 },
-    { k: 'skin', l: 'สีผิว', t: 'color', s: SKIN },
-    { k: 'blush', l: 'แก้มแดงระเรื่อ', t: 'tog' },
-    { k: 'fang', l: 'เขี้ยวน้อย', t: 'tog' },
-  ] },
-  { name: '🐱 หู', items: [
-    { k: 'ears', l: 'แบบหู', t: 'opt', o: [['cat', 'แมว 🐱'], ['fox', 'จิ้งจอก 🦊'], ['bunny', 'กระต่าย 🐰'], ['none', 'ไม่มี']] },
-    { k: 'earColor', l: 'สีหู', t: 'color', s: HAIR },
-    { k: 'earInner', l: 'สีด้านในหู', t: 'color', s: ['#f5eef8', '#ffffff', '#ffc2dc', '#fff3e6', '#e7d6ff'] },
-  ] },
-  { name: '👗 ชุด', items: [
-    { k: 'outfit', l: 'ชุด', t: 'opt', o: [['hoodie', 'แจ็กเก็ตแมว'], ['sailor', 'ชุดนักเรียน'], ['maid', 'ชุดเมด'], ['idol', 'ชุดไอดอล'], ['dress', 'เดรสน่ารัก']] },
-    { k: 'outfitMain', l: 'สีหลัก', t: 'color', s: CLOTH },
-    { k: 'outfitAccent', l: 'สีตกแต่ง', t: 'color', s: CLOTH },
-    { k: 'innerColor', l: 'สีเสื้อตัวใน', t: 'color', s: ['#ffffff', '#f4eefc', '#ffe0ef', '#e0f2ff', '#1f1a2b'] },
-  ] },
-  { name: '🎀 ของแต่ง', items: [
-    { k: 'bow', l: 'โบว์ผม', t: 'tog' },
-    { k: 'bowColor', l: 'สีโบว์/ยางมัดผม', t: 'color', s: CLOTH },
-    { k: 'clip', l: 'กิ๊บหน้าแมว + กิ๊บไขว้', t: 'tog' },
-    { k: 'choker', l: 'โชคเกอร์', t: 'tog' },
-    { k: 'bell', l: 'กระดิ่ง', t: 'tog' },
-    { k: 'glasses', l: 'แว่นตา', t: 'tog' },
-    { k: 'headphones', l: 'หูฟัง', t: 'tog' },
-  ] },
-  { name: '🎤 เสียง', items: [
-    { k: 'voice.lang', l: 'ภาษาที่น้องฟ้าพูด (ซับเป็นไทยเสมอ)', t: 'opt', o: LANGS },
-    { k: 'voice.voiceName', l: 'เสียงในเครื่องนี้', t: 'voice' },
-    { k: 'voice.pitch', l: 'ระดับเสียง (สูง = ใสน่ารัก)', t: 'range', min: 0.5, max: 2, step: 0.05 },
-    { k: 'voice.rate', l: 'ความเร็วพูด', t: 'range', min: 0.6, max: 1.6, step: 0.05 },
-    { t: 'btn', l: '🔊 ทดสอบเสียง', fn: testVoice },
-    { t: 'note', l: 'เสียงใช้ระบบอ่านออกเสียงในตัว iPad/มือถือ ฟรีไม่ต้องต่อเน็ต · ถ้าไม่มีเสียงภาษาที่เลือก ให้เพิ่มที่ การตั้งค่า › การช่วยการเข้าถึง › เนื้อหาที่พูด › เสียง' },
-  ] },
-  { name: '💬 ตัวตน', items: [
-    { k: 'name', l: 'ชื่อเลขา', t: 'text' },
-    { k: 'personality', l: 'นิสัย/บุคลิก (AI จะพูดตามนี้)', t: 'area' },
-  ] },
+  { id: 'img', name: '🖼️ รูป' }, { id: 'face', name: '👀 ตา/ปาก' }, { id: 'color', name: '🎨 สี' },
+  { id: 'stk', name: '🎀 สติกเกอร์' }, { id: 'fx', name: '✨ เอฟเฟกต์' }, { id: 'voice', name: '🎤 เสียง' }, { id: 'me', name: '💬 ตัวตน' },
 ];
-
-const get = k => k.split('.').reduce((o, p) => o?.[p], cfg);
-const set = (k, v) => { const ps = k.split('.'); let o = cfg; while (ps.length > 1) o = o[ps.shift()]; o[ps[0]] = v; };
-
-let saveT, rebuildT;
-function changed(rebuild = true) {
-  if (rebuild) { clearTimeout(rebuildT); rebuildT = setTimeout(() => avatar.setConfig(cfg), 40); }
-  clearTimeout(saveT); saveT = setTimeout(() => { if (saveAvatarConfig(cfg)) toast('บันทึกแล้ว ✓ มีผลกับหน้า AI Live'); }, 500);
-}
-function toast(t) { const e = $('toast'); e.textContent = t; e.style.opacity = 1; clearTimeout(e._t); e._t = setTimeout(() => e.style.opacity = 0, 1600); }
-
-let tab = 0;
 function renderTabs() {
-  const tb = $('tabs'); tb.innerHTML = '';
-  TABS.forEach((T, i) => { const b = document.createElement('button'); b.textContent = T.name; if (i === tab) b.className = 'on'; b.onclick = () => { tab = i; renderTabs(); renderBody(); }; tb.append(b); });
+  $('tabs').innerHTML = '';
+  TABS.forEach((T, i) => { const b = document.createElement('button'); b.textContent = T.name; if (i === tab) b.className = 'on'; b.onclick = () => { tab = i; renderTabs(); renderBody(); }; $('tabs').append(b); });
 }
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+function item(label) { const d = el('div', 'item'); if (label) d.append(el('label', '', label)); $('body').append(d); return d; }
+function slider(box, label, val, min, max, step, fmt, on) {
+  const l = el('label', 'lbl', label), rv = el('span', 'rv', fmt(val)); l.append(rv);
+  const r = document.createElement('input'); r.type = 'range'; r.min = min; r.max = max; r.step = step; r.value = val;
+  r.oninput = () => { rv.textContent = fmt(+r.value); on(+r.value); };
+  box.append(l, r);
+}
+function toggle(box, label, val, on) {
+  const l = el('label', 'tog'); l.append(el('span', '', label)); const c = document.createElement('input'); c.type = 'checkbox'; c.checked = !!val; c.onchange = () => on(c.checked); l.append(c); box.append(l);
+}
+function opts(box, list, cur, on) {
+  const w = el('div', 'opts');
+  for (const [v, t] of list) { const b = el('button', v === cur ? 'on' : '', t); b.onclick = () => on(v); w.append(b); }
+  box.append(w);
+}
+function hint(t) { const h = $('hintBar'); h.textContent = t || ''; h.style.display = t ? 'block' : 'none'; }
+
 function renderBody() {
-  const body = $('body'); body.innerHTML = '';
-  for (const it of TABS[tab].items) {
-    const box = document.createElement('div'); box.className = 'item';
-    if (it.t === 'note') { box.innerHTML = `<div class="note"></div>`; box.firstChild.textContent = it.l; body.append(box); continue; }
-    if (it.t === 'btn') { const b = document.createElement('button'); b.className = 'act'; b.textContent = it.l; b.onclick = it.fn; box.append(b); body.append(box); continue; }
-    if (it.t === 'tog') {
-      box.innerHTML = `<label class="tog"><span></span><input type="checkbox"></label>`;
-      box.querySelector('span').textContent = it.l; const cb = box.querySelector('input'); cb.checked = !!get(it.k);
-      cb.onchange = () => { set(it.k, cb.checked); changed(); };
-      body.append(box); continue;
+  $('body').innerHTML = '';
+  const id = TABS[tab].id;
+  puppet.showGuides = id === 'face'; if (id !== 'stk') puppet.selSticker = -1;
+  hint(id === 'face' ? 'ลากกรอบไปวางให้ตรงตาและปาก (แตะกรอบเพื่อเลือก)' : id === 'stk' ? 'แตะสติกเกอร์บนภาพเพื่อเลือก แล้วลากย้ายได้' : '');
+
+  if (id === 'img') {
+    let b = item('รูปตัวละคร');
+    b.append(el('div', 'note', cfg.custom ? 'ตอนนี้ใช้รูปที่อัปโหลดเอง (เก็บในเครื่องนี้)' : 'ตอนนี้ใช้รูปน้องฟ้าต้นแบบ'));
+    const up = el('button', 'act', '📷 อัปโหลดรูปตัวละครใหม่'); up.onclick = () => $('fImg').click(); b.append(up);
+    if (cfg.custom) { const rs = el('button', 'act alt', '↺ กลับไปใช้รูปน้องฟ้าเดิม'); rs.onclick = async () => { cfg.custom = false; for (const k of ['eye1', 'eye2', 'mouth']) cfg[k] = { ...DEFAULT[k] }; await loadImg(); changed(); renderBody(); }; b.append(rs); }
+    b = item(); b.append(el('div', 'note', 'เคล็ดลับ: รูปที่ดีที่สุดคือรูปตัวละครหันหน้าตรง เห็นตาและปากชัด แนวตั้ง (เช่นรูปจาก AI) หลังอัปโหลดให้ไปแท็บ "👀 ตา/ปาก" เพื่อวางกรอบให้ตรง น้องฟ้าจะกะพริบตาและขยับปากได้ถูกที่'));
+    b = item('การขยับตัว');
+    slider(b, 'ความแรงการขยับ/โยกตัว', cfg.motion, 0, 2, 0.1, v => v.toFixed(1), v => { cfg.motion = v; changed(false); puppet.cfg.motion = v; });
+  }
+  if (id === 'face') {
+    let b = item('เลือกส่วนที่จะปรับ');
+    opts(b, [['eye1', '👁️ ตาข้างที่ 1'], ['eye2', '👁️ ตาข้างที่ 2'], ['mouth', '👄 ปาก']], faceKey, v => { faceKey = v; renderBody(); });
+    const r = cfg[faceKey];
+    b = item();
+    slider(b, 'ความกว้าง', r.w, 0.02, 0.25, 0.002, v => (v * 100).toFixed(1) + '%', v => { r.w = v; changed(); });
+    slider(b, 'ความสูง', r.h, 0.015, 0.2, 0.002, v => (v * 100).toFixed(1) + '%', v => { r.h = v; changed(); });
+    if (faceKey === 'mouth') toggle(b, 'ขยับปากตอนพูด', r.on, v => { r.on = v; changed(); });
+    else toggle(b, 'กะพริบตาข้างนี้ (ปิดไว้ถ้าในรูปหลับตาอยู่แล้ว)', r.blink, v => { r.blink = v; changed(); });
+    b = item(); b.append(el('div', 'note', 'กรอบฟ้า = ตาข้างที่ 1 · กรอบเหลือง = ตาข้างที่ 2 · กรอบชมพู = ปาก · ลองกดปุ่ม "😌 กะพริบตา" กับ "🗣️ พูด" ด้านล่างภาพเพื่อเช็กว่าตรงไหม'));
+  }
+  if (id === 'color') {
+    let b = item('โทนสีสำเร็จรูป');
+    opts(b, COLOR_PRESETS.map((p, i) => [i, p[0]]), -1, i => { cfg.filter = { ...COLOR_PRESETS[i][1] }; changed(); renderBody(); });
+    b = item('ปรับเอง (มีผลกับทั้งภาพ)');
+    const f = cfg.filter;
+    slider(b, 'เปลี่ยนเฉดสี (ผม/ตา/ชุด)', f.hue, -180, 180, 1, v => v + '°', v => { f.hue = v; changed(false); puppet.setConfig(cfg); });
+    slider(b, 'ความสดของสี', f.sat, 0, 200, 1, v => v + '%', v => { f.sat = v; changed(false); puppet.setConfig(cfg); });
+    slider(b, 'ความสว่าง', f.bri, 60, 140, 1, v => v + '%', v => { f.bri = v; changed(false); puppet.setConfig(cfg); });
+    slider(b, 'ความคมชัด', f.con, 60, 140, 1, v => v + '%', v => { f.con = v; changed(false); puppet.setConfig(cfg); });
+  }
+  if (id === 'stk') {
+    let b = item('แตะเพื่อติดสติกเกอร์บนตัวน้องฟ้า');
+    const g = el('div', 'grid');
+    for (const e of STICKERS) {
+      const bt = el('button', '', e);
+      bt.onclick = () => { const ey = cfg.eye1; cfg.stickers.push({ e, x: Math.min(0.9, ey.x + ey.w * 1.2 + Math.random() * 0.06), y: Math.max(0.06, ey.y - 0.14 - Math.random() * 0.06), s: 0.09, r: 0 }); puppet.selSticker = cfg.stickers.length - 1; changed(); renderBody(); };
+      g.append(bt);
     }
-    const lab = document.createElement('label'); lab.textContent = it.l; box.append(lab);
-    if (it.t === 'opt') {
-      const w = document.createElement('div'); w.className = 'opts';
-      for (const [v, txt] of it.o) {
-        const b = document.createElement('button'); b.textContent = txt; if (get(it.k) === v) b.className = 'on';
-        b.onclick = () => { set(it.k, v); if (it.k === 'voice.lang') set('voice.voiceName', ''); changed(!it.k.startsWith('voice')); renderBody(); };
-        w.append(b);
-      }
-      box.append(w);
-    } else if (it.t === 'color') {
-      const w = document.createElement('div'); w.className = 'sw';
-      for (const col of it.s) {
-        const b = document.createElement('button'); b.style.background = col; if (get(it.k).toLowerCase() === col) b.className = 'on';
-        b.onclick = () => { set(it.k, col); changed(); renderBody(); }; w.append(b);
-      }
-      const inp = document.createElement('input'); inp.type = 'color'; inp.value = get(it.k); inp.title = 'เลือกสีเอง';
-      inp.oninput = () => { set(it.k, inp.value); changed(); }; w.append(inp);
-      box.append(w);
-    } else if (it.t === 'range') {
-      const rv = document.createElement('span'); rv.className = 'rv'; rv.textContent = Number(get(it.k)).toFixed(2); lab.append(rv);
-      const r = document.createElement('input'); r.type = 'range'; r.min = it.min; r.max = it.max; r.step = it.step; r.value = get(it.k);
-      r.oninput = () => { set(it.k, Number(r.value)); rv.textContent = Number(r.value).toFixed(2); changed(!it.k.startsWith('voice')); };
-      box.append(r);
-    } else if (it.t === 'text' || it.t === 'area') {
-      const el = document.createElement(it.t === 'text' ? 'input' : 'textarea'); if (it.t === 'text') el.type = 'text'; el.value = get(it.k);
-      el.oninput = () => { set(it.k, el.value); changed(false); }; box.append(el);
-    } else if (it.t === 'voice') {
-      const sel = document.createElement('select');
-      const lang = cfg.voice.lang.slice(0, 2);
-      const list = speechSynthesis.getVoices().filter(v => v.lang.startsWith(lang));
-      sel.add(new Option(list.length ? 'อัตโนมัติ' : 'ไม่พบเสียงภาษานี้ในเครื่อง (จะแสดงแค่ซับ)', ''));
-      for (const v of list) sel.add(new Option(`${v.name} (${v.lang})`, v.name));
-      sel.value = cfg.voice.voiceName || '';
-      sel.onchange = () => { set('voice.voiceName', sel.value); changed(false); };
-      box.append(sel);
+    b.append(g);
+    const i = puppet.selSticker, st = cfg.stickers[i];
+    if (st) {
+      b = item('สติกเกอร์ที่เลือก: ' + st.e);
+      slider(b, 'ขนาด', st.s, 0.03, 0.3, 0.005, v => Math.round(v * 100) + '', v => { st.s = v; changed(); });
+      slider(b, 'หมุน', st.r, -3.14, 3.14, 0.05, v => Math.round(v * 57.3) + '°', v => { st.r = v; changed(); });
+      const del = el('button', 'act alt', '🗑️ ลบสติกเกอร์นี้'); del.onclick = () => { cfg.stickers.splice(i, 1); puppet.selSticker = -1; changed(); renderBody(); }; b.append(del);
     }
-    body.append(box);
+    if (cfg.stickers.length) { b = item(); const clr = el('button', 'act alt', 'ลบสติกเกอร์ทั้งหมด (' + cfg.stickers.length + ')'); clr.onclick = () => { if (confirm('ลบสติกเกอร์ทั้งหมด?')) { cfg.stickers = []; puppet.selSticker = -1; changed(); renderBody(); } }; b.append(clr); }
+  }
+  if (id === 'fx') {
+    let b = item('เอฟเฟกต์ลอยรอบตัว');
+    opts(b, Object.keys(FX).map(k => [k, FX_LABEL[k]]), cfg.effect, v => { cfg.effect = v; changed(); renderBody(); });
+    b = item('ธีมสีหน้าไลฟ์');
+    const w = el('div', 'themes');
+    for (const [k, t] of Object.entries(THEMES)) {
+      const bt = el('button', k === cfg.theme ? 'on' : ''); const i = el('i'); i.style.background = `linear-gradient(135deg, ${t.a}, ${t.b})`; bt.append(i, document.createTextNode(t.label));
+      bt.onclick = () => { cfg.theme = k; changed(false); renderBody(); }; w.append(bt);
+    }
+    b.append(w);
+  }
+  if (id === 'voice') {
+    let b = item('ภาษาที่น้องฟ้าพูด (ซับเป็นภาษาไทยเสมอ)');
+    opts(b, [['ja-JP', 'ญี่ปุ่น 🇯🇵'], ['th-TH', 'ไทย 🇹🇭'], ['ko-KR', 'เกาหลี 🇰🇷*'], ['zh-CN', 'จีน 🇨🇳*'], ['en-US', 'อังกฤษ 🇺🇸*']], cfg.voice.lang, v => { cfg.voice.lang = v; cfg.voice.voiceName = ''; changed(false); renderBody(); });
+    b.append(el('div', 'note', '* เกาหลี/จีน/อังกฤษ ต้องเปิดสมอง AI (Ollama) ในหน้าไลฟ์ ถ้าไม่เปิด แชทบอทจะพูดภาษาญี่ปุ่นแทน'));
+    b = item('เสียงในเครื่องนี้');
+    const sel = document.createElement('select'), two = cfg.voice.lang.slice(0, 2), list = voices().filter(v => v.lang.startsWith(two));
+    sel.add(new Option(list.length ? 'อัตโนมัติ' : 'ไม่พบเสียงภาษานี้ในเครื่อง (จะแสดงแค่ซับ)', ''));
+    for (const v of list) sel.add(new Option(`${v.name} (${v.lang})`, v.name));
+    sel.value = cfg.voice.voiceName || ''; sel.onchange = () => { cfg.voice.voiceName = sel.value; changed(false); };
+    b.append(sel);
+    b = item();
+    slider(b, 'ระดับเสียง (สูง = ใสน่ารัก)', cfg.voice.pitch, 0.5, 2, 0.05, v => v.toFixed(2), v => { cfg.voice.pitch = v; changed(false); });
+    slider(b, 'ความเร็วพูด', cfg.voice.rate, 0.6, 1.6, 0.05, v => v.toFixed(2), v => { cfg.voice.rate = v; changed(false); });
+    const t = el('button', 'act', '🔊 ทดสอบเสียง');
+    t.onclick = () => {
+      const [sp, th] = SAMPLE[cfg.voice.lang] || SAMPLE['ja-JP'];
+      hint(th || sp); puppet.emotion('happy', 3); puppet.motion('hop');
+      speak(sp, cfg.voice, () => puppet.talk(true), () => { puppet.talk(false); setTimeout(() => hint(''), 1200); });
+    };
+    b.append(t);
+    b = item(); b.append(el('div', 'note', 'เสียงใช้ระบบอ่านออกเสียงในตัว iPad ฟรีไม่ต้องต่อเน็ต · ถ้าไม่มีเสียงญี่ปุ่น ให้เพิ่มที่ การตั้งค่า › การช่วยการเข้าถึง › เนื้อหาที่พูด › เสียง › ญี่ปุ่น'));
+  }
+  if (id === 'me') {
+    let b = item('ชื่อเลขา');
+    const n = document.createElement('input'); n.type = 'text'; n.value = cfg.name; n.oninput = () => { cfg.name = n.value; changed(false); }; b.append(n);
+    b = item('นิสัย/บุคลิก (ใช้ตอนเปิดสมอง AI)');
+    const p = document.createElement('textarea'); p.value = cfg.personality; p.oninput = () => { cfg.personality = p.value; changed(false); }; b.append(p);
   }
 }
-if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { if (TABS[tab].name.includes('เสียง')) renderBody(); };
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { if (TABS[tab].id === 'voice') renderBody(); };
 
-function testVoice() {
-  const [sp, th] = SAMPLE[cfg.voice.lang] || SAMPLE['ja-JP'];
-  const say = $('say'); say.textContent = (th || sp).replace('ฟ้า', cfg.name.replace('น้อง', '')); say.style.display = 'block';
-  avatar.gesture('wave'); avatar.setEmotion('happy', 3);
-  const finish = () => { avatar.setTalking(false); setTimeout(() => say.style.display = 'none', 1500); };
-  const voices = speechSynthesis.getVoices();
-  const v = voices.find(x => x.name === cfg.voice.voiceName) || voices.find(x => x.lang.replace('_', '-') === cfg.voice.lang) || voices.find(x => x.lang.startsWith(cfg.voice.lang.slice(0, 2)));
-  if (!v) { avatar.setTalking(true); setTimeout(finish, 2500); return; }
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(sp); u.voice = v; u.lang = v.lang; u.pitch = cfg.voice.pitch; u.rate = cfg.voice.rate;
-  u.onstart = () => avatar.setTalking(true); u.onend = finish; u.onerror = finish;
-  speechSynthesis.speak(u);
-}
-
-// ---------- พรีเซ็ต / ปุ่มล่าง ----------
-for (const [id, p] of Object.entries(PRESETS)) {
-  const b = document.createElement('button'); b.textContent = p.label;
-  b.onclick = () => { const keep = { name: cfg.name, personality: cfg.personality, voice: cfg.voice }; cfg = mergeConfig(mergeConfig(DEFAULT_CONFIG, p.cfg), keep); changed(); renderBody(); avatar.gesture('cheer'); avatar.setEmotion('happy', 2); };
-  $('presets').append(b);
-}
-$('bReset').onclick = () => { if (confirm('รีเซ็ตเป็นน้องฟ้าต้นแบบ?')) { cfg = mergeConfig(DEFAULT_CONFIG, null); changed(); renderBody(); } };
-$('bRandom').onclick = () => {
-  const pick = a => a[Math.floor(Math.random() * a.length)];
-  Object.assign(cfg, {
-    hairStyle: pick(['long', 'twintail', 'ponytail', 'bob', 'short']), bangs: pick(['side', 'straight', 'split']), hairColor: pick(HAIR),
-    eyeColor: pick(EYES), eyeShape: pick(['round', 'sharp', 'sleepy']), ears: pick(['cat', 'cat', 'fox', 'bunny', 'none']),
-    outfit: pick(['hoodie', 'sailor', 'maid', 'idol', 'dress']), outfitMain: pick(CLOTH), outfitAccent: pick(CLOTH), bowColor: pick(CLOTH),
-    bow: Math.random() > 0.3, glasses: Math.random() > 0.8, headphones: Math.random() > 0.75,
-  });
-  cfg.earColor = cfg.hairColor; changed(); renderBody(); avatar.gesture('cheer'); avatar.setEmotion('happy', 2);
+// ---------- อัปโหลดรูป ----------
+$('fImg').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    toast('กำลังเตรียมรูป…');
+    const blob = await shrinkImage(f); await saveImage(blob);
+    cfg.custom = true;
+    cfg.eye1 = { x: 0.52, y: 0.32, w: 0.09, h: 0.06, blink: true };
+    cfg.eye2 = { x: 0.36, y: 0.32, w: 0.09, h: 0.06, blink: true };
+    cfg.mouth = { x: 0.45, y: 0.44, w: 0.08, h: 0.05, on: true };
+    cfg.stickers = [];
+    await loadImg(); changed();
+    tab = 1; faceKey = 'eye1'; renderTabs(); renderBody();
+    toast('อัปโหลดแล้ว ✓ ลากกรอบให้ตรงตาและปากนะคะ');
+  } catch (err) { toast('อัปโหลดไม่สำเร็จ ลองรูป .jpg หรือ .png', true); }
 };
+
+// ---------- ปุ่มล่าง ----------
 $('bExport').onclick = () => {
   const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'nong-fah-avatar.json'; a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'nong-fah-2d.json'; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 };
-$('bImport').onclick = () => $('file').click();
-$('file').onchange = async e => {
-  const f = e.target.files[0]; if (!f) return;
-  try { cfg = mergeConfig(DEFAULT_CONFIG, JSON.parse(await f.text())); changed(); renderBody(); toast('นำเข้าแล้ว ✓'); }
-  catch (err) { toast('ไฟล์ไม่ถูกต้อง'); }
-  e.target.value = '';
+$('bImport').onclick = () => $('fJson').click();
+$('fJson').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { const keepCustom = cfg.custom; cfg = merge(DEFAULT, JSON.parse(await f.text())); cfg.custom = keepCustom && cfg.custom; await loadImg(); changed(); renderBody(); toast('นำเข้าแล้ว ✓'); }
+  catch (err) { toast('ไฟล์ไม่ถูกต้อง', true); }
+};
+$('bReset').onclick = async () => {
+  if (!confirm('รีเซ็ตเป็นน้องฟ้าต้นแบบทั้งหมด?')) return;
+  cfg = merge(DEFAULT, null); await loadImg(); changed(); renderBody();
 };
 
 renderTabs(); renderBody();
