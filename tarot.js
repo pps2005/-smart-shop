@@ -95,60 +95,66 @@
   var TN = ['เรื่องหัวใจ', 'เรื่องงานเงิน', 'ภาพรวมชีวิต'];
   var TONE = [o('ภาพรวมค่อนข้างต้องระวัง', '전체 흐름은 조심이 필요합니다.', '全体に慎重さが必要です。', '整体需要谨慎。'), o('ภาพรวมมีทั้งดีและท้าทาย', '전체는 좋고 어려운 점이 섞여 있습니다.', '全体は良い面と課題が混在します。', '整体好坏参半。'), o('ภาพรวมเป็นไปในทางดี', '전체 흐름은 긍정적입니다.', '全体は良い流れです。', '整体趋势良好。')];
 
-  var CSS = '#tr{position:fixed;inset:0;z-index:9999;display:none;flex-direction:column;background:radial-gradient(120% 80% at 50% 0,#2a1250,#0e0718);color:#f6ecd0;font-family:"Noto Serif Thai","Sarabun",Georgia,serif;-webkit-tap-highlight-color:transparent}#tr.on{display:flex}' +
-    '#tr button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}.trh{display:flex;gap:6px;align-items:center;padding:calc(8px + env(safe-area-inset-top,0px)) 10px 4px}.trh b{flex:1;font-size:1.05rem;letter-spacing:.02em}' +
-    '.trh button{border:1px solid #c9993a88;background:#ffffff10;border-radius:16px;padding:5px 10px;font-size:.82rem}.trh button.on{background:#c9993a;color:#2b1744;font-weight:700}' +
-    '.stg{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center}.tl{width:min(30vw,130px);flex:none}.tl svg{width:100%;display:block;animation:br 4s ease-in-out infinite}@keyframes br{50%{transform:translateY(2px) scale(1.01)}}' +
-    '#tm{transform-origin:60px 71px}.tl.talk #tm{animation:mo .26s infinite alternate}@keyframes mo{from{transform:scaleY(.3)}to{transform:scaleY(1.5)}}.hd{transition:transform .3s}.tl.shk .hl{animation:hl .22s infinite alternate}.tl.shk .hr{animation:hr .22s infinite alternate}@keyframes hl{to{transform:translate(8px,-10px)}}@keyframes hr{to{transform:translate(-8px,-10px)}}' +
+  var CSS = '#tr{position:fixed;inset:0;z-index:9999;display:none;flex-direction:column;background:radial-gradient(120% 80% at 50% 0,#2a1250,#0e0718);color:#f6ecd0;font-family:"Noto Serif Thai","Sarabun",Georgia,serif;-webkit-tap-highlight-color:transparent}#tr.on{display:flex;overflow:hidden;overflow:clip;width:100%}#tr *{box-sizing:border-box}' +
+    '#tr button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}.trh{display:flex;gap:4px;width:100%;align-items:center;padding:calc(8px + env(safe-area-inset-top,0px)) 10px 4px}.trh b{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:.95rem}' +
+    '.trh button{flex:none;border:1px solid #c9993a88;background:#ffffff10;border-radius:16px;padding:5px 8px;font-size:.74rem}.trh button.on{background:#c9993a;color:#2b1744;font-weight:700}' +
+    '.stg{flex:1;min-height:0;min-width:0;width:100%;display:flex;flex-direction:column;align-items:center}.tl{width:min(30vw,130px);flex:none}.tl svg{width:100%;display:block;animation:br 4s ease-in-out infinite}@keyframes br{50%{transform:translateY(2px) scale(1.01)}}' +
+    '#tm{transform-origin:60px 71px}.tl.talk #tm{animation:mo .26s infinite alternate}@keyframes mo{from{transform:scaleY(.3)}to{transform:scaleY(1.5)}}.hd{transition:transform .3s}.tl.shk .trhl{animation:hl .22s infinite alternate}.tl.shk .trhr{animation:hr .22s infinite alternate}@keyframes hl{to{transform:translate(8px,-10px)}}@keyframes hr{to{transform:translate(-8px,-10px)}}' +
     '.tbl{flex:1;min-height:0;width:calc(100% - 12px);position:relative;overflow:auto;border-radius:44% 44% 0 0 / 12% 12% 0 0;border:6px solid #5b3417;border-bottom:0;box-shadow:inset 0 0 40px #0009,0 -4px 18px #000a;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:10px;padding:14px 8px;background:radial-gradient(circle at 50% 40%,var(--f1),var(--f2))}' +
-    '.tbl.t1{--f1:#1f6b4a;--f2:#0d3a29}.tbl.t3{--f1:#7a1f3a;--f2:#3a0b1c}.tbl.t5{--f1:#2c3a8a;--f2:#10153d}.tbl.t7{--f1:#6b4a12;--f2:#2e1d05}.tbl.t10{--f1:#1a5a6b;--f2:#08222b}.tbl.t7 .bd{--w:min(17vw,66px);grid-template-areas:"a . g" "b . f" "c d e";grid-template-columns:repeat(3,var(--w))}.tbl.t10 .bd{--w:min(13vw,54px);gap:8px;grid-template-areas:". g . o" "p c f h" ". d . e" ". . . s";grid-template-columns:repeat(4,var(--w))}.tbl.t0{--f1:#3a2257;--f2:#150a26}' +
-    '.bd{display:grid;gap:10px;--w:min(21vw,88px)}.tbl.t5 .bd{--w:min(15vw,62px);grid-template-areas:". t ." "l b r" ". d .";grid-template-columns:repeat(3,var(--w))}.tbl.t3 .bd{grid-template-columns:repeat(3,var(--w))}.tbl.t1 .bd{grid-template-columns:var(--w);--w:min(26vw,104px)}' +
-    '.sl{width:var(--w);aspect-ratio:5/8;border:1.5px dashed #f6ecd055;border-radius:8px;position:relative;grid-area:var(--a)}.pl{position:absolute;top:100%;left:50%;transform:translateX(-50%);font-size:.66rem;white-space:nowrap;margin-top:2px;color:#e8d49a}' +
+    '.tbl.t1{--f1:#1f6b4a;--f2:#0d3a29}.tbl.t3{--f1:#7a1f3a;--f2:#3a0b1c}.tbl.t5{--f1:#2c3a8a;--f2:#10153d}.tbl.t7{--f1:#6b4a12;--f2:#2e1d05}.tbl.t10{--f1:#1a5a6b;--f2:#08222b}.tbl.t7 .trbd{--w:min(17vw,66px);grid-template-areas:"a . g" "b . f" "c d e";grid-template-columns:repeat(3,var(--w))}.tbl.t10 .trbd{--w:min(13vw,54px);gap:8px;grid-template-areas:". g . o" "p c f h" ". d . e" ". . . s";grid-template-columns:repeat(4,var(--w))}.tbl.t0{--f1:#3a2257;--f2:#150a26}' +
+    '.trbd{display:grid;gap:24px 10px;--w:min(21vw,88px)}.tbl.t5 .trbd{--w:min(15vw,62px);grid-template-areas:". t ." "l b r" ". d .";grid-template-columns:repeat(3,var(--w))}.tbl.t3 .trbd{grid-template-columns:repeat(3,var(--w))}.tbl.t1 .trbd{grid-template-columns:var(--w);--w:min(26vw,104px)}' +
+    '.trsl{z-index:1;width:var(--w);aspect-ratio:5/8;border:1.5px dashed #f6ecd055;border-radius:8px;position:relative;grid-area:var(--a)}.pl{position:absolute;top:100%;left:50%;transform:translateX(-50%);font-size:.58rem;line-height:1.1;width:max-content;max-width:calc(var(--w) * 1.6);text-align:center;margin-top:2px;color:#e8d49a}' +
     '.cd{width:100%;height:100%;container-type:inline-size;perspective:600px;position:absolute;inset:0}.in{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .8s}.cd.fl .in{transform:rotateY(180deg)}' +
     '.bk,.ft{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:7px;border:2px solid #c9993a;box-shadow:0 3px 8px #0008}.bk{background:radial-gradient(circle,#c9993a 0 7%,transparent 8%),repeating-conic-gradient(#3b1b63 0 15deg,#2a1248 0 30deg)}' +
     '.ft{transform:rotateY(180deg);background:#f3e3b8;color:#2b1744}.ft span{display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%;padding:6% 3%;text-align:center}.cd.rv .ft span{transform:rotate(180deg)}.ft b{font-size:15cqw}.ft i{font-style:normal;font-size:44cqw;line-height:1}.ft small{font-size:12cqw;line-height:1.15}' +
-    '.sh{position:relative;width:min(22vw,90px);aspect-ratio:5/8}.sh .cd{transition:none}.sh.go .cd:nth-child(odd){animation:r1 .45s ease-in-out infinite alternate}.sh.go .cd:nth-child(even){animation:r2 .45s ease-in-out infinite alternate}@keyframes r1{to{transform:translateX(-45%) rotate(-10deg)}}@keyframes r2{to{transform:translateX(45%) rotate(10deg)}}' +
+    '.trsh{position:relative;width:min(22vw,90px);aspect-ratio:5/8}.trsh .cd{transition:none}.trsh.go .cd:nth-child(odd){animation:r1 .45s ease-in-out infinite alternate}.trsh.go .cd:nth-child(even){animation:r2 .45s ease-in-out infinite alternate}@keyframes r1{to{transform:translateX(-45%) rotate(-10deg)}}@keyframes r2{to{transform:translateX(45%) rotate(10deg)}}' +
     '.piles{display:flex;gap:18px}.pile{position:relative;width:min(22vw,84px);aspect-ratio:5/8;border:0;background:none;padding:0}.pile .cd:nth-child(2){transform:translate(2px,-2px)}.pile .cd:nth-child(3){transform:translate(4px,-4px)}.fan{display:flex;justify-content:center;padding-top:6px}.fan .cd{position:relative;width:min(15vw,62px);aspect-ratio:5/8;height:auto;margin-left:calc(min(15vw,62px) * var(--ov,-.5));cursor:pointer;transition:transform .25s}.fan .cd:first-child{margin-left:0}.fan .cd:hover{transform:translateY(-8px)}.fan .cd.used{visibility:hidden}' +
-    '.pn{flex:none;padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));background:#0b0614;border-top:1px solid #c9993a66;max-height:40vh;overflow:auto}.sub{font-size:1rem;line-height:1.55;min-height:3.1em;margin-bottom:6px}.sub small{display:block;opacity:.6;font-size:.72rem}' +
+    '.trpn{flex:none;padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));background:#0b0614;border-top:1px solid #c9993a66;max-height:40vh;overflow:auto}.sub{font-size:1rem;line-height:1.55;min-height:3.1em;margin-bottom:6px}.sub small{display:block;opacity:.6;font-size:.72rem}' +
     '.ch{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}.ch button{flex:1 1 30%;border:1px solid #c9993a;background:#c9993a22;border-radius:12px;padding:9px 6px;font-size:.92rem}.ch button:active{background:#c9993a}.ch button b{display:block}.ch button small{opacity:.7;font-size:.72rem}' +
     '.ip{display:flex;gap:6px}.ip input{flex:1;font:inherit;font-size:16px;border-radius:12px;border:1px solid #c9993a88;background:#ffffff12;color:inherit;padding:8px 10px;outline:0}.ip button{border:0;background:#c9993a;color:#2b1744;border-radius:12px;padding:0 14px;font-weight:700}' +
-    '#trbtn{position:fixed;right:14px;bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:40;width:54px;height:54px;border-radius:50%;border:2px solid #c9993a;background:radial-gradient(circle at 35% 30%,#7b3fc4,#2a1250);font-size:1.6rem;box-shadow:0 4px 14px #0007;cursor:pointer}@media(prefers-reduced-motion:reduce){.tl svg,.sh.go .cd,.tl.shk .hd{animation:none!important}}';
+    '#trbtn{position:fixed;right:14px;bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:40;width:54px;height:54px;border-radius:50%;border:2px solid #c9993a;background:radial-gradient(circle at 35% 30%,#7b3fc4,#2a1250);font-size:1.6rem;box-shadow:0 4px 14px #0007;cursor:pointer}@media(prefers-reduced-motion:reduce){.tl svg,.trsh.go .cd,.tl.shk .hd{animation:none!important}}';
 
   var TELLER = '<svg viewBox="0 0 120 135"><path d="M14 135c2-34 20-46 46-46s44 12 46 46z" fill="#5a1f7a"/><path d="M38 100q22 14 44 0" stroke="#e0b24a" stroke-width="3" fill="none"/><path d="M60 8C30 8 20 34 22 60c3 6 12 8 38 8s35-2 38-8C100 34 90 8 60 8z" fill="#8c2f5a"/><path d="M26 28q34-26 68 0" stroke="#e0b24a" stroke-width="3" fill="none"/><ellipse cx="60" cy="52" rx="23" ry="26" fill="#e8b98c"/><path d="M36 38q24-18 48 0q-8-4-24-4t-24 4z" fill="#8c2f5a"/><circle cx="51" cy="50" r="2.6" fill="#2b1744"/><circle cx="69" cy="50" r="2.6" fill="#2b1744"/><path d="M45 44q6-4 11 0M64 44q6-4 11 0" stroke="#2b1744" stroke-width="1.5" fill="none"/><ellipse id="tm" cx="60" cy="71" rx="6" ry="2.6" fill="#8a2230"/><circle cx="36" cy="62" r="3.5" fill="#e0b24a"/><circle cx="84" cy="62" r="3.5" fill="#e0b24a"/>' +
-    '<g class="hd hl"><circle cx="38" cy="116" r="9" fill="#e8b98c"/><circle cx="38" cy="116" r="4" fill="#e0b24a"/></g><g class="hd hr"><circle cx="82" cy="116" r="9" fill="#e8b98c"/><circle cx="82" cy="116" r="4" fill="#e0b24a"/></g></svg>';
+    '<g class="hd trhl"><circle cx="38" cy="116" r="9" fill="#e8b98c"/><circle cx="38" cy="116" r="4" fill="#e0b24a"/></g><g class="hd trhr"><circle cx="82" cy="116" r="9" fill="#e8b98c"/><circle cx="82" cy="116" r="4" fill="#e0b24a"/></g></svg>';
 
   function build() {
     if (document.getElementById('tr')) return;
+    if (window.speechSynthesis) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = function () { speechSynthesis.getVoices(); }; }
     var s = document.createElement('style'); s.textContent = CSS; document.head.appendChild(s);
     var r = el('', ''); r.id = 'tr';
     r.innerHTML = '<div class="trh"><b>🔮 ดูดวงไพ่ยิปซี</b><button data-l="th" class="on">ไทย</button><button data-l="ko">한국어</button><button data-l="ja">日本語</button><button data-l="zh">中文</button><button id="trm" aria-label="เสียง">🔊</button><button id="trx" aria-label="ปิด">✕</button></div>' +
-      '<div class="stg"><div class="tl">' + TELLER + '</div><div class="tbl t0"></div></div><div class="pn"><div class="sub"></div><div class="ch"></div><div class="ip" style="display:none"><input placeholder="หรือพิมพ์ตอบแม่หมอที่นี่..." autocomplete="off"><button>ส่ง</button></div></div>';
+      '<div class="stg"><div class="tl">' + TELLER + '</div><div class="tbl t0"></div></div><div class="trpn"><div class="sub"></div><div class="ch"></div><div class="ip" style="display:none"><input placeholder="หรือพิมพ์ตอบแม่หมอที่นี่..." autocomplete="off"><button>ส่ง</button></div></div>';
     document.body.appendChild(r);
     r.querySelector('.trh').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
-      if (b.dataset.l) { L = b.dataset.l; [].forEach.call(r.querySelectorAll('[data-l]'), function (x) { x.classList.toggle('on', x === b); }); if (window.speechSynthesis) speechSynthesis.cancel(); }
-      else if (b.id === 'trm') { MUTE = !MUTE; b.textContent = MUTE ? '🔇' : '🔊'; if (MUTE && window.speechSynthesis) speechSynthesis.cancel(); }
+      if (b.dataset.l) { L = b.dataset.l; [].forEach.call(r.querySelectorAll('[data-l]'), function (x) { x.classList.toggle('on', x === b); }); if (REDO) REDO(); }
+      else if (b.id === 'trm') { MUTE = !MUTE; b.textContent = MUTE ? '🔇' : '🔊'; if (REDO) REDO(); }
       else if (b.id === 'trx') close();
     });
     $('.sub').addEventListener('click', function () { if (skip) skip(); });
     var f = document.createElement('button'); f.id = 'trbtn'; f.textContent = '🔮'; f.setAttribute('aria-label', 'ดูดวงไพ่ยิปซี'); f.onclick = open; document.body.appendChild(f);
   }
   function open() { build(); $('').classList.add('on'); run(); }
-  function close() { RUN++; if (window.speechSynthesis) speechSynthesis.cancel(); document.getElementById('tr').classList.remove('on'); }
+  function close() { RUN++; CURU = null; REDO = null; if (window.speechSynthesis) speechSynthesis.cancel(); document.getElementById('tr').classList.remove('on'); }
 
   function teller(on, shake) { var t = $('.tl'); t.classList.toggle('talk', !!on); t.classList.toggle('shk', !!shake); }
+  var REDO = null, CURU = null;
   function say(x) {
-    var tx = x[L] || x.th; $('.sub').innerHTML = x.th + (L !== 'th' ? '<small>' + tx + '</small>' : '');
     return new Promise(function (res) {
-      var sp = !MUTE && window.speechSynthesis, tm, done = 0, id = ++SAY;
-      function fin() { if (done) return; done = 1; clearTimeout(tm); if (id === SAY) { skip = null; teller(0); } res(); }
-      skip = function () { fin(); if (sp) speechSynthesis.cancel(); }; teller(1);
-      tm = setTimeout(fin, sp ? tx.length * 380 + 4000 : Math.max(1500, tx.length * (L === 'th' ? 55 : 150)));
-      if (!sp) return;
-      speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(tx); u.lang = LG[L]; u.rate = .9; u.pitch = 1.05;
-      var v = speechSynthesis.getVoices().filter(function (q) { return q.lang.replace('_', '-').indexOf(LG[L].slice(0, 2)) === 0; })[0]; if (v) u.voice = v;
-      u.onend = fin; u.onerror = fin; speechSynthesis.speak(u);
+      var done = 0, tm, id = ++SAY;
+      function fin() { if (done) return; done = 1; clearTimeout(tm); if (id === SAY) { skip = null; REDO = null; teller(0); } res(); }
+      function go() {
+        var tx = x[L] || x.th, sp = !MUTE && window.speechSynthesis;
+        $('.sub').innerHTML = x.th + (L !== 'th' ? '<small>' + tx + '</small>' : ''); teller(1); clearTimeout(tm);
+        tm = setTimeout(fin, sp ? tx.length * 380 + 4000 : Math.max(1500, tx.length * (L === 'th' ? 55 : 150)));
+        CURU = null; if (window.speechSynthesis) speechSynthesis.cancel(); if (!sp) return;
+        var u = new SpeechSynthesisUtterance(tx); u.lang = LG[L]; u.rate = .9; u.pitch = 1.05;
+        var v = speechSynthesis.getVoices().filter(function (q) { return q.lang.replace('_', '-').indexOf(LG[L].slice(0, 2)) === 0; })[0]; if (v) u.voice = v;
+        CURU = u; u.onend = u.onerror = function () { if (CURU === u) fin(); };
+        setTimeout(function () { if (CURU === u) speechSynthesis.speak(u); }, 60);
+      }
+      skip = function () { CURU = null; fin(); if (window.speechSynthesis) speechSynthesis.cancel(); };
+      REDO = go; go();
     });
   }
   /* ถามคำถาม: ปุ่มเลือก 3 ข้อ หรือพิมพ์ตอบ → {i: ลำดับ หรือ -1, t: ข้อความ} */
@@ -176,16 +182,16 @@
       var ans = { t: -1 }, hi = say(T.hi);
       var keys = [1, 3, 5, 7, 10], k = await choose(keys.map(function (n) { return { h: SP[n].ic + ' ' + SP[n].n, s: SP[n].d }; })); ck();
       var sp = SP[keys[k]], n = keys[k]; if (window.speechSynthesis) speechSynthesis.cancel();
-      tb.className = 'tbl t' + n; tb.innerHTML = ''; var bd = el('bd', '', tb), slots = [];
-      sp.a.forEach(function (a, i) { var s = el('sl', '<div class="pl">' + sp.p[i].th + '</div>', bd); if (n >= 5) s.style.gridArea = a; if (n === 10 && i === 1) { s.style.transform = 'rotate(90deg)'; s.style.zIndex = 3; s.firstChild.style.display = 'none'; } slots.push(s); });
+      tb.className = 'tbl t' + n; tb.innerHTML = ''; var bd = el('trbd', '', tb), slots = [];
+      sp.a.forEach(function (a, i) { var s = el('trsl', '<div class="pl">' + sp.p[i].th + '</div>', bd); if (n >= 5) s.style.gridArea = a; if (n === 10 && i === 1) { s.style.transform = 'rotate(90deg)'; s.style.zIndex = 3; s.firstChild.style.display = 'none'; } slots.push(s); });
       await say(sp.ex); ck();
       var qt = await ask(T.qt, TOP); ck();
       var topic = qt.i >= 0 ? qt.i : /รัก|แฟน|คู่|สัมพันธ์|แต่งงาน|love/i.test(qt.t) ? 0 : /งาน|เงิน|ธุรกิจ|เลื่อน|ลงทุน|ขาย|หนี้/.test(qt.t) ? 1 : 2;
       var ff = await ask(T.qf, FEEL); ck();
       var tw = TIME[1]; if (n > 1) { var tt = await ask(T.qw, TIME); ck(); tw = tt.i >= 0 ? tt.t : tt.t; }
       /* สับไพ่ */
-      var sh = el('sh', '', tb); for (var i = 0; i < 8; i++) el('cd', '<div class="in"><div class="bk"></div></div>', sh);
-      var sg = say(T.sh); await wait(1400); sh.classList.add('go'); teller(1, 1); await sg; ck(); await wait(600); sh.classList.remove('go'); teller(0, 0); ck();
+      var sh = el('trsh', '', tb); for (var i = 0; i < 8; i++) el('cd', '<div class="in"><div class="bk"></div></div>', sh);
+      var sg = say(T.sh); await wait(1400); sh.classList.add('trgo'); teller(1, 1); await sg; ck(); await wait(600); sh.classList.remove('trgo'); teller(0, 0); ck();
       var deck = shuf(C.map(function (c, i) { return i; }));
       /* ตัดไพ่ 3 กอง */
       sh.remove(); var pl = el('piles', '', tb); for (var p = 0; p < 3; p++) { var pb = document.createElement('button'); pb.className = 'pile'; for (var q = 0; q < 3; q++) el('cd', '<div class="in"><div class="bk"></div></div>', pb); pl.appendChild(pb); }
