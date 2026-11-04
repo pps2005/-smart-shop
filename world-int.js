@@ -152,7 +152,7 @@
   };
 
   /* ---------- กล้อง/ลูป ---------- */
-  function insets(w, h) { var wide = w > 760; return { l: wide ? 270 : 0, r: wide ? 300 : 0, t: wide ? 128 : 124, b: 84 }; }
+  function insets(w, h) { var wide = w > 1000; return { l: wide ? 270 : 0, r: wide ? 300 : 0, t: wide ? 128 : 124, b: 84 }; }
   function distFor(room, w, h) {
     var t = Math.tan(19 * Math.PI / 180), I = insets(w, h), a = w / h, fw = Math.max(200, w - I.l - I.r), fh = Math.max(200, h - I.t - I.b);
     if (room === 'all') return Math.max(RW * 4 * 1.22 / (2 * t * a * fw / w), (RD * 2 + 8) * 1.0 / (2 * t * fh / h), 50);

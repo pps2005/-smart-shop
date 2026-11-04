@@ -142,7 +142,7 @@
     '.wci{display:flex;gap:8px;padding:8px 10px 10px;border-top:1px solid var(--gl)}.wci input{flex:1;min-width:0;padding:10px 12px;border-radius:12px;background:var(--in);border:1px solid var(--gl);user-select:text;-webkit-user-select:text}.wci button{width:44px;border-radius:12px;background:#ec4899;color:#fff;display:grid;place-items:center}',
     '.wdot{display:inline-flex;gap:3px}.wdot i{width:6px;height:6px;border-radius:50%;background:var(--gm);animation:wdt 1s infinite}.wdot i:nth-child(2){animation-delay:.15s}.wdot i:nth-child(3){animation-delay:.3s}@keyframes wdt{50%{transform:translateY(-4px);opacity:.4}}',
     '.wmenu{position:absolute;inset:0;z-index:8;display:none;background:rgba(15,23,42,.4)}.wmenu.on{display:block}.wmenu>div{position:absolute;right:0;top:0;bottom:0;width:min(300px,84%);padding:calc(18px + env(safe-area-inset-top,0px)) 14px 18px;overflow:auto;border-radius:20px 0 0 20px;background:var(--g2)}.wmenu h3{margin:0 0 10px;font-size:1rem}.wmenu button.mi{display:flex;align-items:center;gap:12px;width:100%;padding:13px 10px;border-radius:12px;font-weight:600;text-align:left}.wmenu button.mi:active,.wmenu button.mi.on{background:var(--in)}',
-    '@media(max-width:760px){.wlogo span{display:none}.wchip.loc{display:none}.wkpi{gap:6px;right:10px;overflow-x:auto;scrollbar-width:none}.wkpi::-webkit-scrollbar{display:none}.wk{min-width:0;flex:1;padding:8px 9px;gap:7px}.wk i{display:none}.wk b{font-size:1.02rem}.wk em{display:none}.wk small{font-size:.62rem}',
+    '@media(max-width:1000px){.wlogo span{display:none}.wchip.loc{display:none}.wkpi{gap:6px;right:10px;overflow-x:auto;scrollbar-width:none}.wkpi::-webkit-scrollbar{display:none}.wk{min-width:0;flex:1;padding:8px 9px;gap:7px}.wk i{display:none}.wk b{font-size:1.02rem}.wk em{display:none}.wk small{font-size:.62rem}',
     '#wd.wp .wctl{display:none}.wpan{left:10px;right:10px;top:auto;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:auto;max-height:46%}.wact{display:none}.wctl{top:auto;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:none;right:10px}.wctl.hp{display:none}',
     '.wleft{display:none!important}.wright{display:none!important}.wchat{left:10px;right:10px;width:auto;bottom:calc(76px + env(safe-area-inset-bottom,0px));height:min(62%,520px)}.wint .wkpi{top:calc(124px + env(safe-area-inset-top,0px))}.wbot button{padding:9px 11px;font-size:.8rem}}'
   ].join('');
@@ -219,7 +219,7 @@
     var m = W.V.mode, b = $$('#wbot');
     b.innerHTML = m === 'ext' ? '<button class="on" data-a="wmode" data-v="ext">ภายนอก</button><button data-a="wenter" data-v="' + (W.V.sel || 'sec') + '">ภายใน</button><button class="wfa" data-a="wchat">🌸 น้องฟ้า</button>'
       : '<button data-a="wmode" data-v="ext">' + IC.out + ' ออกไปข้างนอก</button><button class="on">ภายใน</button><button data-a="wdept" data-v="' + (W.V.room === 'all' ? 'acc' : W.V.room) + '">ข้อมูลฝ่าย</button><button class="wfa" data-a="wchat">🌸 น้องฟ้า</button>';
-    $$('#wact').style.display = ''; $$('#wkpi').style.display = m === 'int' && innerWidth <= 760 ? 'none' : '';
+    $$('#wact').style.display = ''; $$('#wkpi').style.display = m === 'int' && innerWidth <= 1000 ? 'none' : '';
     if (m === 'int') { $$('#wact').style.display = 'none'; $$('#wpan').classList.remove('on'); }
     $$('#wctl').classList.toggle('hp', false);
   }
@@ -459,7 +459,7 @@
         bubble('', 'สวัสดีตอน' + tword() + 'ค่ะ ฟ้าเองนะ 🌸 เลขาประจำร้าน<br>' + (pn ? 'ตอนนี้มีงานค้างอยู่ ' + pn + ' รายการค่ะ<br>' : '') + 'ถามเรื่องข้อมูลร้าน วิธีใช้เว็บ หรือจะคุยเล่นก็ได้เลยนะ');
         $$('#wqs').innerHTML = QS.map(function (q) { return '<button data-a="wq" data-v="' + q + '">' + q + '</button>'; }).join('');
       }
-      if (innerWidth > 760) setTimeout(function () { $$('#wcin').focus(); }, 60);
+      if (innerWidth > 1000) setTimeout(function () { $$('#wcin').focus(); }, 60);
     }
   }
   var busy = false;
