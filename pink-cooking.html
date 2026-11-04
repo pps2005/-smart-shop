@@ -196,7 +196,8 @@
 </dialog>
 
 <script type="module">
-import { Puppet, speak, voices } from './fah-2d.js';
+import { Puppet, speak, voices, embedded } from './fah-2d.js';
+const [HOST_URL, SHEET_URL] = await Promise.all([embedded('./pink-images.js', 'PINK_HOST'), embedded('./pink-images.js', 'PINK_SHEET')]);
 import { RECIPES, SHOTS, KITCHENS, GROUPS, PHASES, buildShow } from './pink-recipes.js';
 
 const $ = id => document.getElementById(id);
@@ -210,14 +211,15 @@ const saveSet = () => { try { localStorage.setItem(SET_KEY, JSON.stringify(set))
 const voice = () => ({ lang: 'zh-CN', voiceName: set.voiceName, pitch: set.pitch, rate: set.rate });
 
 // ---------- ภาพ ----------
-const SHEET = new Image(); SHEET.src = 'pink-sheet.jpg';
+const SHEET = new Image();
+let sheetAlt = false;
 const K = 2; // ภาพ pink-sheet.jpg ขยาย 2 เท่าจากพิกัดใน SHOTS
 const missing = [];
-const sheetReady = new Promise(r => { SHEET.onload = r; SHEET.onerror = () => { missing.push('pink-sheet.jpg'); warn(); r(); }; });
+const sheetReady = new Promise(r => { SHEET.onload = r; SHEET.onerror = () => { if (!sheetAlt) { sheetAlt = true; SHEET.src = 'IMG_0446.jpeg'; return; } missing.push('pink-sheet.jpg'); warn(); r(); }; SHEET.src = SHEET_URL || 'pink-sheet.jpg'; });
 function warn() {
   let w = document.getElementById('warnImg');
   if (!w) { w = document.createElement('div'); w.id = 'warnImg'; w.style.cssText = 'margin:0 14px 10px;padding:12px 14px;border-radius:16px;background:#fff3cd;border:2px solid #f0c36d;font-size:16px;line-height:1.5'; document.querySelector('#menu .wrap').prepend(w); }
-  w.textContent = '⚠️ หารูปไม่เจอ: ' + missing.join(', ') + ' — ตรวจว่าอัปขึ้น GitHub ไว้ที่เดียวกับ index.html และชื่อไฟล์ตรงเป๊ะ (ไม่มี (1) หรือ .jpeg)';
+  w.textContent = '⚠️ หารูปไม่เจอ — ตรวจว่าอัปไฟล์ pink-images.js ขึ้น GitHub ไว้ที่เดียวกับ index.html แล้ว (ถ้าอัปแล้ว ลองปิดแท็บแล้วเปิดใหม่)';
 }
 const PINK = {
   eye1: { x: 0.4252, y: 0.3248, w: 0.1395, h: 0.0662, blink: true },
@@ -255,7 +257,7 @@ const host = new Puppet($('host'), PINK, {
     const s = Math.min(W / iw, H / ih); return { s, x: (W - iw * s) / 2 + W * 0.12, y: H - ih * s };
   },
 });
-Promise.all([heroPuppet.setImage('pink-host.jpg'), host.setImage('pink-host.jpg')]).catch(() => { missing.push('pink-host.jpg'); warn(); });
+Promise.all([heroPuppet.setImage(HOST_URL || 'pink-host.jpg'), host.setImage(HOST_URL || 'pink-host.jpg')]).catch(() => { missing.push('pink-host.jpg'); warn(); });
 
 // ---------- จอฉาก (มุมกล้อง) ----------
 const scv = $('scene'), sg = scv.getContext('2d');

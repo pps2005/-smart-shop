@@ -111,7 +111,7 @@ function applyTheme() {
   const t = THEMES[cfg.theme] || THEMES.purple, r = document.documentElement.style;
   r.setProperty('--a', t.a); r.setProperty('--b', t.b); r.setProperty('--bg', t.bg); r.setProperty('--line', t.line);
 }
-async function loadImg() { const u = await imageURL(cfg); await puppet.setImage(u); $('bg').style.backgroundImage = `url("${u}")`; }
+async function loadImg() { const u = await imageURL(cfg); await puppet.setImage(u); $('bg').style.backgroundImage = `url("${puppet.src || u}")`; }
 applyTheme(); loadImg();
 
 let saveT;

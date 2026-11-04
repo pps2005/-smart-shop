@@ -161,7 +161,7 @@
     <button id="btnSend">➤</button>
   </div>
 </div>
-<img class="sticker" id="sticker" src="live-sticker.jpg" alt="">
+<img class="sticker" id="sticker" alt="" onerror="if(!this.dataset.alt){this.dataset.alt=1;this.src='IMG_0445.jpeg'}else{this.remove()}">
 
 <div id="think" class="box">น้องฟ้ากำลังคิด… 💭</div>
 <div id="sub"><span id="subTh"></span><span id="subSp"></span></div>
@@ -197,7 +197,8 @@
 </dialog>
 
 <script type="module">
-import { Puppet, loadCfg, saveCfg, KEY, THEMES, imageURL, speak, faceThumbStyle } from './fah-2d.js';
+import { Puppet, loadCfg, saveCfg, KEY, THEMES, imageURL, speak, faceThumbStyle, embedded } from './fah-2d.js';
+embedded('./fah-images.js', 'STICKER_IMG').then(u => { document.getElementById('sticker').src = u || 'live-sticker.jpg'; });
 import { createTalker, BIZ } from './fah-talk.js';
 
 const $ = id => document.getElementById(id);
@@ -223,6 +224,7 @@ let imgURL = '', faceCss = '';
 async function loadImg() {
   imgURL = await imageURL(cfg);
   await puppet.setImage(imgURL);
+  imgURL = puppet.src || imgURL;
   $('bg').style.backgroundImage = `url("${imgURL}")`;
   faceCss = faceThumbStyle(imgURL, cfg, puppet.iw, puppet.ih, 32);
   $('startFace').style.cssText = faceThumbStyle(imgURL, cfg, puppet.iw, puppet.ih, 120);

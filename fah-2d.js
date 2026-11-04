@@ -18,6 +18,12 @@ export const DEFAULT = {
   voice: { lang: 'ja-JP', pitch: 1.6, rate: 1.05, voiceName: '' },
 };
 export const DEFAULT_IMG = 'fah-live.jpg';
+// ชื่อสำรอง (เผื่ออัปรูปจากแอปรูปภาพของ iPhone แล้วชื่อไฟล์ถูกเปลี่ยน)
+export const ALT_IMG = { 'fah-live.jpg': 'IMG_0444.jpeg', 'live-sticker.jpg': 'IMG_0445.jpeg', 'pink-sheet.jpg': 'IMG_0446.jpeg', 'pink-host.jpg': 'IMG_0443.jpeg' };
+export function loadImg(src) {
+  const one = u => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = u; });
+  return one(src).catch(() => ALT_IMG[src] ? one(ALT_IMG[src]) : Promise.reject(new Error('missing ' + src)));
+}
 
 export const THEMES = {
   purple: { label: 'ม่วงนีออน', a: '#b48cff', b: '#ff8fd0', bg: '#170b2e', line: 'rgba(205,170,255,.75)' },
@@ -64,9 +70,14 @@ export async function loadImageBlob() {
     return await new Promise(res => { const t = d.transaction('img'); const q = t.objectStore('img').get('main'); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); });
   } catch (e) { return null; }
 }
+// แปลงรูปที่ฝังในไฟล์ .js เป็นลิงก์ภายในเครื่อง (เบากว่าใช้ข้อความยาวๆ ซ้ำหลายที่)
+export async function embedded(mod, key) {
+  try { const m = await import(mod); const r = await fetch(m[key]); return URL.createObjectURL(await r.blob()); }
+  catch (e) { return null; }
+}
 export async function imageURL(cfg) {
   if (cfg.custom) { const b = await loadImageBlob(); if (b) return URL.createObjectURL(b); }
-  return DEFAULT_IMG;
+  return (await embedded('./fah-images.js', 'FAH_IMG')) || DEFAULT_IMG;
 }
 // ย่อรูปใหญ่ก่อนเก็บ (สูงสุด 1400px) เพื่อให้ iPad ลื่น
 export function shrinkImage(file, maxH = 1400) {
@@ -124,9 +135,8 @@ export class Puppet {
     requestAnimationFrame(this._raf);
   }
   async setImage(src) {
-    const img = new Image();
-    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src; });
-    this.img = img; this.iw = img.naturalWidth; this.ih = img.naturalHeight;
+    const img = await loadImg(src);
+    this.img = img; this.src = img.src; this.iw = img.naturalWidth; this.ih = img.naturalHeight;
     this.prepare();
   }
   setConfig(cfg) { this.cfg = merge(DEFAULT, cfg); this.prepare(); }
