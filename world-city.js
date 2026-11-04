@@ -93,10 +93,12 @@
   function winMat() {
     var m = new T.MeshLambertMaterial({ color: 0xffffff });
     m.onBeforeCompile = function (sh) {
+      W.NIGHT = W.NIGHT || { value: 0 }; sh.uniforms.uNight = W.NIGHT;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP; varying vec3 vWN;')
         .replace('#include <project_vertex>', '#include <project_vertex>\nvec4 cwp = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\ncwp = instanceMatrix * cwp;\n#endif\ncwp = modelMatrix * cwp; vWP = cwp.xyz;\nvec3 cwn = objectNormal;\n#ifdef USE_INSTANCING\ncwn = mat3(instanceMatrix) * cwn;\n#endif\nvWN = normalize(mat3(modelMatrix) * cwn);');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP; varying vec3 vWN;\nfloat chash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }')
-        .replace('#include <color_fragment>', '#include <color_fragment>\nfloat cside = 1.0 - step(0.5, abs(vWN.y));\nvec2 cu = vec2(abs(vWN.x) > 0.5 ? vWP.z : vWP.x, vWP.y);\nvec2 cs = vec2(3.0, 3.4);\nvec2 cc = fract(cu / cs);\nfloat cw = step(0.2, cc.x) * step(cc.x, 0.8) * step(0.3, cc.y) * step(cc.y, 0.8) * cside * step(0.9, vWP.y);\nfloat lit = step(0.84, chash(floor(cu / cs)));\nvec3 cg = mix(vec3(0.33, 0.47, 0.62), vec3(0.98, 0.88, 0.6), lit);\ndiffuseColor.rgb = mix(diffuseColor.rgb, cg, cw * 0.85);');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP; varying vec3 vWN; uniform float uNight;\nfloat chash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }')
+        .replace('#include <color_fragment>', '#include <color_fragment>\nfloat cside = 1.0 - step(0.5, abs(vWN.y));\nvec2 cu = vec2(abs(vWN.x) > 0.5 ? vWP.z : vWP.x, vWP.y);\nvec2 cs = vec2(3.0, 3.4);\nvec2 cc = fract(cu / cs);\nfloat cw = step(0.2, cc.x) * step(cc.x, 0.8) * step(0.3, cc.y) * step(cc.y, 0.8) * cside * step(0.9, vWP.y);\nfloat lit = step(mix(0.84, 0.5, uNight), chash(floor(cu / cs)));\nfloat cwl = cw * lit;\nvec3 cg = mix(vec3(0.33, 0.47, 0.62), vec3(0.98, 0.88, 0.6), lit);\ndiffuseColor.rgb = mix(diffuseColor.rgb, cg, cw * 0.85);')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.84, 0.55) * cwl * uNight * 0.9;');
     };
     return m;
   }
@@ -127,6 +129,7 @@
     for (var gx = Math.floor(r.x0 / GS); gx <= Math.floor(r.x1 / GS); gx++) for (var gz = Math.floor(r.z0 / GS); gz <= Math.floor(r.z1 / GS); gz++) (GRID[gx + ',' + gz] || (GRID[gx + ',' + gz] = [])).push(r);
   }
   function onBridge(x) { for (var i = 0; i < SP.length; i++) if (Math.abs(x - SP[i]) < 5.2) return true; return false; }
+  W.cityCol = function (x, z, w, d) { addCol(x, z, w, d); };
   W.cityHit = function (x, z, Rr) {
     if (!CITY) return false; Rr = Rr || .6;
     if (z > RV0 - Rr && z < RV1 + Rr && !onBridge(x)) return true;
@@ -489,18 +492,24 @@
   };
 
   /* ---------- สร้างทั้งเมือง ---------- */
+  /* แปลงว่างสำหรับตึกเช่าจากหน้าอสังหา (world-rent.js สร้างตึกลงที่นี่ตามลำดับ) */
+  var RENT_KEYS = ['4,6', '7,6', '6,4', '5,3', '3,4', '8,5', '4,9', '7,8', '2,6', '9,8', '6,2', '2,3', '9,4', '5,9', '3,2', '8,3', '1,6', '10,6', '6,9', '6,1'];
   var SPECIAL = { '7,4': 'mall', '4,8': 'school', '9,3': 'school', '8,7': 'hosp', '3,7': 'temple', '6,8': 'park', '10,8': 'park', '5,7': 'market', '10,5': 'stadium', '4,4': 'parkS' };
   function build() {
     TH = THEMES[cur]; rng = mul(TH.seed); geos(); BUF = {}; GRID = {}; NSIGN = 0; HILL = null;
     CITY = new T.Group(); CITY.name = 'city';
     var gnd = new T.Mesh(new T.PlaneGeometry(2 * L + 900, 2 * L + 900), new T.MeshLambertMaterial({ color: TH.ground })); gnd.rotation.x = -Math.PI / 2; gnd.position.y = -.02; gnd.receiveShadow = true; CITY.add(gnd);
     segs(); roads(); river(); rail();
+    W.RENT_LOTS = []; W.POI = [{ t: 'station', n: TH.N.station, x: 0, z: RAIL_Z }];
     for (var ix = 0; ix < 12; ix++) for (var iz = 0; iz < 12; iz++) {
       if ((ix === 5 || ix === 6) && (iz === 5 || iz === 6)) continue;
       if (iz === 10) continue;
       var x0 = SP[ix] + 8, x1 = SP[ix + 1] - 8, z0 = SP[iz] + 8, z1 = SP[iz + 1] - 8, key = ix + ',' + iz, sp = SPECIAL[key];
       if (Math.abs(SP[iz] - RAIL_Z) < 1 || Math.abs(SP[iz + 1] - RAIL_Z) < 1) { if (Math.abs(SP[iz + 1] - RAIL_Z) < 1) z1 -= 3; else z0 += 3; }
-      if (TH.lmc[0] === ix && TH.lmc[1] === iz) landmark(x0, x1, z0, z1);
+      var ri = RENT_KEYS.indexOf(key);
+      if (ri >= 0) { pad(x0, x1, z0, z1, TH.lot); W.RENT_LOTS.push({ i: ri, key: key, x0: x0, x1: x1, z0: z0, z1: z1 }); for (var tt = 0; tt < 4; tt++) tree(R(x0 + 2, x1 - 2), rng() < .5 ? z0 + 2 : z1 - 2, .8); continue; }
+      if (sp) W.POI.push({ t: sp === 'parkS' ? 'park' : sp, n: TH.N[sp === 'parkS' ? 'park' : sp] || sp, x: (x0 + x1) / 2, z: (z0 + z1) / 2 });
+      if (TH.lmc[0] === ix && TH.lmc[1] === iz) { W.POI.push({ t: 'landmark', n: 'แลนด์มาร์ก', x: (x0 + x1) / 2, z: (z0 + z1) / 2 }); landmark(x0, x1, z0, z1); }
       else if (sp === 'mall') mall(x0, x1, z0, z1);
       else if (sp === 'school') school(x0, x1, z0, z1);
       else if (sp === 'hosp') hospital(x0, x1, z0, z1);
@@ -515,8 +524,9 @@
     }
     /* เนินเขารอบเมือง */
     for (var h = 0; h < 70; h++) { var an = h / 70 * Math.PI * 2, rr = L + R(60, 140); put('crown', Math.cos(an) * rr * 1.05, -6, Math.sin(an) * rr * 1.05, R(60, 120), R(25, 60), R(60, 120), P([0x6f9a55, 0x7fa862, 0x5e8a4a]), rng() * 3); }
+    W.RENT_LOTS.sort(function (a, b) { return a.i - b.i; });
     flush(); traffic();
-    SC.add(CITY);
+    SC.add(CITY); W.cityVer = (W.cityVer || 0) + 1;
     SC.background = new T.Color(TH.sky); if (SC.fog) SC.fog.color.setHex(TH.sky);
   }
   function dispose() {
