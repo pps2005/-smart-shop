@@ -1,9 +1,9 @@
-// anim-link.js — เมนู "สร้างอนิเมชั่น 🎞" (anim.html) + "สตูดิโอ AI 🎬" (studio.html)
+// anim-link.js — เมนู "โรงงานตัวละคร 🎞" (anim.html) + "สตูดิโอ AI 🎬" (studio.html)
 // โหลดเป็นไฟล์สุดท้ายใน index.html · วิธียกเลิก: ลบ <script src="anim-link.js">
 (function () {
   if (typeof M === 'undefined' || typeof go !== 'function') return;
   var PAGES = { anim: 'anim.html', studio: 'studio.html' };
-  if (!M.some(function (m) { return m.id === 'anim'; })) M.push({ id: 'anim', i: 'sliders', t: 'สร้างอนิเมชั่น 🎞' });
+  if (!M.some(function (m) { return m.id === 'anim'; })) M.push({ id: 'anim', i: 'sliders', t: 'โรงงานตัวละคร 🎞' });
   if (!M.some(function (m) { return m.id === 'studio'; })) M.push({ id: 'studio', i: 'chat', t: 'สตูดิโอ AI 🎬' });
   var origGo = go;
   go = function (id) {
