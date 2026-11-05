@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>สร้างอนิเมชั่น · SMART SHOP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600&family=Sarabun:wght@400;600&display=swap">
+<style>
+/* หน้าสร้างอนิเมชั่นจากรูป — ทำท่าทางตัวละคร 60fps 1080p แล้วส่งต่อให้ Claude ทำวิดีโอ */
+:root{
+  --bg:#0A0F1C; --glass:rgba(17,24,41,.92); --glass2:rgba(26,34,56,.96); --line:rgba(148,163,200,.22);
+  --ink:#EEF2FA; --muted:#9AA6C2; --cyan:#5EE1FF; --ok:#4ADE80; --you:#FFC24B; --red:#FF6B7A;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Sarabun,system-ui,sans-serif;font-size:17px;line-height:1.5}
+body{display:flex;flex-direction:column;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+h1,h2,h3{font-family:Kanit,Sarabun,sans-serif;font-weight:600;margin:0;line-height:1.3}
+.ib,.btn{min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--glass);cursor:pointer;color:var(--ink);text-decoration:none}
+.ib{min-width:44px;display:inline-grid;place-items:center;font-size:18px}
+.btn{padding:8px 14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn.main{background:linear-gradient(135deg,#2563eb,#06b6d4);border-color:transparent}
+.btn.ok{background:#14532d;border-color:#22c55e}
+.btn.red{border-color:rgba(255,107,122,.5);color:#ffb3bb}
+.btn.sm{min-height:38px;padding:6px 10px;font-size:15px}
+.btn:disabled{opacity:.45}
+.muted{color:var(--muted)}
+#top{padding:calc(8px + env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:var(--glass)}
+#top h1{font-size:19px;white-space:nowrap}
+#saveSt{font-size:13px}
+.grow{flex:1}
+#main{flex:1;display:flex;min-height:0}
+#stageWrap{flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px}
+#stage{flex:1;min-height:0;position:relative;overflow:hidden}
+#cv{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#000;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5);touch-action:none}
+#hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;max-width:80%}
+#tl{background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:8px 10px;display:grid;gap:6px}
+#tlRow{display:flex;align-items:center;gap:8px}
+#tTime{font-variant-numeric:tabular-nums;min-width:96px;text-align:center;font-weight:600}
+#scrub{flex:1;position:relative;height:44px;touch-action:none;cursor:pointer}
+#scrubBar{position:absolute;left:0;right:0;top:19px;height:6px;border-radius:3px;background:#25304d}
+#scrubHead{position:absolute;top:6px;width:4px;height:32px;background:var(--cyan);border-radius:2px;margin-left:-2px;box-shadow:0 0 8px var(--cyan)}
+.mk{position:absolute;top:13px;width:12px;height:18px;margin-left:-6px;border-radius:3px}
+.mk.kf{background:var(--you)} .mk.sw{background:#c084fc;top:30px;height:10px} .mk.mv{background:rgba(74,222,128,.35);top:4px;height:8px;margin-left:0;border-radius:4px}
+#panel{flex:none;width:min(400px,42vw);border-left:1px solid var(--line);background:var(--glass2);display:flex;flex-direction:column;min-height:0}
+@media (max-width:820px){#main{flex-direction:column}#panel{width:auto;height:46%;flex:none;border-left:0;border-top:1px solid var(--line)}}
+.tabs{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;padding:8px 12px;border-radius:10px;white-space:nowrap;cursor:pointer;color:var(--muted);font-weight:600;min-height:42px}
+.tabs button.on{background:#25304d;color:var(--ink)}
+#pb{padding:12px;overflow:auto;display:grid;gap:12px;align-content:start}
+.sec{display:grid;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:14px;padding:10px}
+.lab{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lay{display:flex;align-items:center;gap:10px;padding:6px;border-radius:12px;border:1px solid transparent;cursor:pointer;background:rgba(255,255,255,.03)}
+.lay.sel{border-color:var(--cyan);background:rgba(94,225,255,.08)}
+.lay img{width:46px;height:46px;object-fit:contain;background:#1c2438;border-radius:8px}
+.lay b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sl{display:grid;grid-template-columns:70px 1fr 64px;align-items:center;gap:8px}
+.sl input[type=range]{width:100%;height:32px}
+.sl input[type=number]{width:64px;background:#121a2e;border:1px solid var(--line);border-radius:8px;padding:4px;text-align:right}
+.pre{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.pre button{min-height:58px;border-radius:12px;border:1px solid var(--line);background:#141c31;cursor:pointer;display:grid;place-items:center;font-size:14px;line-height:1.2;padding:4px}
+.pre button span{font-size:22px}
+.item{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.04)}
+.item input,.item select{background:#121a2e;border:1px solid var(--line);border-radius:8px;padding:4px 6px;width:70px}
+.item select{width:auto}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap}
+.thumbs button{width:56px;height:56px;border-radius:10px;border:2px solid var(--line);background:#1c2438;padding:2px;cursor:pointer;position:relative}
+.thumbs button.on{border-color:#c084fc}
+.thumbs img{width:100%;height:100%;object-fit:contain}
+.thumbs i{position:absolute;left:2px;top:0;font-style:normal;font-size:11px;color:#fff;text-shadow:0 0 3px #000}
+select.big,input.big{min-height:42px;background:#121a2e;border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+#toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translateX(-50%);background:#111827;border:1px solid var(--line);padding:10px 16px;border-radius:12px;z-index:50;display:none;max-width:90%}
+#recBox{position:fixed;inset:0;background:rgba(5,8,16,.8);display:none;place-items:center;z-index:40}
+#recBox .card{background:var(--glass2);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:420px;display:grid;gap:10px;text-align:center}
+progress{width:100%;height:14px}
+</style>
+</head>
+<body>
+<div id="top">
+  <a class="ib" href="studio.html" aria-label="กลับสตูดิโอ">←</a>
+  <h1>🎞 สร้างอนิเมชั่น</h1>
+  <span class="muted" id="saveSt"></span>
+  <span class="grow"></span>
+  <select id="size" class="big" aria-label="ขนาดวิดีโอ">
+    <option value="1080x1920">แนวตั้ง 1080×1920</option>
+    <option value="1920x1080">แนวนอน 1920×1080</option>
+    <option value="1080x1080">สี่เหลี่ยม 1080×1080</option>
+  </select>
+</div>
+<div id="main">
+  <div id="stageWrap">
+    <div id="stage"><canvas id="cv" width="1080" height="1920"></canvas><div id="hint" class="muted">กด “+ เพิ่มรูป” เพื่อเริ่ม<br>ลากรูปบนจอเพื่อย้ายตำแหน่ง</div></div>
+    <div id="tl">
+      <div id="tlRow">
+        <button class="ib" id="play" aria-label="เล่น">▶</button>
+        <span id="tTime">0.00 / 5.00</span>
+        <div id="scrub"><div id="scrubBar"></div><div id="marks"></div><div id="scrubHead"></div></div>
+        <label class="row" style="gap:4px"><span class="muted">ยาว</span><input id="dur" class="big" type="number" min="1" max="120" step="0.5" value="5" style="width:72px"></label>
+      </div>
+    </div>
+  </div>
+  <div id="panel">
+    <nav class="tabs" id="tabs">
+      <button data-t="layers" class="on">รูป</button>
+      <button data-t="pose">ตำแหน่ง</button>
+      <button data-t="moves">ท่าทาง</button>
+      <button data-t="swaps">สลับรูป</button>
+      <button data-t="out">ส่งออก</button>
+    </nav>
+    <div id="pb"></div>
+  </div>
+</div>
+<input type="file" id="fileNew" accept="image/*" multiple hidden>
+<input type="file" id="fileAlt" accept="image/*" multiple hidden>
+<input type="file" id="fileBg" accept="image/*" hidden>
+<input type="file" id="fileProj" accept=".json,application/json" hidden>
+<div id="recBox"><div class="card"><h2 id="recT">กำลังบันทึกวิดีโอ…</h2><progress id="recP" max="1" value="0"></progress><p class="muted" id="recM" style="margin:0">อย่าสลับแอประหว่างบันทึก</p></div></div>
+<div id="toast"></div>
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const cv=$('#cv'),ctx=cv.getContext('2d');
+const FPS=60;
+const uid=()=>Math.random().toString(36).slice(2,9);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m,ms=2600){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',ms);}
+
+/* ---------------- project ---------------- */
+let P=newProject(), sel=null, T=0, playing=false, tab='layers';
+const IMG=new Map(); // dataURL -> HTMLImageElement
+function newProject(){return {v:1,w:1080,h:1920,fps:FPS,dur:5,bg:{type:'green',color:'#00FF00',img:null},layers:[]};}
+function img(src){if(!src)return null;let im=IMG.get(src);if(!im){im=new Image();im.onload=()=>draw();im.src=src;IMG.set(src,im);}return im;}
+function L(){return P.layers.find(l=>l.id===sel)||null;}
+
+/* ---------------- easing + motion presets ---------------- */
+const EASE={
+  linear:k=>k, smooth:k=>k*k*(3-2*k), inout:k=>k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2,
+  out:k=>1-Math.pow(1-k,3), back:k=>{const c=1.70158;return 1+(c+1)*Math.pow(k-1,3)+c*Math.pow(k-1,2);},
+  bounce:k=>{const n=7.5625,d=2.75;if(k<1/d)return n*k*k;if(k<2/d)return n*(k-=1.5/d)*k+.75;if(k<2.5/d)return n*(k-=2.25/d)*k+.9375;return n*(k-=2.625/d)*k+.984375;},
+  hold:k=>k<1?0:1
+};
+const EASE_TH={smooth:'นุ่ม',linear:'เท่ากัน',inout:'ช้า-เร็ว-ช้า',out:'เร็วแล้วช้า',back:'เด้งเกิน',bounce:'กระดอน',hold:'ตัดทันที'};
+// each preset: label, icon, default duration (0 = whole clip), default amount, amount label, fn(u,tl,len,amt) -> {dx,dy,s,sx,sy,r,o}
+const MOVES={
+  breathe:{n:'หายใจ',i:'😮‍💨',d:0,a:1,al:'แรง',f:(u,t,len,a)=>{const b=Math.sin(t*2*Math.PI*.45);return {sy:1+.018*a*b,sx:1-.008*a*b};}},
+  float:{n:'ลอยเบาๆ',i:'🎈',d:0,a:14,al:'สูง px',f:(u,t,len,a)=>({dy:Math.sin(t*2*Math.PI*.5)*a})},
+  sway:{n:'โยกตัว',i:'🎵',d:2,a:5,al:'องศา',f:(u,t,len,a)=>({r:Math.sin(t*2*Math.PI*.8)*a})},
+  bounce:{n:'เด้งดึ๋ง',i:'🐰',d:2,a:60,al:'สูง px',f:(u,t,len,a)=>{const p=(t*2.2)%1,h=Math.sin(p*Math.PI),sq=p<.12?1-.1*(1-p/.12):1;return {dy:-a*h,sy:sq*(1+.05*h),sx:2-sq};}},
+  jump:{n:'กระโดด',i:'⤴️',d:.8,a:220,al:'สูง px',f:(u,t,len,a)=>{const h=Math.sin(u*Math.PI);const sq=u<.12?1-.14*Math.sin(u/.12*Math.PI):u>.88?1-.14*Math.sin((u-.88)/.12*Math.PI):1+.06*h;return {dy:-a*h,sy:sq,sx:2-sq};}},
+  shake:{n:'สั่น/ตกใจ',i:'😱',d:.8,a:14,al:'แรง px',f:(u,t,len,a)=>({dx:Math.sin(t*75)*a*(1-u)})},
+  nod:{n:'พยักหน้า',i:'🙂',d:1,a:4,al:'องศา',f:(u,t,len,a)=>{const w=Math.sin(u*Math.PI*4)*(1-u);return {r:w*a*.5,dy:Math.abs(w)*a*2};}},
+  shakeNo:{n:'ส่ายหน้า',i:'🙅',d:1,a:5,al:'องศา',f:(u,t,len,a)=>({r:Math.sin(u*Math.PI*6)*a*(1-u)})},
+  pop:{n:'เด้งเข้า',i:'✨',d:.45,a:1,al:'แรง',f:(u,t,len,a)=>{const k=EASE.back(u);return {s:Math.max(.01,1+(k-1)*a)};}},
+  squash:{n:'ยืดหด',i:'🫧',d:.6,a:1,al:'แรง',f:(u,t,len,a)=>{const w=Math.sin(u*Math.PI*3)*(1-u)*.18*a;return {sy:1-w,sx:1+w};}},
+  walk:{n:'เดินไปขวา',i:'🚶',d:2,a:400,al:'ระยะ px',f:(u,t,len,a)=>({dx:a*u,dy:-Math.abs(Math.sin(t*2*Math.PI*1.6))*14,r:Math.sin(t*2*Math.PI*1.6)*2.5})},
+  walkL:{n:'เดินไปซ้าย',i:'🚶‍➡️',d:2,a:400,al:'ระยะ px',f:(u,t,len,a)=>({dx:-a*u,dy:-Math.abs(Math.sin(t*2*Math.PI*1.6))*14,r:-Math.sin(t*2*Math.PI*1.6)*2.5})},
+  run:{n:'วิ่ง',i:'🏃',d:1.2,a:700,al:'ระยะ px',f:(u,t,len,a)=>({dx:a*u,dy:-Math.abs(Math.sin(t*2*Math.PI*3.2))*26,r:6})},
+  spin:{n:'หมุนรอบ',i:'🌀',d:.8,a:360,al:'องศา',f:(u,t,len,a)=>({r:EASE.inout(u)*a})},
+  zoom:{n:'ขยายเข้า',i:'🔍',d:1,a:.3,al:'เพิ่ม',f:(u,t,len,a)=>({s:1+a*EASE.inout(u)})},
+  fadeIn:{n:'ค่อยๆ โผล่',i:'🌅',d:.6,a:1,al:'-',f:u=>({o:u})},
+  fadeOut:{n:'ค่อยๆ หาย',i:'🌫️',d:.6,a:1,al:'-',f:u=>({o:1-u})},
+  shiver:{n:'หนาวสั่น',i:'🥶',d:1.5,a:4,al:'แรง px',f:(u,t,len,a)=>({dx:Math.sin(t*110)*a,dy:Math.cos(t*97)*a*.4})},
+  blink:{n:'กะพริบตา',i:'👁️',d:0,a:1,al:'รูปที่',swap:true,f:()=>({})},
+  talk:{n:'พูด (สลับปาก)',i:'🗣️',d:2,a:1,al:'รูปที่',swap:true,f:()=>({})}
+};
+
+/* ---------------- evaluation ---------------- */
+function baseAt(l,t){
+  const k=l.kf;
+  if(!k.length)return {x:l.x,y:l.y,s:l.s,r:l.r,o:l.o};
+  if(t<=k[0].t)return pick(k[0]); const last=k[k.length-1]; if(t>=last.t)return pick(last);
+  for(let i=0;i<k.length-1;i++){const a=k[i],b=k[i+1];if(t>=a.t&&t<=b.t){const e=(EASE[b.e]||EASE.smooth)(clamp((t-a.t)/Math.max(1e-6,b.t-a.t),0,1));
+    return {x:a.x+(b.x-a.x)*e,y:a.y+(b.y-a.y)*e,s:a.s+(b.s-a.s)*e,r:a.r+(b.r-a.r)*e,o:a.o+(b.o-a.o)*e};}}
+  return pick(last);
+}
+const pick=k=>({x:k.x,y:k.y,s:k.s,r:k.r,o:k.o});
+function imgIndexAt(l,t){
+  let i=0; for(const s of l.sw) if(s.t<=t+1e-6) i=s.i;
+  for(const m of l.mv){const M=MOVES[m.type];if(!M||!M.swap)continue;const t1=m.d>0?m.t+m.d:P.dur;if(t<m.t||t>t1)continue;
+    const alt=clamp(Math.round(m.a),0,l.imgs.length-1);
+    if(m.type==='blink'){const ph=(t-m.t)%3.4; if(ph>3.25) i=alt;}
+    if(m.type==='talk'){const ph=Math.floor((t-m.t)*9)%3; if(ph===1) i=alt;}}
+  return clamp(i,0,l.imgs.length-1);
+}
+function stateAt(l,t){
+  const b=baseAt(l,t); let dx=0,dy=0,s=1,sx=1,sy=1,r=0,o=1;
+  for(const m of l.mv){const M=MOVES[m.type];if(!M||M.swap)continue;const len=m.d>0?m.d:Math.max(.01,P.dur-m.t);const t1=m.t+len;if(t<m.t||t>t1)continue;
+    const u=clamp((t-m.t)/len,0,1);const q=M.f(u,t-m.t,len,m.a);
+    dx+=q.dx||0;dy+=q.dy||0;r+=q.r||0;if(q.s!=null)s*=q.s;if(q.sx!=null)sx*=q.sx;if(q.sy!=null)sy*=q.sy;if(q.o!=null)o*=q.o;}
+  return {x:b.x+dx,y:b.y+dy,s:b.s*s,sx,sy,r:b.r+r,o:clamp(b.o*o,0,1),i:imgIndexAt(l,t)};
+}
+
+/* ---------------- drawing ---------------- */
+function drawBg(c){
+  const bg=P.bg;
+  if(bg.type==='transparent'){c.clearRect(0,0,P.w,P.h);return;}
+  c.fillStyle=bg.type==='green'?'#00FF00':(bg.color||'#000');c.fillRect(0,0,P.w,P.h);
+  if(bg.type==='image'&&bg.img){const im=img(bg.img);if(im&&im.complete&&im.naturalWidth){const s=Math.max(P.w/im.naturalWidth,P.h/im.naturalHeight);const w=im.naturalWidth*s,h=im.naturalHeight*s;c.drawImage(im,(P.w-w)/2,(P.h-h)/2,w,h);}}
+}
+function render(c,t,ui){
+  c.save();c.setTransform(1,0,0,1,0,0);drawBg(c);
+  for(const l of P.layers){if(l.hide)continue;const st=stateAt(l,t);const im=img(l.imgs[st.i]);if(!im||!im.complete||!im.naturalWidth)continue;
+    const w=im.naturalWidth,h=im.naturalHeight;
+    c.save();c.globalAlpha=st.o;c.translate(st.x,st.y);c.rotate(st.r*Math.PI/180);c.scale(st.s*st.sx*(l.flip?-1:1),st.s*st.sy);
+    c.imageSmoothingQuality='high';c.drawImage(im,-w/2,-h,w,h); // anchor = bottom centre (feet)
+    if(ui&&l.id===sel){c.globalAlpha=1;c.lineWidth=4/Math.max(.05,st.s);c.setLineDash([14/st.s,10/st.s]);c.strokeStyle='#5EE1FF';c.strokeRect(-w/2,-h,w,h);
+      c.setLineDash([]);c.fillStyle='#5EE1FF';c.beginPath();c.arc(0,0,10/Math.max(.05,st.s),0,7);c.fill();}
+    c.restore();}
+  c.restore();
+}
+function draw(){render(ctx,T,!playing&&!recording);updTime();}
+
+/* ---------------- layout ---------------- */
+function fit(){const st=$('#stage');const W=st.clientWidth,H=st.clientHeight;const s=Math.min(W/P.w,H/P.h);cv.style.width=(P.w*s)+'px';cv.style.height=(P.h*s)+'px';}
+addEventListener('resize',fit);if(window.ResizeObserver)new ResizeObserver(fit).observe($('#stage'));
+function setSize(v){const [w,h]=v.split('x').map(Number);if(w===P.w&&h===P.h)return;const ox=P.w,oy=P.h;P.w=w;P.h=h;cv.width=w;cv.height=h;
+  for(const l of P.layers){const sx=w/ox,sy=h/oy;l.x*=sx;l.y*=sy;for(const k of l.kf){k.x*=sx;k.y*=sy;}}fit();draw();save();}
+$('#size').onchange=e=>setSize(e.target.value);
+
+/* ---------------- timeline ---------------- */
+function updTime(){$('#tTime').textContent=T.toFixed(2)+' / '+P.dur.toFixed(2);$('#scrubHead').style.left=(T/P.dur*100)+'%';$('#play').textContent=playing?'⏸':'▶';}
+function marks(){const l=L();let h='';if(l){for(const k of l.kf)h+=`<i class="mk kf" style="left:${k.t/P.dur*100}%"></i>`;for(const s of l.sw)h+=`<i class="mk sw" style="left:${s.t/P.dur*100}%"></i>`;
+  for(const m of l.mv){const len=m.d>0?m.d:P.dur-m.t;h+=`<i class="mk mv" style="left:${m.t/P.dur*100}%;width:${Math.min(100-m.t/P.dur*100,len/P.dur*100)}%"></i>`;}}$('#marks').innerHTML=h;}
+function seek(t){T=clamp(Math.round(t*FPS)/FPS,0,P.dur);draw();if(tab==='pose')panel();}
+(function(){const sc=$('#scrub');let dn=false;const at=e=>{const r=sc.getBoundingClientRect();seek((e.clientX-r.left)/r.width*P.dur);};
+  sc.addEventListener('pointerdown',e=>{dn=true;sc.setPointerCapture(e.pointerId);stop();at(e);});sc.addEventListener('pointermove',e=>{if(dn)at(e);});sc.addEventListener('pointerup',()=>dn=false);})();
+$('#dur').onchange=e=>{P.dur=clamp(+e.target.value||5,1,120);T=Math.min(T,P.dur);marks();draw();save();};
+let raf=0,t0=0;
+function loop(now){if(!playing)return;T=Math.min(P.dur,(now-t0)/1000);draw();if(T>=P.dur){playing=false;T=P.dur;draw();return;}raf=requestAnimationFrame(loop);}
+function play(){if(playing)return stop();if(T>=P.dur-1e-3)T=0;playing=true;t0=performance.now()-T*1000;raf=requestAnimationFrame(loop);}
+function stop(){playing=false;cancelAnimationFrame(raf);draw();}
+$('#play').onclick=play;
+
+/* ---------------- canvas drag ---------------- */
+(function(){let drag=null;
+  const pt=e=>{const r=cv.getBoundingClientRect();return {x:(e.clientX-r.left)/r.width*P.w,y:(e.clientY-r.top)/r.height*P.h};};
+  function hit(p){for(let i=P.layers.length-1;i>=0;i--){const l=P.layers[i];if(l.hide)continue;const st=stateAt(l,T);const im=img(l.imgs[st.i]);if(!im||!im.naturalWidth)continue;
+    const a=-st.r*Math.PI/180,dx=p.x-st.x,dy=p.y-st.y;const lx=(dx*Math.cos(a)-dy*Math.sin(a))/(st.s*st.sx),ly=(dx*Math.sin(a)+dy*Math.cos(a))/(st.s*st.sy);
+    if(Math.abs(lx)<=im.naturalWidth/2&&ly<=0&&ly>=-im.naturalHeight)return l;}return null;}
+  cv.addEventListener('pointerdown',e=>{stop();const p=pt(e);const l=hit(p)||L();if(!l)return;sel=l.id;const b=baseAt(l,T);drag={p,b,id:l.id};cv.setPointerCapture(e.pointerId);panelIfLayers();draw();});
+  cv.addEventListener('pointermove',e=>{if(!drag)return;const p=pt(e);setProp({x:drag.b.x+p.x-drag.p.x,y:drag.b.y+p.y-drag.p.y},false);});
+  cv.addEventListener('pointerup',()=>{if(drag){drag=null;save();if(tab==='pose')panel();}});
+})();
+function panelIfLayers(){if(tab==='layers'||tab==='pose'||tab==='swaps'||tab==='moves')panel();marks();}
+
+/* setProp: edit position at current time. If layer has keyframes -> writes/creates keyframe at T (auto-key). */
+function setProp(o,redraw=true){const l=L();if(!l)return;
+  if(l.kf.length){let k=l.kf.find(k=>Math.abs(k.t-T)<.5/FPS);if(!k){k=Object.assign({t:T,e:'smooth'},baseAt(l,T));l.kf.push(k);l.kf.sort((a,b)=>a.t-b.t);marks();}Object.assign(k,o);}
+  else Object.assign(l,o);
+  draw();if(redraw&&tab==='pose')panel();save();}
+
+/* ---------------- images ---------------- */
+function readImages(files){return Promise.all([...files].map(f=>new Promise(res=>{const fr=new FileReader();fr.onload=()=>{const im=new Image();im.onload=()=>{
+  const MAX=2400,s=Math.min(1,MAX/Math.max(im.naturalWidth,im.naturalHeight));if(s>=1&&/png|webp/.test(f.type)){res({name:f.name,src:fr.result});return;}
+  const c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  res({name:f.name,src:c.toDataURL(/jpe?g/.test(f.type)?'image/jpeg':'image/png',.92)});};im.src=fr.result;};fr.readAsDataURL(f);})));}
+$('#fileNew').onchange=async e=>{const arr=await readImages(e.target.files);e.target.value='';
+  for(const a of arr){const im=await loadImg(a.src);const s=Math.min(P.h*.8/im.naturalHeight,P.w*.9/im.naturalWidth);
+    const l={id:uid(),name:a.name.replace(/\.[^.]+$/,''),imgs:[a.src],x:P.w/2,y:P.h*.92,s:+s.toFixed(3),r:0,o:1,flip:false,kf:[],sw:[],mv:[]};P.layers.push(l);sel=l.id;}
+  $('#hint').style.display=P.layers.length?'none':'';panel();marks();draw();save();toast('เพิ่มรูปแล้ว ลากบนจอเพื่อย้ายได้');};
+$('#fileAlt').onchange=async e=>{const l=L();if(!l)return;const arr=await readImages(e.target.files);e.target.value='';for(const a of arr)l.imgs.push(a.src);panel();save();toast('เพิ่มรูปสลับ '+arr.length+' รูป');};
+$('#fileBg').onchange=async e=>{const arr=await readImages(e.target.files);e.target.value='';if(!arr[0])return;P.bg={type:'image',color:'#000',img:arr[0].src};panel();draw();save();};
+function loadImg(src){return new Promise(r=>{const im=img(src);if(im.complete&&im.naturalWidth)r(im);else im.addEventListener('load',()=>r(im),{once:true});});}
+
+/* ---------------- panel ---------------- */
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;tab=b.dataset.t;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));panel();});
+function slider(key,label,min,max,step,val){return `<div class="sl"><span>${label}</span><input type="range" data-k="${key}" min="${min}" max="${max}" step="${step}" value="${val}"><input type="number" data-k="${key}" min="${min}" max="${max}" step="${step}" value="${(+val).toFixed(step<1?2:0)}"></div>`;}
+function noSel(){return `<div class="sec"><p class="muted" style="margin:0">เลือกรูปก่อน (แตะรูปบนจอ หรือในแท็บ “รูป”)</p></div>`;}
+function panel(){const pb=$('#pb');const l=L();let h='';
+  if(tab==='layers'){
+    h+=`<div class="row"><button class="btn main" data-a="add">+ เพิ่มรูป</button><span class="muted">รูปพื้นใสหรือพื้นขาวก็ได้</span></div>`;
+    h+=`<div class="sec"><span class="lab">รูปในฉาก (บนสุด = อยู่หน้าสุด)</span>${[...P.layers].reverse().map(x=>`<div class="lay ${x.id===sel?'sel':''}" data-sel="${x.id}"><img src="${x.imgs[0]}" alt=""><b>${esc(x.name)}</b><button class="ib" data-a="hide" data-id="${x.id}" aria-label="ซ่อน/แสดง">${x.hide?'🙈':'👁'}</button></div>`).join('')||'<span class="muted">ยังไม่มีรูป</span>'}</div>`;
+    if(l)h+=`<div class="sec"><span class="lab">รูปที่เลือก: ${esc(l.name)}</span><div class="row"><button class="btn sm" data-a="up">ขึ้นหน้า</button><button class="btn sm" data-a="down">ลงหลัง</button><button class="btn sm" data-a="flip">กลับซ้าย-ขวา</button><button class="btn sm" data-a="dup">ทำสำเนา</button><button class="btn sm red" data-a="del">ลบรูปนี้</button></div></div>`;
+    h+=`<div class="sec"><span class="lab">พื้นหลัง</span><div class="row"><select class="big" data-bg><option value="green" ${P.bg.type==='green'?'selected':''}>เขียว (ส่งให้ Claude ตัดพื้น)</option><option value="color" ${P.bg.type==='color'?'selected':''}>สีเรียบ</option><option value="image" ${P.bg.type==='image'?'selected':''}>รูปฉาก</option><option value="transparent" ${P.bg.type==='transparent'?'selected':''}>โปร่งใส (เฉพาะไฟล์โปรเจกต์)</option></select>
+      ${P.bg.type==='color'?`<input type="color" data-bgc value="${P.bg.color}" style="width:56px;height:42px;border:0;background:none">`:''}${P.bg.type==='image'?`<button class="btn sm" data-a="bgimg">เลือกรูปฉาก</button>`:''}</div></div>`;
+  }
+  if(tab==='pose'){ if(!l)h=noSel(); else{const b=baseAt(l,T);
+    h+=`<div class="sec"><span class="lab">ตำแหน่งที่เวลา ${T.toFixed(2)} วิ</span>${slider('x','ซ้าย-ขวา',-P.w*.5,P.w*1.5,1,b.x)}${slider('y','บน-ล่าง',-P.h*.2,P.h*1.3,1,b.y)}${slider('s','ขนาด',.05,4,.01,b.s)}${slider('r','หมุน',-180,180,1,b.r)}${slider('o','ความชัด',0,1,.01,b.o)}</div>`;
+    h+=`<div class="sec"><span class="lab">คีย์เฟรม (ให้รูปเคลื่อนจากจุดหนึ่งไปอีกจุด)</span><p class="muted" style="margin:0;font-size:14px">1) เลื่อนเวลา 2) วางตำแหน่ง 3) กด “ปักท่า” — ทำซ้ำที่เวลาอื่น รูปจะเคลื่อนเองระหว่างจุด</p>
+      <div class="row"><button class="btn main" data-a="key">📍 ปักท่าที่เวลานี้</button>${l.kf.length?`<button class="btn sm red" data-a="clearkf">ลบคีย์ทั้งหมด</button>`:''}</div>
+      ${l.kf.map((k,i)=>`<div class="item"><button class="btn sm" data-goto="${k.t}">⏱ ${k.t.toFixed(2)}</button>${i?`<select data-kfe="${i}">${Object.entries(EASE_TH).map(([v,n])=>`<option value="${v}" ${k.e===v?'selected':''}>${n}</option>`).join('')}</select>`:'<span class="muted">จุดเริ่ม</span>'}<span class="grow"></span><button class="ib" data-kfdel="${i}" aria-label="ลบ">✕</button></div>`).join('')}</div>`;}}
+  if(tab==='moves'){ if(!l)h=noSel(); else{
+    h+=`<div class="sec"><span class="lab">แตะท่าเพื่อใส่ที่เวลา ${T.toFixed(2)} วิ</span><div class="pre">${Object.entries(MOVES).map(([k,m])=>`<button data-mv="${k}"><span>${m.i}</span>${m.n}</button>`).join('')}</div>
+      <p class="muted" style="margin:0;font-size:14px">“กะพริบตา” กับ “พูด” ต้องมีรูปที่ 2 ในแท็บ สลับรูป (เช่น รูปหลับตา / รูปอ้าปาก)</p></div>`;
+    h+=`<div class="sec"><span class="lab">ท่าทางของรูปนี้</span>${l.mv.map((m,i)=>{const M=MOVES[m.type];return `<div class="item"><b>${M.i} ${M.n}</b><span class="grow"></span>
+      <label>เริ่ม <input type="number" step="0.05" min="0" data-mvk="t" data-i="${i}" value="${m.t.toFixed(2)}"></label>
+      <label>นาน <input type="number" step="0.05" min="0" data-mvk="d" data-i="${i}" value="${m.d.toFixed(2)}" title="0 = จนจบคลิป"></label>
+      ${M.al!=='-'?`<label>${M.al} <input type="number" step="${M.swap?1:'any'}" data-mvk="a" data-i="${i}" value="${m.a}"></label>`:''}
+      <button class="ib" data-mvdel="${i}" aria-label="ลบ">✕</button></div>`;}).join('')||'<span class="muted">ยังไม่มี — แตะปุ่มด้านบน</span>'}<p class="muted" style="margin:0;font-size:14px">นาน 0 = ทำจนจบคลิป · ท่าซ้อนกันได้ เช่น หายใจ + เดิน</p></div>`;}}
+  if(tab==='swaps'){ if(!l)h=noSel(); else{
+    h+=`<div class="sec"><span class="lab">รูปของ ${esc(l.name)} (แตะเพื่อสลับเป็นรูปนี้ที่เวลา ${T.toFixed(2)} วิ)</span><div class="thumbs">${l.imgs.map((s,i)=>`<button data-swap="${i}" class="${imgIndexAt(l,T)===i?'on':''}"><i>${i}</i><img src="${s}" alt=""></button>`).join('')}</div>
+      <div class="row"><button class="btn" data-a="addalt">+ เพิ่มรูปสลับ</button>${l.imgs.length>1?`<button class="btn sm red" data-a="delimg">ลบรูปที่แสดงอยู่</button>`:''}</div>
+      <p class="muted" style="margin:0;font-size:14px">ใช้เปลี่ยนท่า/สีหน้า เช่น รูป 0 ยืน → รูป 1 ยิ้ม · รูปหลับตา/อ้าปาก ใช้กับท่า กะพริบตา/พูด</p></div>`;
+    h+=`<div class="sec"><span class="lab">จุดสลับรูป</span>${l.sw.map((s,i)=>`<div class="item"><button class="btn sm" data-goto="${s.t}">⏱ ${s.t.toFixed(2)}</button><span>→ รูป ${s.i}</span><span class="grow"></span><button class="ib" data-swdel="${i}" aria-label="ลบ">✕</button></div>`).join('')||'<span class="muted">ยังไม่มี</span>'}</div>`;}}
+  if(tab==='out'){
+    h+=`<div class="sec"><span class="lab">ส่งต่อให้ Claude (แนะนำ)</span><p class="muted" style="margin:0;font-size:14px">ไฟล์โปรเจกต์มีรูปและท่าทางครบ Claude จะสร้างวิดีโอ 60fps 1080p แบบเฟรมต่อเฟรม คมชัดเต็มที่ แล้วใส่ฉาก ซับ เสียงต่อ</p>
+      <div class="row"><button class="btn main" data-a="saveproj">💾 บันทึกไฟล์โปรเจกต์ (.json)</button></div></div>`;
+    h+=`<div class="sec"><span class="lab">บันทึกเป็นวิดีโอในเครื่อง</span><p class="muted" style="margin:0;font-size:14px">บันทึกตามเวลาจริง ${P.w}×${P.h} เป้าหมาย 60fps (เครื่องช้าอาจได้เฟรมน้อยลง) ${P.bg.type==='transparent'?'· พื้นโปร่งใสจะเป็นสีดำในวิดีโอ':''}</p>
+      <div class="row"><button class="btn ok" data-a="rec">⏺ บันทึกวิดีโอ</button></div></div>`;
+    h+=`<div class="sec"><span class="lab">โปรเจกต์</span><div class="row"><button class="btn" data-a="openproj">📂 เปิดไฟล์โปรเจกต์</button><button class="btn red" data-a="newproj">เริ่มใหม่</button></div></div>`;
+  }
+  pb.innerHTML=h;
+}
+$('#pb').addEventListener('input',e=>{const k=e.target.dataset.k;if(k){const v=+e.target.value;e.target.parentElement.querySelectorAll(`[data-k="${k}"]`).forEach(x=>{if(x!==e.target)x.value=x.type==='number'?v.toFixed(+x.step<1?2:0):v;});setProp({[k]:v},false);}
+  if(e.target.dataset.bgc!=null){P.bg.color=e.target.value;draw();save();}});
+$('#pb').addEventListener('change',e=>{const t=e.target,l=L();
+  if(t.dataset.bg!=null){P.bg.type=t.value;if(t.value==='image'&&!P.bg.img)$('#fileBg').click();panel();draw();save();}
+  if(t.dataset.kfe!=null&&l){l.kf[+t.dataset.kfe].e=t.value;draw();save();}
+  if(t.dataset.mvk&&l){const m=l.mv[+t.dataset.i];m[t.dataset.mvk]=Math.max(t.dataset.mvk==='a'?-1e5:0,+t.value||0);marks();draw();save();}});
+$('#pb').addEventListener('click',e=>{const b=e.target.closest('[data-a],[data-sel],[data-mv],[data-goto],[data-kfdel],[data-mvdel],[data-swap],[data-swdel]');if(!b)return;const l=L();const d=b.dataset;
+  if(d.sel){sel=d.sel;panel();marks();draw();return;}
+  if(d.goto!=null){seek(+d.goto);return;}
+  if(d.kfdel!=null&&l){l.kf.splice(+d.kfdel,1);panel();marks();draw();save();return;}
+  if(d.mvdel!=null&&l){l.mv.splice(+d.mvdel,1);panel();marks();draw();save();return;}
+  if(d.swdel!=null&&l){l.sw.splice(+d.swdel,1);panel();marks();draw();save();return;}
+  if(d.swap!=null&&l){const i=+d.swap;const ex=l.sw.find(s=>Math.abs(s.t-T)<.5/FPS);if(ex)ex.i=i;else{l.sw.push({t:T,i});l.sw.sort((a,b)=>a.t-b.t);}panel();marks();draw();save();return;}
+  if(d.mv&&l){const M=MOVES[d.mv];if(M.swap&&l.imgs.length<2){toast('เพิ่มรูปที่ 2 ในแท็บ “สลับรูป” ก่อน (รูปหลับตา/อ้าปาก)');return;}
+    const t=M.d===0?0:T;l.mv.push({type:d.mv,t:+t.toFixed(3),d:M.d,a:M.swap?1:M.a});panel();marks();draw();save();toast('ใส่ท่า '+M.n+' แล้ว กด ▶ ดูได้');return;}
+  const a=d.a;
+  if(a==='add')$('#fileNew').click();
+  if(a==='addalt')$('#fileAlt').click();
+  if(a==='bgimg')$('#fileBg').click();
+  if(a==='hide'){const x=P.layers.find(x=>x.id===d.id);x.hide=!x.hide;panel();draw();save();}
+  if(!l&&['up','down','flip','dup','del','key','clearkf','delimg'].includes(a))return;
+  if(a==='up'||a==='down'){const i=P.layers.indexOf(l),j=a==='up'?i+1:i-1;if(j>=0&&j<P.layers.length){P.layers.splice(i,1);P.layers.splice(j,0,l);}panel();draw();save();}
+  if(a==='flip'){l.flip=!l.flip;draw();save();}
+  if(a==='dup'){const c=JSON.parse(JSON.stringify(l));c.id=uid();c.name+=' (สำเนา)';c.x+=40;c.kf.forEach(k=>k.x+=40);P.layers.push(c);sel=c.id;panel();draw();save();}
+  if(a==='del'){P.layers=P.layers.filter(x=>x!==l);sel=P.layers.length?P.layers[P.layers.length-1].id:null;$('#hint').style.display=P.layers.length?'none':'';panel();marks();draw();save();}
+  if(a==='key'){const b0=baseAt(l,T);if(!l.kf.length&&T>0)l.kf.push({t:0,e:'smooth',x:l.x,y:l.y,s:l.s,r:l.r,o:l.o});const ex=l.kf.find(k=>Math.abs(k.t-T)<.5/FPS);
+    if(ex)Object.assign(ex,b0);else l.kf.push(Object.assign({t:T,e:'smooth'},b0));l.kf.sort((x,y)=>x.t-y.t);panel();marks();draw();save();toast('ปักท่าที่ '+T.toFixed(2)+' วิ แล้ว เลื่อนเวลาแล้ววางตำแหน่งใหม่ต่อได้');}
+  if(a==='clearkf'){const b0=baseAt(l,T);Object.assign(l,b0);l.kf=[];panel();marks();draw();save();}
+  if(a==='delimg'){const i=imgIndexAt(l,T);if(l.imgs.length>1){l.imgs.splice(i,1);l.sw=l.sw.filter(s=>s.i!==i).map(s=>({t:s.t,i:s.i>i?s.i-1:s.i}));panel();draw();save();}}
+  if(a==='saveproj')exportProject();
+  if(a==='openproj')$('#fileProj').click();
+  if(a==='newproj'){if(P.layers.length&&!b._sure){b._sure=1;b.textContent='แตะอีกครั้งเพื่อลบงานนี้';setTimeout(()=>{b._sure=0;b.textContent='เริ่มใหม่';},3000);return;}{P=newProject();sel=null;T=0;$('#dur').value=5;$('#size').value='1080x1920';cv.width=P.w;cv.height=P.h;fit();$('#hint').style.display='';panel();marks();draw();save();}}
+  if(a==='rec')record();
+});
+
+/* ---------------- storage (IndexedDB, autosave) ---------------- */
+const DB='ss_anim';let dbp=null;
+function db(){return dbp||(dbp=new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore('p');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}));}
+async function idb(op,val){const d=await db();return new Promise((res,rej)=>{const tx=d.transaction('p',op?'readwrite':'readonly');const st=tx.objectStore('p');const q=op?st.put(val,'cur'):st.get('cur');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});}
+let svT=0;function save(){$('#saveSt').textContent='กำลังบันทึก…';clearTimeout(svT);svT=setTimeout(async()=>{try{await idb(true,JSON.stringify(P));$('#saveSt').textContent='บันทึกในเครื่องแล้ว';}catch(e){$('#saveSt').textContent='บันทึกไม่สำเร็จ';}},600);}
+async function restore(){try{const s=await idb(false);if(s){load(JSON.parse(s));return;}}catch(e){}panel();marks();draw();}
+function load(p){P=Object.assign(newProject(),p);P.layers.forEach(l=>{l.kf=l.kf||[];l.sw=l.sw||[];l.mv=l.mv||[];});cv.width=P.w;cv.height=P.h;$('#size').value=P.w+'x'+P.h;$('#dur').value=P.dur;
+  sel=P.layers.length?P.layers[P.layers.length-1].id:null;$('#hint').style.display=P.layers.length?'none':'';fit();panel();marks();
+  Promise.all(P.layers.flatMap(l=>l.imgs.map(loadImg)).concat(P.bg.img?[loadImg(P.bg.img)]:[])).then(draw);draw();}
+
+/* ---------------- export: project file ---------------- */
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
+async function shareOrDownload(blob,name){const f=new File([blob],name,{type:blob.type});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:name});return;}catch(e){if(e.name==='AbortError')return;}}download(blob,name);}
+function stamp(){const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');}
+function exportProject(){const p=Object.assign({},P,{note:'SMART SHOP anim project — render at fps/w/h, anchor = bottom-centre of each image',exported:new Date().toISOString()});
+  shareOrDownload(new Blob([JSON.stringify(p)],{type:'application/json'}),'anim-'+stamp()+'.json');toast('ส่งไฟล์นี้ในแชทให้ Claude ได้เลย');}
+$('#fileProj').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const fr=new FileReader();fr.onload=()=>{try{load(JSON.parse(fr.result));save();toast('เปิดโปรเจกต์แล้ว');}catch(x){toast('ไฟล์นี้เปิดไม่ได้');}};fr.readAsText(f);};
+
+/* ---------------- export: realtime video (MediaRecorder) ---------------- */
+let recording=false;
+function pickMime(){const c=['video/mp4;codecs=avc1.640028','video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  for(const m of c)if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m;return '';}
+async function record(){if(!P.layers.length){toast('เพิ่มรูปก่อน');return;}if(!cv.captureStream||!window.MediaRecorder){toast('เบราว์เซอร์นี้บันทึกวิดีโอไม่ได้ ใช้ “บันทึกไฟล์โปรเจกต์” ส่งให้ Claude แทน',4500);return;}
+  stop();await Promise.all(P.layers.flatMap(l=>l.imgs.map(loadImg)));
+  const mime=pickMime();const stream=cv.captureStream(FPS);const rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:16e6}:{videoBitsPerSecond:16e6});
+  const chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  recording=true;$('#recBox').style.display='grid';$('#recT').textContent='กำลังบันทึกวิดีโอ…';
+  const done=new Promise(r=>rec.onstop=r);rec.start(250);
+  const start=performance.now();let frames=0;
+  await new Promise(res=>{function step(now){const t=(now-start)/1000;T=Math.min(P.dur,t);render(ctx,T,false);frames++;$('#recP').value=T/P.dur;$('#recM').textContent=T.toFixed(1)+' / '+P.dur.toFixed(1)+' วิ';
+    if(t>=P.dur+.05)res();else requestAnimationFrame(step);}requestAnimationFrame(step);});
+  rec.stop();await done;stream.getTracks().forEach(t=>t.stop());recording=false;$('#recBox').style.display='none';
+  const type=(rec.mimeType||mime||'video/webm').split(';')[0];const ext=type.includes('mp4')?'mp4':'webm';
+  const fps=Math.round(frames/(P.dur+.05));draw();
+  await shareOrDownload(new Blob(chunks,{type}),'anim-'+stamp()+'.'+ext);
+  toast(`บันทึกแล้ว (${ext.toUpperCase()} ~${fps}fps)${fps<55?' · ถ้าอยากได้ 60fps เต็ม ส่งไฟล์โปรเจกต์ให้ Claude':''}`,5000);}
+
+/* ---------------- hook for offline frame-exact rendering (used by Claude) ---------------- */
+window.SSAnim={load:p=>{load(p);return Promise.all(P.layers.flatMap(l=>l.imgs.map(loadImg)).concat(P.bg.img?[loadImg(P.bg.img)]:[]));},
+  frame:t=>{render(ctx,t,false);return true;},canvas:cv,get project(){return P;}};
+
+fit();restore();
+})();
+</script>
+</body>
+</html>
