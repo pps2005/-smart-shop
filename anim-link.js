@@ -3,7 +3,7 @@
 (function () {
   if (typeof M === 'undefined' || typeof go !== 'function') return;
   var PAGES = { anim: 'anim.html', studio: 'studio.html' };
-  if (!M.some(function (m) { return m.id === 'anim'; })) M.push({ id: 'anim', i: 'sliders', t: 'โรงงานตัวละคร 🎞' });
+  if (!M.some(function (m) { return m.id === 'anim'; })) M.push({ id: 'anim', i: 'sliders', t: 'model 3d 🎞' });
   if (!M.some(function (m) { return m.id === 'studio'; })) M.push({ id: 'studio', i: 'chat', t: 'สตูดิโอ AI 🎬' });
   var origGo = go;
   go = function (id) {
