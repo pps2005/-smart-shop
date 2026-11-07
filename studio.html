@@ -175,6 +175,7 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4p
 .lprev span{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;font-size:13px;background:linear-gradient(transparent,rgba(0,0,0,.75))}
 .lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
 @media (max-width:420px){.lgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.arow{border-top:1px solid var(--line,rgba(255,255,255,.08));padding:8px 0;display:grid;gap:6px}
 .lcard{display:grid;gap:4px;background:none;border:0;padding:0;color:var(--ink);cursor:pointer;text-align:left;min-width:0}
 .lthumb{position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:#241c33;border:1px solid var(--line);display:grid;place-items:center}
 .lthumb img{width:100%;height:100%;object-fit:cover}
@@ -816,6 +817,8 @@ function libStat(){const S=BOT.s||{images:[],jobs:[]},out={};
   libAll().forEach(c=>c.items.forEach(([n])=>{const p=LP(c.n,n);const im=S.images.filter(i=>i.project===p),j=S.jobs.filter(x=>x.project===p);
     out[p]={im,q:j.filter(x=>x.status==='queued').length,run:j.some(x=>x.status==='running'),fail:j.filter(x=>x.status==='failed').length};}));return out;}
 function renderLib(quiet){
+  if(quiet&&[...document.querySelectorAll('#vw audio')].some(a=>!a.paused)){clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);return;}
+  if(quiet&&document.activeElement&&document.activeElement.id==='audTxt')return;
   if(!botCfg().url){$('#vw').innerHTML=`<div class="card"><h2>คลัง</h2><p class="muted" style="margin:0">เชื่อมบอทเจนภาพก่อน (แท็บเจนภาพ)</p></div>`;return;}
   if(!BOT.s){$('#vw').innerHTML=`<div class="card lload"><div class="lbig">กำลังโหลดคลัง…</div><div class="lbar"><i style="width:30%"></i></div></div>`;botLoad();return;}
   const st=libStat(),S=BOT.s,s=S.settings||{};
@@ -845,7 +848,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  $('#vw').innerHTML=castHtml()+hero+cats;
+  $('#vw').innerHTML=castHtml()+hero+audioHtml()+cats;
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -952,6 +955,22 @@ document.addEventListener('click',async e=>{const h=e.target.closest('[data-shq]
   const S=(ep.shots||[]).map(x=>({...x}));
   if(h.dataset.shq!=null){const s=S[+h.dataset.shq];s.hq=!s.hq;await saveEp({shots:S},s.hq?'ตั้งเป็นช็อตสำคัญแล้ว ⭐':'เปลี่ยนเป็นช็อตทั่วไปแล้ว');}
   else{const f=+h.dataset.look;S.forEach(s=>{if(f)s.fps=12;else delete s.fps;});await saveEp({shots:S},f?'ใช้ลุคอนิเมะทั้งตอน (มีผลกับคลิปที่สั่งทำใหม่)':'ใช้ลุคลื่นทั้งตอน');}},true);
+
+
+/* ---------- คลังเสียง (เพลงบรรเลง · เสียงประกอบ) ทำบน Kaggle เก็บเป็นไฟล์ในบอท ---------- */
+function audioHtml(){const V=BOT.v;if(!V)return '';
+  const CATS=[['เพลง','🎵','เพลงบรรเลง (ACE-Step)'],['เสียงประกอบ','🔊','เสียงประกอบ: สัตว์ ธรรมชาติ ชีวิตประจำวัน อนิเมะ ต่อสู้ อาคม (Stable Audio Open)']];
+  const body=CATS.map(([c,ic,d])=>{const pre='คลัง·'+c+'·';
+    const vs=V.videos.filter(v=>String(v.project).startsWith(pre)),js=V.jobs.filter(j=>String(j.project).startsWith(pre)&&j.status!=='done');
+    const rows=vs.map(v=>`<div class="arow"><div class="row" style="justify-content:space-between"><b>${esc(String(v.project).slice(pre.length))}</b><span class="muted small">${v.sec?Math.round(v.sec/60)+' นาทีทำ · ':''}${Math.round(v.size/1024)} KB <button class="btn sm" data-bot="vdel" data-id="${v.id}" aria-label="ลบ">🗑</button></span></div><audio controls preload="none" src="${esc(botU('/vid/'+v.id))}" style="width:100%"></audio></div>`).join('');
+    const pend=js.map(j=>`<span class="st ${j.status==='failed'?'':'todo'}">${j.status==='running'?'✨ กำลังทำ':j.status==='failed'?'⚠️ พัง':'⏳ รอคิว'} ${esc(String(j.project).slice(pre.length))}</span>`).join('');
+    return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${ic} ${c}</h3><span class="muted small">${vs.length} ไฟล์</span></div><span class="muted small">${d}</span>${pend?`<div class="row">${pend}</div>`:''}${rows||'<span class="muted small">ยังไม่มีไฟล์ จะเริ่มทำในรอบรายวันถัดไป หรือสั่งทำเองข้างล่าง</span>'}</div>`;}).join('');
+  return body+`<div class="card"><h3>🎙️ สั่งทำเสียงเอง</h3><div class="row"><select id="audType"><option value="sfx">เสียงประกอบ (10 วิ)</option><option value="music">เพลงบรรเลง (60 วิ)</option></select></div>
+    <input type="text" id="audTxt" placeholder="บรรยายเป็นภาษาอังกฤษ เช่น a cat meowing softly" autocomplete="off"><input type="text" id="audName" placeholder="ชื่อในคลัง เช่น แมวร้องเบาๆ" autocomplete="off">
+    <div><button class="btn sm main" data-bot="audnew">ส่งเข้าคิว</button></div><span class="muted small">เพลงทำด้วย ACE-Step (ใช้เชิงการค้าได้) · เสียงประกอบทำด้วย Stable Audio Open (ใช้เชิงการค้าได้ถ้ารายได้ต่ำกว่า 1 ล้านดอลลาร์ต่อปี)</span></div>`;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot="audnew"]');if(!b)return;e.stopImmediatePropagation();
+  const t=($('#audTxt').value||'').trim();if(!t)return toast('พิมพ์คำบรรยายเสียงก่อน');
+  try{b.disabled=true;await botApi('/api/vcastaudio',{type:$('#audType').value,prompt:t,name:($('#audName').value||'').trim()||t.slice(0,40)});toast('ส่งเข้าคิวแล้ว เครื่อง Kaggle จะทำให้ (ครั้งแรกต้องโหลดโมเดลราว 10 นาที)');$('#audTxt').value='';$('#audName').value='';await botLoad();}catch(err){toast(botErr(err));}finally{b.disabled=false;}},true);
 
 boot();
 })();

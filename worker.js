@@ -537,8 +537,59 @@ def setup():
     fi = COMFY + "/custom_nodes/ComfyUI-Frame-Interpolation/requirements-no-cupy.txt"
     if os.path.exists(fi):
         sh("pip install -q -r " + fi, check=False)
-    log("ติดตั้ง ComfyUI แล้ว กำลังโหลดโมเดล (ครั้งแรกประมาณ 10–20 นาที)")
+    log("ติดตั้ง ComfyUI แล้ว")
+    start_servers(gpu)
 
+
+LOCK = threading.Lock()
+
+
+def fetch(plan):
+    from huggingface_hub import hf_hub_download
+    errs = []
+
+    def dl(item):
+        kind, repo, f = item[:3]
+        dst = os.path.join(COMFY, "models", kind, item[3] if len(item) > 3 else os.path.basename(f))
+        try:
+            if os.path.exists(dst):
+                return
+            p = hf_hub_download(repo, f, local_dir=os.path.join(ROOT, "hf"))
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            os.symlink(p, dst)
+        except Exception as e:
+            errs.append(f + ": " + str(e)[:200])
+
+    th = [threading.Thread(target=dl, args=(it,)) for it in plan]
+    [t.start() for t in th]
+    [t.join() for t in th]
+    if errs:
+        raise RuntimeError("โหลดโมเดลไม่สำเร็จ: " + " | ".join(errs))
+
+
+def ensure_audio():
+    with LOCK:
+        if M.get("audio"):
+            return
+        log("กำลังโหลดโมเดลเสียง (ACE-Step เพลง + Stable Audio Open เสียงประกอบ)")
+        fetch([
+            ("checkpoints", "Comfy-Org/ACE-Step_ComfyUI_repackaged", "all_in_one/ace_step_v1_3.5b.safetensors"),
+            ("checkpoints", "AEmotionStudio/stable-audio-open-models", "model.safetensors", "stable_audio_open_1.0.safetensors"),
+            ("text_encoders", "google-t5/t5-base", "model.safetensors", "t5_base.safetensors"),
+        ])
+        M["audio"] = True
+        log("โมเดลเสียงพร้อม")
+
+
+def ensure_video():
+    with LOCK:
+        if M.get("high"):
+            return
+        load_video_models()
+
+
+def load_video_models():
+    log("กำลังโหลดโมเดลวิดีโอ (ครั้งแรกประมาณ 10–20 นาที)")
     from huggingface_hub import list_repo_files, hf_hub_download
     q = list_repo_files("QuantStack/Wan2.2-I2V-A14B-GGUF")
     r21 = list_repo_files("Comfy-Org/Wan_2.1_ComfyUI_repackaged")
@@ -571,8 +622,10 @@ def setup():
         raise RuntimeError("โหลดโมเดลไม่สำเร็จ: " + " | ".join(errs))
     b = lambda i: os.path.basename(plan[i][2])
     M.update(high=b(0), low=b(1), te=b(2), vae=b(3), lh=b(4), ll=b(5))
-    log("โหลดโมเดลครบ: " + ", ".join(M.values()))
+    log("โหลดโมเดลวิดีโอครบ: " + ", ".join(str(v) for v in M.values()))
 
+
+def start_servers(gpu):
     n = max(1, len([l for l in gpu.splitlines() if l.strip()]))
     try:
         ram = int(open("/proc/meminfo").read().split()[1]) / 1e6
@@ -633,6 +686,7 @@ def ffmpeg_bin():
 
 
 def gen(j, port=8188):
+    ensure_video()
     # ช็อตสั้น (1–5 วิ) = รอบเดียว ยาวตามจริง · ช็อตยาว (>5 วิ) = เจนหลายรอบต่อกันจากเฟรมสุดท้าย
     total = max(17, int(j.get("frames") or 81))
     passes = 1 if total <= 81 else (total - 1 + 79) // 80
@@ -731,6 +785,60 @@ def gen_pass(j, im, k, port=8188, F=81, opt=None):
     return frames, fps, W, H
 
 
+# ---------- เสียง: เพลง (ACE-Step) / เสียงประกอบ (Stable Audio Open) ----------
+def audio(j, port=8188):
+    ensure_audio()
+    opt = j.get("opt") or {}
+    typ, sec = opt.get("type", "sfx"), max(3, min(120, int(opt.get("sec") or 10)))
+    jid = "a%s" % j["id"]
+    seed = random.randint(1, 2 ** 31)
+    pr = j.get("prompt") or ""
+    if typ == "music":
+        wf = {
+            "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ace_step_v1_3.5b.safetensors"}},
+            "2": {"class_type": "TextEncodeAceStepAudio", "inputs": {"clip": ["1", 1], "tags": pr, "lyrics": "[instrumental]", "lyrics_strength": 0.99}},
+            "3": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["2", 0]}},
+            "4": {"class_type": "EmptyAceStepLatentAudio", "inputs": {"seconds": sec, "batch_size": 1}},
+            "5": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["1", 0], "shift": 5.0}},
+            "6": {"class_type": "KSampler", "inputs": {"model": ["5", 0], "seed": seed, "steps": 50, "cfg": 5.0, "sampler_name": "euler", "scheduler": "simple", "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0], "denoise": 1.0}},
+            "7": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}},
+            "8": {"class_type": "SaveAudio", "inputs": {"audio": ["7", 0], "filename_prefix": "aud%s" % jid}},
+        }
+    else:
+        wf = {
+            "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "stable_audio_open_1.0.safetensors"}},
+            "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "t5_base.safetensors", "type": "stable_audio"}},
+            "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": pr}},
+            "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": "music, speech, low quality, noise, distortion"}},
+            "5": {"class_type": "ConditioningStableAudio", "inputs": {"positive": ["3", 0], "negative": ["4", 0], "seconds_start": 0.0, "seconds_total": float(sec)}},
+            "6": {"class_type": "EmptyLatentAudio", "inputs": {"seconds": float(sec), "batch_size": 1}},
+            "7": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed, "steps": 50, "cfg": 4.98, "sampler_name": "dpmpp_3m_sde_gpu", "scheduler": "exponential", "positive": ["5", 0], "negative": ["5", 1], "latent_image": ["6", 0], "denoise": 1.0}},
+            "8": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["7", 0], "vae": ["1", 2]}},
+            "9": {"class_type": "SaveAudio", "inputs": {"audio": ["8", 0], "filename_prefix": "aud%s" % jid}},
+        }
+    t0 = time.time()
+    pid = comfy("/prompt", {"prompt": wf, "client_id": "bot"}, port=port)["prompt_id"]
+    while True:
+        time.sleep(4)
+        h = comfy("/history/" + pid, port=port)
+        if pid in h:
+            st = h[pid].get("status", {})
+            if st.get("status_str") == "error":
+                msgs = [m for m in st.get("messages", []) if m[0] == "execution_error"]
+                raise RuntimeError("ทำเสียงไม่สำเร็จ: " + json.dumps(msgs)[:500])
+            break
+        if time.time() - t0 > 1800:
+            raise RuntimeError("ทำเสียงนานเกิน 30 นาที")
+    outs = sorted(glob.glob(os.path.join(COMFY, "output", "**", "aud%s_*" % jid), recursive=True))
+    if not outs:
+        raise RuntimeError("ไม่มีไฟล์เสียงออกมา")
+    m4a = os.path.join(ROOT, "%s.m4a" % jid)
+    sh('"%s" -y -loglevel error -i "%s" -af "afade=t=in:d=0.05,areverse,afade=t=in:d=0.3,areverse,loudnorm=I=-16:TP=-1.5" -c:a aac -b:a 192k -movflags +faststart -f mp4 "%s"' % (ffmpeg_bin(), outs[-1], m4a))
+    for f in outs:
+        os.remove(f)
+    return m4a, time.time() - t0, 0, 0
+
+
 # ---------- งานหลัก ----------
 def concat(j):
     urls = json.loads(j.get("prompt") or "[]")
@@ -762,6 +870,9 @@ def work(job, port):
     if job.get("kind") == "concat":
         log("กำลังรวมคลิป %s → %s" % (job.get("project"), job.get("shot")))
         return concat(job)
+    if job.get("kind") == "audio":
+        log("เริ่มทำเสียง %s (การ์ด %d)" % (job.get("project"), port - 8187))
+        return audio(job, port)
     log("เริ่มเจน %s ช็อต %s%s (การ์ด %d)" % (job.get("project"), job.get("shot"), " ⭐คุณภาพสูง" if (job.get("opt") or {}).get("hq") else "", port - 8187))
     return gen(job, port)
 
@@ -890,6 +1001,81 @@ function castMake2(cat, r, style) {
   const it = pick(r() < 0.5 ? IDEAS.prop : IDEAS.element, r);
   return { name: it.n, desc: `${it.id} · ${it.d} · เหมาะกับ${it.fit}`, prompt: `a ${it.e}, single object design, centered, plain soft background, ${tail}` };
 }
+
+// ---------- คลังเสียง: เพลงบรรเลง (ACE-Step) + เสียงประกอบ (Stable Audio Open) ----------
+const MUSIC = [
+  ['อบอุ่นยามเช้า', 'warm morning slice of life anime bgm, acoustic guitar, soft piano, light percussion, cheerful, 90 bpm'],
+  ['เดินเล่นในเมือง', 'easygoing city walk anime bgm, ukulele, glockenspiel, light bass, bouncy, 105 bpm'],
+  ['ตลกป่วน', 'comedic anime bgm, pizzicato strings, bassoon, xylophone, playful staccato, 120 bpm'],
+  ['เขินๆ', 'shy romantic comedy anime bgm, soft piano, celesta, light strings, gentle, 80 bpm'],
+  ['รักเงียบๆ ตอนกลางคืน', 'quiet night romance anime bgm, electric piano, soft synth pad, lo-fi drums, mellow, 75 bpm'],
+  ['เศร้า', 'sad emotional anime bgm, solo piano, slow strings, melancholic, 60 bpm'],
+  ['ซึ้งน้ำตาซึม', 'tearjerker anime bgm, piano and cello, building strings, emotional climax, 65 bpm'],
+  ['ลึกลับ', 'mysterious anime bgm, music box, low strings, ambient pads, eerie, 70 bpm'],
+  ['สืบสวน', 'detective investigation anime bgm, plucked bass, muted trumpet, brushed drums, suspense, 95 bpm'],
+  ['ลักลอบย่องเบา', 'sneaking stealth anime bgm, pizzicato, light percussion, tense and playful, 100 bpm'],
+  ['ตื่นเต้น', 'tense suspense anime bgm, ostinato strings, ticking percussion, rising tension, 110 bpm'],
+  ['ต่อสู้มันส์', 'epic battle anime bgm, taiko drums, electric guitar, orchestral strings, intense, 150 bpm'],
+  ['ศึกใหญ่', 'epic orchestral climax anime bgm, choir pads, brass, big drums, heroic, 140 bpm'],
+  ['อาคมโบราณ', 'ancient magic ritual anime bgm, shakuhachi, koto, deep drums, mystical, 85 bpm'],
+  ['ตัวร้ายปรากฏ', 'villain theme anime bgm, dark organ, low brass, ominous choir pads, 70 bpm'],
+  ['ผจญภัย', 'adventure journey anime bgm, orchestral, flute melody, strings, uplifting, 120 bpm'],
+  ['ชีวิตประจำวัน', 'daily life anime bgm, light jazz, piano, upright bass, brushes, relaxed, 100 bpm'],
+  ['ร้านขนมปัง', 'cozy bakery cafe anime bgm, accordion, acoustic guitar, warm, 95 bpm'],
+  ['ฝนตก', 'rainy day anime bgm, soft piano, gentle rain ambience feel, calm, 70 bpm'],
+  ['หวังใหม่', 'hopeful ending anime bgm, piano, strings, warm brass, uplifting resolution, 85 bpm'],
+  ['ดนตรีจากวิทยุเก่า', 'old radio retro swing jazz instrumental, vintage, crackly, 110 bpm'],
+  ['เพลงป๊อปในร้าน', 'background cafe pop instrumental, light and catchy, guitar and synth, 115 bpm'],
+  ['หวาดกลัว', 'horror anime bgm, dissonant strings, low drones, creepy, 60 bpm'],
+  ['ฉากเปิดเรื่อง', 'anime opening style instrumental, energetic rock, guitars, drums, bright, 160 bpm'],
+  ['ฉากปิดเรื่อง', 'anime ending style instrumental, mellow pop ballad, piano and guitar, nostalgic, 90 bpm'],
+];
+const SFX = [
+  ['แมวร้องเหมียว', 'a small cat meowing softly'], ['แมวครางครืด', 'a cat purring contentedly close up'], ['แมวขู่', 'an angry cat hissing'],
+  ['หมาเห่า', 'a medium dog barking twice'], ['หมาครางอ้อน', 'a puppy whining softly'], ['นกร้องตอนเช้า', 'small birds chirping in the morning'],
+  ['การ้อง', 'crows cawing in the distance'], ['นกฮูก', 'an owl hooting at night'], ['ไก่ขัน', 'a rooster crowing at dawn'],
+  ['ม้าร้อง', 'a horse neighing and snorting'], ['หมาป่าหอน', 'a wolf howling at night far away'], ['จิ้งหรีดกลางคืน', 'crickets chirping on a summer night'],
+  ['จั๊กจั่นหน้าร้อน', 'cicadas buzzing loudly on a hot summer day'], ['กบร้อง', 'frogs croaking near a pond at night'], ['ผึ้งบิน', 'a bee buzzing past'],
+  ['มังกรคำราม', 'a huge dragon roaring, deep and powerful'], ['อสูรขู่คำราม', 'a monster growling low and menacing'], ['ฝูงอสูรเล็ก', 'a swarm of small creatures skittering and chittering'],
+  ['ฝนตกเบาๆ', 'light rain falling on a roof'], ['ฝนตกหนัก', 'heavy rain pouring down'], ['ฟ้าร้อง', 'thunder rumbling in the distance'], ['ฟ้าผ่า', 'a close lightning strike with loud crack'],
+  ['ลมพัด', 'wind blowing through trees'], ['พายุ', 'strong storm wind howling'], ['คลื่นทะเล', 'gentle ocean waves on the shore'], ['ลำธาร', 'a small stream flowing over rocks'],
+  ['ไฟลุก', 'a campfire crackling'], ['ใบไม้ไหว', 'leaves rustling in a light breeze'], ['หิมะเหยียบ', 'footsteps crunching on snow'],
+  ['เมืองพลุกพล่าน', 'busy city street ambience with distant traffic and people'], ['ร้านอาหาร', 'restaurant ambience with quiet chatter and cutlery'], ['ห้องเรียน', 'classroom ambience with students murmuring'],
+  ['ออฟฟิศ', 'office ambience with keyboard typing and phones'], ['สถานีรถไฟ', 'train station ambience with announcements and footsteps'], ['รถไฟวิ่ง', 'a train passing on rails'],
+  ['รถรางกระดิ่ง', 'a tram bell ringing and tram passing'], ['ระฆังวัดใหญ่', 'a large temple bell ringing once, deep resonant toll'], ['ระฆังเล็ก', 'small wind chimes tinkling'],
+  ['เปิดประตู', 'a wooden door opening with a creak'], ['ปิดประตูดัง', 'a door slamming shut'], ['เคาะประตู', 'knocking on a wooden door three times'],
+  ['ฝีเท้าเดิน', 'footsteps walking on concrete'], ['วิ่ง', 'footsteps running fast'], ['ตู้กดน้ำ', 'a vending machine humming then a can dropping out'],
+  ['เปิดกระป๋อง', 'opening a soda can with a fizz'], ['ทอดในกระทะ', 'food sizzling in a frying pan'], ['หั่นผัก', 'a knife chopping vegetables on a cutting board'],
+  ['น้ำเดือด', 'water boiling in a kettle'], ['รินกาแฟ', 'pouring coffee into a cup'], ['จานกระทบ', 'ceramic plates clinking'],
+  ['พลิกกระดาษ', 'flipping through paper pages'], ['เขียนด้วยพู่กัน', 'a brush writing on paper'], ['ประทับตรา', 'a rubber stamp pressed on paper'],
+  ['โทรศัพท์สั่น', 'a phone vibrating on a table'], ['นาฬิกาเดิน', 'a clock ticking'], ['ไฟกะพริบ', 'a fluorescent light buzzing and flickering'],
+  ['หมัด', 'a heavy punch impact'], ['เตะ', 'a strong kick impact with whoosh'], ['ชักดาบ', 'a sword being drawn from its sheath'], ['ดาบปะทะ', 'two swords clashing with metallic ring'],
+  ['ฟุ่บ', 'a fast whoosh swing through the air'], ['ระเบิด', 'a large explosion boom'], ['ตึกถล่ม', 'rubble and debris collapsing'], ['กระจกแตก', 'glass shattering'],
+  ['ร่ายเวท', 'a magic spell being cast, shimmering energy rising'], ['ยันต์เรืองแสง', 'a glowing magical seal activating with a resonant hum'], ['โซ่แสง', 'magical energy chains rattling and glowing'],
+  ['พลังชาร์จ', 'energy charging up, rising power hum'], ['พลังปล่อย', 'a magical energy blast released'], ['ม่านอาคม', 'a magical barrier humming with power'],
+  ['อสูรสลายเป็นหมึก', 'a creature dissolving into dark mist, dark magical whoosh'], ['เทเลพอร์ต', 'a magical teleport whoosh'], ['หัวใจเต้น', 'a heartbeat thumping slowly'],
+  ['ปิ๊ง', 'a bright sparkle ding sound'], ['วิบวับ', 'sparkling shimmering twinkle'], ['ตกใจ', 'a cartoon surprise sting with boing'], ['เหงื่อตก', 'a small cartoon droplet plink'],
+  ['หน้าแดง', 'a cute cartoon blush pop'], ['ล้มหัวคะมำ', 'a cartoon fall and thud'], ['เด้ง', 'a cartoon spring boing'], ['เปลี่ยนฉาก', 'a soft scene transition whoosh'],
+  ['ทางเดินในป่ามืด', 'dark forest ambience at night with distant eerie sounds'], ['ถ้ำ', 'cave ambience with water drips echoing'], ['หมอกดำลอยมา', 'an ominous low rumble with whispering wind'],
+];
+async function audioEnqueue(env, items) {
+  const st = items.map(it => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'audio',?)")
+    .bind(it.project, '', '1', it.prompt.slice(0, 1500), Date.now(), JSON.stringify({ type: it.type, sec: it.sec })));
+  if (st.length) await env.DB.batch(st);
+}
+async function audioDaily(env, have) {
+  const r = rng(Date.now() ^ 0x5bd1e995), out = [], made = [];
+  for (const [cat, L, type, sec] of [['เพลง', MUSIC, 'music', 60], ['เสียงประกอบ', SFX, 'sfx', 10]]) {
+    const free = L.filter(([n]) => ![...have].some(p => p === `คลัง·${cat}·${n}` || p.startsWith(`คลัง·${cat}·${n} · รอบ`)));
+    let it = free.length ? free[Math.floor(r() * free.length)] : L[Math.floor(r() * L.length)], nm = it[0];
+    if (!free.length) nm += ` · รอบ ${[...have].filter(p => p.startsWith(`คลัง·${cat}·${it[0]}`)).length + 1}`;
+    out.push({ project: `คลัง·${cat}·${nm}`, prompt: it[1] + (type === 'sfx' ? ', clean high quality sound effect, no music' : ', instrumental, no vocals, high quality'), type, sec });
+    made.push(`${cat}: ${nm}`);
+  }
+  await audioEnqueue(env, out);
+  return made;
+}
+
 // ---------- คลังอัตโนมัติรายวัน: ทุกวันหลัง 07:00 สร้างของใหม่หมวดละ 1 ชิ้น (ยกเว้นตัวละคร) ครบรายการแล้ววนรอบใหม่ ----------
 const LIB_TAIL = 'modern TV anime style, clean lineart, cel shading, high quality';
 const LIBD = [
@@ -924,6 +1110,8 @@ async function libDaily(env, force) {
     made.push(`${cat}: ${nm}`);
   }
   if (st.length) await env.DB.batch(st);
+  const vh = new Set((await env.DB.prepare("SELECT DISTINCT project FROM vjobs WHERE project LIKE 'คลัง·%' UNION SELECT DISTINCT project FROM videos WHERE project LIKE 'คลัง·%'").all()).results.map(x => x.project));
+  try { made.push(...await audioDaily(env, vh)); await vTick(env, true); } catch (e) { made.push('เสียง: ' + String(e.message || e).slice(0, 80)); }
   await notify(env, `📦 คลังวันนี้: ${made.join(' · ')}`);
   return { ok: true, made };
 }
@@ -959,6 +1147,13 @@ async function castBatch(env, n, force, only) {
 async function castApi(req, env, url, body) {
   const p = url.pathname;
   if (p === '/api/vcastlib') return json(await libDaily(env, true));
+  if (p === '/api/vcastaudio') {
+    const cat = body.type === 'music' ? 'เพลง' : 'เสียงประกอบ', name = String(body.name || body.prompt || '').slice(0, 60);
+    if (!body.prompt) return json({ error: 'ต้องมีคำบรรยายเสียง' }, 400);
+    await audioEnqueue(env, [{ project: `คลัง·${cat}·${name}`, prompt: String(body.prompt), type: body.type === 'music' ? 'music' : 'sfx', sec: Math.min(120, Math.max(3, +body.sec || (body.type === 'music' ? 60 : 10))) }]);
+    await vTick(env, true);
+    return json({ ok: true });
+  }
   if (p === '/api/vcastlibset') { await setSetting(env, 'lib_on', body.on ? '1' : '0'); return json({ ok: true }); }
   if (p === '/api/vcast') {
     const rows = (await env.DB.prepare("SELECT * FROM casting WHERE status!='rejected' OR day>=? ORDER BY id DESC LIMIT 200").bind(bkkDay(Date.now() - 2 * 86400000)).all()).results;
