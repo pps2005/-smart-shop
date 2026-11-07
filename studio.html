@@ -124,7 +124,12 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4p
 .bimg .bb{display:flex;gap:4px;padding:4px;flex-wrap:wrap;justify-content:space-between;background:#141019}
 .bimg .bb button{min-height:34px;padding:2px 9px;border-radius:9px;border:1px solid var(--line);background:#2a2238;cursor:pointer;font-size:14px}
 .bimg .bb .use{flex:1 1 100%;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:600}
-.botthumbs:empty{display:none}.botthumbs{display:grid;gap:6px}
+.botthumbs:empty,.vidthumbs:empty{display:none}.vidthumbs{display:grid;gap:6px}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.vcard{border:2px solid transparent;border-radius:12px;overflow:hidden;background:#000;display:grid}
+.vcard video{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#000}
+.vcard .bb{display:flex;gap:4px;padding:4px;flex-wrap:wrap;background:#141019}.vcard .bb button{min-height:34px;padding:2px 9px;border-radius:9px;border:1px solid var(--line);background:#2a2238;cursor:pointer;font-size:14px}.vcard .bb .use{flex:1 1 100%;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:600}
+.botthumbs{display:grid;gap:6px}
 #bview{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.9);display:grid;place-items:center;padding:16px}
 #bview img{max-width:100%;max-height:88vh;border-radius:12px}
 
@@ -352,12 +357,12 @@ function renderEp(){const S=ep.shots||[],P=prog(ep);
       <details class="more"><summary>prompt ภาพต้นแบบ</summary>${copyBox('Prompt ภาพต้นแบบ',ep.character_sheet_prompt)}</details>
       <div class="media">${slot('char','image','ภาพต้นแบบ')}</div>${ep.character_sheet_prompt?botBtn('epchar','','🎨 ให้บอทเจนภาพต้นแบบ (3 แบบ)'):''}<div class="botthumbs" data-k="char"></div></div>`;
   if(epTab==='shots')body=`<div class="card"><div class="row"><span class="muted">ภาพคีย์ ${P.img}/${P.N} · คลิป ${P.vid}/${P.N} · ${fmtS(P.doneSec)} / ${fmtS(P.total)}</span></div>
-      <div class="row">${botBtn('epall','','🎨 ให้บอทเจนภาพทุกช็อต (ช็อตละ 3 แบบ)',true)}<button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+'\n'+(s.image_prompt||'')).join('\n\n'))}">คัดลอก image prompt ทั้งหมด</button></div></div>
+      <div class="row">${botBtn('epall','','🎨 ให้บอทเจนภาพทุกช็อต (ช็อตละ 3 แบบ)',true)}${botBtn('vall','','🎞️ ทำวิดีโอทุกช็อตที่มีภาพคีย์แล้ว',true)}<button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+'\n'+(s.image_prompt||'')).join('\n\n'))}">คัดลอก image prompt ทั้งหมด</button></div></div>
     ${S.map((s,i)=>{const k=String(s.n),hi=!!mUrl(k,'image'),hv=!!mUrl(k,'video');return `<div class="shot${i===P.nowIdx?' now':''}"><div class="no"><b>${esc(s.n)}</b><span class="muted small">${esc(s.sec)} วิ</span><span title="ภาพคีย์">${hi?'🖼️':'·'}</span><span title="คลิป">${hv?'🎞️':'·'}</span></div><div class="bd">
       <div class="row">${s.shot?`<span class="st todo">${esc(s.shot)}</span>`:''}${i===P.nowIdx?'<span class="st doing">กำลังทำช็อตนี้</span>':''}${hv?'<span class="st done">มีคลิปแล้ว</span>':''}</div>
       <div>${esc(s.action)}</div>${s.narration?`<div class="muted small">🎙 ${esc(s.narration)}</div>`:''}${s.text?`<div class="small"><b>ตัวอักษรบนจอ:</b> ${esc(s.text)}</div>`:''}
       <div class="media">${slot(k,'image','ภาพคีย์')}${slot(k,'video','คลิปช็อต')}</div>
-      ${s.image_prompt?botBtn('epone',s.n,'🎨 ให้บอทเจนภาพช็อตนี้'):''}<div class="botthumbs" data-k="${esc(s.n)}"></div>
+      <div class="row">${s.image_prompt?botBtn('epone',s.n,'🎨 ให้บอทเจนภาพช็อตนี้'):''}${hi?botBtn('vone',s.n,'🎞️ ทำวิดีโอช็อตนี้'):''}</div><div class="botthumbs" data-k="${esc(s.n)}"></div><div class="vidthumbs" data-k="${esc(s.n)}"></div>
       <details class="more"><summary>ดู prompt</summary>${copyBox('Image prompt',s.image_prompt)}${copyBox('Video prompt',s.video_prompt)}</details></div></div>`;}).join('')}`;
   if(epTab==='sound'){const narr=S.filter(s=>s.narration).map(s=>`(ช็อต ${s.n}) ${s.narration}`).join('\n');const cap=(ep.caption||'')+'\n\n'+(ep.hashtags||[]).join(' ');
     body=`<div class="card"><h3>🎙️ เสียงพากย์</h3><ol class="howto"><li>คัดลอกบทพากย์ด้านล่างไปให้ GPT (โหมดเสียง) อ่าน</li><li>อัดหน้าจอตอน GPT อ่าน</li><li>อัปโหลดไฟล์ที่ช่องด้านล่าง (ไฟล์เสียงหรือวิดีโออัดจอก็ได้)</li></ol>
@@ -429,7 +434,7 @@ $('#pClose').onclick=()=>{PL.playing=false;stopAll();$('#player').hidden=true;};
 
 /* ================= บอทเจนภาพ (Flux บน Cloudflare Worker: image-bot/) ================= */
 // ตั้งลิงก์บอท + รหัสผ่านครั้งเดียว เก็บใน localStorage 'ss_imgbot' (ต่อเครื่อง)
-const BOT={s:null,err:'',star:false,proj:'',filled:false};
+const BOT={s:null,v:null,err:'',star:false,proj:'',filled:false};
 const tTH=ms=>new Date(+ms).toLocaleString('th-TH',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'});
 function botCfg(){try{return JSON.parse(localStorage.getItem('ss_imgbot')||'{}')||{};}catch(e){return {};}}
 function botSave(c){try{localStorage.setItem('ss_imgbot',JSON.stringify(c));}catch(e){}}
@@ -442,6 +447,7 @@ async function botApi(p,body){
   if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j;}
 async function botLoad(){if(!botCfg().url)return;
   try{BOT.s=await botApi('/api/state');BOT.err='';}catch(e){BOT.err=botErr(e);}
+  try{BOT.v=await botApi('/api/vstate');}catch(e){BOT.v=null;}
   if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
   if(view==='eps'&&ep)botThumbsFill();}
 setInterval(()=>{if(document.hidden||!botCfg().url)return;
@@ -484,6 +490,7 @@ function botParts(){const st=$('#botStat');if(!st)return;const S=BOT.s;
   const line=paused?`⏸ พักอยู่ (โควตาฟรีวันนี้หมด) · ทำต่อเองประมาณ ${tTH(s.paused_until)}`:qd?`▶️ กำลังทำงาน · เหลือ ${qd} ภาพ · ภาพถัดไปประมาณ ${tTH(Math.max(S.now,+s.last_run+s.interval_min*60000))}`:'✅ คิวว่าง';
   st.innerHTML=`<div class="row"><h3 style="margin-right:auto">🎨 บอทเจนภาพ</h3><span class="chip"><span class="dot"></span>${S.images.length} ภาพในคลัง</span></div>
     <div>${line}${fail?` · <span style="color:var(--red)">พัง ${fail}</span>`:''}${S.hasPassword?'':' · <span style="color:var(--you)">⚠️ บอทยังไม่ได้ตั้งรหัสผ่าน</span>'}</div>
+    ${kLine()}
     <div class="row"><button class="btn sm" data-bot="runnow">สร้างภาพถัดไปเดี๋ยวนี้</button><button class="btn sm" data-bot="resume">ทำต่อ / ลองใหม่ที่พัง</button><button class="btn sm" data-bot="clearq">ล้างคิว</button></div>
     ${S.notices.length?S.notices.slice(0,4).map(n=>`<div class="report">${esc(n.msg)} <span class="muted">${tTH(n.created)}</span></div>`).join('')+'<div><button class="btn sm" data-bot="clearn">ล้างแจ้งเตือน</button></div>':''}`;
   const ST={queued:'รอคิว',running:'กำลังสร้าง',failed:'พัง'};
@@ -500,7 +507,26 @@ function botThumbsFill(){const els=document.querySelectorAll('.botthumbs');if(!e
   els.forEach(el=>{const k=el.dataset.k,sc=k==='char'?0:(+k||0);
     if(!S){el.innerHTML='';return;}
     const im=S.images.filter(i=>i.project===proj&&+i.scene===sc),q=S.jobs.filter(j=>j.project===proj&&+j.scene===sc&&j.status!=='failed').length;
-    el.innerHTML=(im.length||q)?`<span class="lab">ภาพจากบอท ${im.length}${q?` · รอคิว ${q}`:''}</span>${im.length?`<div class="bgrid">${im.map(i=>botCard(i,k)).join('')}</div>`:''}`:'';});}
+    el.innerHTML=(im.length||q)?`<span class="lab">ภาพจากบอท ${im.length}${q?` · รอคิว ${q}`:''}</span>${im.length?`<div class="bgrid">${im.map(i=>botCard(i,k)).join('')}</div>`:''}`:'';});
+  vidThumbsFill();}
+const VST={queued:'รอคิว',running:'กำลังทำ',failed:'พัง'};
+function vidThumbsFill(){const V=BOT.v;document.querySelectorAll('.vidthumbs').forEach(el=>{const k=el.dataset.k;
+  if(!V||!ep){el.innerHTML='';return;}
+  const vs=V.videos.filter(v=>v.ep===ep.id&&String(v.shot)===k),js=V.jobs.filter(j=>j.ep===ep.id&&String(j.shot)===k);
+  const run=js.filter(j=>j.status==='running').length,q=js.filter(j=>j.status==='queued').length,f=js.filter(j=>j.status==='failed');
+  el.innerHTML=(vs.length||js.length)?`<span class="lab">วิดีโอจากบอท ${vs.length}${run?' · กำลังทำ':''}${q?` · รอคิว ${q}`:''}${f.length?` · <span style="color:var(--red)">พัง ${f.length}</span>`:''}</span>${f.length&&f[0].error?`<span class="muted small">${esc(String(f[0].error).slice(0,160))}</span>`:''}
+    ${vs.length?`<div class="vgrid">${vs.map(v=>`<div class="vcard"><video src="${esc(botU('/vid/'+v.id))}" muted loop playsinline controls preload="metadata"></video><div class="bb"><button data-bot="vone" data-n="${esc(k)}" aria-label="ทำใหม่">🔁</button><button data-bot="vdel" data-id="${v.id}" aria-label="ลบ">🗑</button><button class="use" data-vuse="${esc(k)}|${v.id}">ใช้คลิปนี้</button></div></div>`).join('')}</div>`:''}`:'';});}
+function kLine(){const V=BOT.v;if(!V)return '';const K=V.kaggle||{},q=V.jobs.filter(j=>j.status==='queued').length,r=V.jobs.filter(j=>j.status==='running').length,f=V.jobs.filter(j=>j.status==='failed').length;
+  if(!K.configured)return `<div class="report">🎞️ เครื่องเจนวิดีโอ (Kaggle) ยังไม่ได้ตั้งค่า · ใส่ KAGGLE_USERNAME และ KAGGLE_KEY ใน Cloudflare</div>`;
+  const alive=V.now-(K.seen||0)<20*60000,st=r?'▶️ กำลังทำวิดีโอ':q?(alive||/start|queued|running/.test(K.status)?'⏳ กำลังเปิดเครื่อง (5–20 นาที)':'💤 รอปลุก'):'✅ ว่าง';
+  return `<div class="report">🎞️ วิดีโอ: ${st} · รอคิว ${q}${r?' · กำลังทำ '+r:''}${f?` · <span style="color:var(--red)">พัง ${f}</span>`:''} · คลิปในคลัง ${V.videos.length}${K.error?`<br><span class="muted small">${esc(K.error)}</span>`:''}${V.logs&&V.logs[0]?`<br><span class="muted small">ล่าสุด: ${esc(V.logs[0].msg)} · ${tTH(V.logs[0].created)}</span>`:''}</div>
+  <div class="row">${q?'<button class="btn sm" data-bot="vkick">ปลุกเครื่องเจนวิดีโอ</button>':''}${f?'<button class="btn sm" data-bot="vretry">ลองวิดีโอที่พังใหม่</button>':''}${q||f?'<button class="btn sm" data-bot="vclear">ล้างคิววิดีโอ</button>':''}</div>`;}
+function jpgB64(url,max){return new Promise(async(ok,no)=>{try{const bl=await (await fetch(url)).blob();const im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*r);c.height=Math.round(im.naturalHeight*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.9).split(',')[1]);URL.revokeObjectURL(im.src);};im.onerror=()=>no(new Error('เปิดภาพคีย์ไม่ได้'));im.src=URL.createObjectURL(bl);}catch(e){no(e);}});}
+async function vEnqueue(shots,label){await signMedia();const items=[];
+  for(const s of shots){const u=mUrl(String(s.n),'image');if(!u)continue;items.push({shot:String(s.n),prompt:s.video_prompt||s.image_prompt||s.action||'',image:await jpgB64(u,1024)});}
+  if(!items.length)return toast('ยังไม่มีช็อตที่ใส่ภาพคีย์ — กด "ใช้ภาพนี้" ใต้ภาพที่ชอบก่อน');
+  const r=await botApi('/api/venqueue',{project:epBotProject(),ep:ep.id,items});
+  toast(`ส่ง${label}เข้าคิววิดีโอแล้ว ${r.added} ช็อต · คลิปละประมาณ 15 นาที (รอบแรกเปิดเครื่องเพิ่ม ~20 นาที)`);}
 
 async function botEnqueueEp(items,label){if(!items.length)return toast('ยังไม่มี prompt ให้เจน');
   const r=await botApi('/api/enqueue',{project:epBotProject(),items,variants:3,raw:true});
@@ -535,8 +561,11 @@ function botView(src){let v=$('#bview');if(!v){v=document.createElement('div');v
 function sure(b,txt){if(b.dataset.sure==='1')return true;const o=b.textContent;b.dataset.sure='1';b.textContent=txt;setTimeout(()=>{if(b.isConnected){b.dataset.sure='';b.textContent=o;}},4000);return false;}
 
 document.addEventListener('change',e=>{if(e.target.id==='bGP'){BOT.proj=e.target.value;botParts();}});
-document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot],[data-use]');if(!b)return;
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot],[data-use],[data-vuse]');if(!b)return;
   try{
+    if(b.dataset.vuse){const [k,id]=b.dataset.vuse.split('|');if(!ep)return;b.disabled=true;b.textContent='กำลังใส่…';
+      const r=await fetch(botU('/vid/'+id));if(!r.ok)throw new Error('โหลดคลิปจากบอทไม่ได้');
+      await upload(k,'video',new File([await r.blob()],`wan-${id}.mp4`,{type:'video/mp4'}));return botLoad();}
     if(b.dataset.use){const [k,id,starred]=b.dataset.use.split('|');if(!ep)return;
       b.disabled=true;b.textContent='กำลังใส่…';
       const r=await fetch(botU('/img/'+id));if(!r.ok)throw new Error('โหลดภาพจากบอทไม่ได้');
@@ -573,6 +602,12 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot]
       case 'save':await botApi('/api/settings',{character:$('#bChar').value,style:$('#bStyle').value,interval_min:Math.max(1,+$('#bInt').value||1),steps:Math.min(8,Math.max(1,+$('#bSteps').value||4))});toast('บันทึกแล้ว');BOT.filled=false;break;
       case 'epall':await botEnqueueEp((ep.shots||[]).filter(s=>s.image_prompt).map(s=>({scene:+s.n||0,prompt:s.image_prompt})),'ทุกช็อต');break;
       case 'epone':{const s=(ep.shots||[]).find(x=>String(x.n)===b.dataset.n);if(!s)return;await botEnqueueEp([{scene:+s.n||0,prompt:s.image_prompt}],`ช็อต ${s.n} `);break;}
+      case 'vall':{b.disabled=true;b.textContent='กำลังส่ง…';await vEnqueue((ep.shots||[]).filter(s=>mUrl(String(s.n),'image')),'ทุกช็อต');b.disabled=false;b.textContent='🎞️ ทำวิดีโอทุกช็อตที่มีภาพคีย์แล้ว';break;}
+      case 'vone':{const s=(ep.shots||[]).find(x=>String(x.n)===b.dataset.n);if(!s)return;b.disabled=true;await vEnqueue([s],`ช็อต ${s.n} `);b.disabled=false;break;}
+      case 'vdel':if(!sure(b,'ลบ?'))return;await botApi('/api/vdel',{id});break;
+      case 'vkick':{const r=await botApi('/api/vkick',{});toast(r.pushed?'สั่งเปิดเครื่องแล้ว รอ 5–20 นาที':r.running?'เครื่องกำลังทำงานอยู่แล้ว':r.error?'ไม่สำเร็จ: '+r.error:r.skipped==='empty'?'ไม่มีงานในคิว':'เพิ่งสั่งไป รอสักครู่');break;}
+      case 'vretry':await botApi('/api/vretry',{});toast('ส่งวิดีโอที่พังกลับเข้าคิวแล้ว');break;
+      case 'vclear':if(!sure(b,'กดอีกครั้งเพื่อล้าง'))return;await botApi('/api/vclear',{});toast('ล้างคิววิดีโอแล้ว');break;
       case 'epchar':await botEnqueueEp([{scene:0,prompt:ep.character_sheet_prompt}],'ภาพต้นแบบ');break;
       default:return;}
     await botLoad();

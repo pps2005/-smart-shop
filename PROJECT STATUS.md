@@ -96,3 +96,11 @@
 - ไฟล์โมเดล `model-<ชื่อ>.json`: {type:'ss-char', v:1, name, img (PNG ตัดพื้นแล้ว, dataURL), w, h, feet{x,y}, top, eyes[{x,y,rx,ry}×2], mouth{x,y}, skin, line, motions[{id,name}]}
 - ฝั่ง Claude แปลงโมเดลเป็นชุดชิ้นส่วน (ตาปิด/ตายิ้ม/ปากหลายแบบ/เอฟเฟกต์) แล้วเรนเดอร์วิดีโอ 60fps 1080p เอง
 - `window.SSChar = {make, draw, motions}` สำหรับเรนเดอร์ภาพตัวอย่าง
+
+## สตูดิโอ: คลังไอเดีย + วิดีโอด้วย Kaggle (2026-11-07)
+- แท็บ "ไอเดีย" ใน studio.html: อัปโหลดรูป/คลิป/PDF/ข้อความ → การ์ดปกเรียงกัน · ไฟล์ใน Supabase Storage `studio-media/{uid}/ideas/` · รายการใน `{uid}/ideas/index.json` (ไม่มีตารางใหม่)
+- วิดีโอ image-to-video: ปุ่ม "🎞️ ทำวิดีโอช็อตนี้ / ทุกช็อตที่มีภาพคีย์แล้ว" ในแท็บช็อต → studio ย่อภาพคีย์เป็น JPG ≤1024 ส่ง `/api/venqueue` ของ worker
+- worker.js (anime-image-bot): ตาราง D1 vjobs / videos / vchunks (mp4 แบ่งก้อน 1MB base64) / vlog · `/api/vstate`, `/vid/:id` (รองรับ Range), `/api/vdel|vcancel|vclear|vretry|vkick`
+- Kaggle: cron ทุกนาทีเช็ก `/kernels/status` → ถ้ามีงานในคิวและเครื่องไม่ได้รัน → `POST /api/v1/kernels/push` (script ส่วนตัว, GPU T4, internet) ชื่อ kernel `anime-video-bot` · ต้องตั้ง Secret `KAGGLE_USERNAME`, `KAGGLE_KEY` · kernel คุยกับ worker ผ่าน `/k/*?t=ktoken` (claim/img/done/fail/log)
+- kernel (KAGGLE_PY ใน worker.js): ComfyUI + ComfyUI-GGUF · Wan2.2 I2V A14B GGUF (QuantStack, Q4_K_M) + LightX2V 4 steps (Comfy-Org repackaged) · 640×640-ish, 81 เฟรม @16fps → mp4 · ปิดเองเมื่อคิวว่าง · ยังไม่มี upscale/เติมเฟรม (Claude ทำตอนตัดต่อ)
+- เลือกคลิป: "ใช้คลิปนี้" → ดึงจาก worker แล้วอัปโหลดเข้าช่องคลิปช็อตใน Supabase

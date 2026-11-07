@@ -1,6 +1,7 @@
 // ===== Anime Image Bot — Cloudflare Worker (Flux schnell + D1 + Cron) =====
 // Bindings ที่ต้องตั้งใน Cloudflare:  AI (Workers AI),  DB (D1: anime-bot-db)
 // Variables (Secret):  PASSWORD   | ไม่บังคับ: TG_TOKEN, TG_CHAT (แจ้งเตือน Telegram)
+// วิดีโอ (ไม่บังคับ): KAGGLE_USERNAME, KAGGLE_KEY → ทำวิดีโอด้วย GPU ฟรีของ Kaggle อัตโนมัติ
 // Cron Trigger:  * * * * *   (บอทเช็คทุกนาที แต่สร้างภาพตามระยะห่างที่ตั้งในเว็บ)
 // ใช้คู่กับ studio.html แท็บ "เจนภาพ" (เรียก API นี้ข้ามโดเมน จึงเปิด CORS ไว้ · ป้องกันด้วย PASSWORD)
 
@@ -12,15 +13,19 @@ export default {
     const p = url.pathname;
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (p === '/') return new Response(HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    if (p.startsWith('/k/')) return (await vRoutes(req, env, url, ctx).catch(e => json({ error: String(e.message || e) }, 500)));
     if (!authOK(req, url, env)) return json({ error: 'รหัสผ่านไม่ถูกต้อง' }, 401);
     await ensureSchema(env);
+    if (selfUrl !== url.origin) { selfUrl = url.origin; ctx.waitUntil(setSetting(env, 'self_url', url.origin)); }
     try {
+      if (p === '/api/vstate' || p.startsWith('/vid/')) return await vApi(req, env, url, ctx, {});
       if (p === '/api/ping') return json({ ok: true, bot: 'anime-image-bot', github: !!(env.GH_TOKEN && env.GH_REPO) });
       if (p === '/api/state') return json(await getState(env));
       if (p.startsWith('/img/')) return getImage(env, +p.split('/')[2]);
       if (p === '/api/zip') return makeZip(env, url.searchParams.get('project') || '', url.searchParams.get('starred') === '1');
       if (req.method !== 'POST') return json({ error: 'not found' }, 404);
       const body = await req.json().catch(() => ({}));
+      if (p.startsWith('/api/v')) { const vr = await vApi(req, env, url, ctx, body); if (vr) return vr; }
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/settings') {
         for (const k of ['interval_min', 'style', 'character', 'steps'])
@@ -47,6 +52,7 @@ export default {
   async scheduled(event, env, ctx) {
     await ensureSchema(env);
     ctx.waitUntil(tick(env, false));
+    ctx.waitUntil(vTick(env, false).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
   },
 };
 
@@ -214,6 +220,7 @@ async function notify(env, msg) {
   }
 }
 let schemaReady = false;
+let selfUrl = '';
 async function ensureSchema(env) {
   if (schemaReady) return;
   await env.DB.batch([
@@ -221,9 +228,444 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS images (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, scene INTEGER, prompt TEXT, data TEXT, starred INTEGER DEFAULT 0, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER)"),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS videos (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, ep TEXT, shot TEXT, prompt TEXT, size INTEGER, sec INTEGER, w INTEGER, h INTEGER, created INTEGER)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS vchunks (vid INTEGER, idx INTEGER, data TEXT, PRIMARY KEY (vid, idx))'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS vlog (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
   ]);
   schemaReady = true;
 }
+
+
+// =====================================================================
+// ===== วิดีโอ: คิว image-to-video → Kaggle (GPU ฟรี) → เก็บคลิปใน D1 =====
+// Secrets ที่ต้องตั้งเพิ่ม:  KAGGLE_USERNAME, KAGGLE_KEY  (จาก kaggle.com/settings → API)
+// Kaggle kernel ถูกส่งขึ้นและสั่งรันอัตโนมัติจาก cron เมื่อมีงานในคิว แล้วปิดเองเมื่อคิวว่าง
+const KSLUG = 'anime-video-bot';
+const VCHUNK = 1000000; // ไบต์ต่อแถว (D1 จำกัด ~2MB/แถว เก็บเป็น base64)
+const VNEG = 'blurry, distorted face, deformed hands, extra fingers, morphing, flickering, sudden movement, text, watermark';
+
+async function vRoutes(req, env, url, ctx) {
+  const p = url.pathname;
+  // ---- ฝั่ง Kaggle kernel (ยืนยันด้วย token แยก) ----
+  if (p.startsWith('/k/')) {
+    await ensureSchema(env);
+    const s = await getSettings(env);
+    if (!s.ktoken || url.searchParams.get('t') !== s.ktoken) return json({ error: 'bad token' }, 401);
+    const id = +p.split('/')[3];
+    if (p === '/k/claim') {
+      await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 75 * 60000).run();
+      const j = await env.DB.prepare("SELECT id,project,ep,shot,prompt,neg,frames FROM vjobs WHERE status='queued' ORDER BY id LIMIT 1").first();
+      if (!j) return json({});
+      await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1 WHERE id=?").bind(Date.now(), j.id).run();
+      await setSetting(env, 'k_seen', String(Date.now()));
+      return json({ job: j });
+    }
+    if (p.startsWith('/k/img/')) {
+      const r = await env.DB.prepare('SELECT image FROM vjobs WHERE id=?').bind(id).first();
+      if (!r) return new Response('not found', { status: 404 });
+      return new Response(b64ToBytes(r.image), { headers: { 'content-type': 'image/jpeg' } });
+    }
+    if (p.startsWith('/k/done/')) {
+      const j = await env.DB.prepare('SELECT * FROM vjobs WHERE id=?').bind(id).first();
+      if (!j) return json({ error: 'no job' }, 404);
+      const buf = new Uint8Array(await req.arrayBuffer());
+      if (buf.length < 1000) return json({ error: 'ไฟล์เล็กผิดปกติ' }, 400);
+      const v = await env.DB.prepare('INSERT INTO videos (job_id,project,ep,shot,prompt,size,sec,w,h,created) VALUES (?,?,?,?,?,?,?,?,?,?)')
+        .bind(id, j.project, j.ep, j.shot, j.prompt, buf.length, +url.searchParams.get('sec') || 0, +url.searchParams.get('w') || 0, +url.searchParams.get('h') || 0, Date.now()).run();
+      const vid = v.meta.last_row_id, st = [];
+      for (let i = 0, n = 0; i < buf.length; i += VCHUNK, n++)
+        st.push(env.DB.prepare('INSERT INTO vchunks (vid,idx,data) VALUES (?,?,?)').bind(vid, n, bytesToB64(buf.subarray(i, i + VCHUNK))));
+      await env.DB.batch(st);
+      await env.DB.prepare("UPDATE vjobs SET status='done', image='' WHERE id=?").bind(id).run();
+      const left = await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status IN ('queued','running')").first();
+      if (left.n === 0) await notify(env, `🎞️ วิดีโอของ "${j.project}" ทำเสร็จครบแล้ว เข้าไปเลือกคลิปในหน้าช็อตได้เลย`);
+      return json({ ok: true, vid });
+    }
+    if (p.startsWith('/k/fail/')) {
+      const b = await req.json().catch(() => ({}));
+      const j = await env.DB.prepare('SELECT tries,shot,project FROM vjobs WHERE id=?').bind(id).first();
+      if (!j) return json({ ok: true });
+      const again = b.requeue || j.tries < 2;
+      await env.DB.prepare('UPDATE vjobs SET status=?, error=? WHERE id=?').bind(again ? 'queued' : 'failed', String(b.error || '').slice(0, 500), id).run();
+      if (!again) await notify(env, `⚠️ ทำวิดีโอช็อต ${j.shot} (${j.project}) ไม่สำเร็จ: ${String(b.error || '').slice(0, 140)}`);
+      return json({ ok: true });
+    }
+    if (p === '/k/log') {
+      const b = await req.json().catch(() => ({}));
+      await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind(String(b.msg || '').slice(0, 600), Date.now()).run();
+      await env.DB.prepare('DELETE FROM vlog WHERE id < (SELECT MAX(id) - 60 FROM vlog)').run();
+      await setSetting(env, 'k_seen', String(Date.now()));
+      return json({ ok: true });
+    }
+    return json({ error: 'not found' }, 404);
+  }
+  return null;
+}
+
+// ---- ฝั่งสตูดิโอ (ผ่าน PASSWORD แล้ว) ----
+async function vApi(req, env, url, ctx, body) {
+  const p = url.pathname;
+  if (p === '/api/vstate') {
+    const s = await getSettings(env);
+    const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started FROM vjobs WHERE status!='done' ORDER BY id LIMIT 300").all()).results;
+    const videos = (await env.DB.prepare('SELECT id,job_id,project,ep,shot,prompt,size,sec,w,h,created FROM videos ORDER BY id DESC LIMIT 500').all()).results;
+    const logs = (await env.DB.prepare('SELECT msg,created FROM vlog ORDER BY id DESC LIMIT 12').all()).results;
+    return json({ jobs, videos, logs, now: Date.now(), kaggle: { configured: !!(env.KAGGLE_USERNAME && env.KAGGLE_KEY), user: env.KAGGLE_USERNAME || '', status: s.k_status || '', checked: +s.k_checked || 0, pushed: +s.k_pushed || 0, seen: +s.k_seen || 0, error: s.k_error || '' } });
+  }
+  if (p.startsWith('/vid/')) return getVideo(req, env, +p.split('/')[2]);
+  if (req.method !== 'POST') return null;
+  if (p === '/api/venqueue') {
+    const items = Array.isArray(body.items) ? body.items.slice(0, 60) : [];
+    const st = [];
+    for (const it of items) {
+      const img = String(it.image || '');
+      if (!img || img.length > 1800000) continue;
+      st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created) VALUES (?,?,?,?,?,?,?,'queued',0,?)")
+        .bind(String(body.project || 'โปรเจกต์').slice(0, 60), String(body.ep || ''), String(it.shot ?? ''), String(it.prompt || '').slice(0, 2000), String(it.neg || VNEG).slice(0, 800), img, Math.min(121, Math.max(33, +it.frames || 81)), Date.now()));
+    }
+    if (!st.length) return json({ error: 'ไม่มีช็อตที่มีภาพคีย์' });
+    await env.DB.batch(st);
+    ctx.waitUntil(vTick(env, true));
+    return json({ ok: true, added: st.length });
+  }
+  if (p === '/api/vdel') { await env.DB.batch([env.DB.prepare('DELETE FROM vchunks WHERE vid=?').bind(body.id), env.DB.prepare('DELETE FROM videos WHERE id=?').bind(body.id)]); return json({ ok: true }); }
+  if (p === '/api/vcancel') { await env.DB.prepare("DELETE FROM vjobs WHERE id=? AND status!='running'").bind(body.id).run(); return json({ ok: true }); }
+  if (p === '/api/vclear') { await env.DB.prepare("DELETE FROM vjobs WHERE status IN ('queued','failed')").run(); return json({ ok: true }); }
+  if (p === '/api/vretry') { await env.DB.prepare("UPDATE vjobs SET status='queued', tries=0, error=NULL WHERE status='failed'").run(); ctx.waitUntil(vTick(env, true)); return json({ ok: true }); }
+  if (p === '/api/vkick') return json(await vTick(env, true));
+  return null;
+}
+
+async function getVideo(req, env, id) {
+  const rows = (await env.DB.prepare('SELECT data FROM vchunks WHERE vid=? ORDER BY idx').bind(id).all()).results;
+  if (!rows.length) return new Response('not found', { status: 404, headers: CORS });
+  const parts = rows.map(r => b64ToBytes(r.data)), len = parts.reduce((a, b) => a + b.length, 0), all = new Uint8Array(len);
+  let o = 0; for (const x of parts) { all.set(x, o); o += x.length; }
+  const h = { 'content-type': 'video/mp4', 'accept-ranges': 'bytes', 'cache-control': 'private, max-age=86400', ...CORS };
+  const m = /bytes=(\d*)-(\d*)/.exec(req.headers.get('range') || '');
+  if (m) {
+    let a = m[1] === '' ? len - +m[2] : +m[1], b = m[1] === '' || m[2] === '' ? len - 1 : Math.min(+m[2], len - 1);
+    if (a < 0) a = 0;
+    if (a >= len) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${len}`, ...CORS } });
+    return new Response(all.subarray(a, b + 1), { status: 206, headers: { ...h, 'content-range': `bytes ${a}-${b}/${len}`, 'content-length': String(b - a + 1) } });
+  }
+  return new Response(all, { headers: { ...h, 'content-length': String(len) } });
+}
+
+// ---- สั่ง Kaggle: เรียกจาก cron ทุกนาที / ตอนเพิ่มงาน ----
+function kAuth(env) {
+  const k = env.KAGGLE_KEY || '';
+  return k.startsWith('KGAT_') ? `Bearer ${k}` : 'Basic ' + btoa(`${env.KAGGLE_USERNAME}:${k}`);
+}
+async function kFetch(env, path, init) {
+  const r = await fetch('https://www.kaggle.com/api/v1' + path, { ...init, headers: { authorization: kAuth(env), accept: 'application/json', 'content-type': 'application/json', 'user-agent': 'anime-image-bot', ...((init && init.headers) || {}) } });
+  const t = await r.text();
+  let j = {}; try { j = JSON.parse(t); } catch (e) { j = { raw: t.slice(0, 200) }; }
+  return { ok: r.ok, status: r.status, j };
+}
+async function vTick(env, force) {
+  if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return { skipped: 'no kaggle' };
+  await ensureSchema(env);
+  const q = await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status='queued'").first();
+  if (!q.n) return { skipped: 'empty' };
+  const s = await getSettings(env), now = Date.now();
+  if (!force && now - (+s.k_checked || 0) < 120000) return { skipped: 'wait' };
+  if (now < (+s.k_pause || 0)) return { skipped: 'paused' };
+  await setSetting(env, 'k_checked', String(now));
+  const slug = `${env.KAGGLE_USERNAME}/${KSLUG}`;
+  const stt = await kFetch(env, `/kernels/status?userName=${encodeURIComponent(env.KAGGLE_USERNAME)}&kernelSlug=${KSLUG}`);
+  const status = String((stt.j && stt.j.status) || (stt.ok ? '' : 'none')).toLowerCase();
+  await setSetting(env, 'k_status', status);
+  if (/running|queued/.test(status)) {
+    // กันกรณีเครื่องค้าง: ถ้าไม่ได้ยินเสียงจาก kernel เกิน 90 นาที ปล่อยให้รอบต่อไปจัดการ
+    return { running: true, status };
+  }
+  if (now - (+s.k_pushed || 0) < 5 * 60000) return { skipped: 'recently pushed', status };
+  if (/error/.test(status) && stt.j && stt.j.failureMessage) await setSetting(env, 'k_error', String(stt.j.failureMessage).slice(0, 300));
+  if (!s.ktoken) { s.ktoken = crypto.randomUUID().replace(/-/g, ''); await setSetting(env, 'ktoken', s.ktoken); }
+  if (!s.self_url) return { error: 'ยังไม่รู้ลิงก์ของบอท เปิดหน้าสตูดิโอ 1 ครั้งก่อน' };
+  const text = KAGGLE_PY.replace('__API__', s.self_url).replace('__TOKEN__', s.ktoken).replace('__MAXH__', '10').replace('__QUANT__', s.k_quant || 'Q4_K_M');
+  const push = await kFetch(env, '/kernels/push', { method: 'POST', body: JSON.stringify({ slug, newTitle: KSLUG, text, language: 'python', kernelType: 'script', isPrivate: true, enableGpu: true, enableTpu: false, enableInternet: true, machineShape: 'NvidiaTeslaT4', datasetDataSources: [], competitionDataSources: [], kernelDataSources: [], modelDataSources: [], categoryIds: [] }) });
+  await setSetting(env, 'k_pushed', String(now));
+  const err = !push.ok ? `Kaggle ${push.status}: ${JSON.stringify(push.j).slice(0, 220)}` : (push.j && (push.j.error || push.j.errorMessage)) || '';
+  await setSetting(env, 'k_error', err);
+  if (err) {
+    if (/quota|limit|exceed/i.test(err)) { await setSetting(env, 'k_pause', String(now + 6 * 3600000)); await notify(env, '⏸ โควตา GPU ของ Kaggle สัปดาห์นี้น่าจะหมดแล้ว งานรออยู่ในคิว จะลองใหม่อีก 6 ชั่วโมง'); }
+    else await notify(env, '⚠️ สั่ง Kaggle ไม่สำเร็จ: ' + err.slice(0, 160));
+    return { error: err };
+  }
+  await setSetting(env, 'k_status', 'starting');
+  return { pushed: true };
+}
+
+function bytesToB64(u) { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+
+const KAGGLE_PY = String.raw`# ===== anime-video-bot : Kaggle kernel (ส่งขึ้นอัตโนมัติจาก Worker anime-image-bot) =====
+# ดึงงานจากเว็บ -> Wan 2.2 Image-to-Video (GGUF + LightX2V 4 steps) บน ComfyUI -> ส่ง mp4 กลับ
+import os, sys, json, time, subprocess, urllib.request, urllib.error, random, shutil, glob, threading
+
+API = "__API__"
+TOKEN = "__TOKEN__"
+MAXH = float("__MAXH__")
+QUANT = "__QUANT__"
+T0 = time.time()
+UA = {"user-agent": "anime-video-bot/1.0"}
+
+
+def call(path, data=None, raw=None, timeout=180):
+    url = API + path + ("&" if "?" in path else "?") + "t=" + TOKEN
+    hdr = dict(UA)
+    body = None
+    if raw is not None:
+        body = raw
+        hdr["content-type"] = "application/octet-stream"
+    elif data is not None:
+        body = json.dumps(data).encode()
+        hdr["content-type"] = "application/json"
+    req = urllib.request.Request(url, data=body, headers=hdr, method="POST" if body is not None else "GET")
+    for i in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            if e.code < 500 or i == 3:
+                raise
+        except Exception:
+            if i == 3:
+                raise
+        time.sleep(5 * (i + 1))
+
+
+def J(path, data=None):
+    out = call(path, data if data is not None else {})
+    return json.loads(out or b"{}")
+
+
+def log(m):
+    print(m, flush=True)
+    try:
+        call("/k/log", {"msg": str(m)[:600]})
+    except Exception as e:
+        print("log fail", e, flush=True)
+
+
+def sh(cmd, cwd=None, check=True):
+    print("$", cmd, flush=True)
+    p = subprocess.run(cmd, shell=True, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    print(p.stdout[-3000:], flush=True)
+    if check and p.returncode != 0:
+        raise RuntimeError("คำสั่งล้มเหลว: " + cmd[:80] + " :: " + p.stdout[-300:])
+    return p.stdout
+
+
+# ---------- เตรียมเครื่อง ----------
+def pick_root():
+    best, root = -1, "/tmp"
+    for d in ["/kaggle/tmp", "/tmp", "/kaggle/working"]:
+        try:
+            os.makedirs(d, exist_ok=True)
+            free = shutil.disk_usage(d).free
+            if free > best:
+                best, root = free, d
+        except Exception:
+            pass
+    return root, best
+
+
+ROOT, FREE = pick_root()
+COMFY = os.path.join(ROOT, "ComfyUI")
+M = {}
+
+
+def pick(files, *need, ext):
+    c = [f for f in files if f.endswith(ext) and all(n.lower() in f.lower() for n in need)]
+    c.sort(key=len)
+    if not c:
+        raise RuntimeError("หาไฟล์โมเดลไม่เจอ: " + " ".join(need))
+    return c[0]
+
+
+def setup():
+    gpu = sh("nvidia-smi --query-gpu=name,memory.total --format=csv,noheader", check=False).strip()
+    log("เครื่องพร้อม GPU: %s · พื้นที่ว่าง %.0f GB ที่ %s" % (gpu or "ไม่พบ GPU!", FREE / 1e9, ROOT))
+    if not gpu or "failed" in gpu.lower():
+        raise RuntimeError("ไม่มี GPU — ตรวจว่าบัญชี Kaggle ยืนยันเบอร์โทรแล้ว และโควตา GPU ยังเหลือ")
+    if not os.path.isdir(COMFY):
+        sh("git clone --depth 1 https://github.com/comfyanonymous/ComfyUI " + COMFY)
+        sh("git clone --depth 1 https://github.com/city96/ComfyUI-GGUF " + COMFY + "/custom_nodes/ComfyUI-GGUF")
+    req = open(COMFY + "/requirements.txt").read().splitlines()
+    keep = [r for r in req if r.strip() and not r.strip().startswith("#") and not r.split("=")[0].split(">")[0].split("<")[0].strip().lower() in ("torch", "torchvision", "torchaudio")]
+    open("/tmp/req.txt", "w").write("\n".join(keep) + "\ngguf\nhuggingface_hub\n")
+    sh("pip install -q -r /tmp/req.txt", check=False)
+    log("ติดตั้ง ComfyUI แล้ว กำลังโหลดโมเดล (ครั้งแรกประมาณ 10–20 นาที)")
+
+    from huggingface_hub import list_repo_files, hf_hub_download
+    q = list_repo_files("QuantStack/Wan2.2-I2V-A14B-GGUF")
+    r21 = list_repo_files("Comfy-Org/Wan_2.1_ComfyUI_repackaged")
+    r22 = list_repo_files("Comfy-Org/Wan_2.2_ComfyUI_Repackaged")
+    plan = [
+        ("unet", "QuantStack/Wan2.2-I2V-A14B-GGUF", pick(q, "HighNoise", QUANT, ext=".gguf")),
+        ("unet", "QuantStack/Wan2.2-I2V-A14B-GGUF", pick(q, "LowNoise", QUANT, ext=".gguf")),
+        ("text_encoders", "Comfy-Org/Wan_2.1_ComfyUI_repackaged", pick(r21, "umt5", "fp8", ext=".safetensors")),
+        ("vae", "Comfy-Org/Wan_2.1_ComfyUI_repackaged", pick(r21, "vae/wan_2.1_vae", ext=".safetensors")),
+        ("loras", "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", pick(r22, "i2v", "lightx2v", "high_noise", ext=".safetensors")),
+        ("loras", "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", pick(r22, "i2v", "lightx2v", "low_noise", ext=".safetensors")),
+    ]
+    errs = []
+
+    def dl(item):
+        kind, repo, f = item
+        try:
+            p = hf_hub_download(repo, f, local_dir=os.path.join(ROOT, "hf"))
+            dst = os.path.join(COMFY, "models", kind, os.path.basename(f))
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            if not os.path.exists(dst):
+                os.symlink(p, dst)
+        except Exception as e:
+            errs.append(f + ": " + str(e)[:200])
+
+    th = [threading.Thread(target=dl, args=(it,)) for it in plan]
+    [t.start() for t in th]
+    [t.join() for t in th]
+    if errs:
+        raise RuntimeError("โหลดโมเดลไม่สำเร็จ: " + " | ".join(errs))
+    b = lambda i: os.path.basename(plan[i][2])
+    M.update(high=b(0), low=b(1), te=b(2), vae=b(3), lh=b(4), ll=b(5))
+    log("โหลดโมเดลครบ: " + ", ".join(M.values()))
+
+    env = dict(os.environ, CUDA_VISIBLE_DEVICES="0")
+    lf = open(os.path.join(ROOT, "comfy.log"), "w")
+    subprocess.Popen([sys.executable, "main.py", "--listen", "127.0.0.1", "--port", "8188", "--disable-auto-launch"], cwd=COMFY, stdout=lf, stderr=subprocess.STDOUT, env=env)
+    for i in range(240):
+        try:
+            urllib.request.urlopen("http://127.0.0.1:8188/system_stats", timeout=5).read()
+            log("ComfyUI เปิดแล้ว")
+            return
+        except Exception:
+            time.sleep(3)
+    raise RuntimeError("ComfyUI เปิดไม่ขึ้น: " + open(os.path.join(ROOT, "comfy.log")).read()[-500:])
+
+
+def comfy(path, data=None):
+    req = urllib.request.Request("http://127.0.0.1:8188" + path, data=json.dumps(data).encode() if data is not None else None, headers={"content-type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        raise RuntimeError("ComfyUI ตอบ %s: %s" % (e.code, e.read()[:600].decode("utf8", "ignore")))
+
+
+def size_for(w, h, area=640 * 640):
+    w, h = max(1, w), max(1, h)
+    s = (area / (w * h)) ** 0.5
+    return max(256, int(round(w * s / 16)) * 16), max(256, int(round(h * s / 16)) * 16)
+
+
+FFMPEG = shutil.which("ffmpeg")
+
+
+def ffmpeg_bin():
+    global FFMPEG
+    if not FFMPEG:
+        sh("pip install -q imageio-ffmpeg", check=False)
+        import imageio_ffmpeg
+        FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
+    return FFMPEG
+
+
+def gen(j):
+    jid = j["id"]
+    img = call("/k/img/%s" % jid)
+    from PIL import Image
+    import io
+    im = Image.open(io.BytesIO(img)).convert("RGB")
+    W, H = size_for(*im.size)
+    fname = "job%s.jpg" % jid
+    im.save(os.path.join(COMFY, "input", fname), quality=95)
+    F = int(j.get("frames") or 81)
+    seed = random.randint(1, 2 ** 31)
+    pos = j.get("prompt") or "subtle natural motion"
+    neg = j.get("neg") or "blurry, distorted face, deformed hands, extra fingers, morphing, flickering, text, watermark"
+    wf = {
+        "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["high"]}},
+        "2": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["low"]}},
+        "3": {"class_type": "LoraLoaderModelOnly", "inputs": {"model": ["1", 0], "lora_name": M["lh"], "strength_model": 1.0}},
+        "4": {"class_type": "LoraLoaderModelOnly", "inputs": {"model": ["2", 0], "lora_name": M["ll"], "strength_model": 1.0}},
+        "5": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["3", 0], "shift": 5.0}},
+        "6": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["4", 0], "shift": 5.0}},
+        "7": {"class_type": "CLIPLoader", "inputs": {"clip_name": M["te"], "type": "wan"}},
+        "8": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["7", 0], "text": pos}},
+        "9": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["7", 0], "text": neg}},
+        "10": {"class_type": "VAELoader", "inputs": {"vae_name": M["vae"]}},
+        "11": {"class_type": "LoadImage", "inputs": {"image": fname}},
+        "12": {"class_type": "WanImageToVideo", "inputs": {"positive": ["8", 0], "negative": ["9", 0], "vae": ["10", 0], "start_image": ["11", 0], "width": W, "height": H, "length": F, "batch_size": 1}},
+        "13": {"class_type": "KSamplerAdvanced", "inputs": {"model": ["5", 0], "add_noise": "enable", "noise_seed": seed, "steps": 4, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "positive": ["12", 0], "negative": ["12", 1], "latent_image": ["12", 2], "start_at_step": 0, "end_at_step": 2, "return_with_leftover_noise": "enable"}},
+        "14": {"class_type": "KSamplerAdvanced", "inputs": {"model": ["6", 0], "add_noise": "disable", "noise_seed": seed, "steps": 4, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "positive": ["12", 0], "negative": ["12", 1], "latent_image": ["13", 0], "start_at_step": 2, "end_at_step": 4, "return_with_leftover_noise": "disable"}},
+        "15": {"class_type": "VAEDecode", "inputs": {"samples": ["14", 0], "vae": ["10", 0]}},
+        "16": {"class_type": "SaveImage", "inputs": {"images": ["15", 0], "filename_prefix": "job%s" % jid}},
+    }
+    t = time.time()
+    pid = comfy("/prompt", {"prompt": wf, "client_id": "bot"})["prompt_id"]
+    while True:
+        time.sleep(5)
+        h = comfy("/history/" + pid)
+        if pid in h:
+            st = h[pid].get("status", {})
+            if st.get("status_str") == "error":
+                msgs = [m for m in st.get("messages", []) if m[0] == "execution_error"]
+                raise RuntimeError("เจนไม่สำเร็จ: " + json.dumps(msgs)[:500])
+            break
+        if time.time() - t > 3600:
+            raise RuntimeError("เจนนานเกิน 60 นาที")
+    out = os.path.join(COMFY, "output")
+    frames = sorted(glob.glob(os.path.join(out, "job%s_*.png" % jid)))
+    if not frames:
+        raise RuntimeError("ไม่มีเฟรมออกมา")
+    mp4 = os.path.join(ROOT, "job%s.mp4" % jid)
+    sh('"%s" -y -loglevel error -framerate 16 -pattern_type glob -i "%s/job%s_*.png" -c:v libx264 -preset veryfast -crf 17 -pix_fmt yuv420p -movflags +faststart "%s"' % (ffmpeg_bin(), out, jid, mp4))
+    for f in frames:
+        os.remove(f)
+    return mp4, time.time() - t, W, H
+
+
+# ---------- งานหลัก ----------
+def main():
+    job = J("/k/claim").get("job")
+    if not job:
+        log("ไม่มีงานวิดีโอในคิว ปิดเครื่องเพื่อประหยัดโควตา")
+        return
+    try:
+        setup()
+    except Exception as e:
+        J("/k/fail/%s" % job["id"], {"error": str(e)[:500], "requeue": 1})
+        log("เตรียมเครื่องไม่สำเร็จ: " + str(e)[:400])
+        raise
+    done = 0
+    while job:
+        try:
+            log("เริ่มเจน %s ช็อต %s" % (job.get("project"), job.get("shot")))
+            mp4, sec, W, H = gen(job)
+            data = open(mp4, "rb").read()
+            call("/k/done/%s?sec=%d&w=%d&h=%d" % (job["id"], sec, W, H), raw=data, timeout=600)
+            os.remove(mp4)
+            done += 1
+            log("เสร็จช็อต %s ใน %d นาที (%d KB)" % (job.get("shot"), sec / 60, len(data) / 1024))
+        except Exception as e:
+            log("ช็อต %s พัง: %s" % (job.get("shot"), str(e)[:400]))
+            try:
+                J("/k/fail/%s" % job["id"], {"error": str(e)[:500]})
+            except Exception:
+                pass
+        if time.time() - T0 > MAXH * 3600:
+            log("ใกล้หมดเวลารอบนี้ จะเริ่มรอบใหม่ให้เอง")
+            break
+        job = J("/k/claim").get("job")
+    log("จบรอบ ทำเสร็จ %d คลิป" % done)
+
+
+main()
+`;
 
 // ---------- หน้าเว็บ ----------
 const HTML = `<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
