@@ -15,7 +15,7 @@ export default {
     if (!authOK(req, url, env)) return json({ error: 'รหัสผ่านไม่ถูกต้อง' }, 401);
     await ensureSchema(env);
     try {
-      if (p === '/api/ping') return json({ ok: true, bot: 'anime-image-bot' });
+      if (p === '/api/ping') return json({ ok: true, bot: 'anime-image-bot', github: !!(env.GH_TOKEN && env.GH_REPO) });
       if (p === '/api/state') return json(await getState(env));
       if (p.startsWith('/img/')) return getImage(env, +p.split('/')[2]);
       if (p === '/api/zip') return makeZip(env, url.searchParams.get('project') || '', url.searchParams.get('starred') === '1');
@@ -35,6 +35,7 @@ export default {
         return json({ ok: true });
       }
       if (p === '/api/runnow') return json(await tick(env, true));
+      if (p === '/api/push') return json(await ghPush(env, body.path, body.b64, body.message));
       if (p === '/api/resume') { await setSetting(env, 'paused_until', '0'); await env.DB.prepare("UPDATE jobs SET status='queued' WHERE status IN ('running','failed')").run(); return json({ ok: true }); }
       if (p === '/api/clearqueue') { await env.DB.prepare("DELETE FROM jobs WHERE status IN ('queued','failed')").run(); return json({ ok: true }); }
       if (p === '/api/clearnotices') { await env.DB.prepare('DELETE FROM notices').run(); return json({ ok: true }); }
@@ -173,6 +174,23 @@ async function makeZip(env, project, starredOnly) {
 const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c; } return t; })();
 function crc32(b) { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
 function safe(s) { return String(s).replace(/[\\/:*?"<>|]/g, '_'); }
+
+// ---------- ส่งไฟล์ขึ้น GitHub (ฟรี) ให้ Claude ดึงไปใช้ต่อ ----------
+// ต้องตั้ง Secret: GH_TOKEN (fine-grained token สิทธิ์ Contents: Read and write เฉพาะ repo นั้น), GH_REPO เช่น pps2005/anime-assets
+async function ghPush(env, path, b64, message) {
+  if (!env.GH_TOKEN || !env.GH_REPO) return { error: 'ยังไม่ได้ตั้ง GH_TOKEN / GH_REPO ใน Cloudflare' };
+  path = String(path || '');
+  if (!/^[A-Za-z0-9._\-\/]{1,200}$/.test(path) || path.includes('..')) return { error: 'ชื่อไฟล์ไม่ถูกต้อง' };
+  if (!b64 || b64.length > 70e6) return { error: 'ไฟล์ว่างหรือใหญ่เกิน' };
+  const url = `https://api.github.com/repos/${env.GH_REPO}/contents/${path}`;
+  const h = { authorization: `Bearer ${env.GH_TOKEN}`, accept: 'application/vnd.github+json', 'user-agent': 'anime-image-bot', 'content-type': 'application/json' };
+  let sha;
+  const g = await fetch(url, { headers: h });
+  if (g.ok) sha = (await g.json()).sha;
+  const r = await fetch(url, { method: 'PUT', headers: h, body: JSON.stringify({ message: message || `studio: ${path}`, content: b64, ...(sha ? { sha } : {}) }) });
+  if (!r.ok) return { error: `GitHub ${r.status}: ${(await r.text()).slice(0, 160)}` };
+  return { ok: true, path };
+}
 
 // ---------- helpers ----------
 function authOK(req, url, env) {

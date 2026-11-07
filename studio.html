@@ -490,7 +490,8 @@ function renderEp(){const S=ep.shots||[],tot=S.reduce((a,s)=>a+(+s.sec||0),0),ni
   const TB={overview:'ภาพรวม',character:'ตัวละคร',shots:'ช็อตและ prompt',post:'เพลงและแคปชัน'};let body='';
   if(epTab==='overview')body=`<div class="card"><div class="row"><span class="stp ${ep.status}">${EPST[ep.status]}</span><span class="muted">ฉบับที่ ${ep.version} · ${S.length} ช็อต · ${Math.round(tot)} วินาที</span></div>
     <p style="margin:0;font-size:19px">${esc(ep.logline)}</p><p class="muted" style="margin:0">${esc(ep.why)}</p>
-    <div class="row"><button class="btn main" data-act="play">▶ ดูฉบับร่าง</button><span class="muted">ภาพ ${ni}/${S.length} · คลิป ${nv}/${S.length}</span></div></div>
+    <div class="row"><button class="btn main" data-act="play">▶ ดูฉบับร่าง</button><span class="muted">ภาพ ${ni}/${S.length} · คลิป ${nv}/${S.length}</span></div>
+    <div class="row"><button class="btn" data-bot="sendclaude">📤 ส่งภาพและคลิปของตอนนี้ให้ Claude</button></div></div>
     <div class="card"><h3>อยากให้แก้อะไร</h3>${ep.feedback?copyBox('ฟีดแบ็กล่าสุด'+(ep.status==='revise'?' (รอ Claude แก้)':''),ep.feedback):''}
       <textarea id="fb" placeholder="เช่น ช็อต 6 อยากให้หมุนช้ากว่านี้"></textarea>
       <div class="row"><button class="btn" data-act="feedback">ส่งให้ Claude แก้</button>${ep.status==='draft'||ep.status==='revise'?'<button class="btn ok" data-act="approve">✓ อนุมัติเป็นต้นฉบับ</button>':''}${ep.status==='approved'?'<button class="btn ok" data-act="posted">โพสต์แล้ว</button>':''}</div></div>`;
@@ -620,6 +621,29 @@ async function botEnqueueEp(items,label){if(!items.length)return toast('ยั�
   const m=+((BOT.s&&BOT.s.settings&&BOT.s.settings.interval_min)||2);
   toast(`ส่ง${label}เข้าคิวแล้ว ${r.added} ภาพ · ใช้เวลาประมาณ ${Math.round(r.added*m)} นาที`);}
 
+function b64utf8(str){return btoa(unescape(encodeURIComponent(str)));}
+function blobB64(bl){return new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]||'');r.onerror=no;r.readAsDataURL(bl);});}
+async function sendToClaude(b){
+  if(!botCfg().url)return toast('เชื่อมบอทเจนภาพก่อน (แท็บเจนภาพ)');
+  const ping=await botApi('/api/ping');if(!ping.github)return toast('บอทยังไม่ได้ตั้ง GH_TOKEN / GH_REPO ใน Cloudflare');
+  const dir='ep-'+String(ep.id).replace(/[^A-Za-z0-9]/g,'').slice(0,10);
+  await signMedia();const m=ep.media||{},files=[];
+  for(const k in m)for(const t of ['image','video'])if(m[k]&&m[k][t]&&urls[m[k][t]])files.push({k,t,u:urls[m[k][t]],p:m[k][t]});
+  const sent=[],total=files.length+1;let n=0,fail=0;b.disabled=true;
+  for(const f of files){b.textContent=`กำลังส่ง ${n+1}/${total}…`;
+    try{const bl=await (await fetch(f.u)).blob();if(bl.size>45e6){fail++;continue;}
+      const ext=(f.p.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'');
+      const name=(f.k==='char'?'char':'shot'+String(f.k).replace(/[^A-Za-z0-9]/g,'').padStart(2,'0'))+'-'+f.t+'.'+ext;
+      await botApi('/api/push',{path:`${dir}/${name}`,b64:await blobB64(bl),message:`${ep.title}: ${name}`});sent.push({shot:f.k,type:f.t,file:name});n++;}
+    catch(e){fail++;}}
+  const {media,...info}=ep;
+  const man={...info,exported_at:new Date().toISOString(),files:sent};
+  b.textContent=`กำลังส่ง ${total}/${total}…`;
+  await botApi('/api/push',{path:`${dir}/manifest.json`,b64:b64utf8(JSON.stringify(man,null,2)),message:`${ep.title}: manifest`});
+  await botApi('/api/push',{path:'latest.json',b64:b64utf8(JSON.stringify({dir,title:ep.title,at:man.exported_at},null,2)),message:`latest: ${ep.title}`});
+  b.disabled=false;b.textContent='📤 ส่งภาพและคลิปของตอนนี้ให้ Claude';
+  toast(fail?`ส่งแล้ว ${n} ไฟล์ (ไม่สำเร็จ ${fail}) · บอก Claude ว่า "ส่งตอนแล้ว"`:`ส่งครบ ${n} ไฟล์ + บท · บอก Claude ในแชทว่า "ส่งตอนแล้ว"`);}
+
 function botView(src){let v=$('#bview');if(!v){v=document.createElement('div');v.id='bview';v.onclick=()=>v.remove();document.body.appendChild(v);}v.innerHTML=`<img src="${esc(src)}" alt="">`;}
 
 function sure(b,txt){if(b.dataset.sure==='1')return true;const o=b.textContent;b.dataset.sure='1';b.textContent=txt;setTimeout(()=>{if(b.isConnected){b.dataset.sure='';b.textContent=o;}},4000);return false;}
@@ -637,6 +661,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot]
     switch(a){
       case 'view':return botView(b.src);
       case 'gotogen':return setView('gen');
+      case 'sendclaude':return await sendToClaude(b);
       case 'connect':{let u=$('#botUrl').value.trim();const k=$('#botKey').value;if(!u)return toast('ใส่ลิงก์บอทก่อน');
         if(!/^https?:\/\//i.test(u))u='https://'+u;u=u.replace(/\/+$/,'');botSave({url:u,key:k});$('#botMsg').textContent='กำลังทดสอบ…';
         try{await botApi('/api/ping');BOT.s=null;BOT.err='';toast('เชื่อมบอทแล้ว');renderGen();}catch(err){botSave({});$('#botMsg').textContent='เชื่อมไม่ได้: '+botErr(err);}return;}
@@ -665,7 +690,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot]
       case 'epchar':await botEnqueueEp([{scene:0,prompt:ep.character_sheet_prompt}],'ภาพต้นแบบ');break;
       default:return;}
     await botLoad();
-  }catch(err){toast(botErr(err));if(b.dataset.use){b.disabled=false;b.textContent='ใช้ภาพนี้';}if(b.dataset.bot==='runnow'){botLoad();}}
+  }catch(err){toast(botErr(err));if(b.dataset.use){b.disabled=false;b.textContent='ใช้ภาพนี้';}if(b.dataset.bot==='runnow'){botLoad();}if(b.dataset.bot==='sendclaude'){b.disabled=false;b.textContent='📤 ส่งภาพและคลิปของตอนนี้ให้ Claude';}}
 });
 
 boot();
