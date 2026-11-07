@@ -1,6 +1,7 @@
 name = "anime-image-bot"
 main = "worker.js"
 compatibility_date = "2026-11-01"
+keep_vars = true
 
 [ai]
 binding = "AI"
