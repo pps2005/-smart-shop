@@ -59,11 +59,24 @@ export default {
   async scheduled(event, env, ctx) {
     await ensureSchema(env);
     ctx.waitUntil(tick(env, false));
-    ctx.waitUntil(vTick(env, false).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
+    ctx.waitUntil(autoHeal(env).catch(() => {}).then(() => vTick(env, false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
     ctx.waitUntil(castBatch(env, 0, false).catch(() => {}));
     ctx.waitUntil(libDaily(env, false).catch(() => {}));
   },
 };
+
+// ---------- ซ่อมงานที่พังอัตโนมัติ ----------
+// งานวิดีโอ/เสียงที่พัง: รอ 2 ชม. (เผื่อแก้โค้ดหรือเครื่องว่าง) แล้วส่งกลับเข้าคิวเอง สูงสุด 6 ครั้ง
+// ภาพที่พัง (ไม่ใช่เพราะโควตา): ลองใหม่เองสูงสุด 2 รอบ
+async function autoHeal(env) {
+  const s = await getSettings(env), now = Date.now();
+  if (now - (+s.heal_last || 0) < 30 * 60000) return;
+  await setSetting(env, 'heal_last', String(now));
+  const v = await env.DB.prepare("UPDATE vjobs SET status='queued', error='🔧 ซ่อมอัตโนมัติ: '||substr(COALESCE(error,''),1,300) WHERE status='failed' AND tries<6 AND COALESCE(started,0)<?").bind(now - 120 * 60000).run();
+  const i = await env.DB.prepare("UPDATE jobs SET status='queued', heal=COALESCE(heal,0)+1 WHERE status='failed' AND COALESCE(heal,0)<2").run();
+  const n = (v.meta?.changes || 0) + (i.meta?.changes || 0);
+  if (n) await setSetting(env, 'heal_note', `${new Date(now).toISOString()} ส่งงานที่พังกลับเข้าคิว ${n} งาน`);
+}
 
 // ---------- core ----------
 async function tick(env, force) {
@@ -233,7 +246,7 @@ let selfUrl = '';
 async function ensureSchema(env) {
   if (schemaReady) return;
   await env.DB.batch([
-    env.DB.prepare("CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, scene INTEGER, prompt TEXT, status TEXT DEFAULT 'queued', error TEXT, created INTEGER, steps INTEGER)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, scene INTEGER, prompt TEXT, status TEXT DEFAULT 'queued', error TEXT, created INTEGER, steps INTEGER, heal INTEGER DEFAULT 0)"),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS images (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, scene INTEGER, prompt TEXT, data TEXT, starred INTEGER DEFAULT 0, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
@@ -306,7 +319,7 @@ async function vRoutes(req, env, url, ctx) {
       if (!j) return json({ ok: true });
       const again = b.requeue || j.tries < 2;
       await env.DB.prepare('UPDATE vjobs SET status=?, error=? WHERE id=?').bind(again ? 'queued' : 'failed', String(b.error || '').slice(0, 500), id).run();
-      if (!again) await notify(env, `⚠️ ทำวิดีโอช็อต ${j.shot} (${j.project}) ไม่สำเร็จ: ${String(b.error || '').slice(0, 140)}`);
+      if (!again && j.tries >= 6) await notify(env, `⚠️ ทำช็อต ${j.shot} (${j.project}) ไม่สำเร็จหลังซ่อมเองหลายรอบ: ${String(b.error || '').slice(0, 140)}`);
       return json({ ok: true });
     }
     if (p === '/k/log') {
@@ -902,8 +915,28 @@ def work(job, port):
     return gen(job, port)
 
 
+def heal(port, err):
+    # ซ่อมเครื่องเอง: ล้างโมเดล/หน่วยความจำการ์ดจอ และโหลดโมเดลเสียงใหม่ถ้าไฟล์ T5 มีปัญหา
+    e = err.lower()
+    try:
+        r = urllib.request.Request("http://127.0.0.1:%d/free" % port, data=json.dumps({"unload_models": True, "free_memory": True}).encode(), headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(r, timeout=60).read()
+    except Exception:
+        pass
+    if "meta tensor" in e or "t5" in e:
+        M["audio"] = False
+    try:
+        import torch
+        torch.cuda.empty_cache()
+    except Exception:
+        pass
+    time.sleep(10)
+    log("🔧 ซ่อมอัตโนมัติ (การ์ด %d): ล้างหน่วยความจำแล้วลองงานเดิมอีกครั้ง" % (port - 8187))
+
+
 def worker(port, first, stat):
     job = first
+    healed = None
     while job:
         try:
             mp4, sec, W, H = work(job, port)
@@ -914,6 +947,10 @@ def worker(port, first, stat):
             log("เสร็จช็อต %s ใน %d นาที (%d KB)" % (job.get("shot"), sec / 60, len(data) / 1024))
         except Exception as e:
             log("ช็อต %s พัง: %s" % (job.get("shot"), str(e)[:400]))
+            if port and healed != job["id"]:  # ซ่อมแล้วลองใหม่ในเครื่องก่อน 1 ครั้ง
+                healed = job["id"]
+                heal(port, str(e))
+                continue
             try:
                 J("/k/fail/%s" % job["id"], {"error": str(e)[:500]})
             except Exception:
