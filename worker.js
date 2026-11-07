@@ -73,7 +73,7 @@ async function tick(env, force) {
   await setSetting(env, 'last_run', String(now));
   await env.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(job.id).run();
   try {
-    const out = await env.AI.run(MODEL, { prompt: job.prompt.slice(0, 2048), steps: Math.min(8, Math.max(1, +s.steps || 4)) });
+    const out = await env.AI.run(MODEL, { prompt: job.prompt.slice(0, 2048), steps: Math.min(8, Math.max(1, +job.steps || +s.steps || 4)) });
     if (!out || !out.image) throw new Error('AI ไม่ได้ส่งภาพกลับมา');
     await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (?,?,?,?,?,0,?)')
       .bind(job.id, job.project, job.scene, job.prompt, out.image, Date.now()).run();
@@ -227,7 +227,7 @@ let selfUrl = '';
 async function ensureSchema(env) {
   if (schemaReady) return;
   await env.DB.batch([
-    env.DB.prepare("CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, scene INTEGER, prompt TEXT, status TEXT DEFAULT 'queued', error TEXT, created INTEGER)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, scene INTEGER, prompt TEXT, status TEXT DEFAULT 'queued', error TEXT, created INTEGER, steps INTEGER)"),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS images (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, scene INTEGER, prompt TEXT, data TEXT, starred INTEGER DEFAULT 0, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
