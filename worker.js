@@ -6,7 +6,8 @@
 // ใช้คู่กับ studio.html แท็บ "เจนภาพ" (เรียก API นี้ข้ามโดเมน จึงเปิด CORS ไว้ · ป้องกันด้วย PASSWORD)
 
 import SCENES from './scenes.json';
-import IDEAS from './ideas.json'; // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
+import IDEAS from './ideas.json';
+import SFXLIB from './sfx.json'; // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 export default {
@@ -1030,34 +1031,6 @@ const MUSIC = [
   ['ฉากเปิดเรื่อง', 'anime opening style instrumental, energetic rock, guitars, drums, bright, 160 bpm'],
   ['ฉากปิดเรื่อง', 'anime ending style instrumental, mellow pop ballad, piano and guitar, nostalgic, 90 bpm'],
 ];
-const SFX = [
-  ['แมวร้องเหมียว', 'a small cat meowing softly'], ['แมวครางครืด', 'a cat purring contentedly close up'], ['แมวขู่', 'an angry cat hissing'],
-  ['หมาเห่า', 'a medium dog barking twice'], ['หมาครางอ้อน', 'a puppy whining softly'], ['นกร้องตอนเช้า', 'small birds chirping in the morning'],
-  ['การ้อง', 'crows cawing in the distance'], ['นกฮูก', 'an owl hooting at night'], ['ไก่ขัน', 'a rooster crowing at dawn'],
-  ['ม้าร้อง', 'a horse neighing and snorting'], ['หมาป่าหอน', 'a wolf howling at night far away'], ['จิ้งหรีดกลางคืน', 'crickets chirping on a summer night'],
-  ['จั๊กจั่นหน้าร้อน', 'cicadas buzzing loudly on a hot summer day'], ['กบร้อง', 'frogs croaking near a pond at night'], ['ผึ้งบิน', 'a bee buzzing past'],
-  ['มังกรคำราม', 'a huge dragon roaring, deep and powerful'], ['อสูรขู่คำราม', 'a monster growling low and menacing'], ['ฝูงอสูรเล็ก', 'a swarm of small creatures skittering and chittering'],
-  ['ฝนตกเบาๆ', 'light rain falling on a roof'], ['ฝนตกหนัก', 'heavy rain pouring down'], ['ฟ้าร้อง', 'thunder rumbling in the distance'], ['ฟ้าผ่า', 'a close lightning strike with loud crack'],
-  ['ลมพัด', 'wind blowing through trees'], ['พายุ', 'strong storm wind howling'], ['คลื่นทะเล', 'gentle ocean waves on the shore'], ['ลำธาร', 'a small stream flowing over rocks'],
-  ['ไฟลุก', 'a campfire crackling'], ['ใบไม้ไหว', 'leaves rustling in a light breeze'], ['หิมะเหยียบ', 'footsteps crunching on snow'],
-  ['เมืองพลุกพล่าน', 'busy city street ambience with distant traffic and people'], ['ร้านอาหาร', 'restaurant ambience with quiet chatter and cutlery'], ['ห้องเรียน', 'classroom ambience with students murmuring'],
-  ['ออฟฟิศ', 'office ambience with keyboard typing and phones'], ['สถานีรถไฟ', 'train station ambience with announcements and footsteps'], ['รถไฟวิ่ง', 'a train passing on rails'],
-  ['รถรางกระดิ่ง', 'a tram bell ringing and tram passing'], ['ระฆังวัดใหญ่', 'a large temple bell ringing once, deep resonant toll'], ['ระฆังเล็ก', 'small wind chimes tinkling'],
-  ['เปิดประตู', 'a wooden door opening with a creak'], ['ปิดประตูดัง', 'a door slamming shut'], ['เคาะประตู', 'knocking on a wooden door three times'],
-  ['ฝีเท้าเดิน', 'footsteps walking on concrete'], ['วิ่ง', 'footsteps running fast'], ['ตู้กดน้ำ', 'a vending machine humming then a can dropping out'],
-  ['เปิดกระป๋อง', 'opening a soda can with a fizz'], ['ทอดในกระทะ', 'food sizzling in a frying pan'], ['หั่นผัก', 'a knife chopping vegetables on a cutting board'],
-  ['น้ำเดือด', 'water boiling in a kettle'], ['รินกาแฟ', 'pouring coffee into a cup'], ['จานกระทบ', 'ceramic plates clinking'],
-  ['พลิกกระดาษ', 'flipping through paper pages'], ['เขียนด้วยพู่กัน', 'a brush writing on paper'], ['ประทับตรา', 'a rubber stamp pressed on paper'],
-  ['โทรศัพท์สั่น', 'a phone vibrating on a table'], ['นาฬิกาเดิน', 'a clock ticking'], ['ไฟกะพริบ', 'a fluorescent light buzzing and flickering'],
-  ['หมัด', 'a heavy punch impact'], ['เตะ', 'a strong kick impact with whoosh'], ['ชักดาบ', 'a sword being drawn from its sheath'], ['ดาบปะทะ', 'two swords clashing with metallic ring'],
-  ['ฟุ่บ', 'a fast whoosh swing through the air'], ['ระเบิด', 'a large explosion boom'], ['ตึกถล่ม', 'rubble and debris collapsing'], ['กระจกแตก', 'glass shattering'],
-  ['ร่ายเวท', 'a magic spell being cast, shimmering energy rising'], ['ยันต์เรืองแสง', 'a glowing magical seal activating with a resonant hum'], ['โซ่แสง', 'magical energy chains rattling and glowing'],
-  ['พลังชาร์จ', 'energy charging up, rising power hum'], ['พลังปล่อย', 'a magical energy blast released'], ['ม่านอาคม', 'a magical barrier humming with power'],
-  ['อสูรสลายเป็นหมึก', 'a creature dissolving into dark mist, dark magical whoosh'], ['เทเลพอร์ต', 'a magical teleport whoosh'], ['หัวใจเต้น', 'a heartbeat thumping slowly'],
-  ['ปิ๊ง', 'a bright sparkle ding sound'], ['วิบวับ', 'sparkling shimmering twinkle'], ['ตกใจ', 'a cartoon surprise sting with boing'], ['เหงื่อตก', 'a small cartoon droplet plink'],
-  ['หน้าแดง', 'a cute cartoon blush pop'], ['ล้มหัวคะมำ', 'a cartoon fall and thud'], ['เด้ง', 'a cartoon spring boing'], ['เปลี่ยนฉาก', 'a soft scene transition whoosh'],
-  ['ทางเดินในป่ามืด', 'dark forest ambience at night with distant eerie sounds'], ['ถ้ำ', 'cave ambience with water drips echoing'], ['หมอกดำลอยมา', 'an ominous low rumble with whispering wind'],
-];
 async function audioEnqueue(env, items) {
   const st = items.map(it => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'audio',?)")
     .bind(it.project, '', '1', it.prompt.slice(0, 1500), Date.now(), JSON.stringify({ type: it.type, sec: it.sec })));
@@ -1065,7 +1038,7 @@ async function audioEnqueue(env, items) {
 }
 async function audioDaily(env, have) {
   const r = rng(Date.now() ^ 0x5bd1e995), out = [], made = [];
-  for (const [cat, L, type, sec] of [['เพลง', MUSIC, 'music', 60], ['เสียงประกอบ', SFX, 'sfx', 10]]) {
+  for (const [cat, L, type, sec] of [['เพลง', MUSIC, 'music', 60], ['เสียงประกอบ', SFXLIB.map(x => [`${String(x.i).padStart(4, '0')} ${x.n}`, x.e]), 'sfx', 10]]) {
     const free = L.filter(([n]) => ![...have].some(p => p === `คลัง·${cat}·${n}` || p.startsWith(`คลัง·${cat}·${n} · รอบ`)));
     let it = free.length ? free[Math.floor(r() * free.length)] : L[Math.floor(r() * L.length)], nm = it[0];
     if (!free.length) nm += ` · รอบ ${[...have].filter(p => p.startsWith(`คลัง·${cat}·${it[0]}`)).length + 1}`;
