@@ -580,8 +580,30 @@ def ensure_audio():
             ("checkpoints", "AEmotionStudio/stable-audio-open-models", "model.safetensors", "stable_audio_open_1.0.safetensors"),
             ("text_encoders", "google-t5/t5-base", "model.safetensors", "t5_base.safetensors"),
         ])
+        fix_t5()
         M["audio"] = True
         log("โมเดลเสียงพร้อม")
+
+
+def fix_t5():
+    # ไฟล์ T5 ของ google มี embedding แบบผูกกัน (tied) บางชื่อหายไป → ComfyUI โหลดไม่ครบ (meta tensor)
+    # ทำไฟล์ใหม่ให้มีทั้ง shared.weight และ encoder.embed_tokens.weight และตัดส่วน decoder ที่ไม่ใช้ออก
+    dst = os.path.join(COMFY, "models", "text_encoders", "t5_base.safetensors")
+    try:
+        from safetensors.torch import load_file, save_file
+        sd = load_file(os.path.realpath(dst))
+        emb = sd.get("shared.weight")
+        if emb is None:
+            emb = sd.get("encoder.embed_tokens.weight")
+        out = {k: v.contiguous() for k, v in sd.items() if not k.startswith("decoder.") and k != "lm_head.weight"}
+        if emb is not None:
+            out["shared.weight"] = emb.contiguous()
+            out["encoder.embed_tokens.weight"] = emb.clone().contiguous()
+        log("แก้ไฟล์ T5: %d → %d keys (embedding %s)" % (len(sd), len(out), "พบ" if emb is not None else "ไม่พบ!"))
+        os.remove(dst)
+        save_file(out, dst)
+    except Exception as e:
+        log("แก้ไฟล์ T5 ไม่สำเร็จ: " + str(e)[:300])
 
 
 def ensure_video():
