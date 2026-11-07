@@ -2,253 +2,202 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<title>สตูดิโอทีม AI · SMART SHOP</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>สตูดิโอ · SMART SHOP</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600&family=Sarabun:wght@400;600&display=swap">
 <style>
-/* แมพสตูดิโอ: ออฟฟิศกลางคืน ห้องของแต่ละทีมล้อมสมองกลาง (Claude) — โทนมืดเพื่อให้จอ/ไฟเรืองแสงเด่น */
 :root{
-  --bg:#0A0F1C; --glass:rgba(17,24,41,.86); --glass2:rgba(26,34,56,.92); --line:rgba(148,163,200,.22);
-  --ink:#EEF2FA; --muted:#9AA6C2; --cyan:#5EE1FF; --you:#FFC24B; --doing:#4ADE80; --todo:#94A3B8; --red:#FF6B7A;
+  --bg:#0E0B14; --card:rgba(30,24,40,.92); --card2:#1b1626; --line:rgba(220,200,255,.14);
+  --ink:#F4EFFA; --muted:#A99FBC; --acc:#FF8FB1; --acc2:#8FD3FF; --you:#FFC24B; --ok:#4ADE80; --red:#FF6B7A; --todo:#7d7590;
   color-scheme:dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Sarabun,system-ui,sans-serif;font-size:17px;line-height:1.55}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Sarabun,system-ui,sans-serif;font-size:17px;line-height:1.55}
 button,input,textarea,select{font:inherit;color:inherit}
 h1,h2,h3{font-family:Kanit,Sarabun,sans-serif;font-weight:600;margin:0;line-height:1.3}
-#gl{position:fixed;inset:0;touch-action:none}
-#gl canvas{display:block}
-.ui{position:fixed;z-index:5}
-body.hide .ui:not(#eye){display:none!important}
-
-/* top bar */
-#top{left:0;right:0;top:0;padding:calc(8px + env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:linear-gradient(var(--bg),rgba(10,15,28,0))}
-.logo{display:flex;align-items:center;gap:8px;font-family:Kanit,sans-serif;font-size:19px;white-space:nowrap}
-.logo i{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,#2563eb,#06b6d4);font-style:normal;font-size:16px}
-.tabs{display:flex;gap:4px;background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:4px;overflow-x:auto;max-width:100%}
-.tabs button{border:0;background:none;padding:8px 14px;border-radius:10px;white-space:nowrap;cursor:pointer;color:var(--muted);font-weight:600;min-height:40px}
-.tabs button.on{background:#25304d;color:var(--ink)}
-.tabs b{font-size:13px;background:var(--you);color:#1d1400;border-radius:999px;padding:0 7px;margin-left:4px}
+h2{font-size:21px}h3{font-size:17px}
+a{color:var(--acc2)}
+/* header */
+#top{position:sticky;top:0;z-index:10;background:linear-gradient(var(--bg) 70%,rgba(14,11,20,0));padding:calc(8px + env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));display:grid;gap:8px}
+.bar{display:flex;align-items:center;gap:10px}
+.logo{font-family:Kanit,sans-serif;font-size:20px;display:flex;gap:8px;align-items:center}
+.logo i{font-style:normal;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#ff8fb1,#8f7bff)}
 .grow{flex:1}
-.chip{display:inline-flex;align-items:center;gap:6px;background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14px;white-space:nowrap}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--doing);box-shadow:0 0 8px var(--doing)}
-.ib{min-width:44px;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--glass);cursor:pointer;display:inline-grid;place-items:center;text-decoration:none;color:var(--ink);font-size:18px}
-
-/* room labels */
-#tags{position:fixed;inset:0;pointer-events:none;z-index:3}
-.tag{position:absolute;left:0;top:0;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;background:var(--glass);border:1px solid var(--line);border-radius:12px;padding:6px 10px;display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-.tag .ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:15px}
-.tag b{font-family:Kanit,sans-serif;font-weight:500;display:block;line-height:1.2}
-.tag small{color:var(--muted);font-size:12px;display:block;line-height:1.2}
-.tag .st{width:8px;height:8px;border-radius:50%;background:var(--todo)}
-.tag .st.doing{background:var(--doing);box-shadow:0 0 8px var(--doing)} .tag .st.you{background:var(--you);box-shadow:0 0 8px var(--you)}
-.tag.brain{border-color:rgba(94,225,255,.5)}
-.tag.sel{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(94,225,255,.35)}
-body.far .tag small{display:none}
-body.far .tag{padding:4px;gap:4px}body.far .tag>span:nth-child(2){display:none}
-
-/* side panel */
-#panel{right:max(12px,env(safe-area-inset-right));top:calc(72px + env(safe-area-inset-top));bottom:calc(12px + env(safe-area-inset-bottom));width:min(400px,calc(100% - 24px));background:var(--glass2);border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-@media (max-width:760px){#panel{left:10px;right:10px;width:auto;top:auto;height:62%}}
-.ph{padding:16px;display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--line)}
-.ph .ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:24px;flex:none}
-.ph h2{font-size:20px}.ph small{color:var(--muted)}
-.pb{padding:14px 16px;overflow:auto;display:grid;gap:14px;align-content:start}
-.sec{display:grid;gap:8px}
-.lab{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:600;text-transform:uppercase}
-.mem{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04)}
-.av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:15px;font-weight:600;flex:none;color:#0b1020}
-.mem b{display:block;line-height:1.2}.mem small{color:var(--muted)}
-.mem .on{margin-left:auto;font-size:12px;color:var(--doing)}
-.pills{display:flex;flex-wrap:wrap;gap:6px}
-.pill{font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
-.report{border-left:3px solid var(--cyan);padding:6px 10px;background:rgba(94,225,255,.06);border-radius:0 10px 10px 0}
-
-/* buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:9px 16px;border-radius:12px;border:1px solid var(--line);background:#1e2842;cursor:pointer;font-weight:600;text-decoration:none;color:var(--ink)}
-.btn.main{background:linear-gradient(135deg,#2563eb,#06b6d4);border-color:transparent;color:#fff}
-.btn.ok{background:#16a34a;border-color:#16a34a;color:#fff}
-.btn.you{background:var(--you);border-color:var(--you);color:#1d1400}
-.btn.sm{min-height:38px;padding:5px 12px;font-size:15px}
+.ib{min-width:44px;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card2);display:inline-grid;place-items:center;text-decoration:none;color:var(--ink);font-size:18px;cursor:pointer}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:4px}
+.tabs button{border:0;background:none;padding:8px 4px;border-radius:10px;cursor:pointer;color:var(--muted);font-weight:600;min-height:44px;white-space:nowrap}
+.tabs button.on{background:#2e2540;color:var(--ink)}
+.tabs b{font-size:12px;background:var(--you);color:#1d1400;border-radius:999px;padding:0 6px;margin-left:3px}
+main{max-width:1000px;margin:0 auto;padding:4px max(12px,env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));display:grid;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:12px;min-width:0}
+.muted{color:var(--muted)}.small{font-size:14px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-textarea,input[type=text],input[type=email],input[type=password],select{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#0f1628}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:9px 16px;border-radius:12px;border:1px solid var(--line);background:#2a2238;cursor:pointer;font-weight:600;text-decoration:none;color:var(--ink)}
+.btn.main{background:linear-gradient(135deg,#ff7aa8,#8f7bff);border-color:transparent;color:#fff}
+.btn.ok{background:#16a34a;border-color:#16a34a;color:#fff}
+.btn.sm{min-height:38px;padding:5px 12px;font-size:15px}
+.btn:disabled{opacity:.6}
+textarea,input[type=text],input[type=email],input[type=password],select{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#141019}
 textarea{min-height:90px;resize:vertical}
-input[type=number]{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#0f1628}
-/* บอทเจนภาพ (Flux) */
+input[type=number]{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#141019}
+.lab{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.sec{display:grid;gap:8px}
+.report{border-left:3px solid var(--acc2);padding:6px 10px;background:rgba(143,211,255,.07);border-radius:0 10px 10px 0}
+.mem{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04)}
+.mem b{display:block;line-height:1.25}.mem small{color:var(--muted);display:block}
+.mem .on{margin-left:auto;font-size:13px;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:14px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+
+/* ===== ห้องสตูดิโอ ===== */
+.room{position:relative;border-radius:22px;overflow:hidden;aspect-ratio:4/3.3;border:1px solid var(--line);
+  background:radial-gradient(120% 70% at 50% 0%,#3a2a52 0%,#1d1529 55%,#120d1a 100%)}
+@media (min-width:760px){.room{aspect-ratio:16/8}}
+.room .wall{position:absolute;inset:0 0 28% 0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 2px,transparent 2px 60px)}
+.room .floor{position:absolute;left:0;right:0;bottom:0;height:28%;background:linear-gradient(#2a1f36,#160f1f);border-top:2px solid rgba(255,200,230,.08)}
+.room .rug{position:absolute;left:18%;right:18%;bottom:4%;height:12%;border-radius:50%;background:radial-gradient(#4a2f55,#2b1d36);opacity:.8}
+.room .win{position:absolute;left:4%;top:8%;width:17%;height:40%;border-radius:10px;border:3px solid #4a3a5f;background:linear-gradient(#0b1530,#1f2c55);overflow:hidden}
+.room .win::after{content:'';position:absolute;inset:0;background-image:radial-gradient(#fff 1px,transparent 1.6px);background-size:14px 14px;opacity:.55;animation:snow 6s linear infinite}
+@keyframes snow{to{background-position:6px 70px}}
+.room .shelf{position:absolute;right:4%;top:12%;width:16%;display:grid;gap:6px}
+.room .shelf div{height:6px;border-radius:3px;background:#4a3a5f}
+.room .shelf span{font-size:clamp(14px,3vw,24px);line-height:1}
+.room .onair{position:absolute;left:50%;top:3.5%;transform:translateX(-50%);font-family:Kanit,sans-serif;font-size:clamp(11px,2.4vw,15px);letter-spacing:.12em;padding:2px 12px;border-radius:8px;border:2px solid #5a4870;color:#7a6890;background:#1a1323}
+.room .onair.live{color:#fff;background:#e0245e;border-color:#ff7aa8;box-shadow:0 0 18px #ff3d7f;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 6px #ff3d7f}}
+.room .screen{position:absolute;left:50%;top:12%;transform:translateX(-50%);height:62%;aspect-ratio:9/16;background:#05030a;border:6px solid #2b2238;border-radius:12px;box-shadow:0 0 0 2px #463a58,0 0 40px rgba(143,123,255,.35);overflow:hidden;display:grid;place-items:center}
+.room .screen video{width:100%;height:100%;object-fit:cover;display:block}
+.room .screen .idle{color:var(--muted);font-size:13px;text-align:center;padding:10px}
+.room .desk{position:absolute;left:24%;right:24%;bottom:13%;height:7%;border-radius:8px 8px 4px 4px;background:linear-gradient(#5a3f3a,#3a2826)}
+.room .lamp{position:absolute;left:27%;bottom:20%;font-size:clamp(16px,4vw,28px)}
+.room .mic{position:absolute;right:28%;bottom:20%;font-size:clamp(16px,4vw,28px)}
+.room .plant{position:absolute;left:6%;bottom:10%;font-size:clamp(22px,6vw,44px)}
+.room .cam{position:absolute;right:7%;bottom:10%;font-size:clamp(22px,6vw,44px)}
+.room .cap{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;font-size:14px;background:linear-gradient(transparent,rgba(0,0,0,.65));text-align:center}
+
+/* progress */
+.pbar{height:12px;border-radius:999px;background:#2a2238;overflow:hidden}
+.pbar i{display:block;height:100%;background:linear-gradient(90deg,#ff7aa8,#8f7bff);border-radius:999px;transition:width .4s}
+.big{font-family:Kanit,sans-serif;font-size:26px;line-height:1.2}
+.stages{display:grid;gap:8px}
+.stage{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid transparent}
+.stage .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:#2a2238}
+.stage b{display:block;line-height:1.25}.stage small{color:var(--muted);display:block;line-height:1.35}
+.st{font-size:13px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.st.done{background:rgba(74,222,128,.15);color:var(--ok)}
+.st.doing{background:rgba(143,211,255,.15);color:var(--acc2)}
+.st.you{background:rgba(255,194,75,.18);color:var(--you)}
+.st.todo{background:rgba(255,255,255,.06);color:var(--todo)}
+.stage.you{border-color:rgba(255,194,75,.45);background:rgba(255,194,75,.06)}
+.stage.doing{border-color:rgba(143,211,255,.3)}
+
+/* stories */
+.epcard{display:grid;gap:8px;cursor:pointer;text-align:left;width:100%;color:var(--ink)}
+.subtabs{display:flex;gap:4px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:4px;overflow-x:auto}
+.subtabs button{border:0;background:none;padding:8px 12px;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:600;white-space:nowrap;min-height:40px}
+.subtabs button.on{background:#2e2540;color:var(--ink)}
+.prompt{background:#141019;border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.prompt code{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+.prompt .k{font-size:13px;font-weight:600;color:var(--muted)}
+details.more summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4px 0}
+.shot{border:1px solid var(--line);border-radius:16px;overflow:hidden;display:grid;grid-template-columns:58px minmax(0,1fr);background:rgba(255,255,255,.03)}
+.shot .no{display:grid;align-content:start;justify-items:center;gap:2px;padding:12px 4px;border-right:1px solid var(--line)}
+.shot .no b{font-family:Kanit,sans-serif;font-size:24px}
+.shot .bd{padding:12px;display:grid;gap:8px;min-width:0}
+.shot.now{border-color:var(--acc)}
+.media{display:flex;gap:10px;flex-wrap:wrap}
+.slot{width:110px;aspect-ratio:9/16;border:2px dashed var(--line);border-radius:12px;display:grid;place-items:center;text-align:center;font-size:13px;color:var(--muted);overflow:hidden;cursor:pointer;padding:6px}
+.slot.wide{width:100%;max-width:340px;aspect-ratio:auto;min-height:70px}
+.slot img,.slot video{width:100%;height:100%;object-fit:cover}
+.slot audio{width:100%}
+.stp{font-size:13px;font-weight:600;padding:3px 10px;border-radius:999px;background:rgba(255,194,75,.15);color:var(--you)}
+.stp.approved,.stp.posted{background:rgba(74,222,128,.15);color:var(--ok)}
+.stp.revise{background:rgba(255,107,122,.15);color:var(--red)}
+.howto{margin:0;padding-left:22px;display:grid;gap:4px}
+
+/* bot */
 .bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
 .bimg{border:2px solid transparent;border-radius:12px;overflow:hidden;background:#000;display:grid;align-content:start}
 .bimg.star{border-color:var(--you)}
 .bimg img{width:100%;aspect-ratio:1;object-fit:cover;display:block;cursor:zoom-in}
-.bimg .bb{display:flex;gap:4px;padding:4px;flex-wrap:wrap;justify-content:space-between;background:#0f1628}
-.bimg .bb button{min-height:34px;padding:2px 9px;border-radius:9px;border:1px solid var(--line);background:#1e2842;cursor:pointer;font-size:14px}
+.bimg .bb{display:flex;gap:4px;padding:4px;flex-wrap:wrap;justify-content:space-between;background:#141019}
+.bimg .bb button{min-height:34px;padding:2px 9px;border-radius:9px;border:1px solid var(--line);background:#2a2238;cursor:pointer;font-size:14px}
 .bimg .bb .use{flex:1 1 100%;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:600}
 .botthumbs:empty{display:none}.botthumbs{display:grid;gap:6px}
 #bview{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.9);display:grid;place-items:center;padding:16px}
 #bview img{max-width:100%;max-height:88vh;border-radius:12px}
 
-/* task card */
-.task{background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:6px}
-.task.you{border-color:rgba(255,194,75,.55);background:rgba(255,194,75,.07)}
-.task .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.task .tm{font-size:12px;padding:2px 8px;border-radius:999px;font-weight:600;color:#0b1020}
-.task .s{font-size:12px;margin-left:auto;font-weight:600}
-.s.todo{color:var(--todo)}.s.doing{color:var(--doing)}.s.you{color:var(--you)}.s.done{color:var(--muted)}
-.task .d{color:var(--muted);font-size:15px}
-.task .r{font-size:15px;border-left:3px solid var(--doing);padding-left:8px}
-
-/* full views */
-#view{left:0;right:0;top:calc(64px + env(safe-area-inset-top));bottom:0;overflow:auto;padding:12px max(12px,env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:rgba(10,15,28,.9);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.vw{max-width:1100px;margin:0 auto;display:grid;gap:16px}
-.card{background:var(--glass2);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px;min-width:0}
-.cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start}
-@media (max-width:980px){.cols{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:560px){.cols{grid-template-columns:1fr}}
-.col{display:grid;gap:10px;min-width:0}
-.col>h3{font-size:16px;display:flex;align-items:center;gap:8px}
-.muted{color:var(--muted)}
-.prompt{background:#0f1628;border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
-.prompt code{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;white-space:pre-wrap;word-break:break-word}
-.prompt .k{font-size:13px;font-weight:600;color:var(--muted)}
-.shot{border:1px solid var(--line);border-radius:14px;overflow:hidden;display:grid;grid-template-columns:62px minmax(0,1fr);background:rgba(255,255,255,.03)}
-.shot .no{display:grid;align-content:start;justify-items:center;padding:12px 4px;border-right:1px solid var(--line)}
-.shot .no b{font-family:Kanit,sans-serif;font-size:26px}
-.shot .bd{padding:12px;display:grid;gap:8px;min-width:0}
-.media{display:flex;gap:10px;flex-wrap:wrap}
-.slot{width:110px;aspect-ratio:9/16;border:2px dashed var(--line);border-radius:12px;display:grid;place-items:center;text-align:center;font-size:13px;color:var(--muted);overflow:hidden;cursor:pointer;padding:6px}
-.slot img,.slot video{width:100%;height:100%;object-fit:cover}
-.epcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;cursor:pointer;text-align:left;width:100%;color:var(--ink)}
-.stp{font-size:13px;font-weight:600;padding:3px 10px;border-radius:999px;background:rgba(255,194,75,.15);color:var(--you)}
-.stp.approved,.stp.posted{background:rgba(74,222,128,.15);color:var(--doing)}
-.stp.revise{background:rgba(255,107,122,.15);color:var(--red)}
-.howto{margin:0;padding-left:22px;display:grid;gap:4px}
-
-/* feed + eye */
-#feed{left:max(12px,env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));width:min(360px,calc(100% - 24px));display:grid;gap:6px;pointer-events:none}
-#feed div{background:var(--glass);border:1px solid var(--line);border-radius:12px;padding:6px 10px;font-size:13.5px;animation:fin .4s ease-out}
-@keyframes fin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@media (max-width:760px){#feed{display:none}}
-#eye{right:max(12px,env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));display:none}
-body.hide #eye{display:inline-grid;opacity:.6}
-#zoom{right:max(12px,env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));display:grid;gap:6px}
-body.panel #zoom{display:none}
-
 /* player */
-#player{position:fixed;inset:0;background:#000;z-index:20;display:grid;grid-template-rows:1fr auto;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-.stage{position:relative;margin:auto;height:100%;max-height:calc(100vh - 130px);aspect-ratio:9/16;max-width:100vw;overflow:hidden;background:#111;border-radius:8px}
-.stage img,.stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.stage img.kb{animation:kb 6s ease-out forwards}@keyframes kb{to{transform:scale(1.12)}}
-.stage .sk{position:absolute;inset:0;display:grid;align-content:center;gap:12px;padding:24px;text-align:center;background:radial-gradient(circle at 50% 40%,#1d2a4a,#080b14)}
-.stage .sk .s{font-family:Kanit,sans-serif;font-size:14px;color:var(--cyan)}
-.stage .ost{position:absolute;left:8%;right:8%;top:16%;text-align:center;font-family:Kanit,sans-serif;font-size:26px;color:#fff;text-shadow:0 0 4px #000,0 2px 6px #000}
-.stage .sfx{position:absolute;left:8px;right:8px;bottom:10px;font-size:13px;color:#ccc;text-align:center;background:rgba(0,0,0,.45);border-radius:6px;padding:2px 6px}
+#player{position:fixed;inset:0;background:#000;z-index:40;display:grid;grid-template-rows:1fr auto;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.stg{position:relative;margin:auto;height:100%;max-height:calc(100vh - 130px);aspect-ratio:9/16;max-width:100vw;overflow:hidden;background:#111;border-radius:8px}
+.stg img,.stg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stg img.kb{animation:kb 6s ease-out forwards}@keyframes kb{to{transform:scale(1.12)}}
+.stg .sk{position:absolute;inset:0;display:grid;align-content:center;gap:12px;padding:24px;text-align:center;background:radial-gradient(circle at 50% 40%,#2a1f3d,#0b0810)}
+.stg .ost{position:absolute;left:8%;right:8%;top:16%;text-align:center;font-family:Kanit,sans-serif;font-size:26px;color:#fff;text-shadow:0 0 4px #000,0 2px 6px #000}
+.stg .sub{position:absolute;left:6%;right:6%;bottom:9%;text-align:center;font-size:17px;color:#fff;text-shadow:0 0 4px #000,0 1px 4px #000}
 .ctrl{display:flex;gap:8px;justify-content:center;align-items:center;padding:10px;flex-wrap:wrap}
-.prog{height:6px;background:#333;border-radius:3px;overflow:hidden;width:min(420px,80vw)}.prog i{display:block;height:100%;background:var(--cyan);width:0}
+.prog{flex:1;max-width:420px;height:6px;border-radius:3px;background:#333;overflow:hidden}.prog i{display:block;height:100%;width:0;background:var(--acc)}
 
-#login{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:20px;background:rgba(10,15,28,.85)}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));background:#EEF2FA;color:#0b1020;padding:10px 18px;border-radius:12px;z-index:40;font-weight:600}
+#login{position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:16px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:70;background:#2e2540;border:1px solid var(--line);border-radius:14px;padding:10px 16px;max-width:calc(100% - 32px);text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.4)}
 [hidden]{display:none!important}
-@media (prefers-reduced-motion:reduce){#feed div{animation:none}.stage img.kb{animation:none}}
 </style>
 </head>
 <body>
-<div id="gl"></div>
-<div id="tags"></div>
-
-<header id="top" class="ui">
-  <a class="ib" href="index.html" aria-label="กลับแมพร้าน">←</a>
-  <div class="logo"><i>🎬</i><span>สตูดิโอทีม AI</span></div>
+<header id="top">
+  <div class="bar">
+    <a class="ib" href="index.html" aria-label="กลับหน้าร้าน">←</a>
+    <div class="logo"><i>🎬</i><span>สตูดิโอ</span></div>
+    <span class="grow"></span>
+    <span class="chip" id="liveChip"><span class="dot"></span><span id="liveT">กำลังโหลด…</span></span>
+  </div>
   <nav class="tabs" id="tabs">
-    <button data-v="office" class="on">ออฟฟิศ</button>
-    <button data-v="tasks">งาน<b id="youN" hidden>0</b></button>
-    <button data-v="eps">ตอน</button>
-    <button data-v="gen">เจนภาพ 🎨</button>
-    <button data-v="brain">สมองกลาง</button>
+    <button data-v="studio" class="on">สตูดิโอ</button>
+    <button data-v="eps">เรื่อง<b id="youN" hidden>0</b></button>
+    <button data-v="gen">เจนภาพ</button>
+    <button data-v="set">ตั้งค่า</button>
   </nav>
-  <span class="grow"></span>
-  <span class="chip" id="stat"><span class="dot"></span><span id="statT">กำลังโหลด…</span></span>
-  <button class="ib" id="hideBtn" aria-label="ซ่อน UI" title="ซ่อน UI">👁</button>
 </header>
-
-<aside id="panel" class="ui" hidden></aside>
-<div id="feed" class="ui"></div>
-<div id="zoom" class="ui"><button class="ib" data-z="in" aria-label="ซูมเข้า">＋</button><button class="ib" data-z="out" aria-label="ซูมออก">－</button><button class="ib" data-z="home" aria-label="มุมมองทั้งหมด">◎</button></div>
-<section id="view" class="ui" hidden><div class="vw" id="vw"></div></section>
-<button id="eye" class="ib ui" aria-label="แสดง UI">👁</button>
+<main id="vw"></main>
 
 <div id="player" hidden>
-  <div class="stage" id="stage"></div>
+  <div class="stg" id="stage"></div>
   <div>
     <div class="ctrl"><div class="prog"><i id="progBar"></i></div><span id="progT" style="color:#ccc;font-size:14px"></span></div>
     <div class="ctrl"><button class="btn sm" id="pPrev">ช็อตก่อน</button><button class="btn sm main" id="pPlay">หยุด</button><button class="btn sm" id="pNext">ช็อตถัดไป</button><button class="btn sm" id="pVoice">เสียงอ่าน: เปิด</button><button class="btn sm" id="pClose">ปิด</button></div>
   </div>
 </div>
 <div id="login" hidden><form class="card" id="loginForm" style="width:min(420px,100%)">
-  <h2>เข้าสู่ระบบร้าน</h2><p class="muted" style="margin:0">ใช้อีเมลและรหัสผ่านเดียวกับหน้าหลัก SMART SHOP</p>
+  <h2>เข้าสู่ระบบสตูดิโอ</h2><p class="muted" style="margin:0">ใช้อีเมลและรหัสผ่านเดียวกับหน้าหลัก SMART SHOP</p>
   <input type="email" id="em" placeholder="อีเมล" autocomplete="username" required>
   <input type="password" id="pw" placeholder="รหัสผ่าน" autocomplete="current-password" required>
   <button class="btn main" type="submit">เข้าสู่ระบบ</button><p class="muted" id="loginErr" style="margin:0"></p></form></div>
 <div id="toast" hidden></div>
 
-<script src="three_min.js"></script>
-<script>if(!window.THREE)document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>');</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 (function(){
 'use strict';
-/* ================= ข้อมูลทีม ================= */
-const TEAMS=[
- {k:'market',n:'สำรวจตลาด',ic:'🔎',c:'#3B82F6',nk:'สำรวจตลาด',mode:'claude',job:'ดูเทรนด์และคลิปคู่แข่ง แกะสูตรว่าทำไมฮิต',
-  ag:[['พลอย','หัวหน้าทีม · แกะสูตรคลิปฮิต'],['ต้น','ส่องคู่แข่งและเทรนด์เพลง'],['มิว','สรุปสถิติช่องรายสัปดาห์']],
-  sk:['แกะสูตรคลิป','จับเทรนด์','เทียบคู่แข่ง','สรุปสถิติ'],tools:['TikTok Creative Center (คุณแคปส่งมา)','YouTube Trending','Google Trends']},
- {k:'hook',n:'ชื่อเรื่อง & Hook',ic:'🪝',c:'#F59E0B',nk:'ชื่อเรื่อง',mode:'claude',job:'คิดชื่อตอน 3 วินาทีแรก และข้อความบนปก',
-  ag:[['บอส','หัวหน้าทีม · Hook 3 วินาทีแรก'],['ฝน','ชื่อตอนและคำบนปก']],sk:['Hook','ชื่อตอน','คำบนปก','มุกหักมุม'],tools:['Claude']},
- {k:'story',n:'บท & สตอรี่บอร์ด',ic:'✍️',c:'#F97316',nk:'บท',mode:'claude',job:'เขียนเรื่อง แตกเป็นช็อต และเขียน prompt ภาพ/วิดีโอ',
-  ag:[['เจ','หัวหน้าทีม · ผู้กำกับ'],['แนน','เขียนบท'],['ภูมิ','เขียน prompt รายช็อต']],sk:['โครงเรื่อง','สตอรี่บอร์ด','image prompt','video prompt'],tools:['Claude']},
- {k:'character',n:'ออกแบบตัวละคร',ic:'🧑‍🎨',c:'#EC4899',nk:'ออกแบบตัวละคร',mode:'mixed',job:'ออกแบบตัวละครประจำช่องและภาพต้นแบบ',
-  ag:[['มายด์','หัวหน้าทีม · ออกแบบตัวละคร'],['แพร','character sheet']],sk:['ลุคจำง่าย','character sheet','คุมหน้าให้เหมือนเดิม'],tools:['Claude คิด prompt','บอท Flux เจนให้อัตโนมัติ (แท็บเจนภาพ)','คุณเลือกภาพ']},
- {k:'graphic',n:'กราฟิก',ic:'🎨',c:'#D946EF',nk:'กราฟิก',mode:'mixed',job:'ภาพแต่ละช็อตและปกคลิป',
-  ag:[['ไอซ์','หัวหน้าทีม · ภาพช็อต'],['เฟิร์น','ปกคลิป']],sk:['ภาพช็อต','ปกคลิป','ตัวอักษรบนภาพ'],tools:['บอท Flux เจนให้อัตโนมัติ (แท็บเจนภาพ)','คุณเลือกภาพ ⭐','CapCut']},
- {k:'anim',n:'อนิเมชัน',ic:'🎞️',c:'#8B5CF6',nk:'อนิเมชัน',mode:'you',job:'ทำภาพให้ขยับทีละช็อต',
-  ag:[['กาย','หัวหน้าทีม · image-to-video'],['นิว','ช็อตแอ็กชัน'],['ปั้น','คัดรอบที่ดีที่สุด']],sk:['image-to-video','สโลว์โมชัน','กล้องเคลื่อน'],tools:['Kling / Hailuo / Vidu (เครดิตฟรี คุณกด)']},
- {k:'voice',n:'พากย์ & ซับ',ic:'🎙️',c:'#14B8A6',nk:'พากย์',mode:'mixed',job:'เสียงพากย์ไทย ซับ และตัวอักษรบนจอ',
-  ag:[['ข้าวหอม','หัวหน้าทีม · เสียงพากย์'],['โอม','ซับไทย']],sk:['พากย์ไทย','ซับ .srt','ตัวอักษรบนจอ'],tools:['เสียงอ่านใน CapCut','Claude เขียนซับ']},
- {k:'edit',n:'ตัดต่อ',ic:'✂️',c:'#06B6D4',nk:'ตัดต่อ',mode:'you',job:'ตัดต่อรวม ใส่เพลงและเสียงประกอบ',
-  ag:[['ปาล์ม','หัวหน้าทีม · ตัดต่อ'],['เบล','เพลงและเสียงประกอบ']],sk:['ตัดตามจังหวะ','ใส่เพลง','9:16'],tools:['CapCut (คุณกด)']},
- {k:'qa',n:'ตรวจงาน',ic:'✅',c:'#22C55E',nk:'ตรวจงาน',mode:'claude',job:'ตรวจภาพและคลิปก่อนปล่อย',
-  ag:[['ครีม','หัวหน้าทีม · ตรวจภาพ'],['ก้อง','ตรวจคลิปและนโยบาย']],sk:['หน้าตัวละครตรงกัน','มือ/หน้าเพี้ยน','กฎแพลตฟอร์ม'],tools:['Claude ดูภาพที่คุณส่ง']},
- {k:'post',n:'โพสต์',ic:'📤',c:'#84CC16',nk:'โพสต์',mode:'mixed',job:'แคปชัน แฮชแท็ก เวลาโพสต์ และป้าย AI',
-  ag:[['บีม','หัวหน้าทีม · โพสต์'],['จูน','แคปชันและแฮชแท็ก']],sk:['แคปชัน','แฮชแท็ก','ป้าย AI'],tools:['TikTok / Reels / Shorts (คุณกดโพสต์)']},
- {k:'library',n:'คลังวิดีโอ',ic:'🗄️',c:'#6366F1',nk:'คลังวิดีโอ',mode:'auto',job:'เก็บภาพ คลิป และ prompt ทุกช็อตไว้ใช้ซ้ำ',
-  ag:[['ต่อ','หัวหน้าทีม · คลัง'],['หมิว','จัดหมวดและป้ายกำกับ']],sk:['เก็บไฟล์','ค้นคลิปเก่า','ใช้ซ้ำ'],tools:['Supabase Storage ของร้าน']},
- {k:'admin',n:'แอดมินช่อง',ic:'💬',c:'#F43F5E',nk:'แอดมิน',mode:'mixed',job:'ดูแลคอมเมนต์และชุมชน',
-  ag:[['ปิ่น','หัวหน้าทีม · ดูแลชุมชน'],['ทอย','ตอบคอมเมนต์']],sk:['ตอบคอมเมนต์','ปักหมุด','ปูตอนต่อไป'],tools:['Claude ร่างคำตอบ','คุณกดตอบในแอป']},
- {k:'account',n:'บัญชี',ic:'🧾',c:'#10B981',nk:'บัญชี',mode:'claude',job:'ต้นทุนต่อคลิป รายรับ และภาษี',
-  ag:[['เงิน','หัวหน้าทีม · บัญชี'],['ทอง','ต้นทุนต่อคลิป']],sk:['ต้นทุนต่อคลิป','รายรับ','สรุปภาษี'],tools:['หน้ารายจ่ายและภาษีของร้าน']},
- {k:'chatbot',n:'แชทบอทลูกค้า',ic:'🤖',c:'#0EA5E9',nk:'แชทบอท',mode:'mixed',job:'ตอบลูกค้าที่ทักมาจ้างงานหรือลงโฆษณา',
-  ag:[['ฟ้าใส','หัวหน้าทีม · ตอบลูกค้า'],['ลม','ส่งต่อดีลให้เจ้าของ']],sk:['ตอบคำถาม','เก็บข้อมูลลูกค้า','ส่งต่อดีล'],tools:['LINE OA (ฟรี 300 ข้อความ/เดือน)','หน้าลูกค้าในร้าน']}
-];
-const TK=Object.fromEntries(TEAMS.map(t=>[t.k,t]));
-TK.brain={k:'brain',n:'สมองกลาง',ic:'🧠',c:'#5EE1FF'};
-const MODE={claude:'Claude ทำให้',you:'คุณกดในแอปฟรี',mixed:'Claude คิด · คุณกด',auto:'ระบบทำเอง'};
-const STN={todo:'รอทำ',doing:'กำลังทำ',you:'รอคุณ',done:'เสร็จแล้ว'};
-const EPST={draft:'ฉบับร่าง',revise:'รอ Claude แก้',approved:'อนุมัติเป็นต้นฉบับ',posted:'โพสต์แล้ว'};
-
-/* ================= Supabase ================= */
+/* ================= พื้นฐาน ================= */
 const sb=window.supabase.createClient('https://tnfjosnpjjrmyxshfzlz.supabase.co','sb_publishable_UnlipRW9A797QdkeNpixug_goq2D5-8',{auth:{persistSession:true,autoRefreshToken:true}});
 const BUCKET='studio-media';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let user=null,tasks=[],episodes=[],ep=null,epTab='overview',urls={},view='office',sel=null,lastSeen={};
-function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2800);}
+let user=null,eps=[],ep=null,epTab='overview',urls={},view='studio',claudeTasks=[],curId=null,screenKey='';
+try{curId=localStorage.getItem('ss_curep');}catch(e){}
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3200);}
 async function copy(t){try{await navigator.clipboard.writeText(t);toast('คัดลอกแล้ว');}catch(e){toast('คัดลอกไม่ได้ ให้กดค้างที่ข้อความแล้วเลือกคัดลอก');}}
 function copyBox(k,t){return t?`<div class="prompt"><span class="k">${esc(k)}</span><code>${esc(t)}</code><div><button class="btn sm" data-copy="${esc(t)}">คัดลอก</button></div></div>`:'';}
+const EPST={draft:'ฉบับร่าง',revise:'รอ Claude แก้',approved:'อนุมัติแล้ว',posted:'โพสต์แล้ว'};
+const fmtS=s=>{s=Math.round(+s||0);return s>=60?`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')} นาที`:`${s} วิ`;};
 
 async function boot(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session){$('#login').hidden=false;return;}
   user=session.user;$('#login').hidden=true;
-  await refresh();setInterval(()=>{if(!document.hidden)refresh(true);},20000);
+  await refresh();render();
+  setInterval(()=>{if(!document.hidden)refresh(true);},20000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh(true);});
 }
 $('#loginForm').onsubmit=async e=>{e.preventDefault();
@@ -256,290 +205,188 @@ $('#loginForm').onsubmit=async e=>{e.preventDefault();
   if(error){$('#loginErr').textContent='เข้าสู่ระบบไม่สำเร็จ ตรวจอีเมลและรหัสผ่านอีกครั้ง';return;}boot();};
 
 async function refresh(quiet){
-  const [t,e]=await Promise.all([
-    sb.from('studio_tasks').select('*').order('sort',{ascending:true}).order('created_at',{ascending:true}),
-    sb.from('studio_episodes').select('id,title,status,version,logline,team_notes,updated_at,created_at').order('created_at',{ascending:false})
+  const [e,t]=await Promise.all([
+    sb.from('studio_episodes').select('*').order('created_at',{ascending:false}),
+    sb.from('studio_tasks').select('*').eq('team','brain').order('created_at',{ascending:false}).limit(6)
   ]);
-  if(t.error||e.error){if(!quiet)toast('โหลดข้อมูลไม่สำเร็จ');return;}
-  const prev=Object.fromEntries(tasks.map(x=>[x.id,x.status]));
-  tasks=t.data||[];episodes=e.data||[];
-  if(quiet) tasks.forEach(x=>{if(prev[x.id]&&prev[x.id]!==x.status)feedAdd(x);});
-  else tasks.slice().sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at)).slice(0,4).reverse().forEach(feedAdd);
-  stats();updateWorld();if(sel)openPanel(sel,true);
-  if(view==='tasks')renderTasks();else if(view==='brain')renderBrain();else if(view==='eps'&&!ep)renderEpList();
+  if(e.error){if(!quiet)toast('โหลดข้อมูลไม่สำเร็จ');return;}
+  eps=e.data||[];claudeTasks=t.data||[];
+  if(!curId||!eps.some(x=>x.id===curId))curId=eps[0]&&eps[0].id;
+  if(ep){const f=eps.find(x=>x.id===ep.id);if(f)ep=f;}
+  await signAll();header();
+  if(quiet){if(view==='studio')renderStudio(true);else if(view==='eps'&&!ep)renderEpList();}
 }
-function counts(k){const r={todo:0,doing:0,you:0,done:0};tasks.forEach(t=>{if(t.team===k)r[t.status]=(r[t.status]||0)+1;});return r;}
-function stats(){
-  const ag=TEAMS.reduce((a,t)=>a+t.ag.length,0),doing=tasks.filter(t=>t.status==='doing').length,you=tasks.filter(t=>t.status==='you').length;
-  $('#statT').textContent=`${TEAMS.length} ทีม · ${ag} เอเจนต์ · ${doing} กำลังทำ`;
+/* signed URL ของไฟล์ทุกตอน (ใช้ทั้งจอฉายและหน้าตอน) */
+async function signAll(){const paths=[];eps.forEach(e=>{const m=e.media||{};for(const k in m)for(const t in m[k])if(m[k][t])paths.push(m[k][t]);});
+  const need=paths.filter(p=>!urls[p]);if(!need.length)return;
+  const {data}=await sb.storage.from(BUCKET).createSignedUrls(need,3600*6);(data||[]).forEach(d=>{if(d.signedUrl)urls[d.path]=d.signedUrl;});}
+async function signMedia(){await signAll();}
+function mUrlOf(e,k,t){const p=e.media&&e.media[k]&&e.media[k][t];return p?urls[p]:null;}
+function mUrl(k,t){return ep?mUrlOf(ep,k,t):null;}
+
+/* ================= ความคืบหน้า ================= */
+function prog(e){const S=e.shots||[],m=e.media||{},N=S.length;
+  const total=S.reduce((a,s)=>a+(+s.sec||0),0);
+  const img=S.filter(s=>m[String(s.n)]&&m[String(s.n)].image).length;
+  const vidS=S.filter(s=>m[String(s.n)]&&m[String(s.n)].video);
+  const vid=vidS.length,doneSec=vidS.reduce((a,s)=>a+(+s.sec||0),0);
+  const voice=!!(m.voice&&(m.voice.audio||m.voice.video)),final=!!(m.final&&m.final.video);
+  const nowIdx=S.findIndex(s=>!(m[String(s.n)]&&m[String(s.n)].video));
+  const ok=e.status==='approved'||e.status==='posted';
+  const st=[];
+  st.push(N?(e.status==='draft'?{k:'you',t:'รอคุณอ่านและอนุมัติ'}:e.status==='revise'?{k:'doing',t:'Claude กำลังแก้ตามที่สั่ง'}:{k:'done',t:`${N} ช็อต · ${fmtS(total)}`}):{k:'doing',t:'Claude กำลังเขียนบท'});
+  st.push(!N?{k:'todo',t:'รอบท'}:img===N?{k:'done',t:`ครบ ${N} ช็อต`}:img?{k:'doing',t:`${img}/${N} ช็อต · บอทกำลังเจน`}:ok?{k:'you',t:'กด "ให้บอทเจนภาพทุกช็อต" ในหน้าเรื่อง'}:{k:'todo',t:'รออนุมัติบท'});
+  st.push(!N?{k:'todo',t:'รอบท'}:vid===N?{k:'done',t:`ครบ ${N} ช็อต · ${fmtS(total)}`}:vid?{k:'doing',t:`${vid}/${N} ช็อต · ${fmtS(doneSec)} จาก ${fmtS(total)}`}:img?{k:'doing',t:'รอทำวิดีโอจากภาพคีย์'}:{k:'todo',t:'รอภาพคีย์'});
+  st.push(voice?{k:'done',t:'อัปโหลดเสียงพากย์แล้ว'}:ok?{k:'you',t:'ให้ GPT อ่านบทแล้วอัปโหลดเสียง'}:{k:'todo',t:'รออนุมัติบท'});
+  st.push(final?{k:'done',t:'ได้คลิปเต็มแล้ว'}:(vid===N&&N&&voice)?{k:'doing',t:'Claude กำลังตัดต่อ'}:{k:'todo',t:'รอวิดีโอครบ + เสียง'});
+  st.push(e.status==='posted'?{k:'done',t:'โพสต์แล้ว'}:final?{k:'you',t:'ใส่เพลงใน TikTok แล้วโพสต์'}:{k:'todo',t:'รอคลิปเต็ม'});
+  return {N,total,img,vid,doneSec,voice,final,nowIdx,st,pct:total?doneSec/total:0};
+}
+const STAGES=[['✍️','บท','overview'],['🖼️','ภาพคีย์','shots'],['🎞️','วิดีโอทีละช็อต','shots'],['🎙️','เสียงพากย์','sound'],['✂️','ตัดต่อ','sound'],['📤','โพสต์','sound']];
+const STL={done:'เสร็จ',doing:'กำลังทำ',you:'รอคุณ',todo:'ยังไม่ถึง'};
+function header(){const you=eps.reduce((a,e)=>a+prog(e).st.filter(s=>s.k==='you').length,0);
   const b=$('#youN');b.hidden=!you;b.textContent=you;
+  const busy=eps.some(e=>prog(e).st.some(s=>s.k==='doing'));
+  $('#liveT').textContent=busy?'กำลังผลิต':'พร้อม';}
+
+/* วิดีโอล่าสุด: ไฟล์วิดีโอที่อัปโหลดล่าสุดในทุกตอน (ดูจากเวลาในชื่อไฟล์) */
+function latestVideo(){let best=null;
+  eps.forEach(e=>{const m=e.media||{};for(const k in m){const p=m[k]&&m[k].video;if(!p)continue;const ts=+((p.match(/-(\d{13})\./)||[])[1]||0);
+    if(!best||ts>best.ts)best={ts,p,e,k};}});return best;}
+
+/* ================= หน้า สตูดิโอ ================= */
+function renderStudio(quiet){
+  const lv=latestVideo(),cur=eps.find(e=>e.id===curId),P=cur?prog(cur):null;
+  const live=eps.some(e=>prog(e).st.some(s=>s.k==='doing'));
+  const key=lv?lv.p:'';
+  if(quiet&&$('#room')){ // อัปเดตเฉพาะส่วนที่เปลี่ยน ไม่ให้วิดีโอสะดุด
+    $('#room .onair').classList.toggle('live',live);
+    if(key!==screenKey)$('#room').outerHTML=roomHtml(lv,live);
+    $('#progCard').innerHTML=progHtml(cur,P);$('#claudeList').innerHTML=claudeListHtml();screenKey=key;return;}
+  screenKey=key;
+  $('#vw').innerHTML=`${roomHtml(lv,live)}
+  <div class="card" id="progCard">${progHtml(cur,P)}</div>
+  <div class="card"><h3>💬 สั่งงาน Claude</h3>
+    <textarea id="cmd" placeholder="เช่น ทำเรื่องใหม่: ลูกเพนกวินสามตัว ฉบับแม่เล่าให้ลูกฟัง หรือ แก้ช็อต 4 ให้ตลกขึ้น"></textarea>
+    <div class="row"><button class="btn main" data-cmd>ส่งให้ Claude</button><span class="muted small">แล้วไปบอก Claude ในแชทว่า "ทำงานในสตูดิโอ"</span></div>
+    <div id="claudeList" class="sec">${claudeListHtml()}</div></div>`;
 }
-function feedAdd(t){const tm=TK[t.team]||TK.brain;const f=$('#feed');const d=document.createElement('div');
-  d.innerHTML=`${tm.ic} <b>${esc(tm.n)}</b> · ${esc(t.title)} — <span class="s ${t.status}">${STN[t.status]}</span>`;f.appendChild(d);while(f.children.length>4)f.firstChild.remove();}
+function roomHtml(lv,live){const u=lv&&urls[lv.p];
+  const lbl=lv?`${esc(lv.e.title)} · ${lv.k==='final'?'คลิปเต็ม':lv.k==='voice'?'เสียงพากย์':lv.k==='char'?'ตัวละคร':'ช็อต '+esc(lv.k)}`:'';
+  return `<div class="room" id="room"><div class="wall"></div><div class="floor"></div><div class="rug"></div>
+    <div class="win"></div><div class="shelf"><span>🎞️ 🏆</span><div></div><span>📚 🎧</span><div></div></div>
+    <div class="onair${live?' live':''}">ON AIR</div>
+    <div class="screen">${u?`<video src="${esc(u)}" autoplay muted loop playsinline controls></video>`:`<div class="idle">📺<br>ยังไม่มีวิดีโอ<br>คลิปแรกที่ทำเสร็จจะมาฉายที่นี่</div>`}</div>
+    <div class="desk"></div><span class="lamp">💡</span><span class="mic">🎙️</span><span class="plant">🪴</span><span class="cam">🎥</span>
+    ${lv?`<div class="cap">▶ ล่าสุด: ${lbl}</div>`:''}</div>`;}
+function progHtml(cur,P){
+  if(!cur)return `<h3>ยังไม่มีเรื่องที่กำลังทำ</h3><p class="muted" style="margin:0">พิมพ์สั่ง Claude ด้านล่างว่าอยากทำเรื่องอะไร</p>`;
+  const now=P.nowIdx<0?'ทำวิดีโอครบทุกช็อตแล้ว':P.N?`กำลังทำถึง ช็อต ${esc((cur.shots[P.nowIdx]||{}).n)} จาก ${P.N}`:'ยังไม่มีช็อต';
+  return `<div class="row"><select id="curSel" style="flex:1;width:auto">${eps.map(e=>`<option value="${e.id}"${e.id===cur.id?' selected':''}>${esc(e.title)}</option>`).join('')}</select><button class="btn sm" data-goep="${cur.id}">เปิดเรื่อง</button></div>
+  <div><div class="big">${fmtS(P.doneSec)} <span class="muted" style="font-size:18px">/ ${fmtS(P.total)}</span></div><div class="muted">${now}</div></div>
+  <div class="pbar"><i style="width:${Math.round(P.pct*100)}%"></i></div>
+  <div class="lab">ลำดับงาน</div>
+  <div class="stages">${STAGES.map(([ic,n,tab],i)=>{const s=P.st[i];return `<button class="stage ${s.k}" data-goep="${cur.id}" data-tab="${tab}" style="text-align:left;color:inherit;cursor:pointer;font:inherit"><span class="ic">${ic}</span><span><b>${i+1}. ${n}</b><small>${esc(s.t)}</small></span><span class="st ${s.k}">${STL[s.k]}</span></button>`;}).join('')}</div>`;}
+function claudeListHtml(){if(!claudeTasks.length)return '';
+  const S={todo:'รอ Claude',doing:'Claude กำลังทำ',you:'รอคุณ',done:'เสร็จแล้ว'};
+  return `<div class="lab">คำสั่งล่าสุด</div>`+claudeTasks.slice(0,4).map(t=>`<div class="mem"><span style="min-width:0"><b>${esc(t.title)}</b>${t.result?`<small>${esc(String(t.result).slice(0,160))}</small>`:''}</span><span class="on" style="color:${t.status==='done'?'var(--ok)':t.status==='you'?'var(--you)':'var(--acc2)'}">${S[t.status]||esc(t.status)}</span></div>`).join('');}
 
-/* ================= 3D ออฟฟิศ ================= */
-const T=window.THREE;const host=$('#gl');
-const renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));host.appendChild(renderer.domElement);
-const scene=new T.Scene();scene.background=new T.Color(0x0A0F1C);scene.fog=new T.Fog(0x0A0F1C,140,260);
-const cam=new T.OrthographicCamera(-1,1,1,-1,1,500);
-scene.add(new T.HemisphereLight(0x9fb4ff,0x0a0f1c,.75));
-const sun=new T.DirectionalLight(0xffffff,.7);sun.position.set(40,80,30);scene.add(sun);
-const CV={tx:0,tz:0,yaw:Math.PI/4,h:50,goal:null};
-const N=TEAMS.length,R=40;
-const M=(c,o)=>new T.MeshStandardMaterial(Object.assign({color:c,roughness:.8,metalness:.05},o||{}));
-const G={box:new T.BoxGeometry(1,1,1),cyl:new T.CylinderGeometry(1,1,1,16),sph:new T.SphereGeometry(1,16,12)};
-function mesh(g,m,sx,sy,sz,x,y,z,par){const o=new T.Mesh(g,m);o.scale.set(sx,sy,sz);o.position.set(x,y,z);(par||scene).add(o);return o;}
-
-// พื้นและกริด
-const ground=new T.Mesh(new T.CircleGeometry(150,64),M(0x0d1426,{roughness:1}));ground.rotation.x=-Math.PI/2;scene.add(ground);
-const grid=new T.GridHelper(300,60,0x1b2541,0x131b31);grid.position.y=.02;scene.add(grid);
-
-// สมองกลาง
-const brain=new T.Group();scene.add(brain);
-mesh(G.cyl,M(0x111a30,{metalness:.4,roughness:.5}),10,.5,10,0,.25,0,brain);
-const rings=[];[[4,4.4,.9],[6.2,6.5,.6],[8.4,8.8,.45],[11,11.25,.3]].forEach(([a,b,o],i)=>{const r=new T.Mesh(new T.RingGeometry(a,b,72),new T.MeshBasicMaterial({color:0x5EE1FF,transparent:true,opacity:o,side:T.DoubleSide,depthWrite:false}));r.rotation.x=-Math.PI/2;r.position.y=.55+i*.01;brain.add(r);rings.push(r);});
-const core=mesh(G.sph,new T.MeshBasicMaterial({color:0xBDF4FF}),1.6,1.6,1.6,0,4,0,brain);
-const halo=mesh(G.sph,new T.MeshBasicMaterial({color:0x5EE1FF,transparent:true,opacity:.18,depthWrite:false,blending:T.AdditiveBlending}),3.2,3.2,3.2,0,4,0,brain);
-const beam=mesh(new T.CylinderGeometry(.35,.35,40,16,1,true),new T.MeshBasicMaterial({color:0x5EE1FF,transparent:true,opacity:.22,depthWrite:false,blending:T.AdditiveBlending}),1,1,1,0,20,0,brain);
-const orbit=new T.Mesh(new T.TorusGeometry(2.6,.05,8,64),new T.MeshBasicMaterial({color:0x9fefff}));orbit.position.y=4;brain.add(orbit);
-const orbit2=orbit.clone();orbit2.rotation.x=Math.PI/2;brain.add(orbit2);
-brain.userData.k='brain';core.userData.k='brain';
-
-// ห้องของแต่ละทีม
-const ROOMS={};const pick=[];
-const shirt=[0xf8fafc,0x1e293b,0xfca5a5,0x93c5fd,0xfde68a,0xa7f3d0,0xc4b5fd];
-const hairC=[0x111111,0x3b2414,0x7c3a12,0xd4a373,0x1f1f2e];
-const skinC=[0xf1c9a5,0xe0ac80,0xc68c63,0xf5d6bb];
-TEAMS.forEach((tm,i)=>{
-  const a=i/N*Math.PI*2-Math.PI/2,x=Math.cos(a)*R,z=Math.sin(a)*R;
-  const g=new T.Group();g.position.set(x,0,z);g.rotation.y=Math.atan2(-Math.cos(a),-Math.sin(a));scene.add(g);
-  const col=new T.Color(tm.c);const dark=col.clone().multiplyScalar(.42),mid=col.clone().multiplyScalar(.7);
-  const floor=mesh(G.box,M(dark,{emissive:col,emissiveIntensity:.05}),14,.5,11,0,.25,0,g);floor.userData.k=tm.k;pick.push(floor);
-  mesh(G.box,M(col,{emissive:col,emissiveIntensity:.25}),14.2,.12,11.2,0,.06,0,g);
-  mesh(G.box,M(mid),14,3,.35,0,1.75,-5.4,g);           // ผนังหลัง
-  mesh(G.box,M(mid.clone().multiplyScalar(.85)),.35,3,11,-6.85,1.75,0,g); // ผนังข้าง
-  mesh(G.box,M(0x0b1020),5,1.6,.05,1.5,2.2,-5.2,g).material=new T.MeshStandardMaterial({color:0x0b1020,emissive:col,emissiveIntensity:.35}); // จอใหญ่บนผนัง
-  const rug=mesh(G.box,M(0xe5e7eb),6,.04,4,1.5,.52,1.5,g);rug.material.color.set(col.clone().lerp(new T.Color(0xffffff),.7));
-  // ต้นไม้ โคม
-  mesh(G.cyl,M(0xf8fafc),.45,.8,.45,5.8,.9,-4.4,g);mesh(G.sph,M(0x22c55e),.9,1.1,.9,5.8,2,-4.4,g);
-  mesh(G.cyl,M(0x334155),.06,3,.06,-5.9,2,4,g);mesh(G.sph,new T.MeshBasicMaterial({color:0xfff1c1}),.35,.35,.35,-5.9,3.6,4,g);
-  const R_={g,tm,mons:[],agents:[],pos:new T.Vector3(x,0,z),act:0};
-  const seats=[[-3.4,-2],[1.4,-2],[-1,2.2]];
-  tm.ag.forEach((ag,j)=>{
-    const [sx,sz]=seats[j];
-    mesh(G.box,M(0xf1f5f9),3.2,.14,1.4,sx,1.2,sz-.4,g);                 // โต๊ะ
-    mesh(G.box,M(0xcbd5e1),.12,1.1,1.3,sx-1.5,.65,sz-.4,g);mesh(G.box,M(0xcbd5e1),.12,1.1,1.3,sx+1.5,.65,sz-.4,g);
-    const mon=mesh(G.box,new T.MeshStandardMaterial({color:0x0b1020,emissive:col,emissiveIntensity:.6}),1.5,.95,.08,sx,1.85,sz-.85,g);R_.mons.push(mon);
-    mesh(G.box,M(0x1f2937),.9,.9,.9,sx,.95,sz+.8,g);                    // เก้าอี้
-    const p=new T.Group();p.position.set(sx,0,sz+.75);g.add(p);
-    mesh(G.cyl,M(shirt[(i+j)%shirt.length]),.42,.95,.38,0,1.85,0,p);
-    const head=mesh(G.sph,M(skinC[(i*3+j)%skinC.length]),.36,.38,.36,0,2.65,0,p);
-    mesh(G.sph,M(hairC[(i+j*2)%hairC.length]),.38,.3,.39,0,2.82,.04,p);
-    p.userData.k=tm.k;R_.agents.push({p,head,base:0,ph:Math.random()*6});
-  });
-  // เส้นเชื่อมไปสมองกลาง
-  const inner=new T.Vector3(Math.cos(a)*(R-7),.6,Math.sin(a)*(R-7)),outer=new T.Vector3(Math.cos(a)*11.5,.6,Math.sin(a)*11.5);
-  const line=new T.Line(new T.BufferGeometry().setFromPoints([inner,outer]),new T.LineBasicMaterial({color:col,transparent:true,opacity:.35}));scene.add(line);
-  const pk=mesh(G.sph,new T.MeshBasicMaterial({color:col}),.35,.35,.35,0,.8,0);pk.visible=false;
-  R_.line=line;R_.inner=inner;R_.outer=outer;R_.pk=pk;R_.pt=Math.random();
-  ROOMS[tm.k]=R_;
-});
-// คนเดินไปมารอบสมองกลาง
-const walkers=[];for(let i=0;i<7;i++){const p=new T.Group();scene.add(p);
-  mesh(G.cyl,M(shirt[i%shirt.length]),.4,1,.36,0,1.3,0,p);mesh(G.sph,M(skinC[i%skinC.length]),.35,.37,.35,0,2.15,0,p);mesh(G.sph,M(hairC[i%hairC.length]),.37,.28,.38,0,2.3,.04,p);
-  mesh(G.cyl,M(0x1e293b),.12,.8,.12,-.18,.4,0,p);mesh(G.cyl,M(0x1e293b),.12,.8,.12,.18,.4,0,p);
-  walkers.push({p,r:16+(i%3)*4,s:(.08+Math.random()*.06)*(i%2?1:-1),a:Math.random()*6.28});}
-
-// ป้ายลอย
-const TAGS={};
-function makeTag(k){const tm=TK[k];const d=document.createElement('div');d.className='tag'+(k==='brain'?' brain':'');d.dataset.k=k;
-  d.innerHTML=`<span class="ic" style="background:${tm.c}33">${tm.ic}</span><span><b>${esc(tm.n)}</b><small></small></span><span class="st"></span>`;
-  d.addEventListener('click',e=>{e.stopPropagation();select(k);});$('#tags').appendChild(d);TAGS[k]=d;}
-TEAMS.forEach(t=>makeTag(t.k));makeTag('brain');
-function updateWorld(){
-  TEAMS.forEach(tm=>{const c=counts(tm.k),R_=ROOMS[tm.k];R_.act=c.doing>0?2:c.you>0?1:0;
-    const el=TAGS[tm.k];el.querySelector('small').textContent=`${tm.ag.length} เอเจนต์ · ${c.doing?c.doing+' กำลังทำ':c.you?c.you+' รอคุณ':c.todo?c.todo+' รอทำ':'ว่าง'}`;
-    el.querySelector('.st').className='st '+(c.doing?'doing':c.you?'you':'');});
-  const q=tasks.filter(t=>t.team==='brain'&&t.status!=='done').length,fb=episodes.filter(e=>e.status==='revise').length;
-  TAGS.brain.querySelector('small').textContent=`Claude · ${q+fb?q+fb+' งานในคิว':'พร้อมรับงาน'}`;
-  TAGS.brain.querySelector('.st').className='st '+(q+fb?'you':'doing');
-}
-
-// กล้อง
-function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);const asp=w/h;cam.left=-CV.h*asp;cam.right=CV.h*asp;cam.top=CV.h;cam.bottom=-CV.h;cam.updateProjectionMatrix();}
-function homeH(){const asp=innerWidth/innerHeight;return Math.max(46,52/asp);}
-function placeCam(){const d=120;cam.position.set(CV.tx+Math.sin(CV.yaw)*d,d*.9,CV.tz+Math.cos(CV.yaw)*d);cam.lookAt(CV.tx,0,CV.tz);resize();document.body.classList.toggle('far',CV.h>70);}
-CV.h=homeH();placeCam();addEventListener('resize',()=>{placeCam();});
-
-// สัมผัส: ลากหนึ่งนิ้ว = หมุน, สองนิ้ว = ซูม/เลื่อน, แตะ = เลือกห้อง
-const ptrs=new Map();let gest=null,moved=0;
-const ray=new T.Raycaster(),v2=new T.Vector2();
-function worldPan(dx,dy){const s=(CV.h*2)/innerHeight;const fx=Math.cos(CV.yaw),fz=-Math.sin(CV.yaw);
-  CV.tx-=dx*s*fx+dy*s*Math.sin(CV.yaw)*1.1;CV.tz-=dx*s*fz+dy*s*Math.cos(CV.yaw)*1.1;CV.tx=Math.max(-70,Math.min(70,CV.tx));CV.tz=Math.max(-70,Math.min(70,CV.tz));}
-host.addEventListener('pointerdown',e=>{host.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;CV.goal=null;
-  if(ptrs.size===2){const [a,b]=[...ptrs.values()];gest={d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2,my:(a.y+b.y)/2,h:CV.h};}});
-host.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
-  if(ptrs.size===1){if(e.shiftKey||e.button===2)worldPan(dx,dy);else CV.yaw-=dx*.006;placeCam();}
-  else if(ptrs.size===2&&gest){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
-    CV.h=Math.max(10,Math.min(95,gest.h*gest.d/Math.max(d,1)));worldPan(mx-gest.mx,my-gest.my);gest.mx=mx;gest.my=my;placeCam();}});
-function up(e){const was=ptrs.size;ptrs.delete(e.pointerId);if(ptrs.size<2)gest=null;
-  if(was===1&&moved<8){v2.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(v2,cam);
-    const hit=ray.intersectObjects(pick.concat([core,halo]),false)[0];if(hit)select(hit.object.userData.k||'brain');else if(sel)closePanel();}}
-host.addEventListener('pointerup',up);host.addEventListener('pointercancel',up);
-host.addEventListener('wheel',e=>{e.preventDefault();CV.h=Math.max(10,Math.min(95,CV.h*(1+Math.sign(e.deltaY)*.1)));placeCam();},{passive:false});
-host.addEventListener('contextmenu',e=>e.preventDefault());
-$('#zoom').addEventListener('click',e=>{const z=e.target.closest('[data-z]');if(!z)return;
-  if(z.dataset.z==='in')CV.h=Math.max(10,CV.h*.8);else if(z.dataset.z==='out')CV.h=Math.min(95,CV.h*1.25);else{CV.goal={tx:0,tz:0,h:homeH()};}placeCam();});
-
-function select(k){sel=k;Object.values(TAGS).forEach(t=>t.classList.toggle('sel',t.dataset.k===k));
-  const p=k==='brain'?{x:0,z:0}:ROOMS[k].pos;const narrow=innerWidth<760;
-  CV.goal={tx:p.x+(narrow?0:Math.cos(CV.yaw)*8),tz:p.z-(narrow?0:Math.sin(CV.yaw)*8),h:narrow?20:24};
-  if(narrow){CV.goal.tx+=Math.sin(CV.yaw)*10;CV.goal.tz+=Math.cos(CV.yaw)*10;}
-  if(view!=='office')setView('office');openPanel(k);}
-
-// ลูปภาพ
-const clock=new T.Clock();
-function loop(){requestAnimationFrame(loop);const t=clock.getElapsedTime(),dt=Math.min(clock.getDelta(),.05);
-  if(CV.goal){const g=CV.goal,k=.12;CV.tx+=(g.tx-CV.tx)*k;CV.tz+=(g.tz-CV.tz)*k;CV.h+=(g.h-CV.h)*k;placeCam();if(Math.abs(g.h-CV.h)<.05&&Math.hypot(g.tx-CV.tx,g.tz-CV.tz)<.05)CV.goal=null;}
-  rings.forEach((r,i)=>{r.rotation.z=t*(.15+i*.07)*(i%2?-1:1);r.material.opacity=(.25+.6/(i+1))*(.75+.25*Math.sin(t*2+i));});
-  const pulse=1+.06*Math.sin(t*2.2);core.scale.setScalar(1.6*pulse);halo.scale.setScalar(3.2+.4*Math.sin(t*1.6));beam.material.opacity=.16+.08*Math.sin(t*3);
-  orbit.rotation.y=t*.8;orbit2.rotation.z=t*.6;
-  TEAMS.forEach(tm=>{const R_=ROOMS[tm.k];const act=R_.act;
-    R_.mons.forEach((m,i)=>{m.material.emissiveIntensity=act===2?.6+.4*Math.abs(Math.sin(t*6+i*2)):act===1?.55+.25*Math.sin(t*1.5):.35;});
-    R_.agents.forEach(a=>{a.head.position.y=2.65+(act===2?Math.abs(Math.sin(t*7+a.ph))*.06:Math.sin(t*1.2+a.ph)*.02);a.p.rotation.y=act===2?Math.sin(t*3+a.ph)*.08:Math.sin(t*.5+a.ph)*.15;});
-    R_.line.material.opacity=act===2?.75:act===1?.5:.25;
-    if(act===2||(act===0&&Math.sin(t*.3+R_.pt*6)>.97)){R_.pk.visible=true;R_.pt=(R_.pt+(act===2?.012:.006))%1;R_.pk.position.lerpVectors(R_.inner,R_.outer,R_.pt);}else R_.pk.visible=false;});
-  walkers.forEach(w=>{w.a+=w.s*.016;const x=Math.cos(w.a)*w.r,z=Math.sin(w.a)*w.r;w.p.position.set(x,Math.abs(Math.sin(t*8+w.r))*.08,z);w.p.rotation.y=Math.atan2(-Math.sin(w.a)*Math.sign(w.s),Math.cos(w.a)*Math.sign(w.s));});
-  renderer.render(scene,cam);
-  if(!document.body.classList.contains('hide')&&view==='office'){const v=new T.Vector3();
-    for(const k in TAGS){if(k==='brain')v.set(0,7.2,0);else{v.copy(ROOMS[k].pos);v.y=4.6;}v.project(cam);
-      const el=TAGS[k];el.style.transform=`translate(${(v.x+1)/2*innerWidth}px,${(1-v.y)/2*innerHeight}px) translate(-50%,-100%)`;}}
-}
-loop();
-
-/* ================= แผงทีม ================= */
-function teamTasks(k){return tasks.filter(t=>t.team===k).sort((a,b)=>({you:0,doing:1,todo:2,done:3}[a.status]-{you:0,doing:1,todo:2,done:3}[b.status])||a.sort-b.sort);}
-function taskCard(t,showTeam){const tm=TK[t.team]||TK.brain;
-  return `<div class="task ${t.status}"><div class="h">${showTeam?`<span class="tm" style="background:${tm.c}">${tm.ic} ${esc(tm.n)}</span>`:''}<b>${esc(t.title)}</b><span class="s ${t.status}">${STN[t.status]}</span></div>
-    ${t.detail?`<div class="d">${esc(t.detail)}</div>`:''}${t.result?`<div class="r">${esc(t.result)}</div>`:''}
-    ${t.status==='you'?`<div class="row"><button class="btn sm you" data-done="${t.id}">ทำเสร็จแล้ว</button>${t.episode_id?`<button class="btn sm" data-goep="${t.episode_id}">เปิดงาน</button>`:''}</div>`:''}</div>`;}
-function latestNote(tm){if(!tm.nk)return null;for(const e of episodes){const n=(e.team_notes||[]).find(x=>(x.team||'').includes(tm.nk));if(n)return {n:n.note,ep:e.title};}return null;}
-function openPanel(k,keep){const P=$('#panel');const scroll=keep?(P.querySelector('.pb')||{}).scrollTop:0;
-  if(k==='brain'){const q=tasks.filter(t=>t.team==='brain'&&t.status!=='done'),fb=episodes.filter(e=>e.status==='revise');
-    P.innerHTML=`<div class="ph"><div class="ic" style="background:#5EE1FF33">🧠</div><div style="min-width:0"><h2>สมองกลาง · Claude</h2><small>รับคำสั่งจากคุณ แล้วแจกงานให้ทุกทีม</small></div><span class="grow"></span><button class="ib" data-x aria-label="ปิด">✕</button></div>
-    <div class="pb"><div class="sec"><span class="lab">วิธีสั่งงาน</span><div class="report">พิมพ์คำสั่งด้านล่าง แล้วไปบอก Claude ในแชทว่า <b>"ทำงานในสตูดิโอ"</b> Claude จะอ่านคิว แจกงานให้ทีม และเขียนผลกลับมาที่นี่ ใช้แพ็กเกจ Claude ที่คุณมีอยู่ ไม่เสียเงินเพิ่ม</div></div>
-    <div class="sec"><span class="lab">สั่งงาน</span><textarea id="cmd" placeholder="เช่น ทำตอน 2 ของมายด์ ฉากตลาดนัด หรือ ดูเทรนด์สัปดาห์นี้"></textarea><button class="btn main" data-cmd="brain">ส่งเข้าคิว</button></div>
-    <div class="sec"><span class="lab">คิวงาน ${q.length+fb.length}</span>${fb.map(e=>`<div class="task you"><div class="h"><b>แก้ตามฟีดแบ็ก: ${esc(e.title)}</b><span class="s you">รอ Claude</span></div></div>`).join('')}${q.map(t=>taskCard(t)).join('')||(!fb.length?'<p class="muted" style="margin:0">ยังไม่มีงานในคิว</p>':'')}</div></div>`;}
-  else{const tm=TK[k],c=counts(k),rep=latestNote(tm);
-    P.innerHTML=`<div class="ph"><div class="ic" style="background:${tm.c}33">${tm.ic}</div><div style="min-width:0"><h2>ทีม${esc(tm.n)}</h2><small>${tm.ag.length} เอเจนต์ · ${MODE[tm.mode]}</small></div><span class="grow"></span><button class="ib" data-x aria-label="ปิด">✕</button></div>
-    <div class="pb"><div class="muted">${esc(tm.job)}</div>
-      ${rep?`<div class="sec"><span class="lab">หัวหน้าทีมรายงาน · ${esc(rep.ep)}</span><div class="report">${esc(rep.n)}</div></div>`:''}
-      <div class="sec"><span class="lab">สมาชิก</span>${tm.ag.map((a,i)=>`<div class="mem"><span class="av" style="background:${tm.c}">${esc(a[0][0])}</span><span><b>${esc(a[0])}</b><small>${esc(a[1])}</small></span>${c.doing&&i===0?'<span class="on">● ทำงาน</span>':''}</div>`).join('')}</div>
-      <div class="sec"><span class="lab">ทักษะ</span><div class="pills">${tm.sk.map(s=>`<span class="pill">${esc(s)}</span>`).join('')}</div></div>
-      <div class="sec"><span class="lab">เครื่องมือ</span><div class="pills">${tm.tools.map(s=>`<span class="pill">${esc(s)}</span>`).join('')}</div></div>
-      <div class="sec"><span class="lab">งานของทีม · รอคุณ ${c.you} · กำลังทำ ${c.doing} · รอทำ ${c.todo} · เสร็จ ${c.done}</span>${teamTasks(k).map(t=>taskCard(t)).join('')||'<p class="muted" style="margin:0">ยังไม่มีงาน</p>'}</div>
-      <div class="sec"><span class="lab">สั่งงานทีมนี้</span><textarea id="cmd" placeholder="บอกสิ่งที่อยากให้ทีม${esc(tm.n)}ทำ"></textarea><button class="btn main" data-cmd="${k}">ส่งเข้าคิว</button></div></div>`;}
-  P.hidden=false;document.body.classList.add('panel');if(keep){const pb=P.querySelector('.pb');if(pb)pb.scrollTop=scroll;}}
-function closePanel(){sel=null;$('#panel').hidden=true;document.body.classList.remove('panel');Object.values(TAGS).forEach(t=>t.classList.remove('sel'));}
-
-/* ================= การคลิกทั่วไป ================= */
-document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.copy!==undefined)return copy(b.dataset.copy);
-  if(b.hasAttribute('data-x'))return closePanel();
-  if(b.dataset.done){const {error}=await sb.from('studio_tasks').update({status:'done',updated_at:new Date().toISOString()}).eq('id',b.dataset.done);if(error)return toast('บันทึกไม่สำเร็จ');toast('เยี่ยม! บันทึกว่าเสร็จแล้ว');return refresh(true);}
-  if(b.dataset.goep){setView('eps');return openEp(b.dataset.goep);}
-  if(b.dataset.cmd){const box=b.parentElement.querySelector('textarea');const v=(box&&box.value||'').trim();if(!v)return toast('พิมพ์คำสั่งก่อน');
-    const {error}=await sb.from('studio_tasks').insert({team:b.dataset.cmd,title:v.slice(0,200),detail:v.length>200?v:null,status:'todo',sort:999});
-    if(error)return toast('ส่งไม่สำเร็จ');box.value='';toast('ส่งเข้าคิวแล้ว บอก Claude ในแชทว่า "ทำงานในสตูดิโอ"');return refresh(true);}
-});
-$('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)setView(b.dataset.v);});
-function setView(v){view=v;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
-  const off=v==='office';$('#view').hidden=off;$('#tags').style.display=off?'':'none';$('#zoom').style.display=off?'':'none';
-  if(!off)closePanel();if(v==='tasks')renderTasks();if(v==='brain')renderBrain();if(v==='eps'){ep?renderEp():renderEpList();}if(v==='gen')renderGen();fitView();}
-// มือถือ: แถบแท็บขึ้นบรรทัดสอง → ดันหน้าเนื้อหาลงตามความสูงหัวจริง ไม่ให้บังแท็บ
-function fitView(){const h=$('#top').getBoundingClientRect().height;$('#view').style.top=Math.ceil(h)+'px';}
-addEventListener('resize',fitView);
-$('#hideBtn').onclick=()=>{document.body.classList.add('hide');$('#tags').style.visibility='hidden';};
-$('#eye').onclick=()=>{document.body.classList.remove('hide');$('#tags').style.visibility='';};
-
-/* ================= หน้า งาน ================= */
-function renderTasks(){const cols=[['you','รอคุณ','🟡'],['doing','กำลังทำ','🟢'],['todo','รอทำ','⚪'],['done','เสร็จแล้ว','✔']];
-  $('#vw').innerHTML=`<div class="card"><h2>บอร์ดงานของทุกทีม</h2><p class="muted" style="margin:0">งานสีเหลืองคืองานที่ต้องให้คุณช่วย เช่น กดเจนภาพหรือวิดีโอในแอปฟรี ทำเสร็จแล้วกด "ทำเสร็จแล้ว" งานที่เหลือ Claude และทีมทำให้เมื่อคุณบอกในแชทว่า "ทำงานในสตูดิโอ"</p></div>
-  <div class="cols">${cols.map(([s,n,i])=>{const L=tasks.filter(t=>t.status===s);return `<div class="col"><h3>${i} ${n} <span class="muted">${L.length}</span></h3>${L.map(t=>taskCard(t,true)).join('')||'<p class="muted" style="margin:0">ไม่มี</p>'}</div>`;}).join('')}</div>`;}
-
-/* ================= หน้า สมองกลาง ================= */
-function renderBrain(){const done=tasks.filter(t=>t.status==='done'&&t.result).slice(-8).reverse();
-  $('#vw').innerHTML=`<div class="card"><h2>🧠 สมองกลาง · Claude</h2>
-    <p class="muted" style="margin:0">ทุกทีมในออฟฟิศนี้ใช้ Claude ตัวเดียวเป็นสมอง Claude อ่านงานจากคิว คิดแทนทุกทีม แล้วเขียนผลกลับมาที่นี่ ส่วนที่ต้องกดในแอปภายนอก (เจนภาพ ทำวิดีโอ ตัดต่อ โพสต์) จะขึ้นเป็นงาน "รอคุณ"</p>
-    <ol class="howto"><li>พิมพ์คำสั่งด้านล่าง หรือสั่งผ่านห้องของแต่ละทีม</li><li>ไปที่แชท Claude แล้วบอกว่า <b>"ทำงานในสตูดิโอ"</b></li><li>กลับมาดูผลในออฟฟิศ ห้องที่ไฟจอกะพริบคือทีมที่กำลังทำงาน</li></ol>
-    <textarea id="cmd" placeholder="เช่น ทำตอน 2 ของมายด์ ฉากตลาดนัด"></textarea><div><button class="btn main" data-cmd="brain">ส่งเข้าคิว</button></div></div>
-  <div class="card"><h3>ผลงานล่าสุดจากทีม</h3>${done.map(t=>taskCard(t,true)).join('')||'<p class="muted" style="margin:0">ยังไม่มี</p>'}</div>`;}
-
-/* ================= หน้า ตอน (ฉบับร่าง → อนุมัติ) ================= */
+/* ================= หน้า เรื่อง ================= */
 function renderEpList(){ep=null;
-  $('#vw').innerHTML=`<div class="card"><h2>ตอนทั้งหมด</h2><p class="muted" style="margin:0">ทุกตอนเริ่มเป็นฉบับร่าง ดูร่างได้ตลอด ถ้าอยากแก้พิมพ์บอก พอโอเคแล้วกดอนุมัติเป็นต้นฉบับ</p></div>
-  ${episodes.map(e=>`<button class="card epcard" data-open="${e.id}"><div style="min-width:0"><h3>${esc(e.title)}</h3><div class="muted">${esc(e.logline||'')}</div></div><span class="stp ${e.status}">${EPST[e.status]||e.status}</span></button>`).join('')||'<div class="card"><p class="muted" style="margin:0">ยังไม่มีตอน สั่งงานที่สมองกลางว่า "ทำตอนใหม่" ได้เลย</p></div>'}`;}
-$('#vw').addEventListener('click',e=>{const b=e.target.closest('[data-open]');if(b)openEp(b.dataset.open);});
-async function openEp(id){const {data,error}=await sb.from('studio_episodes').select('*').eq('id',id).single();if(error)return toast('เปิดงานไม่สำเร็จ');ep=data;epTab='overview';await signMedia();renderEp();}
-async function signMedia(){const paths=[];const m=ep.media||{};for(const k in m)for(const t of ['image','video'])if(m[k]&&m[k][t])paths.push(m[k][t]);urls={};if(!paths.length)return;
-  const {data}=await sb.storage.from(BUCKET).createSignedUrls(paths,3600);(data||[]).forEach(d=>{if(d.signedUrl)urls[d.path]=d.signedUrl;});}
-function mUrl(k,t){const p=ep.media&&ep.media[k]&&ep.media[k][t];return p?urls[p]:null;}
-function slot(k,t,label){const u=mUrl(k,t),id=`f-${k}-${t}`;return `<label class="slot" for="${id}">${u?(t==='image'?`<img src="${u}" alt="${label}">`:`<video src="${u}" muted playsinline preload="metadata"></video>`):`แตะเพื่อ<br>อัปโหลด<br>${label}`}</label><input type="file" id="${id}" accept="${t}/*" data-up="${k}|${t}" hidden>`;}
-function renderEp(){const S=ep.shots||[],tot=S.reduce((a,s)=>a+(+s.sec||0),0),ni=S.filter(s=>mUrl(String(s.n),'image')).length,nv=S.filter(s=>mUrl(String(s.n),'video')).length;
-  const TB={overview:'ภาพรวม',character:'ตัวละคร',shots:'ช็อตและ prompt',post:'เพลงและแคปชัน'};let body='';
-  if(epTab==='overview')body=`<div class="card"><div class="row"><span class="stp ${ep.status}">${EPST[ep.status]}</span><span class="muted">ฉบับที่ ${ep.version} · ${S.length} ช็อต · ${Math.round(tot)} วินาที</span></div>
-    <p style="margin:0;font-size:19px">${esc(ep.logline)}</p><p class="muted" style="margin:0">${esc(ep.why)}</p>
-    <div class="row"><button class="btn main" data-act="play">▶ ดูฉบับร่าง</button><span class="muted">ภาพ ${ni}/${S.length} · คลิป ${nv}/${S.length}</span></div>
-    <div class="row"><button class="btn" data-bot="sendclaude">📤 ส่งภาพและคลิปของตอนนี้ให้ Claude</button></div></div>
+  $('#vw').innerHTML=`<div class="card"><h2>เรื่องทั้งหมด</h2><p class="muted" style="margin:0">ทุกเรื่องแบ่งเป็นช็อตสั้น ๆ ทำทีละช็อตแล้วค่อยตัดต่อรวม แตะเรื่องเพื่อดูรายละเอียด</p></div>
+  ${eps.map(e=>{const P=prog(e);return `<button class="card epcard" data-open="${e.id}"><div class="row" style="justify-content:space-between"><h3>${esc(e.title)}</h3><span class="stp ${e.status}">${EPST[e.status]||esc(e.status)}</span></div>
+    <div class="muted small">${esc(e.logline||'')}</div><div class="pbar"><i style="width:${Math.round(P.pct*100)}%"></i></div>
+    <div class="muted small">วิดีโอ ${fmtS(P.doneSec)} / ${fmtS(P.total)} · ภาพคีย์ ${P.img}/${P.N} · คลิป ${P.vid}/${P.N}</div></button>`;}).join('')||'<div class="card"><p class="muted" style="margin:0">ยังไม่มีเรื่อง สั่ง Claude ที่หน้าสตูดิโอได้เลย</p></div>'}`;}
+async function openEp(id,tab){const f=eps.find(x=>x.id===id);if(!f)return toast('ไม่พบเรื่องนี้');ep=f;epTab=tab||'overview';await signMedia();setView('eps',true);renderEp();}
+function slot(k,t,label){const u=mUrl(k,t),id=`f-${k}-${t}`,acc=t==='audio'?'audio/*,video/*':t+'/*';
+  const isV=u&&/\.(mp4|mov|webm|m4v)(\?|$)/i.test((ep.media[k]||{})[t]||'');
+  const inner=!u?`แตะเพื่อ<br>อัปโหลด<br>${label}`:t==='image'?`<img src="${u}" alt="${label}">`:t==='audio'?(isV?`<video src="${u}" controls playsinline></video>`:`<audio src="${u}" controls></audio>`):`<video src="${u}" muted playsinline preload="metadata" controls></video>`;
+  return `<label class="slot${t==='audio'?' wide':''}" for="${id}">${inner}</label><input type="file" id="${id}" accept="${acc}" data-up="${k}|${t}" hidden>`;}
+function renderEp(){const S=ep.shots||[],P=prog(ep);
+  const TB={overview:'ภาพรวม',shots:'ช็อต',sound:'เสียง & ตัดต่อ'};let body='';
+  if(epTab==='overview')body=`<div class="card"><div class="row"><span class="stp ${ep.status}">${EPST[ep.status]||esc(ep.status)}</span><span class="muted">ฉบับที่ ${ep.version||1} · ${S.length} ช็อต · ${fmtS(P.total)}</span></div>
+      <p style="margin:0;font-size:19px">${esc(ep.logline)}</p>${ep.why?`<p class="muted" style="margin:0">${esc(ep.why)}</p>`:''}
+      <div class="pbar"><i style="width:${Math.round(P.pct*100)}%"></i></div><div class="muted small">วิดีโอ ${fmtS(P.doneSec)} / ${fmtS(P.total)} · ภาพคีย์ ${P.img}/${P.N} · คลิป ${P.vid}/${P.N}</div>
+      <div class="row"><button class="btn main" data-act="play">▶ ดูฉบับร่าง</button><button class="btn" data-bot="sendclaude">📤 ส่งภาพและคลิปให้ Claude</button></div></div>
     <div class="card"><h3>อยากให้แก้อะไร</h3>${ep.feedback?copyBox('ฟีดแบ็กล่าสุด'+(ep.status==='revise'?' (รอ Claude แก้)':''),ep.feedback):''}
-      <textarea id="fb" placeholder="เช่น ช็อต 6 อยากให้หมุนช้ากว่านี้"></textarea>
-      <div class="row"><button class="btn" data-act="feedback">ส่งให้ Claude แก้</button>${ep.status==='draft'||ep.status==='revise'?'<button class="btn ok" data-act="approve">✓ อนุมัติเป็นต้นฉบับ</button>':''}${ep.status==='approved'?'<button class="btn ok" data-act="posted">โพสต์แล้ว</button>':''}</div></div>`;
-  if(epTab==='character')body=`<div class="card"><h3>ตัวละครหลัก</h3><p class="muted" style="margin:0">เจนภาพต้นแบบก่อน แล้วใช้เป็นภาพอ้างอิงทุกช็อต</p>${copyBox('Prompt ภาพต้นแบบ',ep.character_sheet_prompt)}${copyBox('คำบรรยายตัวละคร',ep.character)}<div class="media">${slot('char','image','ภาพต้นแบบ')}</div>${ep.character_sheet_prompt?botBtn('epchar','','🎨 ให้บอทเจนภาพต้นแบบ (3 แบบ)'):''}<div class="botthumbs" data-k="char"></div></div>`;
-  if(epTab==='shots')body=`<div class="card row"><button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+'\n'+s.image_prompt).join('\n\n'))}">คัดลอก image prompt ทุกช็อต</button><button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+' ('+s.sec+'s)\n'+s.video_prompt).join('\n\n'))}">คัดลอก video prompt ทุกช็อต</button>${botBtn('epall','','🎨 ให้บอทเจนภาพทุกช็อต (ช็อตละ 3 แบบ)',true)}</div>
-    ${S.map(s=>`<div class="shot"><div class="no"><b>${esc(s.n)}</b><span class="muted">${esc(s.sec)} วิ</span></div><div class="bd"><div class="row"><span class="pill">${esc(s.shot)}</span>${s.sound?`<span class="pill">เสียง: ${esc(s.sound)}</span>`:''}</div>
-      <div>${esc(s.action)}</div>${s.text?`<div><b>ตัวอักษรบนจอ:</b> ${esc(s.text)}</div>`:''}<div class="media">${slot(String(s.n),'image','ภาพช็อต')}${slot(String(s.n),'video','คลิปช็อต')}</div>
-      ${copyBox('1) Image prompt',s.image_prompt)}${s.image_prompt?botBtn('epone',s.n,'🎨 ให้บอทเจนช็อตนี้'):''}<div class="botthumbs" data-k="${esc(s.n)}"></div>${copyBox('2) Video prompt',s.video_prompt)}</div></div>`).join('')}`;
-  if(epTab==='post'){const cap=(ep.caption||'')+'\n\n'+(ep.hashtags||[]).join(' ');body=`<div class="card"><h3>เพลงและเสียง</h3><p style="margin:0">${esc(ep.music)}</p></div>
-    <div class="card"><h3>ตัดต่อใน CapCut</h3><ol class="howto">${S.map(s=>`<li>ช็อต ${esc(s.n)} ยาว ${esc(s.sec)} วิ${s.text?` · ข้อความ "${esc(s.text)}"`:''}${s.sound?` · ${esc(s.sound)}`:''}</li>`).join('')}</ol></div>
-    <div class="card"><h3>แคปชัน</h3>${copyBox('แคปชันและแฮชแท็ก',cap)}<p class="muted" style="margin:0">ตอนโพสต์เปิดป้าย "เนื้อหาที่สร้างด้วย AI" ทุกแพลตฟอร์ม</p></div>`;}
-  $('#vw').innerHTML=`<div class="row"><button class="btn sm" data-act="eplist">← ตอนทั้งหมด</button></div><h2 style="font-size:26px">${esc(ep.title)}</h2>
-    <nav class="tabs">${Object.entries(TB).map(([k,v])=>`<button class="${k===epTab?'on':''}" data-eptab="${k}">${v}</button>`).join('')}</nav>${body}`;
-  if(epTab==='shots'||epTab==='character'){botThumbsFill();if(botCfg().url&&!BOT.s)botLoad();}}
-$('#vw').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.eptab){epTab=b.dataset.eptab;return renderEp();}
-  const a=b.dataset.act;if(!a)return;
-  if(a==='eplist'){await refresh(true);return renderEpList();}
-  if(a==='play')return startPlayer();
-  if(a==='feedback'){const t=$('#fb').value.trim();if(!t)return toast('พิมพ์สิ่งที่อยากให้แก้ก่อน');await saveEp({feedback:t,feedback_at:new Date().toISOString(),status:'revise'},'ส่งแล้ว บอก Claude ในแชทว่า "ทำงานในสตูดิโอ"');}
-  if(a==='approve'){if(b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent='กดอีกครั้งเพื่อยืนยัน';setTimeout(()=>{if(b.isConnected){b.dataset.sure='';b.textContent='✓ อนุมัติเป็นต้นฉบับ';}},4000);return;}
-    await saveEp({status:'approved',approved_at:new Date().toISOString()},'อนุมัติเป็นต้นฉบับแล้ว');}
-  if(a==='posted')await saveEp({status:'posted'},'บันทึกว่าโพสต์แล้ว');});
-$('#vw').addEventListener('change',e=>{const t=e.target;if(t.dataset.up&&t.files[0]){const [k,ty]=t.dataset.up.split('|');upload(k,ty,t.files[0]);}});
+      <textarea id="fb" placeholder="เช่น ช็อต 6 อยากให้ตลกกว่านี้"></textarea>
+      <div class="row"><button class="btn" data-act="feedback">ส่งให้ Claude แก้</button>${ep.status==='draft'||ep.status==='revise'?'<button class="btn ok" data-act="approve">✓ อนุมัติบท</button>':''}</div></div>
+    <div class="card"><h3>ตัวละคร</h3>${ep.character?`<p style="margin:0">${esc(ep.character)}</p>`:''}
+      <details class="more"><summary>prompt ภาพต้นแบบ</summary>${copyBox('Prompt ภาพต้นแบบ',ep.character_sheet_prompt)}</details>
+      <div class="media">${slot('char','image','ภาพต้นแบบ')}</div>${ep.character_sheet_prompt?botBtn('epchar','','🎨 ให้บอทเจนภาพต้นแบบ (3 แบบ)'):''}<div class="botthumbs" data-k="char"></div></div>`;
+  if(epTab==='shots')body=`<div class="card"><div class="row"><span class="muted">ภาพคีย์ ${P.img}/${P.N} · คลิป ${P.vid}/${P.N} · ${fmtS(P.doneSec)} / ${fmtS(P.total)}</span></div>
+      <div class="row">${botBtn('epall','','🎨 ให้บอทเจนภาพทุกช็อต (ช็อตละ 3 แบบ)',true)}<button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+'\n'+(s.image_prompt||'')).join('\n\n'))}">คัดลอก image prompt ทั้งหมด</button></div></div>
+    ${S.map((s,i)=>{const k=String(s.n),hi=!!mUrl(k,'image'),hv=!!mUrl(k,'video');return `<div class="shot${i===P.nowIdx?' now':''}"><div class="no"><b>${esc(s.n)}</b><span class="muted small">${esc(s.sec)} วิ</span><span title="ภาพคีย์">${hi?'🖼️':'·'}</span><span title="คลิป">${hv?'🎞️':'·'}</span></div><div class="bd">
+      <div class="row">${s.shot?`<span class="st todo">${esc(s.shot)}</span>`:''}${i===P.nowIdx?'<span class="st doing">กำลังทำช็อตนี้</span>':''}${hv?'<span class="st done">มีคลิปแล้ว</span>':''}</div>
+      <div>${esc(s.action)}</div>${s.narration?`<div class="muted small">🎙 ${esc(s.narration)}</div>`:''}${s.text?`<div class="small"><b>ตัวอักษรบนจอ:</b> ${esc(s.text)}</div>`:''}
+      <div class="media">${slot(k,'image','ภาพคีย์')}${slot(k,'video','คลิปช็อต')}</div>
+      ${s.image_prompt?botBtn('epone',s.n,'🎨 ให้บอทเจนภาพช็อตนี้'):''}<div class="botthumbs" data-k="${esc(s.n)}"></div>
+      <details class="more"><summary>ดู prompt</summary>${copyBox('Image prompt',s.image_prompt)}${copyBox('Video prompt',s.video_prompt)}</details></div></div>`;}).join('')}`;
+  if(epTab==='sound'){const narr=S.filter(s=>s.narration).map(s=>`(ช็อต ${s.n}) ${s.narration}`).join('\n');const cap=(ep.caption||'')+'\n\n'+(ep.hashtags||[]).join(' ');
+    body=`<div class="card"><h3>🎙️ เสียงพากย์</h3><ol class="howto"><li>คัดลอกบทพากย์ด้านล่างไปให้ GPT (โหมดเสียง) อ่าน</li><li>อัดหน้าจอตอน GPT อ่าน</li><li>อัปโหลดไฟล์ที่ช่องด้านล่าง (ไฟล์เสียงหรือวิดีโออัดจอก็ได้)</li></ol>
+      ${narr?`<div class="prompt"><span class="k">บทพากย์ทั้งเรื่อง (ปุ่มคัดลอกจะเอาเฉพาะคำพูด ไม่มีเลขช็อต)</span><code>${esc(narr)}</code><div><button class="btn sm" data-copy="${esc(S.filter(s=>s.narration).map(s=>s.narration).join('\n\n'))}">คัดลอกให้ GPT อ่าน</button></div></div>`:'<p class="muted" style="margin:0">ยังไม่มีบทพากย์</p>'}<div class="media">${slot('voice','audio','ไฟล์เสียงพากย์')}</div></div>
+    <div class="card"><h3>✂️ คลิปเต็ม (ตัดต่อแล้ว)</h3><p class="muted" style="margin:0">Claude ตัดต่อคลิปทุกช็อต + เสียง + ซับ ให้ แล้วอัปโหลดคลิปที่ได้ไว้ที่นี่ จะไปฉายที่จอในสตูดิโอ</p><div class="media">${slot('final','video','คลิปเต็ม')}</div></div>
+    <div class="card"><h3>📤 โพสต์</h3>${ep.music?`<p style="margin:0">🎵 ${esc(ep.music)}</p>`:''}${copyBox('แคปชันและแฮชแท็ก',cap.trim())}<p class="muted" style="margin:0">ตอนโพสต์เปิดป้าย "เนื้อหาที่สร้างด้วย AI" ทุกแพลตฟอร์ม</p>
+      <div class="row">${ep.status!=='posted'?'<button class="btn ok" data-act="posted">โพสต์แล้ว</button>':'<span class="st done">โพสต์แล้ว</span>'}</div></div>`;}
+  $('#vw').innerHTML=`<div class="row"><button class="btn sm" data-act="eplist">← เรื่องทั้งหมด</button></div><h2 style="font-size:24px">${esc(ep.title)}</h2>
+    <nav class="subtabs">${Object.entries(TB).map(([k,v])=>`<button class="${k===epTab?'on':''}" data-eptab="${k}">${v}</button>`).join('')}</nav>${body}`;
+  if(epTab==='shots'||epTab==='overview'){botThumbsFill();if(botCfg().url&&!BOT.s)botLoad();}}
 async function saveEp(f,msg){const {error}=await sb.from('studio_episodes').update({...f,updated_at:new Date().toISOString()}).eq('id',ep.id);if(error)return toast('บันทึกไม่สำเร็จ');Object.assign(ep,f);renderEp();toast(msg);refresh(true);}
 async function upload(k,ty,file){if(file.size>50*1024*1024)return toast('ไฟล์ใหญ่เกิน 50MB');toast('กำลังอัปโหลด…');
-  const ext=((file.name.split('.').pop()||(ty==='image'?'jpg':'mp4')).toLowerCase().replace(/[^a-z0-9]/g,''))||'bin';const path=`${user.id}/${ep.id}/${k}-${ty}-${Date.now()}.${ext}`;
-  const {error}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:true});if(error)return toast('อัปโหลดไม่สำเร็จ: '+error.message);
+  const ext=((file.name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,''))||'bin';const path=`${user.id}/${ep.id}/${k}-${ty}-${Date.now()}.${ext}`;
+  const {error}=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type||undefined,upsert:true});if(error)return toast('อัปโหลดไม่สำเร็จ: '+error.message);
   const media={...(ep.media||{})},old=media[k]&&media[k][ty];media[k]={...(media[k]||{}),[ty]:path};
   const {error:e2}=await sb.from('studio_episodes').update({media,updated_at:new Date().toISOString()}).eq('id',ep.id);if(e2)return toast('บันทึกไม่สำเร็จ');
-  if(old)sb.storage.from(BUCKET).remove([old]);ep.media=media;await signMedia();renderEp();toast('อัปโหลดแล้ว ทีมคลังวิดีโอเก็บให้เรียบร้อย');}
+  if(old)sb.storage.from(BUCKET).remove([old]);ep.media=media;await signMedia();renderEp();toast('อัปโหลดแล้ว');header();}
 
-/* ================= ฉบับร่าง (animatic) ================= */
-const P={i:0,playing:false,voice:true,timer:null,t0:0,dur:0,raf:null};
-function stopAll(){clearTimeout(P.timer);cancelAnimationFrame(P.raf);try{speechSynthesis.cancel();}catch(e){}const v=$('#stage video');if(v)v.pause();}
-function startPlayer(){P.i=0;P.playing=true;$('#player').hidden=false;$('#pPlay').textContent='หยุด';showShot();}
-function showShot(){stopAll();const S=ep.shots||[];if(P.i>=S.length){P.playing=false;$('#pPlay').textContent='เล่นใหม่';$('#progT').textContent='จบฉบับร่าง';return;}
-  const s=S[P.i],k=String(s.n),vid=mUrl(k,'video'),img=mUrl(k,'image');
-  $('#stage').innerHTML=(vid?`<video src="${vid}" autoplay muted playsinline></video>`:img?`<img class="kb" src="${img}" alt="">`:`<div class="sk"><div class="s">ช็อต ${esc(s.n)} · ${esc(s.shot)}</div><div>${esc(s.action)}</div><div class="s">ยังไม่มีภาพ</div></div>`)+(s.text?`<div class="ost">${esc(s.text)}</div>`:'')+(s.sound?`<div class="sfx">${esc(s.sound)}</div>`:'');
-  P.dur=(+s.sec||2)*1000;P.t0=performance.now();
-  if(P.voice&&s.narration&&'speechSynthesis' in window){try{const u=new SpeechSynthesisUtterance(s.narration);u.lang='th-TH';const tv=speechSynthesis.getVoices().find(x=>/^th/i.test(x.lang));if(tv)u.voice=tv;u.rate=1.1;u.pitch=1.15;speechSynthesis.speak(u);}catch(e){}}
-  const tick=()=>{const el=performance.now()-P.t0;$('#progBar').style.width=((P.i+Math.min(1,el/P.dur))/S.length*100)+'%';$('#progT').textContent=`ช็อต ${s.n} · ${(el/1000).toFixed(1)}/${s.sec} วิ`;if(P.playing)P.raf=requestAnimationFrame(tick);};tick();
-  if(P.playing)P.timer=setTimeout(()=>{P.i++;showShot();},P.dur);}
-$('#pPlay').onclick=()=>{if(P.playing){P.playing=false;stopAll();$('#pPlay').textContent='เล่นต่อ';}else{if(P.i>=(ep.shots||[]).length)P.i=0;P.playing=true;$('#pPlay').textContent='หยุด';showShot();}};
-$('#pNext').onclick=()=>{P.i=Math.min(P.i+1,(ep.shots||[]).length-1);showShot();};
-$('#pPrev').onclick=()=>{P.i=Math.max(P.i-1,0);showShot();};
-$('#pVoice').onclick=()=>{P.voice=!P.voice;$('#pVoice').textContent='เสียงอ่าน: '+(P.voice?'เปิด':'ปิด');if(!P.voice)try{speechSynthesis.cancel();}catch(e){}};
-$('#pClose').onclick=()=>{P.playing=false;stopAll();$('#player').hidden=true;};
+/* ================= หน้า ตั้งค่า ================= */
+function renderSet(){const c=botCfg();
+  $('#vw').innerHTML=`<div class="card"><h2>ตั้งค่า</h2></div>
+  <div class="card"><h3>🎨 บอทเจนภาพ</h3>${c.url?`<div class="mem"><span style="min-width:0"><b>เชื่อมแล้ว</b><small>${esc(c.url)}</small></span><span class="on" style="color:var(--ok)">●</span></div><div class="row"><button class="btn sm" data-bot="disconnect">เปลี่ยนลิงก์/รหัส</button><button class="btn sm" data-v2="gen">ไปหน้าเจนภาพ</button></div>`:`<p class="muted" style="margin:0">ยังไม่ได้เชื่อม ไปที่แท็บ "เจนภาพ" เพื่อใส่ลิงก์บอทและรหัสผ่าน</p><div><button class="btn sm" data-v2="gen">ไปเชื่อมบอท</button></div>`}</div>
+  <div class="card"><h3>📤 ส่งงานให้ Claude (GitHub)</h3><p class="muted" style="margin:0">ปุ่ม "ส่งภาพและคลิปให้ Claude" ในหน้าเรื่อง จะส่งไฟล์ผ่านบอทขึ้น repo สาธารณะ ตั้ง GH_TOKEN และ GH_REPO ใน Cloudflare (Worker anime-image-bot → Settings → Variables and Secrets)</p></div>
+  <div class="card"><h3>บัญชี</h3><div class="muted small">${esc(user&&user.email||'')}</div><div><button class="btn sm" data-act="logout">ออกจากระบบ</button></div></div>`;}
+
+/* ================= ทั่วไป ================= */
+function render(){if(view==='studio')renderStudio();else if(view==='eps'){ep?renderEp():renderEpList();}else if(view==='gen')renderGen();else renderSet();}
+function setView(v,keep){view=v;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));if(!keep){if(v!=='eps')ep=null;render();}window.scrollTo(0,0);}
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;if(b.dataset.v==='eps')ep=null;setView(b.dataset.v);});
+document.addEventListener('change',e=>{const t=e.target;
+  if(t.id==='curSel'){curId=t.value;try{localStorage.setItem('ss_curep',curId);}catch(_){}renderStudio();}
+  if(t.dataset&&t.dataset.up&&t.files[0]){const [k,ty]=t.dataset.up.split('|');upload(k,ty,t.files[0]);}});
+document.addEventListener('click',async e=>{const b=e.target.closest('button,[data-open]');if(!b)return;
+  if(b.dataset.copy!==undefined)return copy(b.dataset.copy);
+  if(b.dataset.v2)return setView(b.dataset.v2);
+  if(b.dataset.goep)return openEp(b.dataset.goep,b.dataset.tab);
+  if(b.dataset.open)return openEp(b.dataset.open);
+  if(b.dataset.eptab){epTab=b.dataset.eptab;return renderEp();}
+  if(b.hasAttribute('data-cmd')){const v=($('#cmd').value||'').trim();if(!v)return toast('พิมพ์คำสั่งก่อน');
+    const {error}=await sb.from('studio_tasks').insert({team:'brain',title:v.slice(0,200),detail:v.length>200?v:null,status:'todo',sort:999});
+    if(error)return toast('ส่งไม่สำเร็จ');$('#cmd').value='';toast('ส่งแล้ว ไปบอก Claude ในแชทว่า "ทำงานในสตูดิโอ"');await refresh(true);return;}
+  const a=b.dataset.act;if(!a)return;
+  if(a==='eplist'){ep=null;return renderEpList();}
+  if(a==='play')return startPlayer();
+  if(a==='logout'){await sb.auth.signOut();location.reload();return;}
+  if(a==='feedback'){const t=$('#fb').value.trim();if(!t)return toast('พิมพ์สิ่งที่อยากให้แก้ก่อน');return saveEp({feedback:t,feedback_at:new Date().toISOString(),status:'revise'},'ส่งแล้ว บอก Claude ในแชทว่า "ทำงานในสตูดิโอ"');}
+  if(a==='approve'){if(b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent='กดอีกครั้งเพื่อยืนยัน';setTimeout(()=>{if(b.isConnected){b.dataset.sure='';b.textContent='✓ อนุมัติบท';}},4000);return;}
+    return saveEp({status:'approved',approved_at:new Date().toISOString()},'อนุมัติบทแล้ว');}
+  if(a==='posted')return saveEp({status:'posted'},'บันทึกว่าโพสต์แล้ว');});
+
+/* ================= ฉบับร่าง (เล่นช็อตเรียงกัน) ================= */
+const PL={i:0,playing:false,voice:true,timer:null,t0:0,dur:0,raf:null};
+function stopAll(){clearTimeout(PL.timer);cancelAnimationFrame(PL.raf);try{speechSynthesis.cancel();}catch(e){}const v=$('#stage video');if(v)v.pause();}
+function startPlayer(){PL.i=0;PL.playing=true;$('#player').hidden=false;$('#pPlay').textContent='หยุด';showShot();}
+function showShot(){stopAll();const S=ep.shots||[];if(PL.i>=S.length){PL.playing=false;$('#pPlay').textContent='เล่นใหม่';$('#progT').textContent='จบฉบับร่าง';return;}
+  const s=S[PL.i],k=String(s.n),vid=mUrl(k,'video'),img=mUrl(k,'image');
+  $('#stage').innerHTML=(vid?`<video src="${vid}" autoplay muted playsinline></video>`:img?`<img class="kb" src="${img}" alt="">`:`<div class="sk"><div class="muted">ช็อต ${esc(s.n)}${s.shot?' · '+esc(s.shot):''}</div><div>${esc(s.action)}</div><div class="muted small">ยังไม่มีภาพ</div></div>`)+(s.text?`<div class="ost">${esc(s.text)}</div>`:'')+(s.narration?`<div class="sub">${esc(s.narration)}</div>`:'');
+  PL.dur=(+s.sec||2)*1000;PL.t0=performance.now();
+  if(PL.voice&&s.narration&&'speechSynthesis' in window){try{const u=new SpeechSynthesisUtterance(s.narration);u.lang='th-TH';const tv=speechSynthesis.getVoices().find(x=>/^th/i.test(x.lang));if(tv)u.voice=tv;u.rate=1.1;speechSynthesis.speak(u);}catch(e){}}
+  const tick=()=>{const el=performance.now()-PL.t0;$('#progBar').style.width=((PL.i+Math.min(1,el/PL.dur))/S.length*100)+'%';$('#progT').textContent=`ช็อต ${s.n} · ${(el/1000).toFixed(1)}/${s.sec} วิ`;if(PL.playing)PL.raf=requestAnimationFrame(tick);};tick();
+  if(PL.playing)PL.timer=setTimeout(()=>{PL.i++;showShot();},PL.dur);}
+$('#pPlay').onclick=()=>{if(PL.playing){PL.playing=false;stopAll();$('#pPlay').textContent='เล่นต่อ';}else{if(PL.i>=(ep.shots||[]).length)PL.i=0;PL.playing=true;$('#pPlay').textContent='หยุด';showShot();}};
+$('#pNext').onclick=()=>{PL.i=Math.min(PL.i+1,(ep.shots||[]).length-1);showShot();};
+$('#pPrev').onclick=()=>{PL.i=Math.max(PL.i-1,0);showShot();};
+$('#pVoice').onclick=()=>{PL.voice=!PL.voice;$('#pVoice').textContent='เสียงอ่าน: '+(PL.voice?'เปิด':'ปิด');if(!PL.voice)try{speechSynthesis.cancel();}catch(e){}};
+$('#pClose').onclick=()=>{PL.playing=false;stopAll();$('#player').hidden=true;};
 
 /* ================= บอทเจนภาพ (Flux บน Cloudflare Worker: image-bot/) ================= */
 // ตั้งลิงก์บอท + รหัสผ่านครั้งเดียว เก็บใน localStorage 'ss_imgbot' (ต่อเครื่อง)
@@ -559,7 +406,7 @@ async function botLoad(){if(!botCfg().url)return;
   if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
   if(view==='eps'&&ep)botThumbsFill();}
 setInterval(()=>{if(document.hidden||!botCfg().url)return;
-  if(view==='gen'||(view==='eps'&&ep&&(epTab==='shots'||epTab==='character')))botLoad();},20000);
+  if(view==='gen'||(view==='eps'&&ep&&(epTab==='shots'||epTab==='overview')))botLoad();},20000);
 function epBotProject(){return String(ep&&ep.title||'ตอน').slice(0,50);}
 function botBtn(a,n,label,main){return botCfg().url?`<div><button class="btn sm${main?' main':''}" data-bot="${a}" data-n="${esc(n)}">${label}</button></div>`:`<div><button class="btn sm" data-bot="gotogen">🎨 เชื่อมบอทเจนภาพก่อน</button></div>`;}
 function botCard(i,useK){return `<div class="bimg${i.starred?' star':''}"><img loading="lazy" src="${esc(botU('/img/'+i.id))}" alt="ภาพ ${i.id}" data-bot="view">
@@ -628,7 +475,7 @@ async function sendToClaude(b){
   const ping=await botApi('/api/ping');if(!ping.github)return toast('บอทยังไม่ได้ตั้ง GH_TOKEN / GH_REPO ใน Cloudflare');
   const dir='ep-'+String(ep.id).replace(/[^A-Za-z0-9]/g,'').slice(0,10);
   await signMedia();const m=ep.media||{},files=[];
-  for(const k in m)for(const t of ['image','video'])if(m[k]&&m[k][t]&&urls[m[k][t]])files.push({k,t,u:urls[m[k][t]],p:m[k][t]});
+  for(const k in m)for(const t of ['image','video','audio'])if(m[k]&&m[k][t]&&urls[m[k][t]])files.push({k,t,u:urls[m[k][t]],p:m[k][t]});
   const sent=[],total=files.length+1;let n=0,fail=0;b.disabled=true;
   for(const f of files){b.textContent=`กำลังส่ง ${n+1}/${total}…`;
     try{const bl=await (await fetch(f.u)).blob();if(bl.size>45e6){fail++;continue;}
@@ -665,7 +512,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot]
       case 'connect':{let u=$('#botUrl').value.trim();const k=$('#botKey').value;if(!u)return toast('ใส่ลิงก์บอทก่อน');
         if(!/^https?:\/\//i.test(u))u='https://'+u;u=u.replace(/\/+$/,'');botSave({url:u,key:k});$('#botMsg').textContent='กำลังทดสอบ…';
         try{await botApi('/api/ping');BOT.s=null;BOT.err='';toast('เชื่อมบอทแล้ว');renderGen();}catch(err){botSave({});$('#botMsg').textContent='เชื่อมไม่ได้: '+botErr(err);}return;}
-      case 'disconnect':if(!sure(b,'กดอีกครั้งเพื่อยืนยัน'))return;botSave({});BOT.s=null;BOT.err='';return renderGen();
+      case 'disconnect':if(!sure(b,'กดอีกครั้งเพื่อยืนยัน'))return;botSave({});BOT.s=null;BOT.err='';return view==='set'?renderSet():renderGen();
       case 'reload':BOT.err='';BOT.s=null;botParts();break;
       case 'staronly':BOT.star=!BOT.star;return botParts();
       case 'zipstar':case 'zipall':location.href=botU('/api/zip?project='+encodeURIComponent(BOT.proj)+(a==='zipstar'?'&starred=1':''));return;
