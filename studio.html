@@ -323,6 +323,19 @@ textarea,input[type=text],input[type=email],input[type=password],select,input[ty
 .seg button i{font-style:normal;font-size:17px}
 .seg button.on{background:linear-gradient(135deg,#FF5FA2,#8C6BFF);color:#fff;box-shadow:0 4px 12px rgba(255,79,147,.3)}
 @media (max-width:480px){.seg button{flex-direction:column;gap:0;font-size:12px;min-height:50px}}
+
+details.fold{background:var(--card2,#F7F2FF);border:1px solid var(--line);border-radius:12px;margin:6px 0}
+details.fold>summary{list-style:none;cursor:pointer;padding:12px 40px 12px 14px;font-weight:600;position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:44px;box-sizing:border-box}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:'›';position:absolute;right:16px;top:50%;transform:translateY(-50%) rotate(90deg);font-size:22px;color:#9A86C8;transition:.2s}
+details.fold[open]>summary::after{transform:translateY(-50%) rotate(-90deg)}
+details.fold>summary small{font-weight:400;font-size:12px;color:var(--muted);width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details.fold .dn{background:linear-gradient(135deg,#FF5FA2,#8C6BFF);color:#fff;border-radius:99px;padding:1px 8px;font-size:12px}
+details.fold .fbody{padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
+
+.card{min-width:0;overflow-wrap:anywhere}
+.st{white-space:normal;max-width:100%}
+audio.aplay{display:block;width:100%;height:54px;min-height:54px;margin-top:6px}
 </style>
 </head>
 <body>
@@ -654,6 +667,11 @@ function renderGen(){const c=botCfg();BOT.filled=false;
     <p class="muted" style="margin:0">ฟรีประมาณ 200 ภาพ/วันที่ 4 steps (steps มากขึ้น = ละเอียดขึ้นแต่กินโควตามากขึ้น) · โควตารีเซ็ต 07:00 น. · ภาพออกมาเป็นสี่เหลี่ยมจัตุรัส ครอปเป็น 9:16 ตอนตัดต่อ</p></div>`;
   botParts();if(!BOT.s||BOT.err)botLoad();}
 
+/* ---------- กล่องพับได้ (จำว่าเปิดอันไหนไว้) ---------- */
+const DOPEN={};
+function det(k,sum,body,def){const o=k in DOPEN?DOPEN[k]:!!def;return `<details class="fold" data-dk="${esc(k)}"${o?' open':''}><summary>${sum}</summary><div class="fbody">${body}</div></details>`;}
+document.addEventListener('toggle',e=>{const d=e.target;if(d.dataset&&d.dataset.dk)DOPEN[d.dataset.dk]=d.open;},true);
+function shortMsg(m){m=String(m||'');const i=m.indexOf('[["');if(i>=0){const x=/exception_message\W+([^"\\]{3,120})/.exec(m);m=m.slice(0,i).trim()+' '+(x?x[1]:'(เครื่องแจ้งข้อผิดพลาด ระบบจะซ่อมเอง)');}return m.length>220?m.slice(0,220)+'…':m;}
 function botParts(){const st=$('#botStat');if(!st)return;
   const keep={};['kUser','kKey'].forEach(id=>{const el=$('#'+id);if(el)keep[id]={v:el.value,f:document.activeElement===el,ss:el.selectionStart};});
   botParts0(st);
@@ -669,14 +687,17 @@ function botParts0(st){const S=BOT.s;
     <div>${line}${fail?` · <span style="color:var(--red)">พัง ${fail}</span>`:''}${S.hasPassword?'':' · <span style="color:var(--you)">⚠️ บอทยังไม่ได้ตั้งรหัสผ่าน</span>'}</div>
     ${kLine()}
     <div class="row"><button class="btn sm" data-bot="runnow">สร้างภาพถัดไปเดี๋ยวนี้</button><button class="btn sm" data-bot="resume">ทำต่อ / ลองใหม่ที่พัง</button><button class="btn sm" data-bot="clearq">ล้างคิว</button></div>
-    ${S.notices.length?S.notices.slice(0,4).map(n=>`<div class="report">${esc(n.msg)} <span class="muted">${tTH(n.created)}</span></div>`).join('')+'<div><button class="btn sm" data-bot="clearn">ล้างแจ้งเตือน</button></div>':''}`;
+    ${S.notices.length?det('noti',`🔔 แจ้งเตือน <span class="dn">${S.notices.length}</span><small>${esc(shortMsg(S.notices[0].msg).slice(0,60))}…</small>`,S.notices.slice(0,8).map(n=>`<div class="report">${esc(shortMsg(n.msg))} <span class="muted">${tTH(n.created)}</span></div>`).join('')+'<div><button class="btn sm" data-bot="clearn">ล้างแจ้งเตือน</button></div>'):''}`;
   const ST={queued:'รอคิว',running:'กำลังสร้าง',failed:'พัง'};
-  $('#botQ').innerHTML=S.jobs.length?S.jobs.slice(0,40).map(j=>`<div class="mem"><span style="min-width:0"><b>${esc(j.project)} · ฉาก ${esc(j.scene)}</b><small>${esc(String(j.prompt).slice(0,110))}${j.error?' — '+esc(j.error):''}</small></span><span class="on" style="color:${j.status==='failed'?'var(--red)':j.status==='running'?'var(--you)':'var(--muted)'}">${ST[j.status]||esc(j.status)}</span></div>`).join('')+(S.jobs.length>40?`<p class="muted" style="margin:0">และอีก ${S.jobs.length-40} งาน</p>`:''):'<p class="muted" style="margin:0">ไม่มีงานในคิว</p>';
+  const qg={};S.jobs.forEach(j=>(qg[j.project]=qg[j.project]||[]).push(j));
+  $('#botQ').innerHTML=S.jobs.length?Object.entries(qg).map(([pj,a])=>{const f=a.filter(j=>j.status==='failed').length,r=a.filter(j=>j.status==='running').length;
+    return det('q|'+pj,`${esc(pj)} <span class="dn">${a.length}</span>${r?'<small style="color:var(--you)">✨ กำลังสร้าง</small>':''}${f?`<small style="color:var(--red)">พัง ${f}</small>`:''}`,
+      a.slice(0,30).map(j=>`<div class="mem"><span style="min-width:0"><b>ฉาก ${esc(j.scene)}</b><small>${esc(String(j.prompt).slice(0,110))}${j.error?' — '+esc(shortMsg(j.error)):''}</small></span><span class="on" style="color:${j.status==='failed'?'var(--red)':j.status==='running'?'var(--you)':'var(--muted)'}">${ST[j.status]||esc(j.status)}</span></div>`).join('')+(a.length>30?`<p class="muted" style="margin:0">และอีก ${a.length-30} งาน</p>`:''));}).join(''):'<p class="muted" style="margin:0">ไม่มีงานในคิว</p>';
   const projs=[...new Set(S.images.map(i=>i.project))];if(BOT.proj&&!projs.includes(BOT.proj))BOT.proj='';
   $('#bGP').innerHTML='<option value="">ทุกโปรเจกต์</option>'+projs.map(p=>`<option value="${esc(p)}"${p===BOT.proj?' selected':''}>${esc(p)}</option>`).join('');
   const im=S.images.filter(i=>(!BOT.proj||i.project===BOT.proj)&&(!BOT.star||i.starred)),g={};
   im.forEach(i=>{const k=i.project+' · '+(+i.scene?'ฉาก '+i.scene:'ภาพต้นแบบ');(g[k]=g[k]||[]).push(i);});
-  $('#botG').innerHTML=Object.keys(g).length?Object.entries(g).map(([k,a])=>`<div class="sec"><span class="lab">${esc(k)}</span><span class="muted" style="font-size:13px">${esc(String(a[0].prompt).slice(0,140))}</span><div class="bgrid">${a.map(i=>botCard(i)).join('')}</div></div>`).join(''):'<p class="muted" style="margin:0">ยังไม่มีภาพ</p>';
+  $('#botG').innerHTML=Object.keys(g).length?Object.entries(g).map(([k,a],ix)=>det('g|'+k,`${esc(k)} <span class="dn">${a.length}</span>${a.some(i=>i.starred)?'<small>⭐</small>':''}`,`<span class="muted" style="font-size:13px">${esc(String(a[0].prompt).slice(0,140))}</span><div class="bgrid">${a.map(i=>botCard(i)).join('')}</div>`,ix===0)).join(''):'<p class="muted" style="margin:0">ยังไม่มีภาพ</p>';
   const sb_=document.querySelector('[data-bot="staronly"]');if(sb_)sb_.classList.toggle('main',BOT.star);
   if(!BOT.filled){$('#bChar').value=s.character||'';$('#bStyle').value=s.style||'';$('#bInt').value=s.interval_min||2;$('#bSteps').value=s.steps||4;BOT.filled=true;}}
 
@@ -1095,10 +1116,11 @@ function audioHtml(){const V=BOT.v;if(!V)return '';
   const CATS=[['เพลง','🎵','เพลงบรรเลง (ACE-Step)'],['เสียงประกอบ','🔊','เสียงประกอบ: สัตว์ ธรรมชาติ ชีวิตประจำวัน อนิเมะ ต่อสู้ อาคม (Stable Audio Open)']];
   const body=CATS.map(([c,ic,d])=>{const pre='คลัง·'+c+'·';
     const vs=V.videos.filter(v=>String(v.project).startsWith(pre)),js=V.jobs.filter(j=>String(j.project).startsWith(pre)&&j.status!=='done');
-    const rows=vs.map(v=>`<div class="arow"><div class="row" style="justify-content:space-between"><b>${esc(String(v.project).slice(pre.length))}</b><span class="muted small">${v.sec?Math.round(v.sec/60)+' นาทีทำ · ':''}${Math.round(v.size/1024)} KB <button class="btn sm" data-bot="vdel" data-id="${v.id}" aria-label="ลบ">🗑</button></span></div><audio controls preload="none" src="${esc(botU('/vid/'+v.id))}" style="width:100%"></audio></div>`).join('');
+    const rows=vs.map(v=>`<div class="arow"><div class="row" style="justify-content:space-between"><b>${esc(String(v.project).slice(pre.length))}</b><span class="muted small">${v.sec?Math.round(v.sec/60)+' นาทีทำ · ':''}${Math.round(v.size/1024)} KB <button class="btn sm" data-bot="vdel" data-id="${v.id}" aria-label="ลบ">🗑</button></span></div><audio controls preload="metadata" src="${esc(botU('/vid/'+v.id))}" class="aplay"></audio></div>`).join('');
     const run=js.filter(j=>j.status==='running'),fl=js.filter(j=>j.status==='failed'),qn=js.filter(j=>j.status==='queued').length;
-    const pend=[...run.map(j=>`<span class="st doing">✨ กำลังทำ ${esc(String(j.project).slice(pre.length))}</span>`),...fl.slice(0,3).map(j=>`<span class="st">⚠️ พัง ${esc(String(j.project).slice(pre.length))}${j.error?' · '+esc(String(j.error).slice(0,80)):''}</span>`),qn?`<span class="st todo">⏳ รอคิว ${qn} ไฟล์</span>`:''].join('');
-    return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${ic} ${c}</h3><span class="muted small">${vs.length} ไฟล์</span></div><span class="muted small">${d}</span>${pend?`<div class="row">${pend}</div>`:''}${rows||'<span class="muted small">ยังไม่มีไฟล์ จะเริ่มทำในรอบรายวันถัดไป หรือสั่งทำเองข้างล่าง</span>'}</div>`;}).join('');
+    const pend=[...run.map(j=>`<span class="st doing">✨ กำลังทำ ${esc(String(j.project).slice(pre.length))}</span>`),qn?`<span class="st todo">⏳ รอคิว ${qn} ไฟล์</span>`:''].join('');
+    const fails=fl.length?det('af|'+c,`⚠️ พัง ${fl.length} ไฟล์<small>ระบบจะซ่อมและลองใหม่เอง</small>`,fl.slice(0,20).map(j=>`<div class="muted small">• ${esc(String(j.project).slice(pre.length))}${j.error?' — '+esc(shortMsg(j.error).slice(0,120)):''}</div>`).join('')):'';
+    return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${ic} ${c}</h3><span class="muted small">${vs.length} ไฟล์</span></div><span class="muted small">${d}</span>${pend?`<div class="row">${pend}</div>`:''}${fails}${rows?det('al|'+c,`📂 ฟังไฟล์ <span class="dn">${vs.length}</span>`,rows,vs.length<=6):'<span class="muted small">ยังไม่มีไฟล์ จะเริ่มทำในรอบรายวันถัดไป หรือสั่งทำเองข้างล่าง</span>'}</div>`;}).join('');
   return body+`<div class="card"><h3>🎙️ สั่งทำเสียงเอง</h3><div class="row"><select id="audType"><option value="sfx">เสียงประกอบ (10 วิ)</option><option value="music">เพลงบรรเลง (60 วิ)</option></select></div>
     <input type="text" id="audTxt" placeholder="บรรยายเป็นภาษาอังกฤษ เช่น a cat meowing softly" autocomplete="off"><input type="text" id="audName" placeholder="ชื่อในคลัง เช่น แมวร้องเบาๆ" autocomplete="off">
     <div><button class="btn sm main" data-bot="audnew">ส่งเข้าคิว</button></div><span class="muted small">เพลงทำด้วย ACE-Step (ใช้เชิงการค้าได้) · เสียงประกอบทำด้วย Stable Audio Open (ใช้เชิงการค้าได้ถ้ารายได้ต่ำกว่า 1 ล้านดอลลาร์ต่อปี)</span></div>`;}
