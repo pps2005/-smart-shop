@@ -245,6 +245,11 @@ const KSLUG = 'anime-video-bot';
 const VCHUNK = 1000000; // ไบต์ต่อแถว (D1 จำกัด ~2MB/แถว เก็บเป็น base64)
 const VNEG = 'blurry, distorted face, deformed hands, extra fingers, morphing, flickering, sudden movement, text, watermark';
 
+function kEnv(env) { // รับชื่อ secret ได้หลายแบบ: KAGGLE_KEY / Token
+  if (!env.KAGGLE_KEY) env.KAGGLE_KEY = env.Token || env.TOKEN || env.token || env.KAGGLE_TOKEN || '';
+  if (!env.KAGGLE_USERNAME) env.KAGGLE_USERNAME = env.Username || env.USERNAME || env.username || env.KAGGLE_USER || '';
+  return env;
+}
 async function vRoutes(req, env, url, ctx) {
   const p = url.pathname;
   // ---- ฝั่ง Kaggle kernel (ยืนยันด้วย token แยก) ----
@@ -306,6 +311,7 @@ async function vRoutes(req, env, url, ctx) {
 // ---- ฝั่งสตูดิโอ (ผ่าน PASSWORD แล้ว) ----
 async function vApi(req, env, url, ctx, body) {
   const p = url.pathname;
+  kEnv(env);
   if (p === '/api/vstate') {
     const s = await getSettings(env);
     const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started FROM vjobs WHERE status!='done' ORDER BY id LIMIT 300").all()).results;
@@ -365,6 +371,7 @@ async function kFetch(env, path, init) {
   return { ok: r.ok, status: r.status, j };
 }
 async function vTick(env, force) {
+  kEnv(env);
   if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return { skipped: 'no kaggle' };
   await ensureSchema(env);
   const q = await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status='queued'").first();
