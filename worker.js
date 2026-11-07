@@ -2,6 +2,7 @@
 // Bindings ที่ต้องตั้งใน Cloudflare:  AI (Workers AI),  DB (D1: anime-bot-db)
 // Variables (Secret):  PASSWORD   | ไม่บังคับ: TG_TOKEN, TG_CHAT (แจ้งเตือน Telegram)
 // Cron Trigger:  * * * * *   (บอทเช็คทุกนาที แต่สร้างภาพตามระยะห่างที่ตั้งในเว็บ)
+// ใช้คู่กับ studio.html แท็บ "เจนภาพ" (เรียก API นี้ข้ามโดเมน จึงเปิด CORS ไว้ · ป้องกันด้วย PASSWORD)
 
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
@@ -9,10 +10,12 @@ export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     const p = url.pathname;
+    if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (p === '/') return new Response(HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
     if (!authOK(req, url, env)) return json({ error: 'รหัสผ่านไม่ถูกต้อง' }, 401);
     await ensureSchema(env);
     try {
+      if (p === '/api/ping') return json({ ok: true, bot: 'anime-image-bot' });
       if (p === '/api/state') return json(await getState(env));
       if (p.startsWith('/img/')) return getImage(env, +p.split('/')[2]);
       if (p === '/api/zip') return makeZip(env, url.searchParams.get('project') || '', url.searchParams.get('starred') === '1');
@@ -85,6 +88,22 @@ async function tick(env, force) {
 
 async function enqueue(env, b) {
   const project = (b.project || 'โปรเจกต์ใหม่').trim().slice(0, 60);
+  const s0 = await getSettings(env);
+  // แบบส่งจากสตูดิโอ: items = [{scene, prompt}] กำหนดเลขฉากเอง · raw = ใช้ prompt ตามที่เขียนมา ไม่เติมตัวละคร/สไตล์
+  if (Array.isArray(b.items) && b.items.length) {
+    const variants = Math.min(8, Math.max(1, +b.variants || 1));
+    const stmts = [];
+    for (const it of b.items.slice(0, 200)) {
+      const pr = String(it.prompt || '').trim();
+      if (!pr) continue;
+      const full = b.raw ? pr : [s0.character, pr, s0.style].filter(x => x && x.trim()).join(', ');
+      for (let v = 0; v < variants; v++)
+        stmts.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created) VALUES (?,?,?,'queued',?)").bind(project, +it.scene || 0, full, Date.now()));
+    }
+    if (!stmts.length) return { error: 'ไม่มี prompt' };
+    await env.DB.batch(stmts);
+    return { ok: true, added: stmts.length };
+  }
   const lines = String(b.lines || '').split('\n').map(x => x.trim()).filter(Boolean);
   const variants = Math.min(8, Math.max(1, +b.variants || 1));
   if (!lines.length) return { error: 'ยังไม่ได้ใส่ prompt' };
@@ -113,7 +132,9 @@ async function getState(env) {
 async function getImage(env, id) {
   const r = await env.DB.prepare('SELECT data FROM images WHERE id=?').bind(id).first();
   if (!r) return new Response('not found', { status: 404 });
-  return new Response(b64ToBytes(r.data), { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=86400' } });
+  const bytes = b64ToBytes(r.data);
+  const type = bytes[0] === 0x89 && bytes[1] === 0x50 ? 'image/png' : bytes[0] === 0x52 && bytes[8] === 0x57 ? 'image/webp' : 'image/jpeg';
+  return new Response(bytes, { headers: { 'content-type': type, 'cache-control': 'private, max-age=86400', ...CORS } });
 }
 
 // ---------- ZIP (stored, no compression) ----------
@@ -147,7 +168,7 @@ async function makeZip(env, project, starredOnly) {
   end.setUint32(0, 0x06054b50, true); end.setUint16(8, rows.length, true); end.setUint16(10, rows.length, true);
   end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
   const blob = new Blob([...parts, ...central, new Uint8Array(end.buffer)]);
-  return new Response(blob, { headers: { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="images.zip"` } });
+  return new Response(blob, { headers: { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="images.zip"`, ...CORS } });
 }
 const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c; } return t; })();
 function crc32(b) { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
@@ -158,7 +179,8 @@ function authOK(req, url, env) {
   if (!env.PASSWORD) return true;
   return (url.searchParams.get('k') || req.headers.get('x-key')) === env.PASSWORD;
 }
-function json(o, status = 200) { return new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } }); }
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,x-key', 'access-control-max-age': '86400' };
+function json(o, status = 200) { return new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json', ...CORS } }); }
 function b64ToBytes(b64) { const s = atob(b64); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
 async function getSettings(env) {
   const r = await env.DB.prepare('SELECT key,value FROM settings').all();

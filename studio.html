@@ -74,6 +74,18 @@ body.far .tag{padding:4px;gap:4px}body.far .tag>span:nth-child(2){display:none}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 textarea,input[type=text],input[type=email],input[type=password],select{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#0f1628}
 textarea{min-height:90px;resize:vertical}
+input[type=number]{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#0f1628}
+/* บอทเจนภาพ (Flux) */
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.bimg{border:2px solid transparent;border-radius:12px;overflow:hidden;background:#000;display:grid;align-content:start}
+.bimg.star{border-color:var(--you)}
+.bimg img{width:100%;aspect-ratio:1;object-fit:cover;display:block;cursor:zoom-in}
+.bimg .bb{display:flex;gap:4px;padding:4px;flex-wrap:wrap;justify-content:space-between;background:#0f1628}
+.bimg .bb button{min-height:34px;padding:2px 9px;border-radius:9px;border:1px solid var(--line);background:#1e2842;cursor:pointer;font-size:14px}
+.bimg .bb .use{flex:1 1 100%;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:600}
+.botthumbs:empty{display:none}.botthumbs{display:grid;gap:6px}
+#bview{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.9);display:grid;place-items:center;padding:16px}
+#bview img{max-width:100%;max-height:88vh;border-radius:12px}
 
 /* task card */
 .task{background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:6px}
@@ -150,11 +162,11 @@ body.panel #zoom{display:none}
     <button data-v="office" class="on">ออฟฟิศ</button>
     <button data-v="tasks">งาน<b id="youN" hidden>0</b></button>
     <button data-v="eps">ตอน</button>
+    <button data-v="gen">เจนภาพ 🎨</button>
     <button data-v="brain">สมองกลาง</button>
   </nav>
   <span class="grow"></span>
   <span class="chip" id="stat"><span class="dot"></span><span id="statT">กำลังโหลด…</span></span>
-  <a class="ib" href="anim.html" aria-label="สร้างอนิเมชั่นจากรูป" title="สร้างอนิเมชั่นจากรูป">🎞</a>
   <button class="ib" id="hideBtn" aria-label="ซ่อน UI" title="ซ่อน UI">👁</button>
 </header>
 
@@ -194,9 +206,9 @@ const TEAMS=[
  {k:'story',n:'บท & สตอรี่บอร์ด',ic:'✍️',c:'#F97316',nk:'บท',mode:'claude',job:'เขียนเรื่อง แตกเป็นช็อต และเขียน prompt ภาพ/วิดีโอ',
   ag:[['เจ','หัวหน้าทีม · ผู้กำกับ'],['แนน','เขียนบท'],['ภูมิ','เขียน prompt รายช็อต']],sk:['โครงเรื่อง','สตอรี่บอร์ด','image prompt','video prompt'],tools:['Claude']},
  {k:'character',n:'ออกแบบตัวละคร',ic:'🧑‍🎨',c:'#EC4899',nk:'ออกแบบตัวละคร',mode:'mixed',job:'ออกแบบตัวละครประจำช่องและภาพต้นแบบ',
-  ag:[['มายด์','หัวหน้าทีม · ออกแบบตัวละคร'],['แพร','character sheet']],sk:['ลุคจำง่าย','character sheet','คุมหน้าให้เหมือนเดิม'],tools:['Claude คิด prompt','แอปเจนภาพฟรี (คุณกด)']},
+  ag:[['มายด์','หัวหน้าทีม · ออกแบบตัวละคร'],['แพร','character sheet']],sk:['ลุคจำง่าย','character sheet','คุมหน้าให้เหมือนเดิม'],tools:['Claude คิด prompt','บอท Flux เจนให้อัตโนมัติ (แท็บเจนภาพ)','คุณเลือกภาพ']},
  {k:'graphic',n:'กราฟิก',ic:'🎨',c:'#D946EF',nk:'กราฟิก',mode:'mixed',job:'ภาพแต่ละช็อตและปกคลิป',
-  ag:[['ไอซ์','หัวหน้าทีม · ภาพช็อต'],['เฟิร์น','ปกคลิป']],sk:['ภาพช็อต','ปกคลิป','ตัวอักษรบนภาพ'],tools:['แอปเจนภาพฟรี (คุณกด)','CapCut']},
+  ag:[['ไอซ์','หัวหน้าทีม · ภาพช็อต'],['เฟิร์น','ปกคลิป']],sk:['ภาพช็อต','ปกคลิป','ตัวอักษรบนภาพ'],tools:['บอท Flux เจนให้อัตโนมัติ (แท็บเจนภาพ)','คุณเลือกภาพ ⭐','CapCut']},
  {k:'anim',n:'อนิเมชัน',ic:'🎞️',c:'#8B5CF6',nk:'อนิเมชัน',mode:'you',job:'ทำภาพให้ขยับทีละช็อต',
   ag:[['กาย','หัวหน้าทีม · image-to-video'],['นิว','ช็อตแอ็กชัน'],['ปั้น','คัดรอบที่ดีที่สุด']],sk:['image-to-video','สโลว์โมชัน','กล้องเคลื่อน'],tools:['Kling / Hailuo / Vidu (เครดิตฟรี คุณกด)']},
  {k:'voice',n:'พากย์ & ซับ',ic:'🎙️',c:'#14B8A6',nk:'พากย์',mode:'mixed',job:'เสียงพากย์ไทย ซับ และตัวอักษรบนจอ',
@@ -444,7 +456,10 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button');i
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)setView(b.dataset.v);});
 function setView(v){view=v;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
   const off=v==='office';$('#view').hidden=off;$('#tags').style.display=off?'':'none';$('#zoom').style.display=off?'':'none';
-  if(!off)closePanel();if(v==='tasks')renderTasks();if(v==='brain')renderBrain();if(v==='eps'){ep?renderEp():renderEpList();}}
+  if(!off)closePanel();if(v==='tasks')renderTasks();if(v==='brain')renderBrain();if(v==='eps'){ep?renderEp():renderEpList();}if(v==='gen')renderGen();fitView();}
+// มือถือ: แถบแท็บขึ้นบรรทัดสอง → ดันหน้าเนื้อหาลงตามความสูงหัวจริง ไม่ให้บังแท็บ
+function fitView(){const h=$('#top').getBoundingClientRect().height;$('#view').style.top=Math.ceil(h)+'px';}
+addEventListener('resize',fitView);
 $('#hideBtn').onclick=()=>{document.body.classList.add('hide');$('#tags').style.visibility='hidden';};
 $('#eye').onclick=()=>{document.body.classList.remove('hide');$('#tags').style.visibility='';};
 
@@ -479,16 +494,17 @@ function renderEp(){const S=ep.shots||[],tot=S.reduce((a,s)=>a+(+s.sec||0),0),ni
     <div class="card"><h3>อยากให้แก้อะไร</h3>${ep.feedback?copyBox('ฟีดแบ็กล่าสุด'+(ep.status==='revise'?' (รอ Claude แก้)':''),ep.feedback):''}
       <textarea id="fb" placeholder="เช่น ช็อต 6 อยากให้หมุนช้ากว่านี้"></textarea>
       <div class="row"><button class="btn" data-act="feedback">ส่งให้ Claude แก้</button>${ep.status==='draft'||ep.status==='revise'?'<button class="btn ok" data-act="approve">✓ อนุมัติเป็นต้นฉบับ</button>':''}${ep.status==='approved'?'<button class="btn ok" data-act="posted">โพสต์แล้ว</button>':''}</div></div>`;
-  if(epTab==='character')body=`<div class="card"><h3>ตัวละครหลัก</h3><p class="muted" style="margin:0">เจนภาพต้นแบบก่อน แล้วใช้เป็นภาพอ้างอิงทุกช็อต</p>${copyBox('Prompt ภาพต้นแบบ',ep.character_sheet_prompt)}${copyBox('คำบรรยายตัวละคร',ep.character)}<div class="media">${slot('char','image','ภาพต้นแบบ')}</div></div>`;
-  if(epTab==='shots')body=`<div class="card row"><button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+'\n'+s.image_prompt).join('\n\n'))}">คัดลอก image prompt ทุกช็อต</button><button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+' ('+s.sec+'s)\n'+s.video_prompt).join('\n\n'))}">คัดลอก video prompt ทุกช็อต</button></div>
+  if(epTab==='character')body=`<div class="card"><h3>ตัวละครหลัก</h3><p class="muted" style="margin:0">เจนภาพต้นแบบก่อน แล้วใช้เป็นภาพอ้างอิงทุกช็อต</p>${copyBox('Prompt ภาพต้นแบบ',ep.character_sheet_prompt)}${copyBox('คำบรรยายตัวละคร',ep.character)}<div class="media">${slot('char','image','ภาพต้นแบบ')}</div>${ep.character_sheet_prompt?botBtn('epchar','','🎨 ให้บอทเจนภาพต้นแบบ (3 แบบ)'):''}<div class="botthumbs" data-k="char"></div></div>`;
+  if(epTab==='shots')body=`<div class="card row"><button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+'\n'+s.image_prompt).join('\n\n'))}">คัดลอก image prompt ทุกช็อต</button><button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+' ('+s.sec+'s)\n'+s.video_prompt).join('\n\n'))}">คัดลอก video prompt ทุกช็อต</button>${botBtn('epall','','🎨 ให้บอทเจนภาพทุกช็อต (ช็อตละ 3 แบบ)',true)}</div>
     ${S.map(s=>`<div class="shot"><div class="no"><b>${esc(s.n)}</b><span class="muted">${esc(s.sec)} วิ</span></div><div class="bd"><div class="row"><span class="pill">${esc(s.shot)}</span>${s.sound?`<span class="pill">เสียง: ${esc(s.sound)}</span>`:''}</div>
       <div>${esc(s.action)}</div>${s.text?`<div><b>ตัวอักษรบนจอ:</b> ${esc(s.text)}</div>`:''}<div class="media">${slot(String(s.n),'image','ภาพช็อต')}${slot(String(s.n),'video','คลิปช็อต')}</div>
-      ${copyBox('1) Image prompt',s.image_prompt)}${copyBox('2) Video prompt',s.video_prompt)}</div></div>`).join('')}`;
+      ${copyBox('1) Image prompt',s.image_prompt)}${s.image_prompt?botBtn('epone',s.n,'🎨 ให้บอทเจนช็อตนี้'):''}<div class="botthumbs" data-k="${esc(s.n)}"></div>${copyBox('2) Video prompt',s.video_prompt)}</div></div>`).join('')}`;
   if(epTab==='post'){const cap=(ep.caption||'')+'\n\n'+(ep.hashtags||[]).join(' ');body=`<div class="card"><h3>เพลงและเสียง</h3><p style="margin:0">${esc(ep.music)}</p></div>
     <div class="card"><h3>ตัดต่อใน CapCut</h3><ol class="howto">${S.map(s=>`<li>ช็อต ${esc(s.n)} ยาว ${esc(s.sec)} วิ${s.text?` · ข้อความ "${esc(s.text)}"`:''}${s.sound?` · ${esc(s.sound)}`:''}</li>`).join('')}</ol></div>
     <div class="card"><h3>แคปชัน</h3>${copyBox('แคปชันและแฮชแท็ก',cap)}<p class="muted" style="margin:0">ตอนโพสต์เปิดป้าย "เนื้อหาที่สร้างด้วย AI" ทุกแพลตฟอร์ม</p></div>`;}
   $('#vw').innerHTML=`<div class="row"><button class="btn sm" data-act="eplist">← ตอนทั้งหมด</button></div><h2 style="font-size:26px">${esc(ep.title)}</h2>
-    <nav class="tabs">${Object.entries(TB).map(([k,v])=>`<button class="${k===epTab?'on':''}" data-eptab="${k}">${v}</button>`).join('')}</nav>${body}`;}
+    <nav class="tabs">${Object.entries(TB).map(([k,v])=>`<button class="${k===epTab?'on':''}" data-eptab="${k}">${v}</button>`).join('')}</nav>${body}`;
+  if(epTab==='shots'||epTab==='character'){botThumbsFill();if(botCfg().url&&!BOT.s)botLoad();}}
 $('#vw').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.eptab){epTab=b.dataset.eptab;return renderEp();}
   const a=b.dataset.act;if(!a)return;
@@ -523,6 +539,134 @@ $('#pNext').onclick=()=>{P.i=Math.min(P.i+1,(ep.shots||[]).length-1);showShot();
 $('#pPrev').onclick=()=>{P.i=Math.max(P.i-1,0);showShot();};
 $('#pVoice').onclick=()=>{P.voice=!P.voice;$('#pVoice').textContent='เสียงอ่าน: '+(P.voice?'เปิด':'ปิด');if(!P.voice)try{speechSynthesis.cancel();}catch(e){}};
 $('#pClose').onclick=()=>{P.playing=false;stopAll();$('#player').hidden=true;};
+
+/* ================= บอทเจนภาพ (Flux บน Cloudflare Worker: image-bot/) ================= */
+// ตั้งลิงก์บอท + รหัสผ่านครั้งเดียว เก็บใน localStorage 'ss_imgbot' (ต่อเครื่อง)
+const BOT={s:null,err:'',star:false,proj:'',filled:false};
+const tTH=ms=>new Date(+ms).toLocaleString('th-TH',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'});
+function botCfg(){try{return JSON.parse(localStorage.getItem('ss_imgbot')||'{}')||{};}catch(e){return {};}}
+function botSave(c){try{localStorage.setItem('ss_imgbot',JSON.stringify(c));}catch(e){}}
+function botU(p){const c=botCfg();return String(c.url||'').replace(/\/+$/,'')+p+(p.includes('?')?'&':'?')+'k='+encodeURIComponent(c.key||'');}
+function botErr(e){const m=String(e&&e.message||e);return /failed to fetch|load failed|networkerror|network request/i.test(m)?'ติดต่อบอทไม่ได้ ตรวจลิงก์บอท หรือบอทยังไม่ได้ deploy':m;}
+async function botApi(p,body){
+  const r=await fetch(botU(p),body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});
+  if(r.status===401)throw new Error('รหัสผ่านบอทไม่ถูกต้อง');
+  const j=await r.json().catch(()=>({error:'บอทตอบกลับไม่ถูกต้อง (ลิงก์ถูกไหม?)'}));
+  if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j;}
+async function botLoad(){if(!botCfg().url)return;
+  try{BOT.s=await botApi('/api/state');BOT.err='';}catch(e){BOT.err=botErr(e);}
+  if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
+  if(view==='eps'&&ep)botThumbsFill();}
+setInterval(()=>{if(document.hidden||!botCfg().url)return;
+  if(view==='gen'||(view==='eps'&&ep&&(epTab==='shots'||epTab==='character')))botLoad();},20000);
+function epBotProject(){return String(ep&&ep.title||'ตอน').slice(0,50);}
+function botBtn(a,n,label,main){return botCfg().url?`<div><button class="btn sm${main?' main':''}" data-bot="${a}" data-n="${esc(n)}">${label}</button></div>`:`<div><button class="btn sm" data-bot="gotogen">🎨 เชื่อมบอทเจนภาพก่อน</button></div>`;}
+function botCard(i,useK){return `<div class="bimg${i.starred?' star':''}"><img loading="lazy" src="${esc(botU('/img/'+i.id))}" alt="ภาพ ${i.id}" data-bot="view">
+  <div class="bb"><button data-bot="star" data-id="${i.id}" aria-label="เลือก">${i.starred?'⭐':'☆'}</button><button data-bot="regen" data-id="${i.id}" aria-label="เจนใหม่">🔁</button><button data-bot="del" data-id="${i.id}" aria-label="ลบ">🗑</button>
+  ${useK!==undefined?`<button class="use" data-use="${esc(useK)}|${i.id}|${i.starred?1:0}">ใช้ภาพนี้</button>`:''}</div></div>`;}
+
+function renderGen(){const c=botCfg();BOT.filled=false;
+  if(!c.url){$('#vw').innerHTML=`<div class="card"><h2>🎨 เจนภาพด้วยบอท Flux</h2>
+    <p class="muted" style="margin:0">บอทอยู่บน Cloudflare ของคุณ เจนภาพฟรีประมาณ 200 ภาพ/วัน ทยอยทำตามคิวเอง แม้ปิดเว็บไปแล้ว ใส่ลิงก์บอทกับรหัสผ่านครั้งเดียว เครื่องนี้จะจำไว้</p>
+    <input type="text" id="botUrl" placeholder="https://anime-image-bot.xxxx.workers.dev" autocapitalize="off" autocomplete="off" spellcheck="false">
+    <input type="password" id="botKey" placeholder="รหัสผ่านบอท (PASSWORD ที่ตั้งใน Cloudflare)">
+    <div class="row"><button class="btn main" data-bot="connect">เชื่อมต่อ</button></div><p class="muted" id="botMsg" style="margin:0"></p></div>`;return;}
+  $('#vw').innerHTML=`<div class="card" id="botStat"></div>
+  <div class="card"><h3>สั่งเจนภาพ</h3>
+    <input type="text" id="bProj" placeholder="ชื่อโปรเจกต์ / ตอน เช่น EP01">
+    <textarea id="bLines" placeholder="prompt ฉากละ 1 บรรทัด (ภาษาอังกฤษได้ผลดีที่สุด)&#10;standing on a train platform, winter morning&#10;pointing at the sky, smiling, snow falling"></textarea>
+    <div class="row"><label class="muted">ฉากละ <select id="bVar" style="width:auto"><option>1</option><option>2</option><option selected>3</option><option>4</option></select> แบบ</label>
+      <label class="muted"><input type="checkbox" id="bAdd" checked> เติมคำอธิบายตัวละคร + สไตล์ให้</label></div>
+    <div><button class="btn main" data-bot="enqueue">เพิ่มเข้าคิว</button></div>
+    <p class="muted" style="margin:0">มีตอนที่ Claude เขียนแล้ว? เปิดแท็บ "ตอน" → "ช็อตและ prompt" แล้วกด "ให้บอทเจนภาพทุกช็อต" ได้เลย</p></div>
+  <div class="card"><h3>คิว</h3><div id="botQ"></div></div>
+  <div class="card"><div class="row"><h3 style="margin-right:auto">คลังภาพ</h3><select id="bGP" style="width:auto;max-width:60%"></select><button class="btn sm" data-bot="staronly">⭐ เฉพาะที่เลือก</button></div>
+    <div class="row"><button class="btn sm" data-bot="zipstar">⬇️ โหลด ZIP เฉพาะ ⭐</button><button class="btn sm" data-bot="zipall">⬇️ โหลด ZIP ทั้งหมด</button></div><div id="botG" style="display:grid;gap:14px"></div></div>
+  <div class="card"><h3>ตั้งค่าบอท</h3>
+    <span class="muted">คำอธิบายตัวละคร (ใส่หน้าทุก prompt เพื่อให้หน้าตาใกล้เคียงกัน)</span><textarea id="bChar" placeholder="1girl, short black bob hair, low side ponytail, brown eyes, white hoodie"></textarea>
+    <span class="muted">สไตล์ (ต่อท้ายทุก prompt)</span><textarea id="bStyle"></textarea>
+    <div class="row"><label class="muted">ห่างกัน <input id="bInt" type="number" min="1" style="width:80px"> นาที/ภาพ</label><label class="muted">คุณภาพ <input id="bSteps" type="number" min="1" max="8" style="width:70px"> steps (1–8)</label></div>
+    <div class="row"><button class="btn main" data-bot="save">บันทึก</button><button class="btn sm" data-bot="disconnect">เปลี่ยนลิงก์/รหัสบอท</button></div>
+    <p class="muted" style="margin:0">ฟรีประมาณ 200 ภาพ/วันที่ 4 steps (steps มากขึ้น = ละเอียดขึ้นแต่กินโควตามากขึ้น) · โควตารีเซ็ต 07:00 น. · ภาพออกมาเป็นสี่เหลี่ยมจัตุรัส ครอปเป็น 9:16 ตอนตัดต่อ</p></div>`;
+  botParts();if(!BOT.s||BOT.err)botLoad();}
+
+function botParts(){const st=$('#botStat');if(!st)return;const S=BOT.s;
+  if(BOT.err&&!S){st.innerHTML=`<h3>เชื่อมบอทไม่ได้</h3><p class="muted" style="margin:0">${esc(BOT.err)}</p><div class="row"><button class="btn sm" data-bot="reload">ลองใหม่</button><button class="btn sm" data-bot="disconnect">แก้ลิงก์/รหัส</button></div>`;return;}
+  if(!S){st.innerHTML='<p class="muted" style="margin:0">กำลังเชื่อมบอท…</p>';return;}
+  const s=S.settings,qd=S.jobs.filter(j=>j.status!=='failed').length,fail=S.jobs.length-qd,paused=S.now<+s.paused_until;
+  const line=paused?`⏸ พักอยู่ (โควตาฟรีวันนี้หมด) · ทำต่อเองประมาณ ${tTH(s.paused_until)}`:qd?`▶️ กำลังทำงาน · เหลือ ${qd} ภาพ · ภาพถัดไปประมาณ ${tTH(Math.max(S.now,+s.last_run+s.interval_min*60000))}`:'✅ คิวว่าง';
+  st.innerHTML=`<div class="row"><h3 style="margin-right:auto">🎨 บอทเจนภาพ</h3><span class="chip"><span class="dot"></span>${S.images.length} ภาพในคลัง</span></div>
+    <div>${line}${fail?` · <span style="color:var(--red)">พัง ${fail}</span>`:''}${S.hasPassword?'':' · <span style="color:var(--you)">⚠️ บอทยังไม่ได้ตั้งรหัสผ่าน</span>'}</div>
+    <div class="row"><button class="btn sm" data-bot="runnow">สร้างภาพถัดไปเดี๋ยวนี้</button><button class="btn sm" data-bot="resume">ทำต่อ / ลองใหม่ที่พัง</button><button class="btn sm" data-bot="clearq">ล้างคิว</button></div>
+    ${S.notices.length?S.notices.slice(0,4).map(n=>`<div class="report">${esc(n.msg)} <span class="muted">${tTH(n.created)}</span></div>`).join('')+'<div><button class="btn sm" data-bot="clearn">ล้างแจ้งเตือน</button></div>':''}`;
+  const ST={queued:'รอคิว',running:'กำลังสร้าง',failed:'พัง'};
+  $('#botQ').innerHTML=S.jobs.length?S.jobs.slice(0,40).map(j=>`<div class="mem"><span style="min-width:0"><b>${esc(j.project)} · ฉาก ${esc(j.scene)}</b><small>${esc(String(j.prompt).slice(0,110))}${j.error?' — '+esc(j.error):''}</small></span><span class="on" style="color:${j.status==='failed'?'var(--red)':j.status==='running'?'var(--you)':'var(--muted)'}">${ST[j.status]||esc(j.status)}</span></div>`).join('')+(S.jobs.length>40?`<p class="muted" style="margin:0">และอีก ${S.jobs.length-40} งาน</p>`:''):'<p class="muted" style="margin:0">ไม่มีงานในคิว</p>';
+  const projs=[...new Set(S.images.map(i=>i.project))];if(BOT.proj&&!projs.includes(BOT.proj))BOT.proj='';
+  $('#bGP').innerHTML='<option value="">ทุกโปรเจกต์</option>'+projs.map(p=>`<option value="${esc(p)}"${p===BOT.proj?' selected':''}>${esc(p)}</option>`).join('');
+  const im=S.images.filter(i=>(!BOT.proj||i.project===BOT.proj)&&(!BOT.star||i.starred)),g={};
+  im.forEach(i=>{const k=i.project+' · '+(+i.scene?'ฉาก '+i.scene:'ภาพต้นแบบ');(g[k]=g[k]||[]).push(i);});
+  $('#botG').innerHTML=Object.keys(g).length?Object.entries(g).map(([k,a])=>`<div class="sec"><span class="lab">${esc(k)}</span><span class="muted" style="font-size:13px">${esc(String(a[0].prompt).slice(0,140))}</span><div class="bgrid">${a.map(i=>botCard(i)).join('')}</div></div>`).join(''):'<p class="muted" style="margin:0">ยังไม่มีภาพ</p>';
+  const sb_=document.querySelector('[data-bot="staronly"]');if(sb_)sb_.classList.toggle('main',BOT.star);
+  if(!BOT.filled){$('#bChar').value=s.character||'';$('#bStyle').value=s.style||'';$('#bInt').value=s.interval_min||2;$('#bSteps').value=s.steps||4;BOT.filled=true;}}
+
+function botThumbsFill(){const els=document.querySelectorAll('.botthumbs');if(!els.length)return;const S=BOT.s,proj=epBotProject();
+  els.forEach(el=>{const k=el.dataset.k,sc=k==='char'?0:(+k||0);
+    if(!S){el.innerHTML='';return;}
+    const im=S.images.filter(i=>i.project===proj&&+i.scene===sc),q=S.jobs.filter(j=>j.project===proj&&+j.scene===sc&&j.status!=='failed').length;
+    el.innerHTML=(im.length||q)?`<span class="lab">ภาพจากบอท ${im.length}${q?` · รอคิว ${q}`:''}</span>${im.length?`<div class="bgrid">${im.map(i=>botCard(i,k)).join('')}</div>`:''}`:'';});}
+
+async function botEnqueueEp(items,label){if(!items.length)return toast('ยังไม่มี prompt ให้เจน');
+  const r=await botApi('/api/enqueue',{project:epBotProject(),items,variants:3,raw:true});
+  const m=+((BOT.s&&BOT.s.settings&&BOT.s.settings.interval_min)||2);
+  toast(`ส่ง${label}เข้าคิวแล้ว ${r.added} ภาพ · ใช้เวลาประมาณ ${Math.round(r.added*m)} นาที`);}
+
+function botView(src){let v=$('#bview');if(!v){v=document.createElement('div');v.id='bview';v.onclick=()=>v.remove();document.body.appendChild(v);}v.innerHTML=`<img src="${esc(src)}" alt="">`;}
+
+function sure(b,txt){if(b.dataset.sure==='1')return true;const o=b.textContent;b.dataset.sure='1';b.textContent=txt;setTimeout(()=>{if(b.isConnected){b.dataset.sure='';b.textContent=o;}},4000);return false;}
+
+document.addEventListener('change',e=>{if(e.target.id==='bGP'){BOT.proj=e.target.value;botParts();}});
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot],[data-use]');if(!b)return;
+  try{
+    if(b.dataset.use){const [k,id,starred]=b.dataset.use.split('|');if(!ep)return;
+      b.disabled=true;b.textContent='กำลังใส่…';
+      const r=await fetch(botU('/img/'+id));if(!r.ok)throw new Error('โหลดภาพจากบอทไม่ได้');
+      const bl=await r.blob(),ty=bl.type||'image/jpeg',f=new File([bl],`flux-${id}.${ty.includes('png')?'png':ty.includes('webp')?'webp':'jpg'}`,{type:ty});
+      if(starred!=='1')botApi('/api/star',{id:+id}).catch(()=>{});
+      await upload(k,'image',f);return botLoad();}
+    const a=b.dataset.bot,id=+b.dataset.id;
+    switch(a){
+      case 'view':return botView(b.src);
+      case 'gotogen':return setView('gen');
+      case 'connect':{let u=$('#botUrl').value.trim();const k=$('#botKey').value;if(!u)return toast('ใส่ลิงก์บอทก่อน');
+        if(!/^https?:\/\//i.test(u))u='https://'+u;u=u.replace(/\/+$/,'');botSave({url:u,key:k});$('#botMsg').textContent='กำลังทดสอบ…';
+        try{await botApi('/api/ping');BOT.s=null;BOT.err='';toast('เชื่อมบอทแล้ว');renderGen();}catch(err){botSave({});$('#botMsg').textContent='เชื่อมไม่ได้: '+botErr(err);}return;}
+      case 'disconnect':if(!sure(b,'กดอีกครั้งเพื่อยืนยัน'))return;botSave({});BOT.s=null;BOT.err='';return renderGen();
+      case 'reload':BOT.err='';BOT.s=null;botParts();break;
+      case 'staronly':BOT.star=!BOT.star;return botParts();
+      case 'zipstar':case 'zipall':location.href=botU('/api/zip?project='+encodeURIComponent(BOT.proj)+(a==='zipstar'?'&starred=1':''));return;
+      case 'enqueue':{const lines=$('#bLines').value;if(!lines.trim())return toast('ใส่ prompt ก่อน');
+        const proj=$('#bProj').value.trim()||'โปรเจกต์ใหม่',add=$('#bAdd').checked,variants=+$('#bVar').value;
+        let r;if(add)r=await botApi('/api/enqueue',{project:proj,lines,variants});
+        else{const L=lines.split('\n').map(x=>x.trim()).filter(Boolean),S=BOT.s||{images:[],jobs:[]};
+          let mx=0;[...S.images,...S.jobs].forEach(x=>{if(x.project===proj)mx=Math.max(mx,+x.scene||0);});
+          r=await botApi('/api/enqueue',{project:proj,items:L.map((p,i)=>({scene:mx+i+1,prompt:p})),variants,raw:true});}
+        $('#bLines').value='';toast(`เพิ่มเข้าคิว ${r.added} ภาพ`);break;}
+      case 'runnow':{b.disabled=true;b.textContent='กำลังสร้าง… (5–20 วินาที)';const r=await botApi('/api/runnow',{});
+        toast(r.done?'ได้ภาพใหม่แล้ว':r.paused?'โควตาฟรีวันนี้หมดแล้ว':r.skipped==='empty'?'ไม่มีงานในคิว':r.error?'สร้างไม่สำเร็จ: '+r.error:'เรียบร้อย');break;}
+      case 'resume':await botApi('/api/resume',{});toast('บอทกลับมาทำงานต่อแล้ว');break;
+      case 'clearq':if(!sure(b,'กดอีกครั้งเพื่อล้างคิว'))return;await botApi('/api/clearqueue',{});toast('ล้างคิวแล้ว');break;
+      case 'clearn':await botApi('/api/clearnotices',{});break;
+      case 'star':await botApi('/api/star',{id});break;
+      case 'regen':await botApi('/api/regen',{id});toast('เพิ่มเข้าคิวเจนใหม่แล้ว');break;
+      case 'del':if(!sure(b,'ลบ?'))return;await botApi('/api/delete',{id});break;
+      case 'save':await botApi('/api/settings',{character:$('#bChar').value,style:$('#bStyle').value,interval_min:Math.max(1,+$('#bInt').value||1),steps:Math.min(8,Math.max(1,+$('#bSteps').value||4))});toast('บันทึกแล้ว');BOT.filled=false;break;
+      case 'epall':await botEnqueueEp((ep.shots||[]).filter(s=>s.image_prompt).map(s=>({scene:+s.n||0,prompt:s.image_prompt})),'ทุกช็อต');break;
+      case 'epone':{const s=(ep.shots||[]).find(x=>String(x.n)===b.dataset.n);if(!s)return;await botEnqueueEp([{scene:+s.n||0,prompt:s.image_prompt}],`ช็อต ${s.n} `);break;}
+      case 'epchar':await botEnqueueEp([{scene:0,prompt:ep.character_sheet_prompt}],'ภาพต้นแบบ');break;
+      default:return;}
+    await botLoad();
+  }catch(err){toast(botErr(err));if(b.dataset.use){b.disabled=false;b.textContent='ใช้ภาพนี้';}if(b.dataset.bot==='runnow'){botLoad();}}
+});
 
 boot();
 })();
