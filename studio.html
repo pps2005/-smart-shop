@@ -317,6 +317,12 @@ textarea,input[type=text],input[type=email],input[type=password],select,input[ty
 .vxtitle{position:absolute;left:12px;top:10px;z-index:2;display:flex;gap:8px;align-items:center}
 .vxinfo{position:absolute;left:10px;right:10px;bottom:58px;z-index:3;background:rgba(255,255,255,.96);border-radius:16px;padding:10px 12px;box-shadow:0 8px 24px rgba(43,23,69,.25);display:grid;gap:4px}
 .vxinfo[hidden]{display:none}
+
+.seg{position:sticky;top:calc(118px + env(safe-area-inset-top));z-index:5;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:4px;box-shadow:0 6px 16px rgba(124,77,255,.10)}
+.seg button{border:0;background:none;border-radius:10px;min-height:44px;font-weight:600;font-size:14px;color:#8A7BA6;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
+.seg button i{font-style:normal;font-size:17px}
+.seg button.on{background:linear-gradient(135deg,#FF5FA2,#8C6BFF);color:#fff;box-shadow:0 4px 12px rgba(255,79,147,.3)}
+@media (max-width:480px){.seg button{flex-direction:column;gap:0;font-size:12px;min-height:50px}}
 </style>
 </head>
 <body>
@@ -453,22 +459,24 @@ function latestVideo(){let best=null;
 /* ================= หน้า สตูดิโอ ================= */
 function renderStudio(quiet){
   if(!quiet&&botCfg().url&&!BOT.s)setTimeout(botLoad,50);
-  setTimeout(()=>{if($('#vxw'))cityUpdate();},0);
   const lv=latestVideo(),cur=eps.find(e=>e.id===curId),P=cur?prog(cur):null;
   const live=eps.some(e=>e.status!=='posted'&&prog(e).done>0);
-  const key=lv?lv.p:'';
-  if(quiet&&$('#office')){ // อัปเดตเฉพาะส่วนที่เปลี่ยน ไม่ให้วิดีโอสะดุด
-    $('#office .onair2').classList.toggle('live',live);
-    if(key!==screenKey)$('#ofscreen').outerHTML=ofScreenHtml(lv);$('#desks').innerHTML=desksHtml();
-    $('#progCard').innerHTML=progHtml(cur,P);$('#claudeList').innerHTML=claudeListHtml();screenKey=key;return;}
+  const key=lv?lv.p:'',sv=SV.studio;
+  if(quiet&&$('#stuBody')){ // อัปเดตเฉพาะส่วนที่เปลี่ยน ไม่ให้วิดีโอสะดุด
+    if($('#office .onair2'))$('#office .onair2').classList.toggle('live',live);
+    if($('#ofscreen')&&key!==screenKey)$('#ofscreen').outerHTML=ofScreenHtml(lv);
+    if($('#desks'))$('#desks').innerHTML=desksHtml();
+    if($('#progCard'))$('#progCard').innerHTML=progHtml(cur,P);
+    if($('#claudeList'))$('#claudeList').innerHTML=claudeListHtml();screenKey=key;return;}
   screenKey=key;
-  $('#vw').innerHTML=`${officeHtml(lv,live)}
-  <div class="card" id="statCard">${statusHtml()}</div>
-  <div class="card" id="progCard">${progHtml(cur,P)}</div>
-  <div class="card"><h3>💬 สั่งงาน Claude</h3>
+  const body={city:cityHtml(),team:officeHtml(lv,live),stat:`<div class="card" id="statCard">${statusHtml()}</div>`,
+    work:`<div class="card" id="progCard">${progHtml(cur,P)}</div>`,
+    cmd:`<div class="card"><h3>💬 สั่งงาน Claude</h3>
     <textarea id="cmd" placeholder="เช่น ทำเรื่องใหม่: ลูกเพนกวินสามตัว ฉบับแม่เล่าให้ลูกฟัง หรือ แก้ช็อต 4 ให้ตลกขึ้น"></textarea>
     <div class="row"><button class="btn main" data-cmd>ส่งให้ Claude</button><span class="muted small">แล้วไปบอก Claude ในแชทว่า "ทำงานในสตูดิโอ"</span></div>
-    <div id="claudeList" class="sec">${claudeListHtml()}</div></div>`;
+    <div id="claudeList" class="sec">${claudeListHtml()}</div></div>`}[sv]||'';
+  $('#vw').innerHTML=segHtml('studio',[['city','🏙️','เมือง'],['team','👩‍💼','ทีม'],['stat','📊','สถานะ'],['work','🎬','งาน'],['cmd','💬','สั่งงาน']])+`<div id="stuBody" class="sec" style="gap:14px">${body}</div>`;
+  setTimeout(()=>{if($('#vxw'))cityUpdate();},0);
 }
 function roomHtml(lv,live){const u=lv&&(/^https?:/.test(lv.p)?lv.p:urls[lv.p]);
   const lbl=lv?`${esc(lv.e.title)} · ${lv.k==='final'?'คลิปเต็ม':lv.k==='voice'?'เสียงพากย์':lv.k==='char'?'ตัวละคร':'ช็อต '+esc(lv.k)}`:'';
@@ -973,7 +981,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  $('#vw').innerHTML=castHtml()+hero+audioHtml()+cats;
+  const lv2=SV.lib;$('#vw').innerHTML=segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -1217,7 +1225,7 @@ function desksHtml(){return AGENTS.map(a=>{const s=agentState(a.k),im=agentImg(a
     <div class="tk">${esc(s.t)}${s.busy?'<span class="typing"><i></i><i></i><i></i></span>':''}</div></div>`;}).join('');}
 function ofScreenHtml(lv){const u=lv&&(/^https?:/.test(lv.p)?lv.p:urls[lv.p]);
   return `<div class="ofscreen" id="ofscreen">${u?`<video src="${esc(u)}" autoplay muted loop playsinline controls></video>`:`<div class="idle">📺<br>จอฉายผลงาน<br>คลิปแรกที่เสร็จจะมาฉายที่นี่</div>`}</div>`;}
-function officeHtml(lv,live){return cityHtml()+`<div class="office" id="office"><div class="ofhead"><span class="ofsign">SMART STUDIO<small>ห้องทำงานทีมอนิเมะ</small></span><span class="grow"></span><span class="onair2${live?' live':''}">ON AIR</span></div>
+function officeHtml(lv,live){return `<div class="office" id="office"><div class="ofhead"><span class="ofsign">SMART STUDIO<small>ห้องทำงานทีมอนิเมะ</small></span><span class="grow"></span><span class="onair2${live?' live':''}">ON AIR</span></div>
   <div class="ofmain">${ofScreenHtml(lv)}<div class="desks" id="desks">${desksHtml()}</div></div></div>`;}
 document.addEventListener('click',e=>{const d=e.target.closest('[data-agent]');if(!d)return;const go={dir:'eps',art:'gen',cast:'lib',anim:'eps',snd:'lib',edit:'eps',lib:'lib'}[d.dataset.agent];const t=$('#tabs [data-v="'+go+'"]');if(t)t.click();});
 
@@ -1272,6 +1280,14 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-city]');if
 (()=>{let d=null;document.addEventListener('pointerdown',e=>{const v=e.target.closest('#vx');if(!v||e.target.closest('button,.tag,.vxinfo'))return;d={x:e.clientX,rz:CITYV.rz};v.classList.add('drag');});
   document.addEventListener('pointermove',e=>{if(!d)return;CITYV.rz=d.rz+(e.clientX-d.x)*0.4;cityApply();});
   document.addEventListener('pointerup',()=>{if(d){d=null;const v=$('#vx');if(v)v.classList.remove('drag');}});})();
+
+
+/* ---------- แถบย่อยแบบกด (ลดการเลื่อนหน้า) ---------- */
+const SV=(()=>{try{return Object.assign({studio:'city',lib:'cast'},JSON.parse(localStorage.getItem('ss_sv')||'{}'));}catch(e){return {studio:'city',lib:'cast'};}})();
+function segHtml(pg,items){return `<nav class="seg">${items.map(([k,ic,n])=>`<button class="${SV[pg]===k?'on':''}" data-seg="${pg}|${k}"><i>${ic}</i>${n}</button>`).join('')}</nav>`;}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-seg]');if(!b)return;const [pg,k]=b.dataset.seg.split('|');SV[pg]=k;
+  try{localStorage.setItem('ss_sv',JSON.stringify(SV));}catch(err){}
+  if(pg==='studio')renderStudio();else if(pg==='lib')renderLib();window.scrollTo({top:0});});
 
 boot();
 })();
