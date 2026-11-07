@@ -449,7 +449,7 @@ async function botLoad(){if(!botCfg().url)return;
   try{BOT.v=await botApi('/api/vstate');}catch(e){BOT.v=null;}
   if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
   if(view==='eps'&&ep)botThumbsFill();}
-setInterval(()=>{if(document.hidden||!botCfg().url)return;
+setInterval(()=>{if(document.hidden||!botCfg().url)return;if(['kUser','kKey'].includes(document.activeElement&&document.activeElement.id))return;
   if(view==='gen'||(view==='eps'&&ep&&(epTab==='shots'||epTab==='overview')))botLoad();},20000);
 function epBotProject(){return String(ep&&ep.title||'ตอน').slice(0,50);}
 function botBtn(a,n,label,main){return botCfg().url?`<div><button class="btn sm${main?' main':''}" data-bot="${a}" data-n="${esc(n)}">${label}</button></div>`:`<div><button class="btn sm" data-bot="gotogen">🎨 เชื่อมบอทเจนภาพก่อน</button></div>`;}
@@ -482,7 +482,11 @@ function renderGen(){const c=botCfg();BOT.filled=false;
     <p class="muted" style="margin:0">ฟรีประมาณ 200 ภาพ/วันที่ 4 steps (steps มากขึ้น = ละเอียดขึ้นแต่กินโควตามากขึ้น) · โควตารีเซ็ต 07:00 น. · ภาพออกมาเป็นสี่เหลี่ยมจัตุรัส ครอปเป็น 9:16 ตอนตัดต่อ</p></div>`;
   botParts();if(!BOT.s||BOT.err)botLoad();}
 
-function botParts(){const st=$('#botStat');if(!st)return;const S=BOT.s;
+function botParts(){const st=$('#botStat');if(!st)return;
+  const keep={};['kUser','kKey'].forEach(id=>{const el=$('#'+id);if(el)keep[id]={v:el.value,f:document.activeElement===el,ss:el.selectionStart};});
+  botParts0(st);
+  for(const id in keep){const el=$('#'+id);if(!el)continue;if(keep[id].v)el.value=keep[id].v;if(keep[id].f){el.focus();try{el.setSelectionRange(keep[id].ss,keep[id].ss);}catch(e){}}}}
+function botParts0(st){const S=BOT.s;
   if(BOT.err&&!S){st.innerHTML=`<h3>เชื่อมบอทไม่ได้</h3><p class="muted" style="margin:0">${esc(BOT.err)}</p><div class="row"><button class="btn sm" data-bot="reload">ลองใหม่</button><button class="btn sm" data-bot="disconnect">แก้ลิงก์/รหัส</button></div>`;return;}
   if(!S){st.innerHTML='<p class="muted" style="margin:0">กำลังเชื่อมบอท…</p>';return;}
   const s=S.settings,qd=S.jobs.filter(j=>j.status!=='failed').length,fail=S.jobs.length-qd,paused=S.now<+s.paused_until;
