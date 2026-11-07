@@ -245,9 +245,12 @@ const KSLUG = 'anime-video-bot';
 const VCHUNK = 1000000; // ไบต์ต่อแถว (D1 จำกัด ~2MB/แถว เก็บเป็น base64)
 const VNEG = 'blurry, distorted face, deformed hands, extra fingers, morphing, flickering, sudden movement, text, watermark';
 
-function kEnv(env) { // รับชื่อ secret ได้หลายแบบ: KAGGLE_KEY / Token
-  if (!env.KAGGLE_KEY) env.KAGGLE_KEY = env.Token || env.TOKEN || env.token || env.KAGGLE_TOKEN || '';
-  if (!env.KAGGLE_USERNAME) env.KAGGLE_USERNAME = env.Username || env.USERNAME || env.username || env.KAGGLE_USER || '';
+function kEnv(env, s) { // รับชื่อ secret ได้หลายแบบ: KAGGLE_KEY / Token · หรือกรอกในหน้าสตูดิโอ (เก็บใน settings)
+  s = s || {};
+  if (!env.KAGGLE_KEY) env.KAGGLE_KEY = env.Token || env.TOKEN || env.token || env.KAGGLE_TOKEN || s.k_key || '';
+  if (!env.KAGGLE_USERNAME) env.KAGGLE_USERNAME = env.Username || env.USERNAME || env.username || env.KAGGLE_USER || s.k_user || '';
+  env.KAGGLE_USERNAME = String(env.KAGGLE_USERNAME).trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?kaggle\.com\//, '').replace(/\/.*$/, '');
+  env.KAGGLE_KEY = String(env.KAGGLE_KEY).trim();
   return env;
 }
 async function vRoutes(req, env, url, ctx) {
@@ -311,13 +314,13 @@ async function vRoutes(req, env, url, ctx) {
 // ---- ฝั่งสตูดิโอ (ผ่าน PASSWORD แล้ว) ----
 async function vApi(req, env, url, ctx, body) {
   const p = url.pathname;
-  kEnv(env);
+  kEnv(env, await getSettings(env));
   if (p === '/api/vstate') {
     const s = await getSettings(env);
     const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started FROM vjobs WHERE status!='done' ORDER BY id LIMIT 300").all()).results;
     const videos = (await env.DB.prepare('SELECT id,job_id,project,ep,shot,prompt,size,sec,w,h,created FROM videos ORDER BY id DESC LIMIT 500').all()).results;
     const logs = (await env.DB.prepare('SELECT msg,created FROM vlog ORDER BY id DESC LIMIT 12').all()).results;
-    return json({ jobs, videos, logs, now: Date.now(), kaggle: { configured: !!(env.KAGGLE_USERNAME && env.KAGGLE_KEY), user: env.KAGGLE_USERNAME || '', status: s.k_status || '', checked: +s.k_checked || 0, pushed: +s.k_pushed || 0, seen: +s.k_seen || 0, error: s.k_error || '' } });
+    return json({ jobs, videos, logs, now: Date.now(), kaggle: { configured: !!(env.KAGGLE_USERNAME && env.KAGGLE_KEY), user: env.KAGGLE_USERNAME || '', hasKey: !!env.KAGGLE_KEY, status: s.k_status || '', checked: +s.k_checked || 0, pushed: +s.k_pushed || 0, seen: +s.k_seen || 0, error: s.k_error || '' } });
   }
   if (p.startsWith('/vid/')) return getVideo(req, env, +p.split('/')[2]);
   if (req.method !== 'POST') return null;
@@ -340,6 +343,13 @@ async function vApi(req, env, url, ctx, body) {
   if (p === '/api/vclear') { await env.DB.prepare("DELETE FROM vjobs WHERE status IN ('queued','failed')").run(); return json({ ok: true }); }
   if (p === '/api/vretry') { await env.DB.prepare("UPDATE vjobs SET status='queued', tries=0, error=NULL WHERE status='failed'").run(); ctx.waitUntil(vTick(env, true)); return json({ ok: true }); }
   if (p === '/api/vkick') return json(await vTick(env, true));
+  if (p === '/api/vkaggle') {
+    if (body.user !== undefined) await setSetting(env, 'k_user', String(body.user).trim().slice(0, 80));
+    if (body.key) await setSetting(env, 'k_key', String(body.key).trim().slice(0, 300));
+    await setSetting(env, 'k_pushed', '0'); await setSetting(env, 'k_error', '');
+    ctx.waitUntil(vTick(env, true));
+    return json({ ok: true });
+  }
   return null;
 }
 
@@ -371,7 +381,8 @@ async function kFetch(env, path, init) {
   return { ok: r.ok, status: r.status, j };
 }
 async function vTick(env, force) {
-  kEnv(env);
+  await ensureSchema(env);
+  kEnv(env, await getSettings(env));
   if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return { skipped: 'no kaggle' };
   await ensureSchema(env);
   const q = await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status='queued'").first();
