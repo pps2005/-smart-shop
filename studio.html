@@ -50,6 +50,37 @@ input[type=number]{border:1px solid var(--line);border-radius:10px;padding:8px 1
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:14px;white-space:nowrap}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
 
+/* ===== ธีมใหม่: นุ่ม อ่านง่าย กดง่าย ===== */
+body{background:radial-gradient(900px 500px at 10% -10%,rgba(255,122,168,.16),transparent 60%),radial-gradient(800px 500px at 110% 10%,rgba(143,123,255,.16),transparent 60%),var(--bg);background-attachment:fixed}
+.tabs button{display:grid;justify-items:center;gap:1px;font-size:12.5px;padding:6px 1px;transition:background .2s,color .2s}
+.tabs button{position:relative}.tabs button b{position:absolute;top:3px;right:6px;margin:0}
+.boardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.boardgrid .lab{grid-column:1/-1}
+.tabs button i{font-style:normal;font-size:19px;line-height:1.1;filter:grayscale(.6);transition:filter .2s,transform .2s}
+.tabs button.on{background:linear-gradient(135deg,rgba(255,122,168,.25),rgba(143,123,255,.25));color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,180,220,.25)}
+.tabs button.on i{filter:none;transform:scale(1.08)}
+.card{box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 10px 30px rgba(0,0,0,.25)}
+.btn{transition:transform .1s,filter .2s}.btn:active{transform:scale(.97)}.btn.main:hover{filter:brightness(1.08)}
+.hero{display:flex;align-items:center;gap:12px}.hero .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:linear-gradient(135deg,rgba(255,122,168,.3),rgba(143,123,255,.3));flex:none}
+.hero p{margin:0}
+.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat .t{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:grid;gap:2px}
+.stat .t b{font-family:Kanit,sans-serif;font-size:22px;line-height:1.2}.stat .t span{font-size:13px;color:var(--muted)}
+.stat .t.warn{border-color:rgba(255,107,122,.45);background:rgba(255,107,122,.08)}
+.stat .t.good{border-color:rgba(74,222,128,.35)}
+.mini{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}.mini i{display:block;height:100%;background:linear-gradient(90deg,#ff7aa8,#8f7bff)}
+.errl{font-size:13px;color:#ffb3bc;background:rgba(255,107,122,.08);border-radius:10px;padding:6px 10px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;display:grid}
+.panel .pic{aspect-ratio:16/9;background:#120e19;display:grid;place-items:center;position:relative;overflow:hidden}
+.panel .pic img,.panel .pic video{width:100%;height:100%;object-fit:cover}
+.panel .pic .ph{padding:18px;text-align:center;color:var(--muted);font-size:15px}
+.panel .bubble{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(255,255,255,.94);color:#1a1424;border-radius:16px;padding:8px 12px;font-size:15px;line-height:1.45;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.panel .bubble b{color:#7a3fd1}
+.panel .info{padding:10px 14px;display:grid;gap:6px}
+.panel.ok{border-color:rgba(74,222,128,.5)}.panel.fix{border-color:rgba(255,194,75,.6)}
+.pnote{font-size:14px;background:rgba(255,194,75,.1);border-radius:10px;padding:6px 10px;color:#ffd98a}
+.modal[hidden]{display:none}
+.modal{position:fixed;inset:0;z-index:50;background:rgba(8,6,12,.72);display:grid;place-items:center;padding:16px}
+.modal .box{width:min(640px,100%);max-height:90vh;overflow:auto;background:var(--card2);border:1px solid var(--line);border-radius:20px;padding:18px;display:grid;gap:12px}
 /* ===== ห้องสตูดิโอ ===== */
 .room{position:relative;border-radius:22px;overflow:hidden;aspect-ratio:4/3.3;border:1px solid var(--line);
   background:radial-gradient(120% 70% at 50% 0%,#3a2a52 0%,#1d1529 55%,#120d1a 100%)}
@@ -211,12 +242,12 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4p
     <span class="chip" id="liveChip"><span class="dot"></span><span id="liveT">กำลังโหลด…</span></span>
   </div>
   <nav class="tabs" id="tabs">
-    <button data-v="studio" class="on">สตูดิโอ</button>
-    <button data-v="eps">เรื่อง<b id="youN" hidden>0</b></button>
-    <button data-v="ideas">ไอเดีย</button>
-    <button data-v="lib">คลัง</button>
-    <button data-v="gen">เจนภาพ</button>
-    <button data-v="set">ตั้งค่า</button>
+    <button data-v="studio" class="on"><i>🎬</i>สตูดิโอ</button>
+    <button data-v="eps"><i>📖</i>เรื่อง<b id="youN" hidden>0</b></button>
+    <button data-v="ideas"><i>💡</i>ไอเดีย</button>
+    <button data-v="lib"><i>📦</i>คลัง</button>
+    <button data-v="gen"><i>🎨</i>เจนภาพ</button>
+    <button data-v="set"><i>⚙️</i>ตั้งค่า</button>
   </nav>
 </header>
 <main id="vw"></main>
@@ -335,6 +366,7 @@ function latestVideo(){let best=null;
 
 /* ================= หน้า สตูดิโอ ================= */
 function renderStudio(quiet){
+  if(!quiet&&botCfg().url&&!BOT.s)setTimeout(botLoad,50);
   const lv=latestVideo(),cur=eps.find(e=>e.id===curId),P=cur?prog(cur):null;
   const live=eps.some(e=>e.status!=='posted'&&prog(e).done>0);
   const key=lv?lv.p:'';
@@ -344,6 +376,7 @@ function renderStudio(quiet){
     $('#progCard').innerHTML=progHtml(cur,P);$('#claudeList').innerHTML=claudeListHtml();screenKey=key;return;}
   screenKey=key;
   $('#vw').innerHTML=`${roomHtml(lv,live)}
+  <div class="card" id="statCard">${statusHtml()}</div>
   <div class="card" id="progCard">${progHtml(cur,P)}</div>
   <div class="card"><h3>💬 สั่งงาน Claude</h3>
     <textarea id="cmd" placeholder="เช่น ทำเรื่องใหม่: ลูกเพนกวินสามตัว ฉบับแม่เล่าให้ลูกฟัง หรือ แก้ช็อต 4 ให้ตลกขึ้น"></textarea>
@@ -371,7 +404,8 @@ function claudeListHtml(){if(!claudeTasks.length)return '';
 
 /* ================= หน้า เรื่อง ================= */
 function renderEpList(){ep=null;
-  $('#vw').innerHTML=`<div class="card"><h2>เรื่องทั้งหมด</h2><p class="muted" style="margin:0">ทุกเรื่องแบ่งเป็นช็อตสั้น ๆ ทำทีละช็อตแล้วค่อยตัดต่อรวม แตะเรื่องเพื่อดูรายละเอียด</p></div>
+  $('#vw').innerHTML=`<div class="card"><div class="hero"><span class="ic">📖</span><div><h2>เรื่องทั้งหมด</h2><p class="muted small">แตะเรื่องเพื่อเปิด · มีบทอยู่แล้ว วางเพื่อสร้างตอนใหม่ได้เลย</p></div></div>
+    <div class="row"><button class="btn main" data-script="open">📥 วางบท สร้างตอนใหม่</button><button class="btn sm" data-copy="${esc(SCRIPT_PROMPT)}">คัดลอก prompt สำหรับคนเขียนบท</button></div></div>
   ${eps.map(e=>{const P=prog(e);return `<button class="card epcard" data-open="${e.id}"><div class="row" style="justify-content:space-between"><h3>${esc(e.title)}</h3><span class="stp ${e.status}">${EPST[e.status]||esc(e.status)}</span></div>
     <div class="muted small">${esc(e.logline||'')}</div><div class="pbar"><i style="width:${Math.round(P.done/STEPS.length*100)}%"></i></div>
     <div class="muted small">ขั้น ${Math.min(P.done+1,STEPS.length)}/${STEPS.length}${P.curK?' · '+STEPS.find(x=>x.k===P.curK).n:' · เสร็จแล้ว'} · วิดีโอ ${fmtS(P.doneSec)} / ${fmtS(P.total)}</div></button>`;}).join('')||'<div class="card"><p class="muted" style="margin:0">ยังไม่มีเรื่อง สั่ง Claude ที่หน้าสตูดิโอได้เลย</p></div>'}`;}
@@ -381,7 +415,8 @@ function slot(k,t,label){const u=mUrl(k,t),id=`f-${k}-${t}`,acc=t==='audio'?'aud
   const inner=!u?`แตะเพื่อ<br>อัปโหลด<br>${label}`:t==='image'?`<img src="${u}" alt="${label}">`:t==='audio'?(isV?`<video src="${u}" controls playsinline></video>`:`<audio src="${u}" controls></audio>`):`<video src="${u}" muted playsinline preload="metadata" controls></video>`;
   return `<label class="slot${t==='audio'?' wide':''}" for="${id}">${inner}</label><input type="file" id="${id}" accept="${acc}" data-up="${k}|${t}" hidden>`;}
 function renderEp(){const S=ep.shots||[],P=prog(ep);
-  const TB={overview:'ภาพรวม',shots:'ช็อต',sound:'เสียง & ตัดต่อ'};let body='';
+  const TB={overview:'ภาพรวม',board:'สตอรีบอร์ด',shots:'ช็อต',sound:'เสียง & ตัดต่อ'};let body='';
+  if(epTab==='board')body=boardHtml();
   if(epTab==='overview')body=`<div class="card"><div class="row"><span class="stp ${ep.status}">${EPST[ep.status]||esc(ep.status)}</span><span class="muted">ฉบับที่ ${ep.version||1} · ${S.length} ช็อต · ${fmtS(P.total)}</span></div>
       <p style="margin:0;font-size:19px">${esc(ep.logline)}</p>${ep.why?`<p class="muted" style="margin:0">${esc(ep.why)}</p>`:''}
       <div class="pbar"><i style="width:${Math.round(P.pct*100)}%"></i></div><div class="muted small">วิดีโอ ${fmtS(P.doneSec)} / ${fmtS(P.total)} · ภาพคีย์ ${P.img}/${P.N} · คลิป ${P.vid}/${P.N}</div>
@@ -486,10 +521,11 @@ async function botLoad(){if(!botCfg().url)return;
   try{BOT.s=await botApi('/api/state');BOT.err='';}catch(e){BOT.err=botErr(e);}
   try{BOT.v=await botApi('/api/vstate');}catch(e){BOT.v=null;}
   if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
+  if(view==='studio'&&$('#statCard'))$('#statCard').innerHTML=statusHtml();
   if(view==='lib'){try{BOT.c=await botApi('/api/vcast');}catch(e){}renderLib(true);}
   if(view==='eps'&&ep)botThumbsFill();}
 setInterval(()=>{if(document.hidden||!botCfg().url)return;if(['kUser','kKey'].includes(document.activeElement&&document.activeElement.id))return;
-  if(view==='gen'||view==='lib'||(view==='eps'&&ep&&(epTab==='shots'||epTab==='overview')))botLoad();},20000);
+  if(view==='gen'||view==='lib'||view==='studio'||(view==='eps'&&ep&&(epTab==='shots'||epTab==='overview')))botLoad();},20000);
 function epBotProject(){return String(ep&&ep.title||'ตอน').slice(0,50);}
 function botBtn(a,n,label,main){return botCfg().url?`<div><button class="btn sm${main?' main':''}" data-bot="${a}" data-n="${esc(n)}">${label}</button></div>`:`<div><button class="btn sm" data-bot="gotogen">🎨 เชื่อมบอทเจนภาพก่อน</button></div>`;}
 function botCard(i,useK){return `<div class="bimg${i.starred?' star':''}"><img loading="lazy" src="${esc(botU('/img/'+i.id))}" alt="ภาพ ${i.id}" data-bot="view">
@@ -971,6 +1007,88 @@ function audioHtml(){const V=BOT.v;if(!V)return '';
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot="audnew"]');if(!b)return;e.stopImmediatePropagation();
   const t=($('#audTxt').value||'').trim();if(!t)return toast('พิมพ์คำบรรยายเสียงก่อน');
   try{b.disabled=true;await botApi('/api/vcastaudio',{type:$('#audType').value,prompt:t,name:($('#audName').value||'').trim()||t.slice(0,40)});toast('ส่งเข้าคิวแล้ว เครื่อง Kaggle จะทำให้ (ครั้งแรกต้องโหลดโมเดลราว 10 นาที)');$('#audTxt').value='';$('#audName').value='';await botLoad();}catch(err){toast(botErr(err));}finally{b.disabled=false;}},true);
+
+
+/* ================= หน้าสถานะเครื่อง (สตูดิโอ) ================= */
+function bkkDayTs(t){return new Date((t||Date.now())+7*3600000).toISOString().slice(0,10);}
+function statusHtml(){
+  if(!botCfg().url)return `<div class="hero"><span class="ic">📊</span><div><h3>สถานะเครื่อง</h3><p class="muted small">เชื่อมบอทเจนภาพในแท็บเจนภาพก่อน แล้วสถานะจะขึ้นที่นี่</p></div></div>`;
+  const S=BOT.s,V=BOT.v;if(!S)return `<div class="hero"><span class="ic">📊</span><div><h3>สถานะเครื่อง</h3><p class="muted small">กำลังโหลด…</p></div></div>`;
+  const st=S.settings||{},today=bkkDayTs(),imgT=S.images.filter(i=>bkkDayTs(i.created)===today).length;
+  const paused=S.now<+st.paused_until,q=S.jobs.filter(j=>j.status==='queued').length,fl=S.jobs.filter(j=>j.status==='failed');
+  const vj=V?V.jobs:[],vq=vj.filter(j=>j.status==='queued'),vr=vj.filter(j=>j.status==='running'),vf=vj.filter(j=>j.status==='failed');
+  const K=(V&&V.kaggle)||{},alive=V&&V.now-(K.seen||0)<20*60000;
+  const kind=k=>vq.filter(j=>(j.kind||'gen')===k).length;
+  const kst=!K.configured?'ยังไม่ตั้งค่า':vr.length?'กำลังทำงาน':vq.length?(alive?'กำลังเปิดเครื่อง':'รอปลุก'):'ว่าง';
+  const quota=Math.min(100,Math.round(imgT/170*100));
+  const errs=[...fl.map(j=>`🎨 ${j.project}: ${j.error||''}`),...vf.map(j=>`🎞️ ${j.project}${j.shot&&j.shot!=='1'?' ช็อต '+j.shot:''}: ${j.error||''}`)].slice(0,3);
+  const last=V&&V.logs&&V.logs[0];
+  return `<div class="hero"><span class="ic">📊</span><div><h3>สถานะเครื่อง</h3><p class="muted small">อัปเดตเองทุก 20 วินาที</p></div></div>
+  <div class="stat">
+    <div class="t${paused?' warn':''}"><span>🎨 ภาพวันนี้ (Flux)</span><b>${imgT} รูป</b><div class="mini"><i style="width:${quota}%"></i></div><span>${paused?'⏸ โควตาเต็ม ทำต่อ '+tTH(st.paused_until):'ราว '+Math.max(0,170-imgT)+' รูปที่เหลือ (คุณภาพ 4)'}</span></div>
+    <div class="t"><span>⏳ คิวภาพ</span><b>${q}</b><span>${fl.length?`<span style="color:var(--red)">พัง ${fl.length}</span>`:'ไม่มีงานพัง'}</span></div>
+    <div class="t${K.configured&&!K.error?' good':' warn'}"><span>🎞️ เครื่อง Kaggle</span><b style="font-size:18px">${kst}</b><span>วิดีโอ ${kind('gen')} · เสียง ${kind('audio')} · รวมคลิป ${kind('concat')}</span></div>
+    <div class="t${vf.length?' warn':''}"><span>✅ คลิปและเสียงในคลัง</span><b>${V?V.videos.length:0}</b><span>${vf.length?`<span style="color:var(--red)">พัง ${vf.length}</span>`:'ไม่มีงานพัง'}</span></div>
+  </div>
+  ${last?`<div class="muted small">ล่าสุดจาก Kaggle: ${esc(String(last.msg||'').slice(0,140))}</div>`:''}
+  ${K.error?`<div class="errl">⚠️ Kaggle: ${esc(String(K.error).slice(0,200))}</div>`:''}
+  ${errs.map(e=>`<div class="errl">⚠️ ${esc(e.slice(0,200))}</div>`).join('')}
+  <div class="row"><button class="btn sm" data-v-go="lib">📦 ไปคลัง</button><button class="btn sm" data-v-go="gen">🎨 จัดการคิวภาพ</button></div>`;}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-v-go]');if(!b)return;const t=$('#tabs [data-v="'+b.dataset.vGo+'"]');if(t)t.click();});
+
+/* ================= วางบท → สร้างตอน ================= */
+const SCRIPT_PROMPT=`เขียนบทอนิเมะตอนนี้เป็นภาษาไทย แบ่งเป็นฉาก แต่ละช็อตเขียน 1 บรรทัดตามรูปแบบนี้เท่านั้น (คั่นด้วย |):
+ฉาก | ช็อต | วินาที | ขนาดภาพ/มุมกล้อง | สิ่งที่เห็นในภาพ | ใครพูด: บทพูด | เสียงประกอบ | อารมณ์
+ตัวอย่าง:
+1 | 1 | 4 | ภาพกว้าง กล้องนิ่ง | ตู้กดน้ำหลังโกดังตอนกลางคืน โทวะเดินเข้ามา | - | เสียงจั๊กจั่น | เงียบ เหงา
+1 | 2 | 3 | โคลสอัพ | หน้าโทวะตกใจเห็นคนยืนในเงา | โทวะ (คิดในใจ): มีคนอยู่ตรงนี้ด้วยเหรอ | ตึ๊ง! | ตกใจ ตลก
+ช็อตละ 1–10 วินาที ห้ามใช้ชื่อหรือบทจากอนิเมะที่มีอยู่จริง ตัวละครทุกตัวเป็นผู้ใหญ่`;
+function parseScript(txt){const out=[];let n=0;
+  for(const raw of String(txt).split(/\r?\n/)){const l=raw.trim().replace(/^\|/,'').replace(/\|$/,'');if(!l.includes('|'))continue;
+    const c=l.split('|').map(x=>x.trim());if(c.length<5||!/^\d+$/.test(c[0])||!/^\d+$/.test(c[1]))continue;
+    const say=(c[5]||'').replace(/^-$/,'');n++;
+    out.push({n,scene:+c[0],sec:Math.min(10,Math.max(1,Math.round(+c[2]||4))),shot:c[3]||'',action:c[4]||'',narration:say,sfx:(c[6]||'').replace(/^-$/,''),mood:(c[7]||'').replace(/^-$/,''),image_prompt:'',video_prompt:''});}
+  return out;}
+function scriptModal(){let m=$('#scriptM');if(!m){m=document.createElement('div');m.id='scriptM';m.className='modal';document.body.appendChild(m);}
+  m.innerHTML=`<div class="box"><div class="hero"><span class="ic">📥</span><div><h3>วางบท สร้างตอนใหม่</h3><p class="muted small">บทจากใครหรือ AI ตัวไหนก็ได้ ขอแค่ใช้รูปแบบเดียวกัน</p></div></div>
+    <input type="text" id="scT" placeholder="ชื่อตอน เช่น สาเหตุที่ฉันรัก ตอน 1" autocomplete="off">
+    <input type="text" id="scL" placeholder="เรื่องย่อตอนนี้ 1 บรรทัด (ไม่ใส่ก็ได้)" autocomplete="off">
+    <textarea id="scX" style="min-height:220px" placeholder="ฉาก | ช็อต | วินาที | มุมกล้อง | ภาพ | ใครพูด: บทพูด | เสียง | อารมณ์"></textarea>
+    <div id="scP" class="muted small">วางบทแล้วระบบจะนับช็อตให้ดูก่อนบันทึก</div>
+    <div class="row"><button class="btn main" data-script="save">สร้างตอน</button><button class="btn sm" data-copy="${esc(SCRIPT_PROMPT)}">คัดลอกรูปแบบบท</button><span class="grow"></span><button class="btn sm" data-script="close">ปิด</button></div></div>`;
+  m.hidden=false;$('#scX').addEventListener('input',()=>{const sh=parseScript($('#scX').value),sec=sh.reduce((a,x)=>a+x.sec,0),sc=new Set(sh.map(x=>x.scene)).size;
+    $('#scP').textContent=sh.length?`อ่านได้ ${sh.length} ช็อต · ${sc} ฉาก · ยาวประมาณ ${fmtS(sec)}`:'ยังอ่านบทไม่ได้ ตรวจว่าแต่ละบรรทัดขึ้นต้นด้วยเลขฉาก | เลขช็อต';});}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-script]');if(!b)return;const a=b.dataset.script;
+  if(a==='open')return scriptModal();
+  if(a==='close'){$('#scriptM').hidden=true;return;}
+  if(a==='save'){const t=$('#scT').value.trim(),sh=parseScript($('#scX').value);
+    if(!t)return toast('ใส่ชื่อตอนก่อน');if(!sh.length)return toast('ยังอ่านบทไม่ได้ ตรวจรูปแบบบท');
+    b.disabled=true;const {error}=await sb.from('studio_episodes').insert({owner_id:user.id,title:t,logline:$('#scL').value.trim()||null,status:'draft',version:1,shots:sh,media:{},format:'anime'});
+    b.disabled=false;if(error)return toast('บันทึกไม่สำเร็จ: '+String(error.message||'').slice(0,80));
+    $('#scriptM').hidden=true;toast(`สร้างตอน "${t}" แล้ว ${sh.length} ช็อต · ให้ Claude เติมคำสั่งภาพต่อได้`);await refresh(true);if(view==='eps'&&!ep)renderEpList();}});
+
+/* ================= สตอรีบอร์ด: อ่านทีละช่อง กดผ่าน / ขอแก้ ================= */
+function boardHtml(){const S=ep.shots||[];if(!S.length)return '<div class="card"><p class="muted" style="margin:0">ยังไม่มีช็อต</p></div>';
+  const ok=S.filter(s=>s.ok).length,fix=S.filter(s=>s.note).length;
+  const head=`<div class="card"><div class="hero"><span class="ic">🎞️</span><div><h3>สตอรีบอร์ด</h3><p class="muted small">อ่านทีละช่องเหมือนมังงะ · กด ✓ ผ่าน หรือ ✎ ขอแก้ แล้วส่งให้ Claude ทีเดียว</p></div></div>
+    <div class="mini"><i style="width:${Math.round(ok/S.length*100)}%"></i></div><div class="row" style="justify-content:space-between"><span class="muted small">ผ่าน ${ok}/${S.length} ช่อง${fix?` · ขอแก้ ${fix} ช่อง`:''}</span>
+    ${fix?'<button class="btn sm main" data-board="send">📤 ส่งคำขอแก้ให้ Claude</button>':ok===S.length?'<span class="st done">ผ่านครบทุกช่อง 🎉</span>':''}</div></div>`;
+  return head+'<div class="boardgrid">'+S.map((s,i)=>{const k=String(s.n),im=mUrl(k,'image'),vd=mUrl(k,'video'),sc=+s.scene||1,first=i===0||(+S[i-1].scene||1)!==sc;
+    const sp=String(s.narration||''),m=sp.match(/^([^:]{1,30}):\s*(.+)$/);
+    return `${first?`<div class="lab" style="margin-top:6px">ฉาก ${sc}</div>`:''}<div class="panel${s.ok?' ok':s.note?' fix':''}">
+      <div class="pic">${vd?`<video src="${esc(vd)}" muted loop playsinline controls preload="metadata"></video>`:im?`<img loading="lazy" src="${esc(im)}" alt="">`:`<div class="ph">🖼️<br>${esc(s.action||'')}</div>`}
+        ${sp?`<div class="bubble">${m?`<b>${esc(m[1])}:</b> ${esc(m[2])}`:esc(sp)}</div>`:''}</div>
+      <div class="info"><div class="row"><span class="st todo">#${esc(k)}</span><span class="st todo">⏱ ${shotSec(s)} วิ</span>${s.shot?`<span class="st todo">${esc(s.shot)}</span>`:''}${s.mood?`<span class="st todo">${esc(s.mood)}</span>`:''}</div>
+        ${im||vd?`<div class="small">${esc(s.action||'')}</div>`:''}${s.sfx?`<div class="muted small">🔊 ${esc(s.sfx)}</div>`:''}
+        ${s.note?`<div class="pnote">✎ ${esc(s.note)}</div>`:''}
+        <div class="row"><button class="btn sm${s.ok?' ok':''}" data-board="ok|${i}">${s.ok?'✓ ผ่านแล้ว':'✓ ผ่าน'}</button><button class="btn sm" data-board="fix|${i}">✎ ขอแก้</button>${s.note?`<button class="btn sm" data-board="clr|${i}">ลบคำขอ</button>`:''}</div></div></div>`;}).join('')+'</div>';}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-board]');if(!b||!ep)return;const [a,i]=b.dataset.board.split('|');
+  const S=(ep.shots||[]).map(x=>({...x}));
+  if(a==='ok'){S[+i].ok=!S[+i].ok;if(S[+i].ok)delete S[+i].note;return saveEp({shots:S},S[+i].ok?'ผ่านช่องนี้แล้ว':'ยกเลิกแล้ว');}
+  if(a==='fix'){const t=prompt('อยากให้แก้ช่องนี้ยังไง',S[+i].note||'');if(t===null)return;S[+i].note=t.trim();if(S[+i].note)S[+i].ok=false;else delete S[+i].note;return saveEp({shots:S},'บันทึกคำขอแก้แล้ว');}
+  if(a==='clr'){delete S[+i].note;return saveEp({shots:S},'ลบคำขอแล้ว');}
+  if(a==='send'){const L=S.filter(x=>x.note).map(x=>`ช็อต ${x.n}: ${x.note}`).join('\n');if(!L)return;
+    await saveEp({feedback:(ep.feedback?ep.feedback+'\n\n':'')+'[สตอรีบอร์ด]\n'+L,status:'revise'},'ส่งคำขอแก้ให้ Claude แล้ว');}});
 
 boot();
 })();
