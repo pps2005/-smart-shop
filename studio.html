@@ -25,8 +25,8 @@ a{color:var(--acc2)}
 .logo i{font-style:normal;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#ff8fb1,#8f7bff)}
 .grow{flex:1}
 .ib{min-width:44px;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card2);display:inline-grid;place-items:center;text-decoration:none;color:var(--ink);font-size:18px;cursor:pointer}
-.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:4px}
-.tabs button{border:0;background:none;padding:8px 2px;font-size:15px;border-radius:10px;cursor:pointer;color:var(--muted);font-weight:600;min-height:44px;white-space:nowrap}
+.tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:4px}
+.tabs button{border:0;background:none;padding:8px 1px;font-size:14px;border-radius:10px;cursor:pointer;color:var(--muted);font-weight:600;min-height:44px;white-space:nowrap}
 .tabs button.on{background:#2e2540;color:var(--ink)}
 .tabs b{font-size:12px;background:var(--you);color:#1d1400;border-radius:999px;padding:0 6px;margin-left:3px}
 main{max-width:1000px;margin:0 auto;padding:4px max(12px,env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));display:grid;gap:14px}
@@ -162,6 +162,33 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4p
 #iview .iv img,#iview .iv video{max-width:100%;max-height:100%;border-radius:12px}
 #iview .iv pre{white-space:pre-wrap;word-break:break-word;font-family:Sarabun,sans-serif;font-size:18px;max-width:720px;width:100%;background:var(--card2);padding:16px;border-radius:14px;margin:0}
 #iview .ib2{display:grid;gap:8px;max-width:720px;width:100%;margin:10px auto 0}
+/* คลัง: หน้าโหลดแบบเกม */
+.lload{background:linear-gradient(160deg,#2a1d42,#16101f);border-color:rgba(255,143,177,.35)}
+.lbig{font-family:Kanit,sans-serif;font-size:21px;line-height:1.3}
+.lbar{height:14px;border-radius:999px;background:#120d1a;border:1px solid var(--line);overflow:hidden;position:relative}
+.lbar i{display:block;height:100%;background:linear-gradient(90deg,#ff7aa8,#8f7bff,#8fd3ff);background-size:200% 100%;animation:lflow 2.4s linear infinite;border-radius:999px;transition:width .6s}
+.lbar.thin{height:6px}
+@keyframes lflow{to{background-position:-200% 0}}
+.ltip{font-size:14px;color:#d9cdee;border-left:3px solid var(--acc);padding:4px 10px;background:rgba(255,255,255,.04);border-radius:0 8px 8px 0}
+.lprev{position:relative;border-radius:14px;overflow:hidden;max-height:260px}
+.lprev img{width:100%;height:260px;object-fit:cover;display:block;filter:saturate(1.1)}
+.lprev span{position:absolute;left:0;right:0;bottom:0;padding:8px 12px;font-size:13px;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+@media (max-width:420px){.lgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.lcard{display:grid;gap:4px;background:none;border:0;padding:0;color:var(--ink);cursor:pointer;text-align:left;min-width:0}
+.lthumb{position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:#241c33;border:1px solid var(--line);display:grid;place-items:center}
+.lthumb img{width:100%;height:100%;object-fit:cover}
+.lthumb i{font-style:normal;font-size:30px;opacity:.6}
+.lcard.lock .lthumb{filter:grayscale(1);opacity:.55;aspect-ratio:1}
+.lgrid.small{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+@media (max-width:420px){.lgrid.small{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.lcard.done .lthumb{border-color:rgba(74,222,128,.45)}
+.lcard.run .lthumb{border-color:var(--acc);box-shadow:0 0 14px rgba(255,122,168,.45)}
+.shim{position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%);background-size:200% 100%;animation:lshim 1.4s linear infinite}
+@keyframes lshim{to{background-position:-200% 0}}
+.lname{font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbadge{font-size:11.5px;color:var(--muted)}
+.lcard.run .lbadge{color:var(--acc)}.lcard.done .lbadge{color:var(--ok)}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -177,6 +204,7 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4p
     <button data-v="studio" class="on">สตูดิโอ</button>
     <button data-v="eps">เรื่อง<b id="youN" hidden>0</b></button>
     <button data-v="ideas">ไอเดีย</button>
+    <button data-v="lib">คลัง</button>
     <button data-v="gen">เจนภาพ</button>
     <button data-v="set">ตั้งค่า</button>
   </nav>
@@ -388,7 +416,7 @@ function renderSet(){const c=botCfg();
   <div class="card"><h3>บัญชี</h3><div class="muted small">${esc(user&&user.email||'')}</div><div><button class="btn sm" data-act="logout">ออกจากระบบ</button></div></div>`;}
 
 /* ================= ทั่วไป ================= */
-function render(){if(view==='ideas'){IDEA.vfetched=false;return renderIdeas();}if(view==='studio')renderStudio();else if(view==='eps'){ep?renderEp():renderEpList();}else if(view==='gen')renderGen();else renderSet();}
+function render(){if(view==='lib'){renderLib();botLoad();return;}if(view==='ideas'){IDEA.vfetched=false;return renderIdeas();}if(view==='studio')renderStudio();else if(view==='eps'){ep?renderEp():renderEpList();}else if(view==='gen')renderGen();else renderSet();}
 function setView(v,keep){view=v;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));if(!keep){if(v!=='eps')ep=null;render();}window.scrollTo(0,0);}
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;if(b.dataset.v==='eps')ep=null;setView(b.dataset.v);});
 document.addEventListener('change',e=>{const t=e.target;
@@ -448,9 +476,10 @@ async function botLoad(){if(!botCfg().url)return;
   try{BOT.s=await botApi('/api/state');BOT.err='';}catch(e){BOT.err=botErr(e);}
   try{BOT.v=await botApi('/api/vstate');}catch(e){BOT.v=null;}
   if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
+  if(view==='lib')renderLib(true);
   if(view==='eps'&&ep)botThumbsFill();}
 setInterval(()=>{if(document.hidden||!botCfg().url)return;if(['kUser','kKey'].includes(document.activeElement&&document.activeElement.id))return;
-  if(view==='gen'||(view==='eps'&&ep&&(epTab==='shots'||epTab==='overview')))botLoad();},20000);
+  if(view==='gen'||view==='lib'||(view==='eps'&&ep&&(epTab==='shots'||epTab==='overview')))botLoad();},20000);
 function epBotProject(){return String(ep&&ep.title||'ตอน').slice(0,50);}
 function botBtn(a,n,label,main){return botCfg().url?`<div><button class="btn sm${main?' main':''}" data-bot="${a}" data-n="${esc(n)}">${label}</button></div>`:`<div><button class="btn sm" data-bot="gotogen">🎨 เชื่อมบอทเจนภาพก่อน</button></div>`;}
 function botCard(i,useK){return `<div class="bimg${i.starred?' star':''}"><img loading="lazy" src="${esc(botU('/img/'+i.id))}" alt="ภาพ ${i.id}" data-bot="view">
@@ -724,6 +753,91 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-idea
       IDEA.list=IDEA.list.filter(y=>y!==x);await ideasSave();const rm=[x.path,x.cover].filter(Boolean);if(rm.length)sb.storage.from(BUCKET).remove(rm);
       ideaClose();renderIdeas();return toast('ลบแล้ว');}
   }catch(err){toast(String(err.message||err));}});
+
+/* ================= คลัง (หน้าโหลดแบบเกม) =================
+   ของในคลัง = โปรเจกต์ในบอทที่ชื่อขึ้นต้นด้วย "คลัง·<หมวด>·<ชื่อ>" → ไม่ต้องมีตารางใหม่
+   หมวดที่ต้องล็อกหน้า (ตัวละคร/ตู้เสื้อผ้า) แสดงเป็นช่องล็อกไว้ก่อน จนกว่าระบบล็อกหน้าบน Kaggle จะพร้อม */
+const LSTYLE='soft anime style, clean detailed background art, cinematic lighting, vertical 9:16';
+const LIB=[
+ {k:'char',n:'ตัวละคร',ic:'🧑‍🎤',lock:'รอระบบล็อกหน้า',items:[['นางเอก (ลุคหลัก)'],['นางเอก · หน้าใกล้ หลายมุม']]},
+ {k:'look',n:'ตู้เสื้อผ้า',ic:'👗',lock:'รอระบบล็อกหน้า',items:[['ผมบ็อบเดิม'],['ผมหางม้า'],['ผมมัดครึ่งหัว'],['ผมเปียข้าง'],['ผมดังโงะ'],['ผมยาว (ย้อนอดีต)'],['ชุดอยู่บ้าน'],['ชุดนอน'],['ชุดทำงาน'],['เดรสไปเที่ยว'],['ชุดกีฬา'],['ชุดกันหนาว'],['ยูกาตะ'],['แว่นกรอบกลม'],['สร้อยคอจี้'],['ต่างหูมุก'],['กิ๊บติดผม'],['หมวกไหมพรม']]},
+ {k:'pet',n:'สัตว์เลี้ยง',ic:'🐾',items:[
+  ['แมวส้มขนฟู','a chubby fluffy orange tabby cat with big round eyes, sitting and looking at the camera, full body, plain soft background, cute anime character design, '+LSTYLE],
+  ['แมวขาวตาสองสี','an elegant white cat with one blue eye and one gold eye, full body, plain soft background, cute anime character design, '+LSTYLE],
+  ['หมาชิบะ','a smiling shiba inu dog with a red collar, full body, plain soft background, cute anime character design, '+LSTYLE],
+  ['กระต่ายหูตก','a small cream lop-eared rabbit, full body, plain soft background, cute anime character design, '+LSTYLE],
+  ['แฮมสเตอร์','a round golden hamster holding a sunflower seed, full body, plain soft background, cute anime character design, '+LSTYLE],
+  ['นกแก้วเขียว','a small green parakeet with a yellow face perched on a branch, full body, plain soft background, cute anime character design, '+LSTYLE]]},
+ {k:'place',n:'ฉาก',ic:'🏙️',items:[
+  ['ห้องนอนนางเอก · กลางวัน','a cozy small apartment bedroom with a bed by the window, bookshelf, plants and warm wooden furniture, morning sunlight, no people, '+LSTYLE],
+  ['ห้องนอนนางเอก · กลางคืน','a cozy small apartment bedroom with a bed by the window, bookshelf, plants and warm wooden furniture, night with a warm desk lamp and city lights outside, no people, '+LSTYLE],
+  ['ห้องนั่งเล่น','a cozy apartment living room with a gray sofa, coffee table, rug and big window, afternoon light, no people, '+LSTYLE],
+  ['ครัว','a small bright apartment kitchen with hanging pans, a kettle and plants on the windowsill, morning light, no people, '+LSTYLE],
+  ['ร้านกาแฟ','a warm indie coffee shop interior with wooden tables, hanging lights and a counter with pastries, no people, '+LSTYLE],
+  ['ออฟฟิศ','a modern open office with desks, monitors and large windows over the city, daytime, no people, '+LSTYLE],
+  ['สวนสาธารณะ','a city park with a walking path, benches, big trees and a pond, sunny day, no people, '+LSTYLE],
+  ['ถนนยามค่ำ','a narrow city street at night with neon signs, small shops and wet asphalt reflections, no people, '+LSTYLE],
+  ['ชายหาด','a quiet tropical beach with gentle waves and palm trees at golden sunset, no people, '+LSTYLE],
+  ['มหาวิทยาลัย','a university campus courtyard with brick buildings, trees and students benches, daytime, no people, '+LSTYLE],
+  ['รถไฟฟ้า','the interior of a modern skytrain carriage with blue seats and windows showing the city, daytime, no people, '+LSTYLE]]},
+ {k:'prop',n:'ของประกอบ',ic:'🎒',items:[
+  ['แก้วกาแฟนางเอก','a cute white ceramic mug with a small cat doodle, steaming coffee, on a wooden table, '+LSTYLE],
+  ['จักรยานแม่บ้าน','a pastel mint city bicycle with a front basket, parked by a wall, '+LSTYLE],
+  ['ร่มใส','a clear umbrella with raindrops, leaning against a wall, '+LSTYLE]]}];
+const LP=(c,n)=>`คลัง·${c}·${n}`;
+const TIPS=['ทิป: ภาพต้นแบบหน้าตรงพื้นเรียบ ช่วยให้ AI จำตัวละครได้แม่นที่สุด','ทิป: 1 ตอนใช้ทรงผมเดียว หน้านางเอกจะนิ่งทุกช็อต','ทิป: ฉากเดียวกันใช้ภาพเดียวกันทุกตอน คนดูจะรู้สึกว่าเป็นโลกเดียวกัน','ทิป: ตัวละครไม่เกิน 2–3 คนต่อช็อต ภาพจะไม่ตีกัน','ทิป: กด ⭐ ที่ภาพที่ชอบ ภาพนั้นจะเป็นภาพทางการของรายการ','ทิป: สัตว์เลี้ยงที่ใช้ซ้ำหลายตอน ตั้งเป็นตัวละครได้'];
+let LIBT=0;
+function libStat(){const S=BOT.s||{images:[],jobs:[]},out={};
+  LIB.forEach(c=>c.items.forEach(([n])=>{const p=LP(c.n,n);const im=S.images.filter(i=>i.project===p),j=S.jobs.filter(x=>x.project===p);
+    out[p]={im,q:j.filter(x=>x.status==='queued').length,run:j.some(x=>x.status==='running'),fail:j.filter(x=>x.status==='failed').length};}));return out;}
+function renderLib(quiet){
+  if(!botCfg().url){$('#vw').innerHTML=`<div class="card"><h2>คลัง</h2><p class="muted" style="margin:0">เชื่อมบอทเจนภาพก่อน (แท็บเจนภาพ)</p></div>`;return;}
+  if(!BOT.s){$('#vw').innerHTML=`<div class="card lload"><div class="lbig">กำลังโหลดคลัง…</div><div class="lbar"><i style="width:30%"></i></div></div>`;botLoad();return;}
+  const st=libStat(),S=BOT.s,s=S.settings||{};
+  const libJobs=S.jobs.filter(j=>String(j.project).startsWith('คลัง·'));
+  const allQ=S.jobs.filter(j=>j.status!=='failed'),myQ=libJobs.filter(j=>j.status!=='failed');
+  const run=libJobs.find(j=>j.status==='running')||myQ[0];
+  const total=Object.values(st).reduce((a,x)=>a+x.im.length,0)+myQ.length,done=Object.values(st).reduce((a,x)=>a+x.im.length,0);
+  const pct=total?Math.round(done/total*100):100;
+  const ahead=run?allQ.findIndex(j=>j.id===run.id):0,eta=Math.round((myQ.length+Math.max(0,ahead))*(+s.interval_min||2));
+  const paused=S.now<+s.paused_until;
+  const cur=run?String(run.project).split('·'):null;
+  const last=[...S.images].filter(i=>String(i.project).startsWith('คลัง·')).sort((a,b)=>b.created-a.created)[0];
+  const tip=TIPS[Math.floor(Date.now()/8000)%TIPS.length];
+  const hero=`<div class="card lload">${last?`<div class="lprev"><img src="${esc(botU('/img/'+last.id))}" alt=""><span>ล่าสุด: ${esc(String(last.project).split('·').slice(1).join(' · '))}</span></div>`:''}
+    <div class="lbig">${paused?'⏸ พักเครื่อง (โควตาวันนี้หมด) ทำต่อ '+tTH(s.paused_until):cur?`✨ กำลังสร้าง: ${esc(cur[1])} · ${esc(cur[2])}`:total?'✅ สร้างครบแล้ว':'คลังยังว่าง'}</div>
+    <div class="lbar"><i style="width:${pct}%"></i></div>
+    <div class="row" style="justify-content:space-between"><span class="muted small">${done}/${total} ภาพ · ${pct}%</span><span class="muted small">${myQ.length?`เหลือประมาณ ${eta} นาที${ahead>0?` (มีงานอื่นรอก่อน ${ahead})`:''}`:''}</span></div>
+    <div class="ltip">${esc(tip)}</div>
+    <div class="row"><button class="btn sm main" data-lib="starter">✨ สร้างคลังเริ่มต้น (สัตว์เลี้ยง · ฉาก · ของประกอบ)</button></div></div>`;
+  const cats=[...LIB.filter(c=>!c.lock),...LIB.filter(c=>c.lock)].map(c=>{const items=c.items.map(([n,pr])=>{const p=LP(c.n,n),x=st[p];
+      const best=x.im.find(i=>i.starred)||x.im[0];
+      const state=c.lock?'lock':best?'done':x.run?'run':x.q?'q':'none';
+      const badge={lock:'🔒 '+c.lock,done:`✓ ${x.im.length} ภาพ${x.im.some(i=>i.starred)?' · ⭐':''}`,run:'✨ กำลังสร้าง',q:'⏳ รอคิว',none:'แตะเพื่อสร้าง'}[state];
+      return `<button class="lcard ${state}" data-libitem="${esc(c.k)}|${esc(n)}"><div class="lthumb">${best?`<img loading="lazy" src="${esc(botU('/img/'+best.id))}" alt="">`:`<i>${c.ic}</i>`}${state==='run'||state==='q'?'<b class="shim"></b>':''}</div><span class="lname">${esc(n)}</span><span class="lbadge">${badge}</span></button>`;}).join('');
+    const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
+    return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
+      ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
+  $('#vw').innerHTML=hero+cats;
+  clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
+async function libEnqueue(list,label){let n=0;
+  for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
+  toast(`ส่ง${label}เข้าคิวแล้ว ${n} ภาพ`);await botLoad();renderLib();}
+function libOpen(ck,name){const c=LIB.find(x=>x.k===ck);if(!c)return;const p=LP(c.n,name),it=c.items.find(i=>i[0]===name);
+  if(c.lock)return toast('หมวดนี้ต้องรอระบบล็อกหน้าให้เสร็จก่อน จะได้หน้าเหมือนนางเอกทุกลุค');
+  const x=libStat()[p];
+  if(!x.im.length&&!x.q&&!x.run)return libEnqueue([[c.n,name,it[1]]],name+' ');
+  let v=$('#iview');if(!v){v=document.createElement('div');v.id='iview';document.body.appendChild(v);}
+  v.innerHTML=`<div class="iv" style="align-content:start;place-items:stretch"><div class="sec"><h3>${c.ic} ${esc(name)}</h3><span class="muted small">กด ⭐ ที่ภาพที่ชอบ = ภาพทางการ · 🔁 เจนเพิ่ม</span>${x.im.length?`<div class="bgrid">${x.im.map(i=>botCard(i)).join('')}</div>`:'<p class="muted">กำลังสร้าง… รอสักครู่</p>'}</div></div>
+    <div class="ib2"><div class="row"><button class="btn sm" data-libmore="${esc(ck)}|${esc(name)}">เจนเพิ่ม 2 แบบ</button><span class="grow"></span><button class="btn sm main" data-iclose>ปิด</button></div></div>`;v.hidden=false;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-lib],[data-libitem],[data-libmore]');if(!b)return;
+  try{
+    if(b.dataset.lib==='starter'){if(!sure(b,'กดอีกครั้งเพื่อเริ่มสร้าง (ประมาณ 40 ภาพ)'))return;b.disabled=true;
+      const L=[];LIB.filter(c=>!c.lock).forEach(c=>c.items.forEach(([n,pr])=>{const x=libStat()[LP(c.n,n)];if(!x.im.length&&!x.q&&!x.run)L.push([c.n,n,pr]);}));
+      if(!L.length)return toast('สร้างครบทุกรายการแล้ว');return await libEnqueue(L,'คลังเริ่มต้น');}
+    if(b.dataset.libitem){const [ck,n]=b.dataset.libitem.split('|');return libOpen(ck,n);}
+    if(b.dataset.libmore){const [ck,n]=b.dataset.libmore.split('|');const c=LIB.find(x=>x.k===ck),it=c.items.find(i=>i[0]===n);await libEnqueue([[c.n,n,it[1]]],n+' ');const v=$('#iview');if(v){v.innerHTML='';v.hidden=true;}}
+  }catch(err){toast(botErr(err));}});
 
 boot();
 })();
