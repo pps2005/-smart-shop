@@ -1,0 +1,14 @@
+name = "anime-image-bot"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "anime-bot-db"
+database_id = "b734bddd-c453-46dc-8c83-3f90f7026aaa"
+
+[triggers]
+crons = ["* * * * *"]
