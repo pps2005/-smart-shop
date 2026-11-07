@@ -231,6 +231,69 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4p
 .lbadge{font-size:11.5px;color:var(--muted)}
 .lcard.run .lbadge{color:var(--acc)}.lcard.done .lbadge{color:var(--ok)}
 [hidden]{display:none!important}
+
+/* ===== ธีมสดใส (โหมดสว่าง) ===== */
+:root{--bg:#FFF6FB;--card:rgba(255,255,255,.92);--card2:#F5EEFF;--line:rgba(124,77,255,.16);--ink:#2B1745;--muted:#7B6B94;--acc:#FF4F93;--acc2:#2F9BFF;--you:#FFB020;--ok:#16C26B;--red:#F0445A;--todo:#8A7BA6;color-scheme:light}
+body{background:radial-gradient(900px 520px at 0% -10%,rgba(255,94,160,.22),transparent 60%),radial-gradient(800px 520px at 110% 0%,rgba(80,170,255,.22),transparent 60%),radial-gradient(700px 500px at 50% 120%,rgba(255,206,84,.18),transparent 60%),var(--bg);background-attachment:fixed}
+#top{background:linear-gradient(var(--bg) 70%,rgba(255,246,251,0))}
+.card{box-shadow:0 8px 24px rgba(124,77,255,.10)}
+.tabs{background:#fff;box-shadow:0 6px 18px rgba(124,77,255,.10)}
+.tabs button{color:#8A7BA6}.tabs button i{filter:none;opacity:.75}
+.tabs button.on{background:linear-gradient(135deg,#FF5FA2,#8C6BFF);color:#fff;box-shadow:0 6px 16px rgba(255,79,147,.35)}.tabs button.on i{opacity:1}
+.subtabs button.on{background:linear-gradient(135deg,#FF5FA2,#8C6BFF);color:#fff}
+.btn{background:#fff;box-shadow:0 2px 8px rgba(124,77,255,.08)}
+.btn.main{background:linear-gradient(135deg,#FF4F93,#8C6BFF 60%,#2F9BFF);box-shadow:0 8px 18px rgba(255,79,147,.3)}
+.btn.ok{background:#16C26B;border-color:#16C26B}
+textarea,input[type=text],input[type=email],input[type=password],select,input[type=number],.prompt{background:#fff}
+.mem,.stat .t,.ltip,.ccard,.shot{background:rgba(124,77,255,.05)}
+.stat .t{background:linear-gradient(160deg,#fff,#FBF5FF)}
+.stat .t.good{border-color:rgba(22,194,107,.45);background:linear-gradient(160deg,#fff,#EFFFF6)}
+.stat .t.warn{border-color:rgba(240,68,90,.45);background:linear-gradient(160deg,#fff,#FFF0F2)}
+.mini,.pbar,.lbar{background:#EEE6FB}
+.stage .ic,.hero .ic{background:linear-gradient(135deg,#FFE0EE,#E6DEFF)}
+.st.todo{background:#F1EAFD;color:#6E5C8C}
+.bimg .bb,.vcard .bb{background:#F5EEFF}.bimg .bb button,.vcard .bb button{background:#fff}
+.icov,.lthumb{background:#F1EAFD}
+.ltip{color:#5C4A78}
+.errl{color:#B4233A;background:#FFEFF2}
+.pnote{color:#8A5A00;background:#FFF4D6}
+.report{background:rgba(47,155,255,.08)}
+.panel .pic{background:#F1EAFD}
+#toast{background:#2B1745;color:#fff}
+.modal{background:rgba(43,23,69,.45)}.modal .box{background:#fff}
+.logo i{background:linear-gradient(135deg,#FF4F93,#8C6BFF)}
+.chip{background:#fff}
+.lload{background:linear-gradient(160deg,#FFE3F0,#E9E1FF 55%,#DDF0FF);border-color:rgba(255,79,147,.3)}
+.lprev span{color:#fff}
+
+/* ===== ออฟฟิศสตูดิโอจำลอง ===== */
+.office{position:relative;border-radius:24px;overflow:hidden;border:1px solid var(--line);padding:14px;display:grid;gap:12px;
+  background:linear-gradient(180deg,#E9F4FF 0%,#FFF0F7 55%,#FFF7E3 100%);box-shadow:0 10px 30px rgba(124,77,255,.12)}
+.office::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(124,77,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(124,77,255,.06) 1px,transparent 1px);background-size:36px 36px;pointer-events:none}
+.ofhead{position:relative;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ofsign{font-family:Kanit,sans-serif;font-size:20px;padding:6px 14px;border-radius:14px;background:linear-gradient(135deg,#FF4F93,#8C6BFF);color:#fff;box-shadow:0 6px 16px rgba(255,79,147,.35)}
+.ofsign small{font-family:Sarabun,sans-serif;font-size:12px;opacity:.9;margin-left:6px}
+.onair2{font-family:Kanit,sans-serif;font-size:13px;letter-spacing:.12em;padding:4px 10px;border-radius:8px;border:2px solid #d9cfe8;color:#a99bbd;background:#fff}
+.onair2.live{color:#fff;background:#FF3D7F;border-color:#FF7AA8;box-shadow:0 0 16px rgba(255,61,127,.6);animation:pulse 2s ease-in-out infinite}
+.ofmain{position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+@media (min-width:760px){.ofmain{grid-template-columns:240px minmax(0,1fr)}}
+.ofscreen{border-radius:18px;background:#16112a;border:6px solid #2B1745;aspect-ratio:9/16;max-height:420px;margin:0 auto;width:100%;max-width:240px;overflow:hidden;display:grid;place-items:center;box-shadow:0 10px 24px rgba(43,23,69,.3)}
+.ofscreen video{width:100%;height:100%;object-fit:cover}.ofscreen .idle{color:#c9bde0;font-size:13px;text-align:center;padding:10px}
+.desks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start}
+.desk2{position:relative;border-radius:18px;padding:10px;background:#fff;border:1px solid var(--line);display:grid;gap:6px;justify-items:center;text-align:center;box-shadow:0 6px 16px rgba(124,77,255,.10);cursor:pointer}
+.desk2 .av{position:relative;width:76px;height:76px;border-radius:50%;padding:3px;background:var(--rc,#ccc)}
+.desk2 .av img,.desk2 .av .fb{width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top;display:grid;place-items:center;font-size:34px;background:#fff}
+.desk2.busy .av{animation:ring 1.6s ease-in-out infinite}
+@keyframes ring{0%,100%{box-shadow:0 0 0 0 rgba(255,79,147,.45)}50%{box-shadow:0 0 0 8px rgba(255,79,147,0)}}
+.desk2 .nm{font-family:Kanit,sans-serif;font-size:16px;line-height:1.1}
+.desk2 .rl{font-size:12px;color:var(--muted);line-height:1.2}
+.desk2 .tk{font-size:13px;line-height:1.35;min-height:34px;color:#4b3966}
+.desk2 .bd{position:absolute;top:8px;right:8px;font-size:11px;font-weight:700;border-radius:99px;padding:1px 7px;background:#FFE2EE;color:#C2185B}
+.desk2 .bd.idle{background:#E9FBF1;color:#13804A}.desk2 .bd.wait{background:#FFF3D6;color:#9A6400}
+.typing{display:inline-flex;gap:3px;vertical-align:middle;margin-left:4px}.typing i{width:5px;height:5px;border-radius:50%;background:#FF4F93;animation:tp 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes tp{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+.desk2 .prop{position:absolute;left:8px;top:6px;font-size:16px}
 </style>
 </head>
 <body>
@@ -370,12 +433,12 @@ function renderStudio(quiet){
   const lv=latestVideo(),cur=eps.find(e=>e.id===curId),P=cur?prog(cur):null;
   const live=eps.some(e=>e.status!=='posted'&&prog(e).done>0);
   const key=lv?lv.p:'';
-  if(quiet&&$('#room')){ // อัปเดตเฉพาะส่วนที่เปลี่ยน ไม่ให้วิดีโอสะดุด
-    $('#room .onair').classList.toggle('live',live);
-    if(key!==screenKey)$('#room').outerHTML=roomHtml(lv,live);
+  if(quiet&&$('#office')){ // อัปเดตเฉพาะส่วนที่เปลี่ยน ไม่ให้วิดีโอสะดุด
+    $('#office .onair2').classList.toggle('live',live);
+    if(key!==screenKey)$('#ofscreen').outerHTML=ofScreenHtml(lv);$('#desks').innerHTML=desksHtml();
     $('#progCard').innerHTML=progHtml(cur,P);$('#claudeList').innerHTML=claudeListHtml();screenKey=key;return;}
   screenKey=key;
-  $('#vw').innerHTML=`${roomHtml(lv,live)}
+  $('#vw').innerHTML=`${officeHtml(lv,live)}
   <div class="card" id="statCard">${statusHtml()}</div>
   <div class="card" id="progCard">${progHtml(cur,P)}</div>
   <div class="card"><h3>💬 สั่งงาน Claude</h3>
@@ -522,6 +585,7 @@ async function botLoad(){if(!botCfg().url)return;
   try{BOT.v=await botApi('/api/vstate');}catch(e){BOT.v=null;}
   if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
   if(view==='studio'&&$('#statCard'))$('#statCard').innerHTML=statusHtml();
+  if(view==='studio'&&$('#desks'))$('#desks').innerHTML=desksHtml();
   if(view==='lib'){try{BOT.c=await botApi('/api/vcast');}catch(e){}renderLib(true);}
   if(view==='eps'&&ep)botThumbsFill();}
 setInterval(()=>{if(document.hidden||!botCfg().url)return;if(['kUser','kKey'].includes(document.activeElement&&document.activeElement.id))return;
@@ -874,7 +938,7 @@ function renderLib(quiet){
     <div class="row" style="justify-content:space-between"><span class="muted small">${done}/${total} ภาพ · ${pct}%</span><span class="muted small">${myQ.length?`เหลือประมาณ ${eta} นาที${ahead>0?` (มีงานอื่นรอก่อน ${ahead})`:''}`:''}</span></div>
     <div class="ltip">${esc(tip)}</div>
     <div class="row"><button class="btn sm main" data-lib="starter">✨ สร้างคลังเริ่มต้น (สัตว์เลี้ยง · ฉาก · ของประกอบ)</button></div>
-    <div class="report">📦 ทุกวันหลัง 07:00 บอทสร้างของใหม่ให้เองหมวดละ 1 ชิ้น: ฉาก · สัตว์และอสูร · ของประกอบ · ชุด · องค์ประกอบฉาก · เอฟเฟกต์ (ยกเว้นตัวละคร) ครบแล้ววนรอบใหม่ · เสียงและดนตรีจะเพิ่มเมื่อระบบเสียงพร้อม
+    <div class="report">📦 ทุกวันหลัง 07:00 บอทสร้างของใหม่ให้เองหมวดละ 1 ชิ้น: ฉาก · สัตว์และอสูร · ของประกอบ · ชุด · องค์ประกอบฉาก · เอฟเฟกต์ (ยกเว้นตัวละคร) ครบแล้ววนรอบใหม่ · เสียงประกอบวันละ 200 + เพลงวันละ 20 ทำบน Kaggle
       <div class="row" style="margin-top:6px"><button class="btn sm" data-lib="dailynow">สร้างชุดวันนี้เพิ่มตอนนี้</button><button class="btn sm" data-lib="dailyset" data-on="${s.lib_on==='0'?1:0}">${s.lib_on==='0'?'▶️ เปิดสร้างอัตโนมัติ':'⏸ ปิดสร้างอัตโนมัติ'}</button></div></div></div>`;
   const LA=libAll(),cats=[...LA.filter(c=>!c.lock),...LA.filter(c=>c.lock)].map(c=>{const items=c.items.map(([n,pr])=>{const p=LP(c.n,n),x=st[p];
       const best=x.im.find(i=>i.starred)||x.im[0];
@@ -999,7 +1063,8 @@ function audioHtml(){const V=BOT.v;if(!V)return '';
   const body=CATS.map(([c,ic,d])=>{const pre='คลัง·'+c+'·';
     const vs=V.videos.filter(v=>String(v.project).startsWith(pre)),js=V.jobs.filter(j=>String(j.project).startsWith(pre)&&j.status!=='done');
     const rows=vs.map(v=>`<div class="arow"><div class="row" style="justify-content:space-between"><b>${esc(String(v.project).slice(pre.length))}</b><span class="muted small">${v.sec?Math.round(v.sec/60)+' นาทีทำ · ':''}${Math.round(v.size/1024)} KB <button class="btn sm" data-bot="vdel" data-id="${v.id}" aria-label="ลบ">🗑</button></span></div><audio controls preload="none" src="${esc(botU('/vid/'+v.id))}" style="width:100%"></audio></div>`).join('');
-    const pend=js.map(j=>`<span class="st ${j.status==='failed'?'':'todo'}">${j.status==='running'?'✨ กำลังทำ':j.status==='failed'?'⚠️ พัง':'⏳ รอคิว'} ${esc(String(j.project).slice(pre.length))}</span>`).join('');
+    const run=js.filter(j=>j.status==='running'),fl=js.filter(j=>j.status==='failed'),qn=js.filter(j=>j.status==='queued').length;
+    const pend=[...run.map(j=>`<span class="st doing">✨ กำลังทำ ${esc(String(j.project).slice(pre.length))}</span>`),...fl.slice(0,3).map(j=>`<span class="st">⚠️ พัง ${esc(String(j.project).slice(pre.length))}${j.error?' · '+esc(String(j.error).slice(0,80)):''}</span>`),qn?`<span class="st todo">⏳ รอคิว ${qn} ไฟล์</span>`:''].join('');
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${ic} ${c}</h3><span class="muted small">${vs.length} ไฟล์</span></div><span class="muted small">${d}</span>${pend?`<div class="row">${pend}</div>`:''}${rows||'<span class="muted small">ยังไม่มีไฟล์ จะเริ่มทำในรอบรายวันถัดไป หรือสั่งทำเองข้างล่าง</span>'}</div>`;}).join('');
   return body+`<div class="card"><h3>🎙️ สั่งทำเสียงเอง</h3><div class="row"><select id="audType"><option value="sfx">เสียงประกอบ (10 วิ)</option><option value="music">เพลงบรรเลง (60 วิ)</option></select></div>
     <input type="text" id="audTxt" placeholder="บรรยายเป็นภาษาอังกฤษ เช่น a cat meowing softly" autocomplete="off"><input type="text" id="audName" placeholder="ชื่อในคลัง เช่น แมวร้องเบาๆ" autocomplete="off">
@@ -1089,6 +1154,47 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-boar
   if(a==='clr'){delete S[+i].note;return saveEp({shots:S},'ลบคำขอแล้ว');}
   if(a==='send'){const L=S.filter(x=>x.note).map(x=>`ช็อต ${x.n}: ${x.note}`).join('\n');if(!L)return;
     await saveEp({feedback:(ep.feedback?ep.feedback+'\n\n':'')+'[สตอรีบอร์ด]\n'+L,status:'revise'},'ส่งคำขอแก้ให้ Claude แล้ว');}});
+
+
+/* ================= ออฟฟิศสตูดิโอ: ทีม Agent ทำงานจริงตามคิว ================= */
+const AGENTS=[
+ {k:'dir',n:'ฮารุ',r:'ผู้กำกับ · เขียนบท (Claude)',ic:'🎬',c:'linear-gradient(135deg,#FF4F93,#8C6BFF)'},
+ {k:'art',n:'ริโกะ',r:'นักวาดภาพ (Flux)',ic:'🎨',c:'linear-gradient(135deg,#FF9A5A,#FF4F93)'},
+ {k:'cast',n:'ยูซุ',r:'แคสติ้ง',ic:'🧑‍🎤',c:'linear-gradient(135deg,#FFC93C,#FF7A59)'},
+ {k:'anim',n:'เรนะ',r:'แอนิเมเตอร์ (Kaggle)',ic:'🎞️',c:'linear-gradient(135deg,#2F9BFF,#8C6BFF)'},
+ {k:'snd',n:'โซระ',r:'ซาวด์และดนตรี',ic:'🎧',c:'linear-gradient(135deg,#22D3B6,#2F9BFF)'},
+ {k:'edit',n:'นาโอะ',r:'ตัดต่อ · รวมคลิป',ic:'✂️',c:'linear-gradient(135deg,#A855F7,#2F9BFF)'},
+ {k:'lib',n:'คาโยะ',r:'บรรณารักษ์คลัง',ic:'📦',c:'linear-gradient(135deg,#7CDB4F,#22D3B6)'}];
+function agentImg(n){const S=BOT.s;if(!S)return '';const p='คลัง·ทีมงาน·'+n,L=S.images.filter(i=>i.project===p);const x=L.find(i=>i.starred)||L[0];return x?botU('/img/'+x.id):'';}
+function agentState(k){const S=BOT.s,V=BOT.v,st=(S&&S.settings)||{};
+  const J=S?S.jobs:[],VJ=V?V.jobs:[],bkk=t=>new Date((t||Date.now())+7*3600000).toISOString().slice(0,10);
+  const jq=f=>J.filter(j=>f(String(j.project))),vq=k=>VJ.filter(j=>(j.kind||'gen')===k);
+  const run=L=>L.find(j=>j.status==='running'),q=L=>L.filter(j=>j.status==='queued').length,fail=L=>L.filter(j=>j.status==='failed').length;
+  const paused=S&&S.now<+st.paused_until;
+  const nm=p=>String(p).split('·').slice(-1)[0];
+  if(k==='dir'){const d=claudeTasks.find(t=>t.status==='doing'),w=claudeTasks.filter(t=>t.status==='todo').length;
+    return d?{busy:1,t:'กำลังทำ: '+d.title,b:'ทำงาน'}:w?{t:`มีคำสั่งรอ ${w} งาน · เรียกฉันในแชตได้เลย`,b:'รอ',wait:1}:{t:'พร้อมรับคำสั่งเรื่องใหม่',b:'ว่าง'};}
+  if(k==='art'){const L=jq(p=>!p.startsWith('แคสติ้ง·')&&!p.startsWith('คลัง·')),r=run(L);
+    if(paused&&q(J))return {t:'พักรอโควตาภาพ ทำต่อ '+tTH(st.paused_until),b:'พัก',wait:1};
+    return r?{busy:1,t:'กำลังวาด: '+r.project,b:'ทำงาน'}:q(L)?{busy:1,t:`มีภาพรอวาด ${q(L)} ภาพ`,b:q(L)}:{t:'วาดครบแล้ว',b:'ว่าง'};}
+  if(k==='cast'){const L=jq(p=>p.startsWith('แคสติ้ง·'));return q(L)||run(L)?{busy:1,t:`กำลังเตรียมนักแสดง ${q(L)} ภาพ`,b:q(L)}:{t:'นักแสดงรอคุณคัดในแท็บคลัง',b:'ว่าง'};}
+  if(k==='lib'){const L=jq(p=>p.startsWith('คลัง·'));return q(L)||run(L)?{busy:1,t:`จัดของเข้าคลัง ${q(L)} ชิ้น`,b:q(L)}:{t:st.lib_day?'คลังวันนี้เรียบร้อย ('+st.lib_day+')':'รอรอบเช้า 07:00',b:'ว่าง'};}
+  const kk={anim:'gen',snd:'audio',edit:'concat'}[k],L=vq(kk),r=run(L),f=fail(L);
+  const lbl={anim:'ทำวิดีโอ',snd:'ทำเสียง',edit:'รวมคลิป'}[k];
+  if(r)return {busy:1,t:`กำลัง${lbl}: ${nm(r.project)}${r.shot&&r.shot!=='1'?' ช็อต '+r.shot:''}`,b:'ทำงาน'};
+  if(q(L))return {busy:1,t:`มีงาน${lbl}รอ ${q(L)} งาน`+(V&&V.kaggle&&!V.kaggle.configured?' (ยังไม่ตั้งค่า Kaggle)':''),b:q(L)};
+  if(f)return {t:`มีงานพัง ${f} งาน ดูสาเหตุที่หน้าสถานะ`,b:'พัง',wait:1};
+  return {t:'ว่าง รองานใหม่',b:'ว่าง'};}
+function desksHtml(){return AGENTS.map(a=>{const s=agentState(a.k),im=agentImg(a.n);
+  return `<div class="desk2${s.busy?' busy':''}" data-agent="${a.k}"><span class="bd ${s.busy?'':s.wait?'wait':'idle'}">${esc(String(s.b))}</span>
+    <div class="av" style="--rc:${a.c}">${im?`<img src="${esc(im)}" alt="${esc(a.n)}">`:`<div class="fb">${a.ic}</div>`}</div>
+    <div class="nm">${esc(a.n)}</div><div class="rl">${esc(a.r)}</div>
+    <div class="tk">${esc(s.t)}${s.busy?'<span class="typing"><i></i><i></i><i></i></span>':''}</div></div>`;}).join('');}
+function ofScreenHtml(lv){const u=lv&&(/^https?:/.test(lv.p)?lv.p:urls[lv.p]);
+  return `<div class="ofscreen" id="ofscreen">${u?`<video src="${esc(u)}" autoplay muted loop playsinline controls></video>`:`<div class="idle">📺<br>จอฉายผลงาน<br>คลิปแรกที่เสร็จจะมาฉายที่นี่</div>`}</div>`;}
+function officeHtml(lv,live){return `<div class="office" id="office"><div class="ofhead"><span class="ofsign">SMART STUDIO<small>ห้องทำงานทีมอนิเมะ</small></span><span class="grow"></span><span class="onair2${live?' live':''}">ON AIR</span></div>
+  <div class="ofmain">${ofScreenHtml(lv)}<div class="desks" id="desks">${desksHtml()}</div></div></div>`;}
+document.addEventListener('click',e=>{const d=e.target.closest('[data-agent]');if(!d)return;const go={dir:'eps',art:'gen',cast:'lib',anim:'eps',snd:'lib',edit:'eps',lib:'lib'}[d.dataset.agent];const t=$('#tabs [data-v="'+go+'"]');if(t)t.click();});
 
 boot();
 })();
