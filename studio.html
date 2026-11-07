@@ -361,7 +361,7 @@ function renderEp(){const S=ep.shots||[],P=prog(ep);
       <div class="row">${s.shot?`<span class="st todo">${esc(s.shot)}</span>`:''}${i===P.nowIdx?'<span class="st doing">กำลังทำช็อตนี้</span>':''}${hv?'<span class="st done">มีคลิปแล้ว</span>':''}</div>
       <div>${esc(s.action)}</div>${s.narration?`<div class="muted small">🎙 ${esc(s.narration)}</div>`:''}${s.text?`<div class="small"><b>ตัวอักษรบนจอ:</b> ${esc(s.text)}</div>`:''}
       <div class="media">${slot(k,'image','ภาพคีย์')}${slot(k,'video','คลิปช็อต')}</div>
-      <div class="row">${s.image_prompt?botBtn('epone',s.n,'🎨 ให้บอทเจนภาพช็อตนี้'):''}${hi?botBtn('vone',s.n,'🎞️ ทำวิดีโอช็อตนี้'):''}</div><div class="botthumbs" data-k="${esc(s.n)}"></div><div class="vidthumbs" data-k="${esc(s.n)}"></div>
+      <div class="row">${s.image_prompt?botBtn('epone',s.n,'🎨 ให้บอทเจนภาพช็อตนี้'):''}${botBtn('vone',s.n,hi?'🎞️ ทำวิดีโอช็อตนี้':'🎞️ ทำวิดีโอ (ต้องมีภาพคีย์ก่อน)')}</div><div class="botthumbs" data-k="${esc(s.n)}"></div><div class="vidthumbs" data-k="${esc(s.n)}"></div>
       <details class="more"><summary>ดู prompt</summary>${copyBox('Image prompt',s.image_prompt)}${copyBox('Video prompt',s.video_prompt)}</details></div></div>`;}).join('')}`;
   if(epTab==='sound'){const narr=S.filter(s=>s.narration).map(s=>`(ช็อต ${s.n}) ${s.narration}`).join('\n');const cap=(ep.caption||'')+'\n\n'+(ep.hashtags||[]).join(' ');
     body=`<div class="card"><h3>🎙️ เสียงพากย์</h3><ol class="howto"><li>คัดลอกบทพากย์ด้านล่างไปให้ GPT (โหมดเสียง) อ่าน</li><li>อัดหน้าจอตอน GPT อ่าน</li><li>อัปโหลดไฟล์ที่ช่องด้านล่าง (ไฟล์เสียงหรือวิดีโออัดจอก็ได้)</li></ol>
@@ -602,7 +602,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot]
       case 'epall':await botEnqueueEp((ep.shots||[]).filter(s=>s.image_prompt).map(s=>({scene:+s.n||0,prompt:s.image_prompt})),'ทุกช็อต');break;
       case 'epone':{const s=(ep.shots||[]).find(x=>String(x.n)===b.dataset.n);if(!s)return;await botEnqueueEp([{scene:+s.n||0,prompt:s.image_prompt}],`ช็อต ${s.n} `);break;}
       case 'vall':{b.disabled=true;b.textContent='กำลังส่ง…';await vEnqueue((ep.shots||[]).filter(s=>mUrl(String(s.n),'image')),'ทุกช็อต');b.disabled=false;b.textContent='🎞️ ทำวิดีโอทุกช็อตที่มีภาพคีย์แล้ว';break;}
-      case 'vone':{const s=(ep.shots||[]).find(x=>String(x.n)===b.dataset.n);if(!s)return;b.disabled=true;await vEnqueue([s],`ช็อต ${s.n} `);b.disabled=false;break;}
+      case 'vone':{const s=(ep.shots||[]).find(x=>String(x.n)===b.dataset.n);if(!s)return;if(!mUrl(String(s.n),'image'))return toast('ช็อตนี้ยังไม่มีภาพคีย์ — กดปุ่มเขียว "ใช้ภาพนี้" ใต้ภาพที่ชอบก่อน แล้วค่อยกดทำวิดีโอ');b.disabled=true;await vEnqueue([s],`ช็อต ${s.n} `);b.disabled=false;break;}
       case 'vdel':if(!sure(b,'ลบ?'))return;await botApi('/api/vdel',{id});break;
       case 'vkick':{const r=await botApi('/api/vkick',{});toast(r.pushed?'สั่งเปิดเครื่องแล้ว รอ 5–20 นาที':r.running?'เครื่องกำลังทำงานอยู่แล้ว':r.error?'ไม่สำเร็จ: '+r.error:r.skipped==='empty'?'ไม่มีงานในคิว':'เพิ่งสั่งไป รอสักครู่');break;}
       case 'vretry':await botApi('/api/vretry',{});toast('ส่งวิดีโอที่พังกลับเข้าคิวแล้ว');break;
