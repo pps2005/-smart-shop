@@ -20,6 +20,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (p === '/') return new Response(HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
     if (p.startsWith('/k/')) return (await vRoutes(req, env, url, ctx).catch(e => json({ error: String(e.message || e) }, 500)));
+    if (p.startsWith('/h/')) return (await helperScript(env, url).catch(e => new Response('# error: ' + String(e.message || e), { status: 500 })));
     if (!authOK(req, url, env)) return json({ error: 'รหัสผ่านไม่ถูกต้อง' }, 401);
     await ensureSchema(env);
     if (selfUrl !== url.origin) { selfUrl = url.origin; ctx.waitUntil(setSetting(env, 'self_url', url.origin)); }
@@ -251,7 +252,8 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS images (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, scene INTEGER, prompt TEXT, data TEXT, starred INTEGER DEFAULT 0, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
-    env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT, helper INTEGER DEFAULT 0)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS helpers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, key TEXT UNIQUE, on_ INTEGER DEFAULT 1, created INTEGER, seen INTEGER DEFAULT 0, done INTEGER DEFAULT 0, cur TEXT DEFAULT '')"),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS videos (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, ep TEXT, shot TEXT, prompt TEXT, size INTEGER, sec INTEGER, w INTEGER, h INTEGER, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vchunks (vid INTEGER, idx INTEGER, data TEXT, PRIMARY KEY (vid, idx))'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vlog (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
@@ -283,14 +285,25 @@ async function vRoutes(req, env, url, ctx) {
   if (p.startsWith('/k/')) {
     await ensureSchema(env);
     const s = await getSettings(env);
-    if (!s.ktoken || url.searchParams.get('t') !== s.ktoken) return json({ error: 'bad token' }, 401);
+    const tk = url.searchParams.get('t') || '';
+    let hid = 0, hname = '';
+    if (!s.ktoken || tk !== s.ktoken) { // ผู้ช่วย: ใช้รหัสของตัวเอง ทำได้แค่รับงาน/ส่งงาน
+      const h = tk.length > 20 ? await env.DB.prepare('SELECT id,name FROM helpers WHERE key=? AND on_=1').bind(tk).first() : null;
+      if (!h) return json({ error: 'bad token' }, 401);
+      hid = h.id; hname = h.name;
+    }
     const id = +p.split('/')[3];
+    if (hid && id && p !== '/k/claim' && p !== '/k/log') {
+      const own = await env.DB.prepare('SELECT helper FROM vjobs WHERE id=?').bind(id).first();
+      if (!own || own.helper !== hid) return json({ error: 'not your job' }, 403);
+    }
     if (p === '/k/claim') {
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1 WHERE id=(SELECT id FROM vjobs WHERE status='queued' ORDER BY id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now()).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' ORDER BY id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid).first();
+      if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
-      await setSetting(env, 'k_seen', String(Date.now()));
+      if (!hid) await setSetting(env, 'k_seen', String(Date.now()));
       return json({ job: j });
     }
     if (p.startsWith('/k/img/')) {
@@ -310,6 +323,7 @@ async function vRoutes(req, env, url, ctx) {
         st.push(env.DB.prepare('INSERT INTO vchunks (vid,idx,data) VALUES (?,?,?)').bind(vid, n, bytesToB64(buf.subarray(i, i + VCHUNK))));
       await env.DB.batch(st);
       await env.DB.prepare("UPDATE vjobs SET status='done', image='' WHERE id=?").bind(id).run();
+      if (hid) await env.DB.prepare("UPDATE helpers SET done=done+1, seen=?, cur='' WHERE id=?").bind(Date.now(), hid).run();
       const left = await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status IN ('queued','running')").first();
       if (left.n === 0) await notify(env, `🎞️ วิดีโอของ "${j.project}" ทำเสร็จครบแล้ว เข้าไปเลือกคลิปในหน้าช็อตได้เลย`);
       return json({ ok: true, vid });
@@ -325,9 +339,10 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p === '/k/log') {
       const b = await req.json().catch(() => ({}));
-      await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind(String(b.msg || '').slice(0, 600), Date.now()).run();
+      await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind((hid ? `🤝 ${hname}: ` : '') + String(b.msg || '').slice(0, 600), Date.now()).run();
       await env.DB.prepare('DELETE FROM vlog WHERE id < (SELECT MAX(id) - 60 FROM vlog)').run();
-      await setSetting(env, 'k_seen', String(Date.now()));
+      if (hid) await env.DB.prepare('UPDATE helpers SET seen=? WHERE id=?').bind(Date.now(), hid).run();
+      else await setSetting(env, 'k_seen', String(Date.now()));
       return json({ ok: true });
     }
     return json({ error: 'not found' }, 404);
@@ -344,7 +359,8 @@ async function vApi(req, env, url, ctx, body) {
     const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started,kind FROM vjobs WHERE status!='done' ORDER BY id LIMIT 300").all()).results;
     const videos = (await env.DB.prepare('SELECT id,job_id,project,ep,shot,prompt,size,sec,w,h,created FROM videos ORDER BY id DESC LIMIT 500').all()).results;
     const logs = (await env.DB.prepare('SELECT msg,created FROM vlog ORDER BY id DESC LIMIT 12').all()).results;
-    return json({ jobs, videos, logs, now: Date.now(), kaggle: { configured: !!(env.KAGGLE_USERNAME && env.KAGGLE_KEY), user: env.KAGGLE_USERNAME || '', hasKey: !!env.KAGGLE_KEY, status: s.k_status || '', checked: +s.k_checked || 0, pushed: +s.k_pushed || 0, seen: +s.k_seen || 0, error: s.k_error || '' } });
+    const helpers = (await env.DB.prepare('SELECT id,name,key,on_,created,seen,done,cur FROM helpers ORDER BY id').all()).results;
+    return json({ jobs, videos, logs, helpers, now: Date.now(), kaggle: { configured: !!(env.KAGGLE_USERNAME && env.KAGGLE_KEY), user: env.KAGGLE_USERNAME || '', hasKey: !!env.KAGGLE_KEY, status: s.k_status || '', checked: +s.k_checked || 0, pushed: +s.k_pushed || 0, seen: +s.k_seen || 0, error: s.k_error || '' } });
   }
   if (p.startsWith('/vid/')) return getVideo(req, env, +p.split('/')[2]);
   if (req.method !== 'POST') return null;
@@ -373,6 +389,18 @@ async function vApi(req, env, url, ctx, body) {
   }
   if (p === '/api/vdel') { await env.DB.batch([env.DB.prepare('DELETE FROM vchunks WHERE vid=?').bind(body.id), env.DB.prepare('DELETE FROM videos WHERE id=?').bind(body.id)]); return json({ ok: true }); }
   if (p === '/api/vcancel') { await env.DB.prepare("DELETE FROM vjobs WHERE id=? AND status!='running'").bind(body.id).run(); return json({ ok: true }); }
+  if (p === '/api/vhelperadd') {
+    const name = String(body.name || '').trim().slice(0, 40) || 'ผู้ช่วย';
+    const key = 'h' + crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+    await env.DB.prepare('INSERT INTO helpers (name,key,on_,created) VALUES (?,?,1,?)').bind(name, key, Date.now()).run();
+    return json({ ok: true, key });
+  }
+  if (p === '/api/vhelperset') {
+    if (body.del) { await env.DB.prepare('DELETE FROM helpers WHERE id=?').bind(+body.id).run(); }
+    else await env.DB.prepare('UPDATE helpers SET on_=? WHERE id=?').bind(body.on ? 1 : 0, +body.id).run();
+    await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND helper=?").bind(+body.id).run(); // คืนงานที่ค้างอยู่กับผู้ช่วยคนนี้
+    return json({ ok: true });
+  }
   if (p === '/api/vclear') { await env.DB.prepare("DELETE FROM vjobs WHERE status IN ('queued','failed')").run(); return json({ ok: true }); }
   if (p === '/api/vretry') { await env.DB.prepare("UPDATE vjobs SET status='queued', tries=0, error=NULL WHERE status='failed'").run(); ctx.waitUntil(vTick(env, true)); return json({ ok: true }); }
   if (p === '/api/vkick') return json(await vTick(env, true));
@@ -448,6 +476,17 @@ async function vTick(env, force) {
   }
   await setSetting(env, 'k_status', 'starting');
   return { pushed: true };
+}
+
+// ---- สคริปต์สำหรับผู้ช่วย (เปิดใน Kaggle ของตัวเอง) ----
+async function helperScript(env, url) {
+  await ensureSchema(env);
+  const key = url.pathname.split('/')[2] || '';
+  const h = key.length > 20 ? await env.DB.prepare('SELECT id,name FROM helpers WHERE key=? AND on_=1').bind(key).first() : null;
+  if (!h) return new Response('print("รหัสผู้ช่วยนี้ใช้ไม่ได้แล้ว ติดต่อเจ้าของสตูดิโอ")\n', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+  const s = await getSettings(env);
+  const text = KAGGLE_PY.replace('__API__', s.self_url || url.origin).replace('__TOKEN__', key).replace('__MAXH__', '11').replace('__QUANT__', s.k_quant || 'Q4_K_M');
+  return new Response(text, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
 }
 
 function bytesToB64(u) { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }

@@ -346,6 +346,8 @@ html,body{overflow-x:hidden}
 .witem b{font-size:13px;line-height:1.35}
 .witem .bimg{margin:0}
 .wph{aspect-ratio:1;border-radius:10px;background:linear-gradient(135deg,#FFE3F1,#E9E1FF);display:grid;place-items:center;font-size:40px}
+
+pre.hcell{white-space:pre-wrap;word-break:break-all;background:#2A1F3D;color:#FFE9F6;border-radius:10px;padding:10px;font-size:12px;margin:0;user-select:all;-webkit-user-select:all}
 </style>
 </head>
 <body>
@@ -490,9 +492,10 @@ function renderStudio(quiet){
     if($('#ofscreen')&&key!==screenKey)$('#ofscreen').outerHTML=ofScreenHtml(lv);
     if($('#desks'))$('#desks').innerHTML=desksHtml();
     if($('#progCard'))$('#progCard').innerHTML=progHtml(cur,P);
-    if($('#claudeList'))$('#claudeList').innerHTML=claudeListHtml();screenKey=key;return;}
+    if($('#claudeList'))$('#claudeList').innerHTML=claudeListHtml();
+    if($('#helpCard')&&!$('#helpCard').contains(document.activeElement))$('#helpCard').innerHTML=helpersHtml();screenKey=key;return;}
   screenKey=key;
-  const body={city:cityHtml(),team:officeHtml(lv,live),stat:`<div class="card" id="statCard">${statusHtml()}</div>`,
+  const body={city:cityHtml(),team:officeHtml(lv,live)+`<div class="card" id="helpCard">${helpersHtml()}</div>`,stat:`<div class="card" id="statCard">${statusHtml()}</div>`,
     work:`<div class="card" id="progCard">${progHtml(cur,P)}</div>`,
     cmd:`<div class="card"><h3>💬 สั่งงาน Claude</h3>
     <textarea id="cmd" placeholder="เช่น ทำเรื่องใหม่: ลูกเพนกวินสามตัว ฉบับแม่เล่าให้ลูกฟัง หรือ แก้ช็อต 4 ให้ตลกขึ้น"></textarea>
@@ -1338,6 +1341,44 @@ function worldHtml(){loadWorld();
     return det('w|'+k,`${ic} ${c} <span class="dn">${L.length}</span><small>มีภาพแล้ว ${done} รายการ</small>`,`<div class="wgrid">${rows}</div>`);}).join('');}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-wmake]');if(!b)return;const [cat,i]=b.dataset.wmake.split('|');
   try{b.disabled=true;await botApi('/api/vcastlibone',{cat,i:+i});toast('ส่งเข้าคิววาดแล้ว 2 แบบ');b.outerHTML='<span class="muted small">⏳ รอคิว</span>';botLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
+
+
+/* ---------- ผู้ช่วย: คนที่ช่วยเปิดเครื่อง Kaggle ของตัวเองมารับงานจากคิวเรา ---------- */
+let HNEW=null;
+function helperCell(key){const u=String(botCfg().url||'').replace(/\/+$/,'');return `import urllib.request\nexec(urllib.request.urlopen("${u}/h/${key}/run.py").read().decode())`;}
+function helpersHtml(){const V=BOT.v;
+  if(!botCfg().url)return '<h3>🤝 ผู้ช่วย</h3><p class="muted small" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p>';
+  if(!V)return '<h3>🤝 ผู้ช่วย</h3><p class="muted small" style="margin:0">กำลังโหลด…</p>';
+  const H=V.helpers||[],now=V.now||Date.now();
+  const rows=H.map(h=>{const on=now-(h.seen||0)<20*60000,st=!h.on_?'⏸ ปิดสิทธิ์อยู่':on?(h.cur?'⚙️ กำลังทำ '+esc(String(h.cur).replace(/^คลัง·/,'')):'🟢 ออนไลน์ รองาน'):h.seen?'💤 ออฟไลน์ · เห็นล่าสุด '+tTH(h.seen):'⏳ ยังไม่เคยเปิดเครื่อง';
+    return det('h|'+h.id,`${on?'🟢':'⚪'} ${esc(h.name)} <span class="dn">${h.done} ชิ้น</span><small>${st}</small>`,
+      `<span class="muted small">ส่งข้อความนี้ให้ ${esc(h.name)} ไปวางในโน้ตบุ๊ก Kaggle ของตัวเอง</span><pre class="hcell">${esc(helperCell(h.key))}</pre>
+      <div class="row"><button class="btn sm main" data-help="copy|${h.id}">📋 คัดลอก</button><button class="btn sm" data-help="guide|${h.id}">📨 คัดลอกพร้อมวิธีทำ</button><button class="btn sm" data-help="${h.on_?'off':'on'}|${h.id}">${h.on_?'⏸ ปิดสิทธิ์':'▶️ เปิดสิทธิ์'}</button><button class="btn sm" data-help="del|${h.id}">🗑 ลบ</button></div>`,HNEW===h.id);}).join('');
+  return `<div class="row" style="justify-content:space-between"><h3>🤝 ผู้ช่วยเพิ่มกำลังผลิต</h3><span class="muted small">${H.length} คน</span></div>
+  <span class="muted small">คนที่ช่วยเปิด Kaggle <b>บัญชีของตัวเอง</b> มารับงานวิดีโอ/เสียงจากคิวเรา · รหัสของแต่ละคนรับ-ส่งงานได้อย่างเดียว ปิดหรือลบได้ทุกเมื่อ · อย่าขอรหัสหรือ token ของเขามาใช้เอง</span>
+  ${rows}
+  <div class="row"><input type="text" id="helpName" placeholder="ชื่อผู้ช่วย เช่น พี่ต้น" autocomplete="off" style="flex:1;min-width:0"><button class="btn sm main" data-help="add|0">➕ เพิ่มผู้ช่วย</button></div>`;}
+function helperGuide(h){return `ช่วยเปิดเครื่องทำอนิเมะให้หน่อยนะ 🙏 (ใช้ GPU ฟรีของ Kaggle บัญชีเราเอง สัปดาห์ละ ~30 ชม.)
+1) เข้า kaggle.com ล็อกอินบัญชีของตัวเอง → ยืนยันเบอร์โทรใน Settings (ต้องทำครั้งแรกครั้งเดียว ถึงจะเปิดอินเทอร์เน็ตกับ GPU ได้)
+2) กด Create → New Notebook
+3) แถบขวา Session options: Accelerator = GPU T4 x2 · Internet = On
+4) ลบโค้ดเดิมในช่อง แล้ววางโค้ดนี้:
+
+${helperCell(h.key)}
+
+5) กด Save Version (มุมขวาบน) → เลือก Save & Run All (Commit) → Save
+เครื่องจะทำงานเองเบื้องหลังได้ถึง ~11 ชม. ปิดเว็บ/ปิดเครื่องได้เลย ถ้าคิวว่างจะปิดตัวเองเพื่อประหยัดโควตา
+อยากช่วยอีกรอบ ก็กด Save Version ซ้ำได้ อยากหยุดก็กด Cancel ที่หน้า Versions ได้ทุกเมื่อ`;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-help]');if(!b)return;const [a,id]=b.dataset.help.split('|'),h=((BOT.v||{}).helpers||[]).find(x=>x.id===+id);
+  try{
+    if(a==='copy'&&h)return copy(helperCell(h.key));
+    if(a==='guide'&&h)return copy(helperGuide(h));
+    if(a==='add'){const n=($('#helpName').value||'').trim();if(!n)return toast('ใส่ชื่อผู้ช่วยก่อน');b.disabled=true;await botApi('/api/vhelperadd',{name:n});$('#helpName').value='';await botLoad();
+      const H=(BOT.v||{}).helpers||[];HNEW=H.length?H[H.length-1].id:null;if(HNEW)DOPEN['h|'+HNEW]=true;toast('เพิ่มแล้ว กด "คัดลอกพร้อมวิธีทำ" แล้วส่งให้ '+n);}
+    if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ'))return;await botApi('/api/vhelperset',{id:+id,del:1});await botLoad();toast('ลบผู้ช่วยแล้ว รหัสนี้ใช้ไม่ได้อีก');}
+    if(a==='off'||a==='on'){await botApi('/api/vhelperset',{id:+id,on:a==='on'});await botLoad();toast(a==='on'?'เปิดสิทธิ์แล้ว':'ปิดสิทธิ์แล้ว งานที่ค้างอยู่จะคืนเข้าคิว');}
+    if($('#helpCard'))$('#helpCard').innerHTML=helpersHtml();
+  }catch(err){toast(botErr(err));}finally{b.disabled=false;}});
 
 boot();
 })();
