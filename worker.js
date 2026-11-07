@@ -9,7 +9,8 @@ import SCENES from './scenes.json';
 import IDEAS from './ideas.json';
 import SFXLIB from './sfx.json';
 import MUSICLIB from './music.json';
-import VFXLIB from './vfx.json'; // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
+import VFXLIB from './vfx.json';
+import WORLD from './world.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 export default {
@@ -1104,8 +1105,13 @@ const LIBD = [
   ['ของประกอบ', () => IDEAS.prop, it => `a ${it.e}, single object design, centered, plain soft background, ${LIB_TAIL}`],
   ['ชุด', () => IDEAS.costume, it => `${it.e} outfit displayed on a faceless mannequin, fashion design sheet, front and back view, plain soft background, ${LIB_TAIL}`],
   ['องค์ประกอบฉาก', () => IDEAS.element, it => `a ${it.e}, environment element design, no people, ${LIB_TAIL}`],
+  ['อาวุธ', () => WORLD.weapon, it => `a ${it.e}, weapon design, single object, centered, plain soft background, ${LIB_TAIL}`],
+  ['พลังอาคม', () => WORLD.power, it => `${it.e}, magic power visual effect, anime spell, dramatic lighting, dark background, no people, ${LIB_TAIL}`],
+  ['ของวิเศษ', () => WORLD.artifact, it => `a ${it.e}, magical item design, single object, centered, plain soft background, ${LIB_TAIL}`],
+  ['โลกและจักรวาล', () => WORLD.realm, it => `${it.e}, epic anime world landscape, no people, cinematic lighting, detailed background art, ${LIB_TAIL}`],
   ['เอฟเฟกต์', () => VFXLIB, it => `${it.e}, visual effect artwork for anime and film, isolated effect on a dark background, no people, high quality`],
 ];
+function libName(it) { return (typeof it.i === 'number' ? String(it.i).padStart(4, '0') + ' ' : '') + String(it.n).replace(' — ', ' · ').replace(/·/g, '-').replace(' - ', ' · '); }
 async function libDaily(env, force) {
   const s = await getSettings(env), day = bkkDay(), hr = new Date(Date.now() + 7 * 3600000).getUTCHours();
   if (!force && (s.lib_on === '0' || hr < 7 || s.lib_day === day)) return { skipped: true };
@@ -1116,7 +1122,7 @@ async function libDaily(env, force) {
   for (const [cat, list, mk] of LIBD) {
     const L = list() || [];
     if (!L.length) continue;
-    const name = it => (typeof it.i === 'number' ? String(it.i).padStart(4, '0') + ' ' : '') + String(it.n).replace(' — ', ' · ').replace(/·/g, '-').replace(' - ', ' · ');
+    const name = libName;
     let free = L.filter(it => ![...have].some(p => p === `คลัง·${cat}·${name(it)}` || p.startsWith(`คลัง·${cat}·${name(it)} · รอบ`)));
     let it, nm;
     if (free.length) { it = free[Math.floor(r() * free.length)]; nm = name(it); }
@@ -1167,6 +1173,14 @@ async function castBatch(env, n, force, only) {
 async function castApi(req, env, url, body) {
   const p = url.pathname;
   if (p === '/api/vcastlib') return json(await libDaily(env, true));
+  if (p === '/api/vcastlibone') { // สั่งสร้างภาพรายการเดียวจากคลังทันที
+    const b = body || {};
+    const row = LIBD.find(x => x[0] === b.cat); if (!row) return json({ error: 'ไม่รู้จักหมวด' }, 400);
+    const it = (row[1]() || []).find(x => x.i === +b.i); if (!it) return json({ error: 'ไม่พบรายการ' }, 400);
+    const proj = `คลัง·${b.cat}·${libName(it)}`, pr = row[2](it).slice(0, 2000);
+    await env.DB.batch([0, 1].map(() => env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,8)").bind(proj, 1, pr, Date.now())));
+    return json({ ok: true, project: proj });
+  }
   if (p === '/api/vcastaudio') {
     const cat = body.type === 'music' ? 'เพลง' : 'เสียงประกอบ', name = String(body.name || body.prompt || '').slice(0, 60);
     if (!body.prompt) return json({ error: 'ต้องมีคำบรรยายเสียง' }, 400);

@@ -340,6 +340,12 @@ audio.aplay{display:block;width:100%;height:54px;min-height:54px;margin-top:6px}
 details.fold,details.fold>summary,details.fold>summary small,.card>*{min-width:0;max-width:100%}
 details.fold>summary small{display:block}
 html,body{overflow-x:hidden}
+
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.witem{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px;min-width:0}
+.witem b{font-size:13px;line-height:1.35}
+.witem .bimg{margin:0}
+.wph{aspect-ratio:1;border-radius:10px;background:linear-gradient(135deg,#FFE3F1,#E9E1FF);display:grid;place-items:center;font-size:40px}
 </style>
 </head>
 <body>
@@ -961,7 +967,7 @@ const LIB=[
   ['ร่มใส','a clear umbrella with raindrops, leaning against a wall, '+LSTYLE]]}];
 const LP=(c,n)=>`คลัง·${c}·${n}`;
 /* ของที่บอทสร้างให้เองทุกวัน (หมวดละ 1 ชิ้น ยกเว้นตัวละคร) โผล่ในคลังอัตโนมัติจากชื่อโปรเจกต์ */
-const LDYN={'ฉาก':'🏙️','สัตว์และอสูร':'🐉','ของประกอบ':'🎒','ชุด':'👘','องค์ประกอบฉาก':'🏮','เอฟเฟกต์':'✨'};
+const LDYN={'อาวุธ':'⚔️','พลังอาคม':'🔮','ของวิเศษ':'🗝️','โลกและจักรวาล':'🌌','ฉาก':'🏙️','สัตว์และอสูร':'🐉','ของประกอบ':'🎒','ชุด':'👘','องค์ประกอบฉาก':'🏮','เอฟเฟกต์':'✨'};
 function libAll(){const S=BOT.s||{images:[],jobs:[]},L=LIB.map(c=>({...c,items:[...c.items]}));
   const ps=new Set([...S.images,...S.jobs].map(x=>String(x.project)).filter(p=>p.startsWith('คลัง·')));
   ps.forEach(p=>{const [,cat,...rest]=p.split('·'),nm=rest.join('·');if(!cat||!nm)return;
@@ -1006,7 +1012,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  const lv2=SV.lib;$('#vw').innerHTML=segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats);
+  const lv2=SV.lib;$('#vw').innerHTML=segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -1314,6 +1320,24 @@ function segHtml(pg,items){return `<nav class="seg">${items.map(([k,ic,n])=>`<bu
 document.addEventListener('click',e=>{const b=e.target.closest('[data-seg]');if(!b)return;const [pg,k]=b.dataset.seg.split('|');SV[pg]=k;
   try{localStorage.setItem('ss_sv',JSON.stringify(SV));}catch(err){}
   if(pg==='studio')renderStudio();else if(pg==='lib')renderLib();window.scrollTo({top:0});});
+
+
+/* ---------- คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล ---------- */
+const WCATS=[['weapon','อาวุธ','⚔️'],['power','พลังอาคม','🔮'],['artifact','ของวิเศษ','🗝️'],['realm','โลกและจักรวาล','🌌']];
+let WORLD=null;
+function loadWorld(){if(WORLD)return;WORLD={};fetch('world.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{WORLD=d;if(view==='lib')renderLib();}).catch(()=>{WORLD={err:1};if(view==='lib')renderLib();});}
+function libNm(it){return String(it.i).padStart(4,'0')+' '+String(it.n).replace(' — ',' · ').replace(/·/g,'-').replace(' - ',' · ');}
+function worldHtml(){loadWorld();
+  if(WORLD.err)return '<div class="card"><p class="muted" style="margin:0">โหลดรายการคลังโลกไม่ได้ ลองรีเฟรชอีกครั้ง</p></div>';
+  if(!WORLD.weapon)return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดคลังโลก…</p></div>';
+  const S=BOT.s||{images:[],jobs:[]};
+  return `<div class="card"><h3>🌌 คลังโลกของเรื่อง</h3><span class="muted small">อาวุธ พลังอาคม ของวิเศษ และโลกต่างๆ ไว้หยิบใช้ประกอบฉาก · ระบบวาดให้เองวันละ 1 ชิ้นต่อหมวด (หลัง 07:00) หรือแตะ ✨ สร้าง เพื่อวาดทันที (ใช้โควตาภาพวันนั้น)</span></div>`+
+  WCATS.map(([k,c,ic])=>{const L=WORLD[k]||[];let done=0;
+    const rows=L.map(it=>{const pj=`คลัง·${c}·${libNm(it)}`,im=S.images.filter(i=>i.project===pj||i.project.startsWith(pj+' · รอบ')),q=S.jobs.some(j=>j.project===pj&&j.status!=='failed');if(im.length)done++;
+      return `<div class="witem">${im.length?botCard(im[0]):`<div class="wph">${ic}</div>`}<b>${esc(it.n)}</b>${im.length?`<span class="muted small">✓ ${im.length} ภาพ</span>`:q?'<span class="muted small">⏳ รอคิว</span>':`<button class="btn sm" data-wmake="${esc(c)}|${it.i}">✨ สร้าง</button>`}</div>`;}).join('');
+    return det('w|'+k,`${ic} ${c} <span class="dn">${L.length}</span><small>มีภาพแล้ว ${done} รายการ</small>`,`<div class="wgrid">${rows}</div>`);}).join('');}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-wmake]');if(!b)return;const [cat,i]=b.dataset.wmake.split('|');
+  try{b.disabled=true;await botApi('/api/vcastlibone',{cat,i:+i});toast('ส่งเข้าคิววาดแล้ว 2 แบบ');b.outerHTML='<span class="muted small">⏳ รอคิว</span>';botLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
 
 boot();
 })();
