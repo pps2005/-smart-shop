@@ -388,7 +388,7 @@ function renderSet(){const c=botCfg();
   <div class="card"><h3>บัญชี</h3><div class="muted small">${esc(user&&user.email||'')}</div><div><button class="btn sm" data-act="logout">ออกจากระบบ</button></div></div>`;}
 
 /* ================= ทั่วไป ================= */
-function render(){if(view==='ideas')return renderIdeas();if(view==='studio')renderStudio();else if(view==='eps'){ep?renderEp():renderEpList();}else if(view==='gen')renderGen();else renderSet();}
+function render(){if(view==='ideas'){IDEA.vfetched=false;return renderIdeas();}if(view==='studio')renderStudio();else if(view==='eps'){ep?renderEp():renderEpList();}else if(view==='gen')renderGen();else renderSet();}
 function setView(v,keep){view=v;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));if(!keep){if(v!=='eps')ep=null;render();}window.scrollTo(0,0);}
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;if(b.dataset.v==='eps')ep=null;setView(b.dataset.v);});
 document.addEventListener('change',e=>{const t=e.target;
@@ -648,14 +648,19 @@ async function ideasSave(){
   const bl=new Blob([JSON.stringify(IDEA.list)],{type:'application/json'});
   const {error}=await sb.storage.from(BUCKET).upload(`${ideaDir()}/index.json`,bl,{upsert:true,contentType:'application/json',cacheControl:'0'});
   if(error)throw new Error('บันทึกรายการไม่สำเร็จ: '+error.message);}
-function ideaCard(x){const cu=x.cover&&urls[x.cover],col=ICOL[(+String(x.id).slice(-3)||0)%ICOL.length];
+/* คลิปที่ Kaggle ทำเสร็จ โชว์ในคลังไอเดียด้วย (ไฟล์อยู่ที่บอท) */
+function ideaBotVids(){const V=BOT.v;if(!V||!V.videos)return [];
+  return V.videos.map(v=>({id:'v'+v.id,bot:v.id,title:`${v.project||'วิดีโอ'} · ช็อต ${v.shot}`,at:+v.created,type:'video',dur:v.w?5:0,src:botU('/vid/'+v.id)}));}
+function ideaCard(x){if(x.bot)return `<button class="icard" data-idea="${esc(x.id)}"><div class="icov"><video src="${esc(x.src)}#t=1" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block"></video><span class="ty">🎞️ บอท</span><span class="badge">0:05</span></div><b>${esc(x.title)}</b><small>${new Date(x.at).toLocaleDateString('th-TH',{day:'numeric',month:'short'})} · ทำโดย Kaggle</small></button>`;
+  const cu=x.cover&&urls[x.cover],col=ICOL[(+String(x.id).slice(-3)||0)%ICOL.length];
   const d=new Date(x.at).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
   const inner=cu?`<img loading="lazy" src="${esc(cu)}" alt="">`:`<div class="ph" style="background:${col}"><i>${IICON[x.type]||'📎'}</i>${x.text?`<p>${esc(x.text)}</p>`:`<p>${esc(x.title)}</p>`}</div>`;
   return `<button class="icard" data-idea="${esc(x.id)}"><div class="icov">${inner}${cu?`<span class="ty">${IICON[x.type]||''}</span>`:''}${x.dur?`<span class="badge">${fmtDur(x.dur)}</span>`:''}</div><b>${esc(x.title)}</b><small>${d}</small></button>`;}
 const fmtDur=s=>{s=Math.round(+s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
 async function renderIdeas(){
   if(!IDEA.list){$('#vw').innerHTML='<div class="card"><p class="muted" style="margin:0">กำลังโหลดคลังไอเดีย…</p></div>';await ideasLoad();if(view!=='ideas')return;}
-  const L=[...IDEA.list].sort((a,b)=>b.at-a.at);
+  if(botCfg().url&&!IDEA.vfetched){IDEA.vfetched=true;try{BOT.v=await botApi('/api/vstate');}catch(e){}if(view!=='ideas')return;}
+  const L=[...IDEA.list,...ideaBotVids()].sort((a,b)=>b.at-a.at);
   $('#vw').innerHTML=`<div class="card"><div class="row"><h2 style="margin-right:auto">คลังไอเดีย</h2>
       <label class="btn main" for="ideaFile">⬆️ อัปโหลด</label><button class="btn" data-inote>✏️ จด</button></div>
     <input type="file" id="ideaFile" multiple accept="image/*,video/*,application/pdf,.pdf,text/plain,.txt,.md" hidden>
@@ -696,16 +701,18 @@ async function ideasUpload(files){
       IDEA.list.push(it);await ideasSave();ok++;
     }catch(e){bad++;toast(`${f.name}: ${e.message||e}`);}}
   IDEA.busy='';await ideasLoad();renderIdeas();toast(bad?`อัปโหลดแล้ว ${ok} ไฟล์ · ไม่สำเร็จ ${bad}`:`เพิ่ม ${ok} ไอเดียแล้ว`);}
-function ideaOpen(id){const x=IDEA.list.find(y=>String(y.id)===String(id));if(!x)return;const u=x.path&&urls[x.path];
+function ideaOpen(id){const x=[...IDEA.list,...ideaBotVids()].find(y=>String(y.id)===String(id));if(!x)return;const u=x.bot?x.src:x.path&&urls[x.path];
   let v=$('#iview');if(!v){v=document.createElement('div');v.id='iview';document.body.appendChild(v);}
   const body=x.type==='image'?`<img src="${esc(u)}" alt="">`:x.type==='video'?`<video src="${esc(u)}" controls playsinline autoplay></video>`:x.type==='text'?`<pre>${esc(x.text)}</pre>`:`<div class="card" style="text-align:center"><div style="font-size:48px">${IICON[x.type]||'📎'}</div><a class="btn main" href="${esc(u)}" target="_blank" rel="noopener">เปิดไฟล์</a></div>`;
-  v.innerHTML=`<div class="iv">${body}</div><div class="ib2"><input type="text" id="ivT" value="${esc(x.title)}" aria-label="ชื่อไอเดีย">
+  v.innerHTML=x.bot?`<div class="iv">${body}</div><div class="ib2"><b>${esc(x.title)}</b>
+    <div class="row"><a class="btn sm" href="${esc(u)}" download="clip-${x.bot}.mp4" target="_blank" rel="noopener">ดาวน์โหลด</a><button class="btn sm" data-ivdel="${x.bot}">ลบ</button><span class="grow"></span><button class="btn sm main" data-iclose>ปิด</button></div></div>`:`<div class="iv">${body}</div><div class="ib2"><input type="text" id="ivT" value="${esc(x.title)}" aria-label="ชื่อไอเดีย">
     <div class="row"><button class="btn sm ok" data-isave="${esc(x.id)}">บันทึกชื่อ</button>${u?`<a class="btn sm" href="${esc(u)}" download target="_blank" rel="noopener">ดาวน์โหลด</a>`:''}<button class="btn sm" data-idel="${esc(x.id)}">ลบ</button><span class="grow"></span><button class="btn sm main" data-iclose>ปิด</button></div></div>`;
   v.hidden=false;}
 function ideaClose(){const v=$('#iview');if(v){v.innerHTML='';v.hidden=true;}}
 document.addEventListener('change',e=>{if(e.target.id==='ideaFile'&&e.target.files.length){const fs=[...e.target.files];e.target.value='';ideasUpload(fs);}});
-document.addEventListener('click',async e=>{const b=e.target.closest('[data-idea],[data-inote],[data-inotesave],[data-isave],[data-idel],[data-iclose]');if(!b)return;
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-idea],[data-inote],[data-inotesave],[data-isave],[data-idel],[data-iclose],[data-ivdel]');if(!b)return;
   try{
+    if(b.dataset.ivdel){if(!sure(b,'กดอีกครั้งเพื่อลบ'))return;await botApi('/api/vdel',{id:+b.dataset.ivdel});BOT.v=await botApi('/api/vstate');ideaClose();renderIdeas();return toast('ลบคลิปแล้ว');}
     if(b.dataset.idea)return ideaOpen(b.dataset.idea);
     if(b.hasAttribute('data-iclose'))return ideaClose();
     if(b.hasAttribute('data-inote')){IDEA.note=!IDEA.note;$('#inoteBox').hidden=!IDEA.note;if(IDEA.note)$('#inoteX').focus();return;}

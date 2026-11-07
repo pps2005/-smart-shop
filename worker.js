@@ -512,10 +512,14 @@ def setup():
     if not os.path.isdir(COMFY):
         sh("git clone --depth 1 https://github.com/comfyanonymous/ComfyUI " + COMFY)
         sh("git clone --depth 1 https://github.com/city96/ComfyUI-GGUF " + COMFY + "/custom_nodes/ComfyUI-GGUF")
+        sh("git clone --depth 1 https://github.com/Fannovel16/ComfyUI-Frame-Interpolation " + COMFY + "/custom_nodes/ComfyUI-Frame-Interpolation", check=False)
     req = open(COMFY + "/requirements.txt").read().splitlines()
     keep = [r for r in req if r.strip() and not r.strip().startswith("#") and not r.split("=")[0].split(">")[0].split("<")[0].strip().lower() in ("torch", "torchvision", "torchaudio")]
     open("/tmp/req.txt", "w").write("\n".join(keep) + "\ngguf\nhuggingface_hub\n")
     sh("pip install -q -r /tmp/req.txt", check=False)
+    fi = COMFY + "/custom_nodes/ComfyUI-Frame-Interpolation/requirements-no-cupy.txt"
+    if os.path.exists(fi):
+        sh("pip install -q -r " + fi, check=False)
     log("ติดตั้ง ComfyUI แล้ว กำลังโหลดโมเดล (ครั้งแรกประมาณ 10–20 นาที)")
 
     from huggingface_hub import list_repo_files, hf_hub_download
@@ -558,7 +562,11 @@ def setup():
     for i in range(240):
         try:
             urllib.request.urlopen("http://127.0.0.1:8188/system_stats", timeout=5).read()
-            log("ComfyUI เปิดแล้ว")
+            try:
+                M["rife"] = "RIFE VFI" in comfy("/object_info/RIFE%20VFI")
+            except Exception:
+                M["rife"] = False
+            log("ComfyUI เปิดแล้ว · เติมเฟรม RIFE: " + ("พร้อม" if M["rife"] else "ไม่มี (ใช้ 16fps)"))
             return
         except Exception:
             time.sleep(3)
@@ -623,25 +631,46 @@ def gen(j):
         "15": {"class_type": "VAEDecode", "inputs": {"samples": ["14", 0], "vae": ["10", 0]}},
         "16": {"class_type": "SaveImage", "inputs": {"images": ["15", 0], "filename_prefix": "job%s" % jid}},
     }
+    fps = 16
+    if M.get("rife"):
+        # เติมเฟรม 16 → 48 fps ให้ลื่น (ถ้าพัง ใช้ผลเดิมจาก cache ไม่ต้องเจนใหม่)
+        wf["17"] = {"class_type": "RIFE VFI", "inputs": {"ckpt_name": "rife47.pth", "frames": ["15", 0], "clear_cache_after_n_frames": 10, "multiplier": 3, "fast_mode": True, "ensemble": True, "scale_factor": 1.0}}
+        wf["16"]["inputs"]["images"] = ["17", 0]
+        fps = 48
     t = time.time()
-    pid = comfy("/prompt", {"prompt": wf, "client_id": "bot"})["prompt_id"]
-    while True:
-        time.sleep(5)
-        h = comfy("/history/" + pid)
-        if pid in h:
-            st = h[pid].get("status", {})
-            if st.get("status_str") == "error":
-                msgs = [m for m in st.get("messages", []) if m[0] == "execution_error"]
-                raise RuntimeError("เจนไม่สำเร็จ: " + json.dumps(msgs)[:500])
-            break
-        if time.time() - t > 3600:
-            raise RuntimeError("เจนนานเกิน 60 นาที")
+
+    def run(w):
+        pid = comfy("/prompt", {"prompt": w, "client_id": "bot"})["prompt_id"]
+        while True:
+            time.sleep(5)
+            h = comfy("/history/" + pid)
+            if pid in h:
+                st = h[pid].get("status", {})
+                if st.get("status_str") == "error":
+                    msgs = [m for m in st.get("messages", []) if m[0] == "execution_error"]
+                    raise RuntimeError("เจนไม่สำเร็จ: " + json.dumps(msgs)[:500])
+                return
+            if time.time() - t > 3600:
+                raise RuntimeError("เจนนานเกิน 60 นาที")
+    try:
+        run(wf)
+    except Exception as e:
+        if fps == 16:
+            raise
+        log("เติมเฟรมไม่สำเร็จ ใช้ 16fps แทน: " + str(e)[:200])
+        M["rife"] = False
+        wf.pop("17", None)
+        wf["16"]["inputs"]["images"] = ["15", 0]
+        fps = 16
+        run(wf)
     out = os.path.join(COMFY, "output")
     frames = sorted(glob.glob(os.path.join(out, "job%s_*.png" % jid)))
     if not frames:
         raise RuntimeError("ไม่มีเฟรมออกมา")
     mp4 = os.path.join(ROOT, "job%s.mp4" % jid)
-    sh('"%s" -y -loglevel error -framerate 16 -pattern_type glob -i "%s/job%s_*.png" -c:v libx264 -preset veryfast -crf 17 -pix_fmt yuv420p -movflags +faststart "%s"' % (ffmpeg_bin(), out, jid, mp4))
+    # ขยายเป็นด้านสั้น 1080 + เพิ่มความคมเล็กน้อย
+    vf = "scale='if(gt(iw,ih),-2,1080)':'if(gt(iw,ih),1080,-2)':flags=lanczos,unsharp=5:5:0.6:5:5:0.0"
+    sh('"%s" -y -loglevel error -framerate %d -pattern_type glob -i "%s/job%s_*.png" -vf "%s" -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart "%s"' % (ffmpeg_bin(), fps, out, jid, vf, mp4))
     for f in frames:
         os.remove(f)
     return mp4, time.time() - t, W, H
