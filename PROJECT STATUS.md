@@ -104,3 +104,9 @@
 - Kaggle: cron ทุกนาทีเช็ก `/kernels/status` → ถ้ามีงานในคิวและเครื่องไม่ได้รัน → `POST /api/v1/kernels/push` (script ส่วนตัว, GPU T4, internet) ชื่อ kernel `anime-video-bot` · ต้องตั้ง Secret `KAGGLE_USERNAME`, `KAGGLE_KEY` · kernel คุยกับ worker ผ่าน `/k/*?t=ktoken` (claim/img/done/fail/log)
 - kernel (KAGGLE_PY ใน worker.js): ComfyUI + ComfyUI-GGUF · Wan2.2 I2V A14B GGUF (QuantStack, Q4_K_M) + LightX2V 4 steps (Comfy-Org repackaged) · 640×640-ish, 81 เฟรม @16fps → mp4 · ปิดเองเมื่อคิวว่าง · ยังไม่มี upscale/เติมเฟรม (Claude ทำตอนตัดต่อ)
 - เลือกคลิป: "ใช้คลิปนี้" → ดึงจาก worker แล้วอัปโหลดเข้าช่องคลิปช็อตใน Supabase
+
+## คลังไอเดียของผู้ใช้ (2026-11-08)
+- scenes.json — 1000 ฉาก จาก Anime_Scene_Library_1000.xlsx (20 หมวด × 50) แปลเป็น prompt อังกฤษแล้ว · แคสติ้งหมวดฉากสุ่มจากที่นี่ไม่ซ้ำ
+- ideas.json — 600 ไอเดีย จาก Anime_Complete_Idea_Library_for_Claude.xlsx: char/costume/prop/creature/element/fx (20 ฐาน × 5 เวอร์ชัน: คลาสสิก, แฟนตาซีเรืองแสง, โลกอนาคตไฮเทค, วัฒนธรรมดั้งเดิม, มาสคอตน่ารัก) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX-### · rules = คำสั่งให้ Claude (บทบาท Art Director ฯลฯ, ห้ามลอกผลงานอื่น, ระบุ ID ทุกชิ้นเพื่อคุมความต่อเนื่อง)
+- แคสติ้ง: ตัวละคร = อาชีพ/บทบาทจาก char + ชุดจาก costume · สัตว์ = creature · ของประกอบ = prop + element
+- เป้าหมายปลายทางของผู้ใช้: อนิเมะเต็มตอน ~20 นาที ตัวละครคงที่ทุกช็อต แบบคลิปตัวอย่างทำอาหาร (ช็อตแทรกอาหาร/มือ/หน้าใกล้ สลับมุมเยอะ)

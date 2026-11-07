@@ -5,7 +5,8 @@
 // Cron Trigger:  * * * * *   (บอทเช็คทุกนาที แต่สร้างภาพตามระยะห่างที่ตั้งในเว็บ)
 // ใช้คู่กับ studio.html แท็บ "เจนภาพ" (เรียก API นี้ข้ามโดเมน จึงเปิด CORS ไว้ · ป้องกันด้วย PASSWORD)
 
-import SCENES from './scenes.json'; // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
+import SCENES from './scenes.json';
+import IDEAS from './ideas.json'; // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 export default {
@@ -742,11 +743,15 @@ function castMake(r, style) {
   const tot = CAST.g.reduce((a, b) => a + b[2], 0); let t = r() * tot, g = CAST.g[0];
   for (const x of CAST.g) { if ((t -= x[2]) < 0) { g = x; break; } }
   const f = g[0] === 'f', age = pick(CAST.age, r), hair = pick(f ? CAST.hairF : CAST.hairM, r), hc = pick(CAST.hc, r), eye = pick(CAST.eye, r),
-    out = pick(f ? CAST.outF : CAST.outM, r), vibe = pick(CAST.vibe, r), acc = pick(CAST.acc, r), name = pick(f ? CAST.nameF : CAST.nameM, r);
+    vibe = pick(CAST.vibe, r), acc = pick(CAST.acc, r), name = pick(f ? CAST.nameF : CAST.nameM, r);
+  const arch = pick(IDEAS.char, r);
+  let cos = pick(IDEAS.costume, r);
+  for (let k = 0; k < 10 && age[0] > 22 && /นักเรียน/.test(cos.n); k++) cos = pick(IDEAS.costume, r); // ชุดนักเรียนเฉพาะคนอายุไม่เกิน 22
+  const out = [cos.e, `${cos.n} (${cos.id})`];
   const who = f ? 'young woman' : 'young man';
   const real = style === 'real';
-  const prompt = `${real ? 'photorealistic full body photo' : 'full body anime character design'} of an original ${who}, ${age[0]} years old, ${hc[0]} ${hair[0]}, ${eye[0]} eyes, ${vibe[2]}, ${vibe[0]} personality, wearing ${out[0]}${acc[0] ? ', ' + acc[0] : ''}, standing in a relaxed natural pose, front view, plain light gray studio background, ${real ? 'soft studio lighting, 50mm photo' : 'clean lineart, soft cel shading, high quality anime illustration'}, vertical 9:16`;
-  const desc = `${g[1]} ${age[0]} ปี (${age[1]}) · ผม${hc[1]} ${hair[1]} · ตา${eye[1]} · ${out[1]}${acc[1] ? ' · ' + acc[1] : ''} · นิสัย${vibe[1]}`;
+  const prompt = `${real ? 'photorealistic full body photo' : 'full body anime character design'} of an original ${who} as a ${arch.e}, ${age[0]} years old, ${hc[0]} ${hair[0]}, ${eye[0]} eyes, ${vibe[2]}, ${vibe[0]} personality, wearing ${out[0]}${acc[0] ? ', ' + acc[0] : ''}, standing in a relaxed natural pose, front view, plain light gray studio background, ${real ? 'soft studio lighting, 50mm photo' : 'clean lineart, soft cel shading, high quality anime illustration'}, vertical 9:16`;
+  const desc = `${arch.id} ${arch.n} · ${g[1]} ${age[0]} ปี · ผม${hc[1]} ${hair[1]} · ตา${eye[1]} · ${out[1]}${acc[1] ? ' · ' + acc[1] : ''} · นิสัย${vibe[1]}`;
   return { name, desc, prompt };
 }
 const CAST2 = {
@@ -769,16 +774,17 @@ const CAST2 = {
 };
 function castMake2(cat, r, style) {
   const real = style === 'real', tail = real ? 'photorealistic, 50mm photo, vertical 9:16' : 'soft anime style, high quality anime illustration, cinematic lighting, vertical 9:16';
-  if (cat === 'pet') { const C = CAST2.pet, a = pick(C.sp, r), c = pick(C.col, r), x = pick(C.acc, r), m = pick(C.mood, r);
-    return { name: pick(C.name, r), desc: `${a[1]} ${c[1]}${x[1] ? ' · ' + x[1] : ''} · นิสัย${m[1]}`, prompt: `${real ? 'photorealistic full body photo' : 'full body cute anime character design'} of an original ${c[0]} ${a[0]}${x[0] ? ' wearing a ' + x[0] : ''}, ${m[0]} expression, plain light gray background, ${tail}` }; }
+  if (cat === 'pet') { const C = CAST2.pet, a = pick(IDEAS.creature, r), c = pick(C.col, r), m = pick(C.mood, r);
+    const x = /แมว|สุนัข|กระต่าย|เม่น|แพนด้า|จิ้งจอก/.test(a.n) ? pick(C.acc, r) : ['', ''];
+    return { name: pick(C.name, r), desc: `${a.id} ${a.n} · ${c[1]}${x[1] ? ' · ' + x[1] : ''} · นิสัย${m[1]} · เหมาะกับ${a.fit}`, prompt: `${real ? 'photorealistic full body photo' : 'full body anime creature character design'} of an original ${c[0]} ${a.e}${x[0] ? ' wearing a ' + x[0] : ''}, ${m[0]} expression, plain light gray background, ${tail}` }; }
   if (cat === 'place') {
     const used = castMake2.usedPlaces || new Set();
     let sc = pick(SCENES, r);
     for (let k = 0; k < 30 && used.has(sc.n); k++) sc = pick(SCENES, r);
     used.add(sc.n);
     return { name: sc.n, desc: `#${sc.i} ${sc.c} · ${sc.m} · เหมาะกับ ${sc.g}`, prompt: `${sc.e}, detailed anime background art, no people, ${tail}` }; }
-  const C = CAST2.prop, i = pick(C.it, r), st = pick(C.st, r);
-  return { name: i[1], desc: `${i[1]} · ${st[1]}`, prompt: `a ${st[0]} ${i[0]}, single object, centered, plain soft background, ${tail}` };
+  const it = pick(r() < 0.5 ? IDEAS.prop : IDEAS.element, r);
+  return { name: it.n, desc: `${it.id} · ${it.d} · เหมาะกับ${it.fit}`, prompt: `a ${it.e}, single object design, centered, plain soft background, ${tail}` };
 }
 function bkkDay(ts) { return new Date((ts || Date.now()) + 7 * 3600000).toISOString().slice(0, 10); }
 async function castBatch(env, n, force, only) {
