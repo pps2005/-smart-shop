@@ -217,11 +217,12 @@ async function refresh(quiet){
   if(quiet){if(view==='studio')renderStudio(true);else if(view==='eps'&&!ep)renderEpList();}
 }
 /* signed URL ของไฟล์ทุกตอน (ใช้ทั้งจอฉายและหน้าตอน) */
-async function signAll(){const paths=[];eps.forEach(e=>{const m=e.media||{};for(const k in m)for(const t in m[k])if(m[k][t])paths.push(m[k][t]);});
+async function signAll(){const paths=[];eps.forEach(e=>{const m=e.media||{};for(const k in m)for(const t in m[k])if(m[k][t]&&!/^https?:/.test(m[k][t]))paths.push(m[k][t]);});
   const need=paths.filter(p=>!urls[p]);if(!need.length)return;
   const {data}=await sb.storage.from(BUCKET).createSignedUrls(need,3600*6);(data||[]).forEach(d=>{if(d.signedUrl)urls[d.path]=d.signedUrl;});}
 async function signMedia(){await signAll();}
-function mUrlOf(e,k,t){const p=e.media&&e.media[k]&&e.media[k][t];return p?urls[p]:null;}
+// media เก็บได้ 2 แบบ: path ใน Supabase Storage หรือ URL เต็ม (เช่นคลิปที่ Claude ส่งขึ้น GitHub)
+function mUrlOf(e,k,t){const p=e.media&&e.media[k]&&e.media[k][t];return p?(/^https?:/.test(p)?p:urls[p]):null;}
 function mUrl(k,t){return ep?mUrlOf(ep,k,t):null;}
 
 /* ================= ความคืบหน้า ================= */
@@ -232,21 +233,40 @@ function prog(e){const S=e.shots||[],m=e.media||{},N=S.length;
   const vid=vidS.length,doneSec=vidS.reduce((a,s)=>a+(+s.sec||0),0);
   const voice=!!(m.voice&&(m.voice.audio||m.voice.video)),final=!!(m.final&&m.final.video);
   const nowIdx=S.findIndex(s=>!(m[String(s.n)]&&m[String(s.n)].video));
-  const ok=e.status==='approved'||e.status==='posted';
-  const st=[];
-  st.push(N?(e.status==='draft'?{k:'you',t:'รอคุณอ่านและอนุมัติ'}:e.status==='revise'?{k:'doing',t:'Claude กำลังแก้ตามที่สั่ง'}:{k:'done',t:`${N} ช็อต · ${fmtS(total)}`}):{k:'doing',t:'Claude กำลังเขียนบท'});
-  st.push(!N?{k:'todo',t:'รอบท'}:img===N?{k:'done',t:`ครบ ${N} ช็อต`}:img?{k:'doing',t:`${img}/${N} ช็อต · บอทกำลังเจน`}:ok?{k:'you',t:'กด "ให้บอทเจนภาพทุกช็อต" ในหน้าเรื่อง'}:{k:'todo',t:'รออนุมัติบท'});
-  st.push(!N?{k:'todo',t:'รอบท'}:vid===N?{k:'done',t:`ครบ ${N} ช็อต · ${fmtS(total)}`}:vid?{k:'doing',t:`${vid}/${N} ช็อต · ${fmtS(doneSec)} จาก ${fmtS(total)}`}:img?{k:'doing',t:'รอทำวิดีโอจากภาพคีย์'}:{k:'todo',t:'รอภาพคีย์'});
-  st.push(voice?{k:'done',t:'อัปโหลดเสียงพากย์แล้ว'}:ok?{k:'you',t:'ให้ GPT อ่านบทแล้วอัปโหลดเสียง'}:{k:'todo',t:'รออนุมัติบท'});
-  st.push(final?{k:'done',t:'ได้คลิปเต็มแล้ว'}:(vid===N&&N&&voice)?{k:'doing',t:'Claude กำลังตัดต่อ'}:{k:'todo',t:'รอวิดีโอครบ + เสียง'});
-  st.push(e.status==='posted'?{k:'done',t:'โพสต์แล้ว'}:final?{k:'you',t:'ใส่เพลงใน TikTok แล้วโพสต์'}:{k:'todo',t:'รอคลิปเต็ม'});
-  return {N,total,img,vid,doneSec,voice,final,nowIdx,st,pct:total?doneSec/total:0};
+  const conf=(e.checks&&e.checks.steps)||{};
+  const hint={script:N?`${N} ช็อต · ${fmtS(total)}`:'Claude กำลังเขียนบท',images:N?`ภาพที่ใส่ในช็อตแล้ว ${img}/${N}`:'',handoff:'',anim:N?`คลิปที่ใส่ในช็อตแล้ว ${vid}/${N} · ${fmtS(doneSec)} จาก ${fmtS(total)}`:'',
+    voice:voice?'อัปโหลดเสียงแล้ว':'',edit:final?'มีคลิปเต็มแล้ว':'',post:''};
+  let curK=null;const st=STEPS.map(x=>{const d=!!conf[x.k];let k=d?'done':'todo';if(!d&&!curK){curK=x.k;k='you';}return {k,t:hint[x.k]||'',at:conf[x.k]};});
+  return {N,total,img,vid,doneSec,voice,final,nowIdx,st,curK,done:st.filter(x=>x.k==='done').length,pct:total?doneSec/total:0};
 }
-const STAGES=[['✍️','บท','overview'],['🖼️','ภาพคีย์','shots'],['🎞️','วิดีโอทีละช็อต','shots'],['🎙️','เสียงพากย์','sound'],['✂️','ตัดต่อ','sound'],['📤','โพสต์','sound']];
-const STL={done:'เสร็จ',doing:'กำลังทำ',you:'รอคุณ',todo:'ยังไม่ถึง'};
-function header(){const you=eps.reduce((a,e)=>a+prog(e).st.filter(s=>s.k==='you').length,0);
+/* ลำดับงาน 1 วิดีโอ: คุณกดยืนยันเองทีละขั้นจนจบ */
+const STEPS=[
+ {k:'script',ic:'✍️',n:'บท',who:'Claude',tab:'overview',how:'Claude เขียนบทและแตกช็อตลงเว็บ → อ่านบท ถ้าอยากแก้พิมพ์บอก ถ้าโอเคกดยืนยัน'},
+ {k:'images',ic:'🖼️',n:'ทำรูป',who:'เว็บ (บอท)',tab:'shots',how:'กด "ให้บอทเจนภาพทุกช็อต" → รอบอททำ → เลือกภาพที่ชอบด้วย ⭐ หรือ "ใช้ภาพนี้" ใต้แต่ละช็อต'},
+ {k:'handoff',ic:'📦',n:'ส่งรูปให้ Claude',who:'คุณ',tab:'gen',how:'แท็บเจนภาพ → เลือกเรื่อง → "โหลด ZIP เฉพาะ ⭐" → ส่งไฟล์ให้ Claude ในแชท พร้อมบอกชื่อเรื่อง'},
+ {k:'anim',ic:'🎞️',n:'อนิเมชัน flipbook',who:'Claude',tab:'shots',how:'Claude ทำคลิป flipbook จากรูป ส่งกลับในแชท → ดูแล้วโอเค อัปโหลดลงช่อง "คลิปช็อต" (หรือคลิปเต็มในแท็บเสียง) แล้วกดยืนยัน'},
+ {k:'voice',ic:'🎙️',n:'พากย์เสียง (GPT)',who:'คุณ',tab:'sound',how:'คัดลอกบทพากย์ให้ GPT อ่าน → อัดหน้าจอ → ส่งไฟล์ให้ Claude ในแชท (และอัปโหลดเก็บในแท็บเสียง)'},
+ {k:'edit',ic:'✂️',n:'ตัดต่อเสียงเข้ากับวิดีโอ',who:'Claude',tab:'sound',how:'Claude ซิงก์เสียงกับภาพ ใส่ซับ ส่งคลิปเต็มกลับ → ดูแล้วโอเค อัปโหลดช่อง "คลิปเต็ม" แล้วกดยืนยัน'},
+ {k:'post',ic:'📤',n:'โพสต์',who:'คุณ',tab:'sound',how:'ใส่เพลงใน TikTok เปิดป้ายเนื้อหา AI แล้วโพสต์'}];
+const STL={done:'เสร็จแล้ว',you:'ขั้นปัจจุบัน',todo:'ยังไม่ถึง'};
+function stepsHtml(e,P){const last=STEPS.map(x=>x.k).filter(k=>P.st[STEPS.findIndex(y=>y.k===k)].k==='done').pop();
+  return `<div class="stages">${STEPS.map((x,i)=>{const s=P.st[i];const d=s.k==='done';
+    return `<div class="stage ${s.k}"><span class="ic">${d?'✅':x.ic}</span><span style="min-width:0"><b>${i+1}. ${x.n}</b><small>ใครทำ: ${x.who}${s.t?' · '+esc(s.t):''}</small>${s.k==='you'?`<small style="color:var(--ink);margin-top:4px">${esc(x.how)}</small>`:''}${d&&s.at?`<small>ยืนยันเมื่อ ${new Date(s.at).toLocaleString('th-TH',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small>`:''}
+      ${s.k==='you'?`<span class="row" style="margin-top:8px"><button class="btn sm ok" data-confirm="${x.k}" data-ep="${e.id}">✓ ยืนยันขั้นนี้</button><button class="btn sm" data-goep="${e.id}" data-tab="${x.tab}">ไปทำ</button></span>`:''}
+      ${d&&x.k===last?`<span class="row" style="margin-top:8px"><button class="btn sm" data-unconfirm="${x.k}" data-ep="${e.id}">↩︎ ยกเลิกการยืนยัน</button></span>`:''}</span>
+      <span class="st ${s.k}">${STL[s.k]}</span></div>`;}).join('')}</div>`;}
+async function setStep(id,k,on,b){const e=eps.find(x=>x.id===id);if(!e)return;
+  if(on&&b&&b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent='กดอีกครั้งเพื่อยืนยัน';setTimeout(()=>{if(b.isConnected){b.dataset.sure='';b.textContent='✓ ยืนยันขั้นนี้';}},4000);return;}
+  const checks={...(e.checks||{})};const steps={...(checks.steps||{})};if(on)steps[k]=new Date().toISOString();else delete steps[k];checks.steps=steps;
+  const f={checks,updated_at:new Date().toISOString()};
+  if(k==='script')f.status=on?'approved':'draft';if(k==='script'&&on)f.approved_at=new Date().toISOString();
+  if(k==='post')f.status=on?'posted':'approved';
+  const {error}=await sb.from('studio_episodes').update(f).eq('id',id);if(error)return toast('บันทึกไม่สำเร็จ');
+  Object.assign(e,f);if(ep&&ep.id===id)Object.assign(ep,f);toast(on?'ยืนยันแล้ว ✓':'ยกเลิกการยืนยันแล้ว');header();
+  if(view==='studio')renderStudio();else if(view==='eps'&&ep)renderEp();}
+function header(){const you=eps.filter(e=>e.status!=='posted'&&prog(e).curK).length;
   const b=$('#youN');b.hidden=!you;b.textContent=you;
-  const busy=eps.some(e=>prog(e).st.some(s=>s.k==='doing'));
+  const busy=eps.some(e=>e.status!=='posted'&&prog(e).done>0);
   $('#liveT').textContent=busy?'กำลังผลิต':'พร้อม';}
 
 /* วิดีโอล่าสุด: ไฟล์วิดีโอที่อัปโหลดล่าสุดในทุกตอน (ดูจากเวลาในชื่อไฟล์) */
@@ -257,7 +277,7 @@ function latestVideo(){let best=null;
 /* ================= หน้า สตูดิโอ ================= */
 function renderStudio(quiet){
   const lv=latestVideo(),cur=eps.find(e=>e.id===curId),P=cur?prog(cur):null;
-  const live=eps.some(e=>prog(e).st.some(s=>s.k==='doing'));
+  const live=eps.some(e=>e.status!=='posted'&&prog(e).done>0);
   const key=lv?lv.p:'';
   if(quiet&&$('#room')){ // อัปเดตเฉพาะส่วนที่เปลี่ยน ไม่ให้วิดีโอสะดุด
     $('#room .onair').classList.toggle('live',live);
@@ -271,7 +291,7 @@ function renderStudio(quiet){
     <div class="row"><button class="btn main" data-cmd>ส่งให้ Claude</button><span class="muted small">แล้วไปบอก Claude ในแชทว่า "ทำงานในสตูดิโอ"</span></div>
     <div id="claudeList" class="sec">${claudeListHtml()}</div></div>`;
 }
-function roomHtml(lv,live){const u=lv&&urls[lv.p];
+function roomHtml(lv,live){const u=lv&&(/^https?:/.test(lv.p)?lv.p:urls[lv.p]);
   const lbl=lv?`${esc(lv.e.title)} · ${lv.k==='final'?'คลิปเต็ม':lv.k==='voice'?'เสียงพากย์':lv.k==='char'?'ตัวละคร':'ช็อต '+esc(lv.k)}`:'';
   return `<div class="room" id="room"><div class="wall"></div><div class="floor"></div><div class="rug"></div>
     <div class="win"></div><div class="shelf"><span>🎞️ 🏆</span><div></div><span>📚 🎧</span><div></div></div>
@@ -281,12 +301,11 @@ function roomHtml(lv,live){const u=lv&&urls[lv.p];
     ${lv?`<div class="cap">▶ ล่าสุด: ${lbl}</div>`:''}</div>`;}
 function progHtml(cur,P){
   if(!cur)return `<h3>ยังไม่มีเรื่องที่กำลังทำ</h3><p class="muted" style="margin:0">พิมพ์สั่ง Claude ด้านล่างว่าอยากทำเรื่องอะไร</p>`;
-  const now=P.nowIdx<0?'ทำวิดีโอครบทุกช็อตแล้ว':P.N?`กำลังทำถึง ช็อต ${esc((cur.shots[P.nowIdx]||{}).n)} จาก ${P.N}`:'ยังไม่มีช็อต';
   return `<div class="row"><select id="curSel" style="flex:1;width:auto">${eps.map(e=>`<option value="${e.id}"${e.id===cur.id?' selected':''}>${esc(e.title)}</option>`).join('')}</select><button class="btn sm" data-goep="${cur.id}">เปิดเรื่อง</button></div>
-  <div><div class="big">${fmtS(P.doneSec)} <span class="muted" style="font-size:18px">/ ${fmtS(P.total)}</span></div><div class="muted">${now}</div></div>
-  <div class="pbar"><i style="width:${Math.round(P.pct*100)}%"></i></div>
-  <div class="lab">ลำดับงาน</div>
-  <div class="stages">${STAGES.map(([ic,n,tab],i)=>{const s=P.st[i];return `<button class="stage ${s.k}" data-goep="${cur.id}" data-tab="${tab}" style="text-align:left;color:inherit;cursor:pointer;font:inherit"><span class="ic">${ic}</span><span><b>${i+1}. ${n}</b><small>${esc(s.t)}</small></span><span class="st ${s.k}">${STL[s.k]}</span></button>`;}).join('')}</div>`;}
+  <div class="row" style="justify-content:space-between;align-items:flex-end"><div><div class="big">ขั้น ${Math.min(P.done+1,STEPS.length)}/${STEPS.length}</div><div class="muted">${P.curK?'ตอนนี้: '+STEPS.find(x=>x.k===P.curK).n:'เสร็จครบทุกขั้นแล้ว 🎉'}</div></div>
+    <div style="text-align:right"><div class="big" style="font-size:20px">${fmtS(P.doneSec)} / ${fmtS(P.total)}</div><div class="muted small">วิดีโอที่ทำแล้ว</div></div></div>
+  <div class="pbar"><i style="width:${Math.round(P.done/STEPS.length*100)}%"></i></div>
+  <div class="lab">ตารางเช็กงาน · กดยืนยันทีละขั้นจนจบ 1 วิดีโอ</div>${stepsHtml(cur,P)}`;}
 function claudeListHtml(){if(!claudeTasks.length)return '';
   const S={todo:'รอ Claude',doing:'Claude กำลังทำ',you:'รอคุณ',done:'เสร็จแล้ว'};
   return `<div class="lab">คำสั่งล่าสุด</div>`+claudeTasks.slice(0,4).map(t=>`<div class="mem"><span style="min-width:0"><b>${esc(t.title)}</b>${t.result?`<small>${esc(String(t.result).slice(0,160))}</small>`:''}</span><span class="on" style="color:${t.status==='done'?'var(--ok)':t.status==='you'?'var(--you)':'var(--acc2)'}">${S[t.status]||esc(t.status)}</span></div>`).join('');}
@@ -295,8 +314,8 @@ function claudeListHtml(){if(!claudeTasks.length)return '';
 function renderEpList(){ep=null;
   $('#vw').innerHTML=`<div class="card"><h2>เรื่องทั้งหมด</h2><p class="muted" style="margin:0">ทุกเรื่องแบ่งเป็นช็อตสั้น ๆ ทำทีละช็อตแล้วค่อยตัดต่อรวม แตะเรื่องเพื่อดูรายละเอียด</p></div>
   ${eps.map(e=>{const P=prog(e);return `<button class="card epcard" data-open="${e.id}"><div class="row" style="justify-content:space-between"><h3>${esc(e.title)}</h3><span class="stp ${e.status}">${EPST[e.status]||esc(e.status)}</span></div>
-    <div class="muted small">${esc(e.logline||'')}</div><div class="pbar"><i style="width:${Math.round(P.pct*100)}%"></i></div>
-    <div class="muted small">วิดีโอ ${fmtS(P.doneSec)} / ${fmtS(P.total)} · ภาพคีย์ ${P.img}/${P.N} · คลิป ${P.vid}/${P.N}</div></button>`;}).join('')||'<div class="card"><p class="muted" style="margin:0">ยังไม่มีเรื่อง สั่ง Claude ที่หน้าสตูดิโอได้เลย</p></div>'}`;}
+    <div class="muted small">${esc(e.logline||'')}</div><div class="pbar"><i style="width:${Math.round(P.done/STEPS.length*100)}%"></i></div>
+    <div class="muted small">ขั้น ${Math.min(P.done+1,STEPS.length)}/${STEPS.length}${P.curK?' · '+STEPS.find(x=>x.k===P.curK).n:' · เสร็จแล้ว'} · วิดีโอ ${fmtS(P.doneSec)} / ${fmtS(P.total)}</div></button>`;}).join('')||'<div class="card"><p class="muted" style="margin:0">ยังไม่มีเรื่อง สั่ง Claude ที่หน้าสตูดิโอได้เลย</p></div>'}`;}
 async function openEp(id,tab){const f=eps.find(x=>x.id===id);if(!f)return toast('ไม่พบเรื่องนี้');ep=f;epTab=tab||'overview';await signMedia();setView('eps',true);renderEp();}
 function slot(k,t,label){const u=mUrl(k,t),id=`f-${k}-${t}`,acc=t==='audio'?'audio/*,video/*':t+'/*';
   const isV=u&&/\.(mp4|mov|webm|m4v)(\?|$)/i.test((ep.media[k]||{})[t]||'');
@@ -308,9 +327,10 @@ function renderEp(){const S=ep.shots||[],P=prog(ep);
       <p style="margin:0;font-size:19px">${esc(ep.logline)}</p>${ep.why?`<p class="muted" style="margin:0">${esc(ep.why)}</p>`:''}
       <div class="pbar"><i style="width:${Math.round(P.pct*100)}%"></i></div><div class="muted small">วิดีโอ ${fmtS(P.doneSec)} / ${fmtS(P.total)} · ภาพคีย์ ${P.img}/${P.N} · คลิป ${P.vid}/${P.N}</div>
       <div class="row"><button class="btn main" data-act="play">▶ ดูฉบับร่าง</button><button class="btn" data-bot="sendclaude">📤 ส่งภาพและคลิปให้ Claude</button></div></div>
+    <div class="card"><h3>ตารางเช็กงาน</h3>${stepsHtml(ep,P)}</div>
     <div class="card"><h3>อยากให้แก้อะไร</h3>${ep.feedback?copyBox('ฟีดแบ็กล่าสุด'+(ep.status==='revise'?' (รอ Claude แก้)':''),ep.feedback):''}
       <textarea id="fb" placeholder="เช่น ช็อต 6 อยากให้ตลกกว่านี้"></textarea>
-      <div class="row"><button class="btn" data-act="feedback">ส่งให้ Claude แก้</button>${ep.status==='draft'||ep.status==='revise'?'<button class="btn ok" data-act="approve">✓ อนุมัติบท</button>':''}</div></div>
+      <div class="row"><button class="btn" data-act="feedback">ส่งให้ Claude แก้</button></div></div>
     <div class="card"><h3>ตัวละคร</h3>${ep.character?`<p style="margin:0">${esc(ep.character)}</p>`:''}
       <details class="more"><summary>prompt ภาพต้นแบบ</summary>${copyBox('Prompt ภาพต้นแบบ',ep.character_sheet_prompt)}</details>
       <div class="media">${slot('char','image','ภาพต้นแบบ')}</div>${ep.character_sheet_prompt?botBtn('epchar','','🎨 ให้บอทเจนภาพต้นแบบ (3 แบบ)'):''}<div class="botthumbs" data-k="char"></div></div>`;
@@ -327,7 +347,7 @@ function renderEp(){const S=ep.shots||[],P=prog(ep);
       ${narr?`<div class="prompt"><span class="k">บทพากย์ทั้งเรื่อง (ปุ่มคัดลอกจะเอาเฉพาะคำพูด ไม่มีเลขช็อต)</span><code>${esc(narr)}</code><div><button class="btn sm" data-copy="${esc(S.filter(s=>s.narration).map(s=>s.narration).join('\n\n'))}">คัดลอกให้ GPT อ่าน</button></div></div>`:'<p class="muted" style="margin:0">ยังไม่มีบทพากย์</p>'}<div class="media">${slot('voice','audio','ไฟล์เสียงพากย์')}</div></div>
     <div class="card"><h3>✂️ คลิปเต็ม (ตัดต่อแล้ว)</h3><p class="muted" style="margin:0">Claude ตัดต่อคลิปทุกช็อต + เสียง + ซับ ให้ แล้วอัปโหลดคลิปที่ได้ไว้ที่นี่ จะไปฉายที่จอในสตูดิโอ</p><div class="media">${slot('final','video','คลิปเต็ม')}</div></div>
     <div class="card"><h3>📤 โพสต์</h3>${ep.music?`<p style="margin:0">🎵 ${esc(ep.music)}</p>`:''}${copyBox('แคปชันและแฮชแท็ก',cap.trim())}<p class="muted" style="margin:0">ตอนโพสต์เปิดป้าย "เนื้อหาที่สร้างด้วย AI" ทุกแพลตฟอร์ม</p>
-      <div class="row">${ep.status!=='posted'?'<button class="btn ok" data-act="posted">โพสต์แล้ว</button>':'<span class="st done">โพสต์แล้ว</span>'}</div></div>`;}
+      <p class="muted small" style="margin:0">โพสต์แล้วไปกดยืนยันขั้น "โพสต์" ในตารางเช็กงาน</p></div>`;}
   $('#vw').innerHTML=`<div class="row"><button class="btn sm" data-act="eplist">← เรื่องทั้งหมด</button></div><h2 style="font-size:24px">${esc(ep.title)}</h2>
     <nav class="subtabs">${Object.entries(TB).map(([k,v])=>`<button class="${k===epTab?'on':''}" data-eptab="${k}">${v}</button>`).join('')}</nav>${body}`;
   if(epTab==='shots'||epTab==='overview'){botThumbsFill();if(botCfg().url&&!BOT.s)botLoad();}}
@@ -356,7 +376,9 @@ document.addEventListener('change',e=>{const t=e.target;
 document.addEventListener('click',async e=>{const b=e.target.closest('button,[data-open]');if(!b)return;
   if(b.dataset.copy!==undefined)return copy(b.dataset.copy);
   if(b.dataset.v2)return setView(b.dataset.v2);
-  if(b.dataset.goep)return openEp(b.dataset.goep,b.dataset.tab);
+  if(b.dataset.confirm)return setStep(b.dataset.ep,b.dataset.confirm,true,b);
+  if(b.dataset.unconfirm)return setStep(b.dataset.ep,b.dataset.unconfirm,false);
+  if(b.dataset.goep){if(b.dataset.tab==='gen')return setView('gen');return openEp(b.dataset.goep,b.dataset.tab);}
   if(b.dataset.open)return openEp(b.dataset.open);
   if(b.dataset.eptab){epTab=b.dataset.eptab;return renderEp();}
   if(b.hasAttribute('data-cmd')){const v=($('#cmd').value||'').trim();if(!v)return toast('พิมพ์คำสั่งก่อน');
