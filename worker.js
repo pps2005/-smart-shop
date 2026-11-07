@@ -58,6 +58,7 @@ export default {
     ctx.waitUntil(tick(env, false));
     ctx.waitUntil(vTick(env, false).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
     ctx.waitUntil(castBatch(env, 0, false).catch(() => {}));
+    ctx.waitUntil(libDaily(env, false).catch(() => {}));
   },
 };
 
@@ -889,6 +890,43 @@ function castMake2(cat, r, style) {
   const it = pick(r() < 0.5 ? IDEAS.prop : IDEAS.element, r);
   return { name: it.n, desc: `${it.id} · ${it.d} · เหมาะกับ${it.fit}`, prompt: `a ${it.e}, single object design, centered, plain soft background, ${tail}` };
 }
+// ---------- คลังอัตโนมัติรายวัน: ทุกวันหลัง 07:00 สร้างของใหม่หมวดละ 1 ชิ้น (ยกเว้นตัวละคร) ครบรายการแล้ววนรอบใหม่ ----------
+const LIB_TAIL = 'modern TV anime style, clean lineart, cel shading, high quality';
+const LIBD = [
+  ['ฉาก', () => SCENES, it => `${it.e}, no people, detailed anime background art, cinematic lighting, ${LIB_TAIL}`],
+  ['สัตว์และอสูร', () => IDEAS.creature, it => `a ${it.e}, full body, creature design, front view, plain soft background, ${LIB_TAIL}`],
+  ['ของประกอบ', () => IDEAS.prop, it => `a ${it.e}, single object design, centered, plain soft background, ${LIB_TAIL}`],
+  ['ชุด', () => IDEAS.costume, it => `${it.e} outfit displayed on a faceless mannequin, fashion design sheet, front and back view, plain soft background, ${LIB_TAIL}`],
+  ['องค์ประกอบฉาก', () => IDEAS.element, it => `a ${it.e}, environment element design, no people, ${LIB_TAIL}`],
+  ['เอฟเฟกต์', () => IDEAS.fx, it => `${it.e} anime visual effect example, effect art sheet, dark background, ${LIB_TAIL}`],
+];
+async function libDaily(env, force) {
+  const s = await getSettings(env), day = bkkDay(), hr = new Date(Date.now() + 7 * 3600000).getUTCHours();
+  if (!force && (s.lib_on === '0' || hr < 7 || s.lib_day === day)) return { skipped: true };
+  await setSetting(env, 'lib_day', day);
+  const have = new Set([...(await env.DB.prepare("SELECT DISTINCT project FROM jobs WHERE project LIKE 'คลัง·%'").all()).results,
+    ...(await env.DB.prepare("SELECT DISTINCT project FROM images WHERE project LIKE 'คลัง·%'").all()).results].map(x => x.project));
+  const r = rng(Date.now() ^ Math.floor(Math.random() * 1e9)), st = [], made = [];
+  for (const [cat, list, mk] of LIBD) {
+    const L = list() || [];
+    if (!L.length) continue;
+    const name = it => String(it.n).replace(' — ', ' · ').replace(/·/g, '-').replace(' - ', ' · ');
+    let free = L.filter(it => ![...have].some(p => p === `คลัง·${cat}·${name(it)}` || p.startsWith(`คลัง·${cat}·${name(it)} · รอบ`)));
+    let it, nm;
+    if (free.length) { it = free[Math.floor(r() * free.length)]; nm = name(it); }
+    else { // ครบทุกรายการแล้ว → วนรอบใหม่ เป็นเวอร์ชันใหม่ของของเดิม
+      it = L[Math.floor(r() * L.length)]; const base = name(it);
+      const n = [...have].filter(p => p === `คลัง·${cat}·${base}` || p.startsWith(`คลัง·${cat}·${base} · รอบ`)).length;
+      nm = `${base} · รอบ ${n + 1}`;
+    }
+    const proj = `คลัง·${cat}·${nm}`, pr = mk(it).slice(0, 2000);
+    for (let v = 0; v < 2; v++) st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,8)").bind(proj, 1, pr, Date.now()));
+    made.push(`${cat}: ${nm}`);
+  }
+  if (st.length) await env.DB.batch(st);
+  await notify(env, `📦 คลังวันนี้: ${made.join(' · ')}`);
+  return { ok: true, made };
+}
 function bkkDay(ts) { return new Date((ts || Date.now()) + 7 * 3600000).toISOString().slice(0, 10); }
 async function castBatch(env, n, force, only) {
   const s = await getSettings(env), day = bkkDay(), hr = new Date(Date.now() + 7 * 3600000).getUTCHours();
@@ -920,6 +958,8 @@ async function castBatch(env, n, force, only) {
 }
 async function castApi(req, env, url, body) {
   const p = url.pathname;
+  if (p === '/api/vcastlib') return json(await libDaily(env, true));
+  if (p === '/api/vcastlibset') { await setSetting(env, 'lib_on', body.on ? '1' : '0'); return json({ ok: true }); }
   if (p === '/api/vcast') {
     const rows = (await env.DB.prepare("SELECT * FROM casting WHERE status!='rejected' OR day>=? ORDER BY id DESC LIMIT 200").bind(bkkDay(Date.now() - 2 * 86400000)).all()).results;
     const imgs = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE project LIKE 'แคสติ้ง·%'").all()).results;

@@ -801,10 +801,19 @@ const LIB=[
   ['จักรยานแม่บ้าน','a pastel mint city bicycle with a front basket, parked by a wall, '+LSTYLE],
   ['ร่มใส','a clear umbrella with raindrops, leaning against a wall, '+LSTYLE]]}];
 const LP=(c,n)=>`คลัง·${c}·${n}`;
+/* ของที่บอทสร้างให้เองทุกวัน (หมวดละ 1 ชิ้น ยกเว้นตัวละคร) โผล่ในคลังอัตโนมัติจากชื่อโปรเจกต์ */
+const LDYN={'ฉาก':'🏙️','สัตว์และอสูร':'🐉','ของประกอบ':'🎒','ชุด':'👘','องค์ประกอบฉาก':'🏮','เอฟเฟกต์':'✨'};
+function libAll(){const S=BOT.s||{images:[],jobs:[]},L=LIB.map(c=>({...c,items:[...c.items]}));
+  const ps=new Set([...S.images,...S.jobs].map(x=>String(x.project)).filter(p=>p.startsWith('คลัง·')));
+  ps.forEach(p=>{const [,cat,...rest]=p.split('·'),nm=rest.join('·');if(!cat||!nm)return;
+    let c=L.find(x=>x.n===cat);if(!c){c={k:'d'+cat,n:cat,ic:LDYN[cat]||'📦',items:[]};L.push(c);}
+    if(!c.items.some(i=>i[0]===nm))c.items.unshift([nm]);});
+  return L;}
+function libPrompt(p){const S=BOT.s||{images:[],jobs:[]};const x=[...S.images,...S.jobs].find(i=>i.project===p&&i.prompt);return x?x.prompt:'';}
 const TIPS=['ทิป: ภาพต้นแบบหน้าตรงพื้นเรียบ ช่วยให้ AI จำตัวละครได้แม่นที่สุด','ทิป: 1 ตอนใช้ทรงผมเดียว หน้านางเอกจะนิ่งทุกช็อต','ทิป: ฉากเดียวกันใช้ภาพเดียวกันทุกตอน คนดูจะรู้สึกว่าเป็นโลกเดียวกัน','ทิป: ตัวละครไม่เกิน 2–3 คนต่อช็อต ภาพจะไม่ตีกัน','ทิป: กด ⭐ ที่ภาพที่ชอบ ภาพนั้นจะเป็นภาพทางการของรายการ','ทิป: สัตว์เลี้ยงที่ใช้ซ้ำหลายตอน ตั้งเป็นตัวละครได้'];
 let LIBT=0;
 function libStat(){const S=BOT.s||{images:[],jobs:[]},out={};
-  LIB.forEach(c=>c.items.forEach(([n])=>{const p=LP(c.n,n);const im=S.images.filter(i=>i.project===p),j=S.jobs.filter(x=>x.project===p);
+  libAll().forEach(c=>c.items.forEach(([n])=>{const p=LP(c.n,n);const im=S.images.filter(i=>i.project===p),j=S.jobs.filter(x=>x.project===p);
     out[p]={im,q:j.filter(x=>x.status==='queued').length,run:j.some(x=>x.status==='running'),fail:j.filter(x=>x.status==='failed').length};}));return out;}
 function renderLib(quiet){
   if(!botCfg().url){$('#vw').innerHTML=`<div class="card"><h2>คลัง</h2><p class="muted" style="margin:0">เชื่อมบอทเจนภาพก่อน (แท็บเจนภาพ)</p></div>`;return;}
@@ -825,8 +834,10 @@ function renderLib(quiet){
     <div class="lbar"><i style="width:${pct}%"></i></div>
     <div class="row" style="justify-content:space-between"><span class="muted small">${done}/${total} ภาพ · ${pct}%</span><span class="muted small">${myQ.length?`เหลือประมาณ ${eta} นาที${ahead>0?` (มีงานอื่นรอก่อน ${ahead})`:''}`:''}</span></div>
     <div class="ltip">${esc(tip)}</div>
-    <div class="row"><button class="btn sm main" data-lib="starter">✨ สร้างคลังเริ่มต้น (สัตว์เลี้ยง · ฉาก · ของประกอบ)</button></div></div>`;
-  const cats=[...LIB.filter(c=>!c.lock),...LIB.filter(c=>c.lock)].map(c=>{const items=c.items.map(([n,pr])=>{const p=LP(c.n,n),x=st[p];
+    <div class="row"><button class="btn sm main" data-lib="starter">✨ สร้างคลังเริ่มต้น (สัตว์เลี้ยง · ฉาก · ของประกอบ)</button></div>
+    <div class="report">📦 ทุกวันหลัง 07:00 บอทสร้างของใหม่ให้เองหมวดละ 1 ชิ้น: ฉาก · สัตว์และอสูร · ของประกอบ · ชุด · องค์ประกอบฉาก · เอฟเฟกต์ (ยกเว้นตัวละคร) ครบแล้ววนรอบใหม่ · เสียงและดนตรีจะเพิ่มเมื่อระบบเสียงพร้อม
+      <div class="row" style="margin-top:6px"><button class="btn sm" data-lib="dailynow">สร้างชุดวันนี้เพิ่มตอนนี้</button><button class="btn sm" data-lib="dailyset" data-on="${s.lib_on==='0'?1:0}">${s.lib_on==='0'?'▶️ เปิดสร้างอัตโนมัติ':'⏸ ปิดสร้างอัตโนมัติ'}</button></div></div></div>`;
+  const LA=libAll(),cats=[...LA.filter(c=>!c.lock),...LA.filter(c=>c.lock)].map(c=>{const items=c.items.map(([n,pr])=>{const p=LP(c.n,n),x=st[p];
       const best=x.im.find(i=>i.starred)||x.im[0];
       const state=c.lock?'lock':best?'done':x.run?'run':x.q?'q':'none';
       const badge={lock:'🔒 '+c.lock,done:`✓ ${x.im.length} ภาพ${x.im.some(i=>i.starred)?' · ⭐':''}`,run:'✨ กำลังสร้าง',q:'⏳ รอคิว',none:'แตะเพื่อสร้าง'}[state];
@@ -839,10 +850,10 @@ function renderLib(quiet){
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
   toast(`ส่ง${label}เข้าคิวแล้ว ${n} ภาพ`);await botLoad();renderLib();}
-function libOpen(ck,name){const c=LIB.find(x=>x.k===ck);if(!c)return;const p=LP(c.n,name),it=c.items.find(i=>i[0]===name);
+function libOpen(ck,name){const c=libAll().find(x=>x.k===ck);if(!c)return;const p=LP(c.n,name),it=c.items.find(i=>i[0]===name);
   if(c.lock)return toast('หมวดนี้ต้องรอระบบล็อกหน้าให้เสร็จก่อน จะได้หน้าเหมือนนางเอกทุกลุค');
   const x=libStat()[p];
-  if(!x.im.length&&!x.q&&!x.run)return libEnqueue([[c.n,name,it[1]]],name+' ');
+  if(!x.im.length&&!x.q&&!x.run&&(it[1]||libPrompt(p)))return libEnqueue([[c.n,name,it[1]||libPrompt(p)]],name+' ');
   let v=$('#iview');if(!v){v=document.createElement('div');v.id='iview';document.body.appendChild(v);}
   v.innerHTML=`<div class="iv" style="align-content:start;place-items:stretch"><div class="sec"><h3>${c.ic} ${esc(name)}</h3><span class="muted small">กด ⭐ ที่ภาพที่ชอบ = ภาพทางการ · 🔁 เจนเพิ่ม</span>${x.im.length?`<div class="bgrid">${x.im.map(i=>botCard(i)).join('')}</div>`:'<p class="muted">กำลังสร้าง… รอสักครู่</p>'}</div></div>
     <div class="ib2"><div class="row"><button class="btn sm" data-libmore="${esc(ck)}|${esc(name)}">เจนเพิ่ม 2 แบบ</button><span class="grow"></span><button class="btn sm main" data-iclose>ปิด</button></div></div>`;v.hidden=false;}
@@ -852,7 +863,9 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-lib]
       const L=[];LIB.filter(c=>!c.lock).forEach(c=>c.items.forEach(([n,pr])=>{const x=libStat()[LP(c.n,n)];if(!x.im.length&&!x.q&&!x.run)L.push([c.n,n,pr]);}));
       if(!L.length)return toast('สร้างครบทุกรายการแล้ว');return await libEnqueue(L,'คลังเริ่มต้น');}
     if(b.dataset.libitem){const [ck,n]=b.dataset.libitem.split('|');return libOpen(ck,n);}
-    if(b.dataset.libmore){const [ck,n]=b.dataset.libmore.split('|');const c=LIB.find(x=>x.k===ck),it=c.items.find(i=>i[0]===n);await libEnqueue([[c.n,n,it[1]]],n+' ');const v=$('#iview');if(v){v.innerHTML='';v.hidden=true;}}
+    if(b.dataset.lib==='dailynow'){if(!sure(b,'กดอีกครั้งเพื่อสร้างชุดใหม่ (6 ชิ้น · 12 ภาพ)'))return;b.disabled=true;const r=await botApi('/api/vcastlib',{});toast(r.made?'ส่งเข้าคิวแล้ว: '+r.made.join(' · '):'ยังสร้างไม่ได้');await botLoad();return renderLib();}
+    if(b.dataset.lib==='dailyset'){await botApi('/api/vcastlibset',{on:b.dataset.on==='1'});toast(b.dataset.on==='1'?'เปิดสร้างอัตโนมัติแล้ว':'ปิดสร้างอัตโนมัติแล้ว');await botLoad();return renderLib();}
+    if(b.dataset.libmore){const [ck,n]=b.dataset.libmore.split('|');const c=libAll().find(x=>x.k===ck),it=c.items.find(i=>i[0]===n),pr=it[1]||libPrompt(LP(c.n,n));if(!pr)return toast('หาคำสั่งภาพเดิมไม่เจอ');await libEnqueue([[c.n,n,pr]],n+' ');const v=$('#iview');if(v){v.innerHTML='';v.hidden=true;}}
   }catch(err){toast(botErr(err));}});
 
 
