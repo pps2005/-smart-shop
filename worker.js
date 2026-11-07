@@ -7,7 +7,9 @@
 
 import SCENES from './scenes.json';
 import IDEAS from './ideas.json';
-import SFXLIB from './sfx.json'; // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
+import SFXLIB from './sfx.json';
+import MUSICLIB from './music.json';
+import VFXLIB from './vfx.json'; // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 export default {
@@ -797,7 +799,7 @@ def audio(j, port=8188):
     if typ == "music":
         wf = {
             "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ace_step_v1_3.5b.safetensors"}},
-            "2": {"class_type": "TextEncodeAceStepAudio", "inputs": {"clip": ["1", 1], "tags": pr, "lyrics": "[instrumental]", "lyrics_strength": 0.99}},
+            "2": {"class_type": "TextEncodeAceStepAudio", "inputs": {"clip": ["1", 1], "tags": pr, "lyrics": ("[verse]\nooh, aah, ooh\n[chorus]\nla la la, ooh aah" if opt.get("vocal") else "[instrumental]"), "lyrics_strength": 0.99}},
             "3": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["2", 0]}},
             "4": {"class_type": "EmptyAceStepLatentAudio", "inputs": {"seconds": sec, "batch_size": 1}},
             "5": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["1", 0], "shift": 5.0}},
@@ -1004,48 +1006,34 @@ function castMake2(cat, r, style) {
 }
 
 // ---------- คลังเสียง: เพลงบรรเลง (ACE-Step) + เสียงประกอบ (Stable Audio Open) ----------
-const MUSIC = [
-  ['อบอุ่นยามเช้า', 'warm morning slice of life anime bgm, acoustic guitar, soft piano, light percussion, cheerful, 90 bpm'],
-  ['เดินเล่นในเมือง', 'easygoing city walk anime bgm, ukulele, glockenspiel, light bass, bouncy, 105 bpm'],
-  ['ตลกป่วน', 'comedic anime bgm, pizzicato strings, bassoon, xylophone, playful staccato, 120 bpm'],
-  ['เขินๆ', 'shy romantic comedy anime bgm, soft piano, celesta, light strings, gentle, 80 bpm'],
-  ['รักเงียบๆ ตอนกลางคืน', 'quiet night romance anime bgm, electric piano, soft synth pad, lo-fi drums, mellow, 75 bpm'],
-  ['เศร้า', 'sad emotional anime bgm, solo piano, slow strings, melancholic, 60 bpm'],
-  ['ซึ้งน้ำตาซึม', 'tearjerker anime bgm, piano and cello, building strings, emotional climax, 65 bpm'],
-  ['ลึกลับ', 'mysterious anime bgm, music box, low strings, ambient pads, eerie, 70 bpm'],
-  ['สืบสวน', 'detective investigation anime bgm, plucked bass, muted trumpet, brushed drums, suspense, 95 bpm'],
-  ['ลักลอบย่องเบา', 'sneaking stealth anime bgm, pizzicato, light percussion, tense and playful, 100 bpm'],
-  ['ตื่นเต้น', 'tense suspense anime bgm, ostinato strings, ticking percussion, rising tension, 110 bpm'],
-  ['ต่อสู้มันส์', 'epic battle anime bgm, taiko drums, electric guitar, orchestral strings, intense, 150 bpm'],
-  ['ศึกใหญ่', 'epic orchestral climax anime bgm, choir pads, brass, big drums, heroic, 140 bpm'],
-  ['อาคมโบราณ', 'ancient magic ritual anime bgm, shakuhachi, koto, deep drums, mystical, 85 bpm'],
-  ['ตัวร้ายปรากฏ', 'villain theme anime bgm, dark organ, low brass, ominous choir pads, 70 bpm'],
-  ['ผจญภัย', 'adventure journey anime bgm, orchestral, flute melody, strings, uplifting, 120 bpm'],
-  ['ชีวิตประจำวัน', 'daily life anime bgm, light jazz, piano, upright bass, brushes, relaxed, 100 bpm'],
-  ['ร้านขนมปัง', 'cozy bakery cafe anime bgm, accordion, acoustic guitar, warm, 95 bpm'],
-  ['ฝนตก', 'rainy day anime bgm, soft piano, gentle rain ambience feel, calm, 70 bpm'],
-  ['หวังใหม่', 'hopeful ending anime bgm, piano, strings, warm brass, uplifting resolution, 85 bpm'],
-  ['ดนตรีจากวิทยุเก่า', 'old radio retro swing jazz instrumental, vintage, crackly, 110 bpm'],
-  ['เพลงป๊อปในร้าน', 'background cafe pop instrumental, light and catchy, guitar and synth, 115 bpm'],
-  ['หวาดกลัว', 'horror anime bgm, dissonant strings, low drones, creepy, 60 bpm'],
-  ['ฉากเปิดเรื่อง', 'anime opening style instrumental, energetic rock, guitars, drums, bright, 160 bpm'],
-  ['ฉากปิดเรื่อง', 'anime ending style instrumental, mellow pop ballad, piano and guitar, nostalgic, 90 bpm'],
-];
 async function audioEnqueue(env, items) {
   const st = items.map(it => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'audio',?)")
-    .bind(it.project, '', '1', it.prompt.slice(0, 1500), Date.now(), JSON.stringify({ type: it.type, sec: it.sec })));
+    .bind(it.project, '', '1', it.prompt.slice(0, 1500), Date.now(), JSON.stringify({ type: it.type, sec: it.sec, vocal: it.vocal ? 1 : 0 })));
   if (st.length) await env.DB.batch(st);
 }
 async function audioDaily(env, have) {
-  const r = rng(Date.now() ^ 0x5bd1e995), out = [], made = [];
-  for (const [cat, L, type, sec] of [['เพลง', MUSIC, 'music', 60], ['เสียงประกอบ', SFXLIB.map(x => [`${String(x.i).padStart(4, '0')} ${x.n}`, x.e]), 'sfx', 10]]) {
-    const free = L.filter(([n]) => ![...have].some(p => p === `คลัง·${cat}·${n}` || p.startsWith(`คลัง·${cat}·${n} · รอบ`)));
-    let it = free.length ? free[Math.floor(r() * free.length)] : L[Math.floor(r() * L.length)], nm = it[0];
-    if (!free.length) nm += ` · รอบ ${[...have].filter(p => p.startsWith(`คลัง·${cat}·${it[0]}`)).length + 1}`;
-    out.push({ project: `คลัง·${cat}·${nm}`, prompt: it[1] + (type === 'sfx' ? ', clean high quality sound effect, no music' : ', instrumental, no vocals, high quality'), type, sec });
-    made.push(`${cat}: ${nm}`);
-  }
-  await audioEnqueue(env, out);
+  // ต่อวัน: เสียงประกอบ aud_sfx_n รายการ + เพลง aud_music_n รายการ รายการละ aud_var แบบ (ตั้งค่าได้)
+  const s = await getSettings(env), r = rng(Date.now() ^ 0x5bd1e995), out = [], made = [];
+  const V = Math.min(3, Math.max(1, +s.aud_var || 2));
+  const pickN = (cat, L, n) => {
+    const key = x => `${String(x.i).padStart(4, '0')} ${x.n}`;
+    let free = L.filter(x => ![...have].some(p => p === `คลัง·${cat}·${key(x)}` || p.startsWith(`คลัง·${cat}·${key(x)} · รอบ`)));
+    const res = [];
+    for (let k = 0; k < n; k++) {
+      if (free.length) { const t = Math.floor(r() * free.length); res.push([free[t], key(free[t])]); free.splice(t, 1); }
+      else { const x = L[Math.floor(r() * L.length)], b = key(x); res.push([x, `${b} · รอบ ${[...have].filter(p => p.startsWith(`คลัง·${cat}·${b}`)).length + 1 + k}`]); }
+    }
+    return res;
+  };
+  for (const [x, nm] of pickN('เสียงประกอบ', SFXLIB, Math.min(400, +s.aud_sfx_n || 200)))
+    for (let v = 0; v < V; v++) out.push({ project: `คลัง·เสียงประกอบ·${nm}`, prompt: x.e + ', clean high quality sound effect, no music', type: 'sfx', sec: 10 });
+  const ms = pickN('เพลง', MUSICLIB, Math.min(100, +s.aud_music_n || 20));
+  for (const [x, nm] of ms)
+    for (let v = 0; v < V; v++) out.push(x.t === 'sfx'
+      ? { project: `คลัง·เพลง·${nm}`, prompt: x.e + ', cinematic music sound effect, high quality', type: 'sfx', sec: 8 }
+      : { project: `คลัง·เพลง·${nm}`, prompt: x.e + (x.v ? ', anime soundtrack, wordless vocals, high quality' : ', anime soundtrack, instrumental, no vocals, high quality'), type: 'music', sec: 45, vocal: x.v ? 1 : 0 });
+  for (let k = 0; k < out.length; k += 50) await audioEnqueue(env, out.slice(k, k + 50));
+  made.push(`เสียงประกอบ ${Math.min(400, +s.aud_sfx_n || 200)} รายการ`, `เพลง ${ms.length} รายการ (รายการละ ${V} แบบ)`);
   return made;
 }
 
@@ -1057,7 +1045,7 @@ const LIBD = [
   ['ของประกอบ', () => IDEAS.prop, it => `a ${it.e}, single object design, centered, plain soft background, ${LIB_TAIL}`],
   ['ชุด', () => IDEAS.costume, it => `${it.e} outfit displayed on a faceless mannequin, fashion design sheet, front and back view, plain soft background, ${LIB_TAIL}`],
   ['องค์ประกอบฉาก', () => IDEAS.element, it => `a ${it.e}, environment element design, no people, ${LIB_TAIL}`],
-  ['เอฟเฟกต์', () => IDEAS.fx, it => `${it.e} anime visual effect example, effect art sheet, dark background, ${LIB_TAIL}`],
+  ['เอฟเฟกต์', () => VFXLIB, it => `${it.e}, visual effect artwork for anime and film, isolated effect on a dark background, no people, high quality`],
 ];
 async function libDaily(env, force) {
   const s = await getSettings(env), day = bkkDay(), hr = new Date(Date.now() + 7 * 3600000).getUTCHours();
@@ -1069,7 +1057,7 @@ async function libDaily(env, force) {
   for (const [cat, list, mk] of LIBD) {
     const L = list() || [];
     if (!L.length) continue;
-    const name = it => String(it.n).replace(' — ', ' · ').replace(/·/g, '-').replace(' - ', ' · ');
+    const name = it => (typeof it.i === 'number' ? String(it.i).padStart(4, '0') + ' ' : '') + String(it.n).replace(' — ', ' · ').replace(/·/g, '-').replace(' - ', ' · ');
     let free = L.filter(it => ![...have].some(p => p === `คลัง·${cat}·${name(it)}` || p.startsWith(`คลัง·${cat}·${name(it)} · รอบ`)));
     let it, nm;
     if (free.length) { it = free[Math.floor(r() * free.length)]; nm = name(it); }
@@ -1127,7 +1115,11 @@ async function castApi(req, env, url, body) {
     await vTick(env, true);
     return json({ ok: true });
   }
-  if (p === '/api/vcastlibset') { await setSetting(env, 'lib_on', body.on ? '1' : '0'); return json({ ok: true }); }
+  if (p === '/api/vcastlibset') {
+    if (body.on !== undefined) await setSetting(env, 'lib_on', body.on ? '1' : '0');
+    for (const k of ['aud_sfx_n', 'aud_music_n', 'aud_var']) if (body[k] !== undefined) await setSetting(env, k, String(Math.max(0, +body[k] || 0)));
+    return json({ ok: true });
+  }
   if (p === '/api/vcast') {
     const rows = (await env.DB.prepare("SELECT * FROM casting WHERE status!='rejected' OR day>=? ORDER BY id DESC LIMIT 200").bind(bkkDay(Date.now() - 2 * 86400000)).all()).results;
     const imgs = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE project LIKE 'แคสติ้ง·%'").all()).results;
