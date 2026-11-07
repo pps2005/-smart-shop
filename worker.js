@@ -233,7 +233,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS images (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, scene INTEGER, prompt TEXT, data TEXT, starred INTEGER DEFAULT 0, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
-    env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT)"),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS videos (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, ep TEXT, shot TEXT, prompt TEXT, size INTEGER, sec INTEGER, w INTEGER, h INTEGER, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vchunks (vid INTEGER, idx INTEGER, data TEXT, PRIMARY KEY (vid, idx))'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vlog (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
@@ -268,10 +268,10 @@ async function vRoutes(req, env, url, ctx) {
     if (!s.ktoken || url.searchParams.get('t') !== s.ktoken) return json({ error: 'bad token' }, 401);
     const id = +p.split('/')[3];
     if (p === '/k/claim') {
-      await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 75 * 60000).run();
-      const j = await env.DB.prepare("SELECT id,project,ep,shot,prompt,neg,frames FROM vjobs WHERE status='queued' ORDER BY id LIMIT 1").first();
+      await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1 WHERE id=(SELECT id FROM vjobs WHERE status='queued' ORDER BY id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now()).first();
       if (!j) return json({});
-      await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1 WHERE id=?").bind(Date.now(), j.id).run();
+      try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
       await setSetting(env, 'k_seen', String(Date.now()));
       return json({ job: j });
     }
@@ -323,7 +323,7 @@ async function vApi(req, env, url, ctx, body) {
   kEnv(env, await getSettings(env));
   if (p === '/api/vstate') {
     const s = await getSettings(env);
-    const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started FROM vjobs WHERE status!='done' ORDER BY id LIMIT 300").all()).results;
+    const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started,kind FROM vjobs WHERE status!='done' ORDER BY id LIMIT 300").all()).results;
     const videos = (await env.DB.prepare('SELECT id,job_id,project,ep,shot,prompt,size,sec,w,h,created FROM videos ORDER BY id DESC LIMIT 500').all()).results;
     const logs = (await env.DB.prepare('SELECT msg,created FROM vlog ORDER BY id DESC LIMIT 12').all()).results;
     return json({ jobs, videos, logs, now: Date.now(), kaggle: { configured: !!(env.KAGGLE_USERNAME && env.KAGGLE_KEY), user: env.KAGGLE_USERNAME || '', hasKey: !!env.KAGGLE_KEY, status: s.k_status || '', checked: +s.k_checked || 0, pushed: +s.k_pushed || 0, seen: +s.k_seen || 0, error: s.k_error || '' } });
@@ -336,13 +336,22 @@ async function vApi(req, env, url, ctx, body) {
     for (const it of items) {
       const img = String(it.image || '');
       if (!img || img.length > 1800000) continue;
-      st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created) VALUES (?,?,?,?,?,?,?,'queued',0,?)")
-        .bind(String(body.project || 'โปรเจกต์').slice(0, 60), String(body.ep || ''), String(it.shot ?? ''), String(it.prompt || '').slice(0, 2000), String(it.neg || VNEG).slice(0, 800), img, Math.min(121, Math.max(33, +it.frames || 81)), Date.now()));
+      const opt = JSON.stringify({ hq: it.hq ? 1 : 0, fps: +it.fps === 12 ? 12 : 0 });
+      st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)")
+        .bind(String(body.project || 'โปรเจกต์').slice(0, 60), String(body.ep || ''), String(it.shot ?? ''), String(it.prompt || '').slice(0, 2000), String(it.neg || VNEG).slice(0, 800), img, Math.min(161, Math.max(17, +it.frames || 81)), Date.now(), opt));
     }
     if (!st.length) return json({ error: 'ไม่มีช็อตที่มีภาพคีย์' });
     await env.DB.batch(st);
     ctx.waitUntil(vTick(env, true));
     return json({ ok: true, added: st.length });
+  }
+  if (p === '/api/vconcat') {
+    const urls = (Array.isArray(body.urls) ? body.urls : []).filter(u => /^https:\/\//.test(u)).slice(0, 400);
+    if (urls.length < 1) return json({ error: 'ไม่มีคลิปให้รวม' });
+    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind) VALUES (?,?,?,?,'','',0,'queued',0,?,'concat')")
+      .bind(String(body.project || '').slice(0, 60), String(body.ep || ''), String(body.key || 'final').slice(0, 20), JSON.stringify(urls), Date.now()).run();
+    ctx.waitUntil(vTick(env, true));
+    return json({ ok: true, clips: urls.length });
   }
   if (p === '/api/vdel') { await env.DB.batch([env.DB.prepare('DELETE FROM vchunks WHERE vid=?').bind(body.id), env.DB.prepare('DELETE FROM videos WHERE id=?').bind(body.id)]); return json({ ok: true }); }
   if (p === '/api/vcancel') { await env.DB.prepare("DELETE FROM vjobs WHERE id=? AND status!='running'").bind(body.id).run(); return json({ ok: true }); }
@@ -500,6 +509,7 @@ def pick_root():
 ROOT, FREE = pick_root()
 COMFY = os.path.join(ROOT, "ComfyUI")
 M = {}
+PORTS = []
 
 
 def pick(files, *need, ext):
@@ -562,25 +572,40 @@ def setup():
     M.update(high=b(0), low=b(1), te=b(2), vae=b(3), lh=b(4), ll=b(5))
     log("โหลดโมเดลครบ: " + ", ".join(M.values()))
 
-    env = dict(os.environ, CUDA_VISIBLE_DEVICES="0")
-    lf = open(os.path.join(ROOT, "comfy.log"), "w")
-    subprocess.Popen([sys.executable, "main.py", "--listen", "127.0.0.1", "--port", "8188", "--disable-auto-launch"], cwd=COMFY, stdout=lf, stderr=subprocess.STDOUT, env=env)
-    for i in range(240):
-        try:
-            urllib.request.urlopen("http://127.0.0.1:8188/system_stats", timeout=5).read()
+    n = max(1, len([l for l in gpu.splitlines() if l.strip()]))
+    try:
+        ram = int(open("/proc/meminfo").read().split()[1]) / 1e6
+    except Exception:
+        ram = 0
+    if ram and ram < 24:
+        n = 1
+    for g in range(n):
+        if g:
+            time.sleep(20)
+        port = 8188 + g
+        env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(g))
+        lf = open(os.path.join(ROOT, "comfy%d.log" % g), "w")
+        subprocess.Popen([sys.executable, "main.py", "--listen", "127.0.0.1", "--port", str(port), "--disable-auto-launch", "--temp-directory", os.path.join(ROOT, "ctmp%d" % g)], cwd=COMFY, stdout=lf, stderr=subprocess.STDOUT, env=env)
+        for i in range(240):
             try:
-                M["rife"] = "RIFE VFI" in comfy("/object_info/RIFE%20VFI")
+                urllib.request.urlopen("http://127.0.0.1:%d/system_stats" % port, timeout=5).read()
+                PORTS.append(port)
+                break
             except Exception:
-                M["rife"] = False
-            log("ComfyUI เปิดแล้ว · เติมเฟรม RIFE: " + ("พร้อม" if M["rife"] else "ไม่มี (ใช้ 16fps)"))
-            return
-        except Exception:
-            time.sleep(3)
-    raise RuntimeError("ComfyUI เปิดไม่ขึ้น: " + open(os.path.join(ROOT, "comfy.log")).read()[-500:])
+                time.sleep(3)
+        else:
+            log("ComfyUI การ์ดที่ %d เปิดไม่ขึ้น: %s" % (g + 1, open(os.path.join(ROOT, "comfy%d.log" % g)).read()[-300:]))
+    if not PORTS:
+        raise RuntimeError("ComfyUI เปิดไม่ขึ้นเลย")
+    try:
+        M["rife"] = "RIFE VFI" in comfy("/object_info/RIFE%20VFI", port=PORTS[0])
+    except Exception:
+        M["rife"] = False
+    log("ComfyUI เปิดแล้ว %d การ์ด (RAM %.0f GB) · เติมเฟรม RIFE: %s" % (len(PORTS), ram, "พร้อม" if M["rife"] else "ไม่มี"))
 
 
-def comfy(path, data=None):
-    req = urllib.request.Request("http://127.0.0.1:8188" + path, data=json.dumps(data).encode() if data is not None else None, headers={"content-type": "application/json"})
+def comfy(path, data=None, port=8188):
+    req = urllib.request.Request("http://127.0.0.1:%d" % port + path, data=json.dumps(data).encode() if data is not None else None, headers={"content-type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.loads(r.read() or b"{}")
@@ -606,16 +631,45 @@ def ffmpeg_bin():
     return FFMPEG
 
 
-def gen(j):
-    jid = j["id"]
-    img = call("/k/img/%s" % jid)
+def gen(j, port=8188):
+    # ช็อตสั้น (1–5 วิ) = รอบเดียว ยาวตามจริง · ช็อตยาว (>5 วิ) = เจนหลายรอบต่อกันจากเฟรมสุดท้าย
+    total = max(17, int(j.get("frames") or 81))
+    passes = 1 if total <= 81 else (total - 1 + 79) // 80
+    F1 = min(81, max(17, 4 * round((total - 1) / 4) + 1)) if passes == 1 else 81
+    opt = j.get("opt") or {}
     from PIL import Image
     import io
-    im = Image.open(io.BytesIO(img)).convert("RGB")
-    W, H = size_for(*im.size)
+    img = Image.open(io.BytesIO(call("/k/img/%s" % j["id"]))).convert("RGB")
+    seq, fps, t0, W, H = [], 16, time.time(), 0, 0
+    for k in range(passes):
+        frames, fps, W, H = gen_pass(j, img, k, port, F1, opt)
+        seq += frames if k == 0 else frames[1:]
+        img = Image.open(frames[-1]).convert("RGB")
+    jid = j["id"]
+    tmp = os.path.join(ROOT, "seq%s" % jid)
+    os.makedirs(tmp, exist_ok=True)
+    for i, f in enumerate(seq):
+        shutil.move(f, os.path.join(tmp, "%05d.png" % i))
+    out = os.path.join(COMFY, "output")
+    for f in glob.glob(os.path.join(out, "job%s_*.png" % jid)):
+        os.remove(f)
+    mp4 = os.path.join(ROOT, "job%s.mp4" % jid)
+    vf = "scale='if(gt(iw,ih),-2,1080)':'if(gt(iw,ih),1080,-2)':flags=lanczos,unsharp=5:5:0.6:5:5:0.0"
+    if opt.get("fps") == 12:
+        vf = "fps=12," + vf  # ลุคอนิเมะ: 12 ภาพ/วิ แบบวาดมือ
+    sh('"%s" -y -loglevel error -framerate %d -i "%s/%%05d.png" -vf "%s" -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart "%s"' % (ffmpeg_bin(), fps, tmp, vf, mp4))
+    shutil.rmtree(tmp, ignore_errors=True)
+    return mp4, time.time() - t0, W, H
+
+
+def gen_pass(j, im, k, port=8188, F=81, opt=None):
+    opt = opt or {}
+    hq = bool(opt.get("hq"))
+    ST = 8 if hq else 4  # ช็อตสำคัญ: 8 steps + ภาพใหญ่ขึ้น
+    jid = "%s_p%d" % (j["id"], k)
+    W, H = size_for(*im.size, area=(720 * 720 if hq else 640 * 640))
     fname = "job%s.jpg" % jid
     im.save(os.path.join(COMFY, "input", fname), quality=95)
-    F = int(j.get("frames") or 81)
     seed = random.randint(1, 2 ** 31)
     pos = j.get("prompt") or "subtle natural motion"
     neg = j.get("neg") or "blurry, distorted face, deformed hands, extra fingers, morphing, flickering, text, watermark"
@@ -632,13 +686,13 @@ def gen(j):
         "10": {"class_type": "VAELoader", "inputs": {"vae_name": M["vae"]}},
         "11": {"class_type": "LoadImage", "inputs": {"image": fname}},
         "12": {"class_type": "WanImageToVideo", "inputs": {"positive": ["8", 0], "negative": ["9", 0], "vae": ["10", 0], "start_image": ["11", 0], "width": W, "height": H, "length": F, "batch_size": 1}},
-        "13": {"class_type": "KSamplerAdvanced", "inputs": {"model": ["5", 0], "add_noise": "enable", "noise_seed": seed, "steps": 4, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "positive": ["12", 0], "negative": ["12", 1], "latent_image": ["12", 2], "start_at_step": 0, "end_at_step": 2, "return_with_leftover_noise": "enable"}},
-        "14": {"class_type": "KSamplerAdvanced", "inputs": {"model": ["6", 0], "add_noise": "disable", "noise_seed": seed, "steps": 4, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "positive": ["12", 0], "negative": ["12", 1], "latent_image": ["13", 0], "start_at_step": 2, "end_at_step": 4, "return_with_leftover_noise": "disable"}},
+        "13": {"class_type": "KSamplerAdvanced", "inputs": {"model": ["5", 0], "add_noise": "enable", "noise_seed": seed, "steps": ST, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "positive": ["12", 0], "negative": ["12", 1], "latent_image": ["12", 2], "start_at_step": 0, "end_at_step": ST // 2, "return_with_leftover_noise": "enable"}},
+        "14": {"class_type": "KSamplerAdvanced", "inputs": {"model": ["6", 0], "add_noise": "disable", "noise_seed": seed, "steps": ST, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "positive": ["12", 0], "negative": ["12", 1], "latent_image": ["13", 0], "start_at_step": ST // 2, "end_at_step": ST, "return_with_leftover_noise": "disable"}},
         "15": {"class_type": "VAEDecode", "inputs": {"samples": ["14", 0], "vae": ["10", 0]}},
         "16": {"class_type": "SaveImage", "inputs": {"images": ["15", 0], "filename_prefix": "job%s" % jid}},
     }
     fps = 16
-    if M.get("rife"):
+    if M.get("rife") and opt.get("fps") != 12:
         # เติมเฟรม 16 → 48 fps ให้ลื่น (ถ้าพัง ใช้ผลเดิมจาก cache ไม่ต้องเจนใหม่)
         wf["17"] = {"class_type": "RIFE VFI", "inputs": {"ckpt_name": "rife47.pth", "frames": ["15", 0], "clear_cache_after_n_frames": 10, "multiplier": 3, "fast_mode": True, "ensemble": True, "scale_factor": 1.0}}
         wf["16"]["inputs"]["images"] = ["17", 0]
@@ -646,18 +700,18 @@ def gen(j):
     t = time.time()
 
     def run(w):
-        pid = comfy("/prompt", {"prompt": w, "client_id": "bot"})["prompt_id"]
+        pid = comfy("/prompt", {"prompt": w, "client_id": "bot"}, port=port)["prompt_id"]
         while True:
             time.sleep(5)
-            h = comfy("/history/" + pid)
+            h = comfy("/history/" + pid, port=port)
             if pid in h:
                 st = h[pid].get("status", {})
                 if st.get("status_str") == "error":
                     msgs = [m for m in st.get("messages", []) if m[0] == "execution_error"]
                     raise RuntimeError("เจนไม่สำเร็จ: " + json.dumps(msgs)[:500])
                 return
-            if time.time() - t > 3600:
-                raise RuntimeError("เจนนานเกิน 60 นาที")
+            if time.time() - t > 7200:
+                raise RuntimeError("เจนนานเกิน 120 นาที")
     try:
         run(wf)
     except Exception as e:
@@ -673,36 +727,53 @@ def gen(j):
     frames = sorted(glob.glob(os.path.join(out, "job%s_*.png" % jid)))
     if not frames:
         raise RuntimeError("ไม่มีเฟรมออกมา")
-    mp4 = os.path.join(ROOT, "job%s.mp4" % jid)
-    # ขยายเป็นด้านสั้น 1080 + เพิ่มความคมเล็กน้อย
-    vf = "scale='if(gt(iw,ih),-2,1080)':'if(gt(iw,ih),1080,-2)':flags=lanczos,unsharp=5:5:0.6:5:5:0.0"
-    sh('"%s" -y -loglevel error -framerate %d -pattern_type glob -i "%s/job%s_*.png" -vf "%s" -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart "%s"' % (ffmpeg_bin(), fps, out, jid, vf, mp4))
-    for f in frames:
-        os.remove(f)
-    return mp4, time.time() - t, W, H
+    return frames, fps, W, H
 
 
 # ---------- งานหลัก ----------
-def main():
-    job = J("/k/claim").get("job")
-    if not job:
-        log("ไม่มีงานวิดีโอในคิว ปิดเครื่องเพื่อประหยัดโควตา")
-        return
-    try:
-        setup()
-    except Exception as e:
-        J("/k/fail/%s" % job["id"], {"error": str(e)[:500], "requeue": 1})
-        log("เตรียมเครื่องไม่สำเร็จ: " + str(e)[:400])
-        raise
-    done = 0
+def concat(j):
+    urls = json.loads(j.get("prompt") or "[]")
+    d = os.path.join(ROOT, "cc%s" % j["id"])
+    os.makedirs(d, exist_ok=True)
+    files = []
+    for i, u in enumerate(urls):
+        f = os.path.join(d, "%03d.mp4" % i)
+        req = urllib.request.Request(u, headers=UA)
+        with urllib.request.urlopen(req, timeout=300) as r, open(f, "wb") as o:
+            shutil.copyfileobj(r, o)
+        files.append(f)
+    ff = ffmpeg_bin()
+    probe = sh('"%s" -i "%s" 2>&1 | grep -m1 "Video:" || true' % (ff, files[0]), check=False)
+    import re
+    m = re.search(r", (\d{3,4})x(\d{3,4})", probe)
+    W, H = (int(m.group(1)), int(m.group(2))) if m else (1080, 1080)
+    W, H = W // 2 * 2, H // 2 * 2
+    ins = " ".join('-i "%s"' % f for f in files)
+    parts = "".join("[%d:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1,format=yuv420p[v%d];" % (i, W, H, W, H, i) for i in range(len(files)))
+    chain = "".join("[v%d]" % i for i in range(len(files)))
+    out = os.path.join(ROOT, "job%s.mp4" % j["id"])
+    sh('"%s" -y -loglevel error %s -filter_complex "%s%sconcat=n=%d:v=1:a=0[o]" -map "[o]" -c:v libx264 -preset veryfast -crf 18 -movflags +faststart "%s"' % (ff, ins, parts, chain, len(files), out))
+    shutil.rmtree(d, ignore_errors=True)
+    return out, 0, W, H
+
+
+def work(job, port):
+    if job.get("kind") == "concat":
+        log("กำลังรวมคลิป %s → %s" % (job.get("project"), job.get("shot")))
+        return concat(job)
+    log("เริ่มเจน %s ช็อต %s%s (การ์ด %d)" % (job.get("project"), job.get("shot"), " ⭐คุณภาพสูง" if (job.get("opt") or {}).get("hq") else "", port - 8187))
+    return gen(job, port)
+
+
+def worker(port, first, stat):
+    job = first
     while job:
         try:
-            log("เริ่มเจน %s ช็อต %s" % (job.get("project"), job.get("shot")))
-            mp4, sec, W, H = gen(job)
+            mp4, sec, W, H = work(job, port)
             data = open(mp4, "rb").read()
             call("/k/done/%s?sec=%d&w=%d&h=%d" % (job["id"], sec, W, H), raw=data, timeout=600)
             os.remove(mp4)
-            done += 1
+            stat["done"] += 1
             log("เสร็จช็อต %s ใน %d นาที (%d KB)" % (job.get("shot"), sec / 60, len(data) / 1024))
         except Exception as e:
             log("ช็อต %s พัง: %s" % (job.get("shot"), str(e)[:400]))
@@ -710,11 +781,43 @@ def main():
                 J("/k/fail/%s" % job["id"], {"error": str(e)[:500]})
             except Exception:
                 pass
+            try:  # ComfyUI การ์ดนี้ตายแล้ว → หยุดเฉพาะการ์ดนี้ อีกการ์ดทำต่อ
+                urllib.request.urlopen("http://127.0.0.1:%d/system_stats" % port, timeout=10).read()
+            except Exception:
+                log("การ์ด %d หยุดทำงาน การ์ดที่เหลือทำต่อ" % (port - 8187))
+                return
         if time.time() - T0 > MAXH * 3600:
             log("ใกล้หมดเวลารอบนี้ จะเริ่มรอบใหม่ให้เอง")
-            break
+            return
         job = J("/k/claim").get("job")
-    log("จบรอบ ทำเสร็จ %d คลิป" % done)
+
+
+def main():
+    job = J("/k/claim").get("job")
+    if not job:
+        log("ไม่มีงานวิดีโอในคิว ปิดเครื่องเพื่อประหยัดโควตา")
+        return
+    stat = {"done": 0}
+    if job.get("kind") == "concat":  # งานรวมคลิปไม่ต้องใช้ GPU
+        worker(0, job, stat)
+        job = J("/k/claim").get("job")
+        if not job:
+            log("จบรอบ ทำเสร็จ %d คลิป" % stat["done"])
+            return
+    try:
+        setup()
+    except Exception as e:
+        J("/k/fail/%s" % job["id"], {"error": str(e)[:500], "requeue": 1})
+        log("เตรียมเครื่องไม่สำเร็จ: " + str(e)[:400])
+        raise
+    th = [threading.Thread(target=worker, args=(PORTS[0], job, stat))]
+    for port in PORTS[1:]:
+        th.append(threading.Thread(target=lambda p=port: worker(p, J("/k/claim").get("job"), stat)))
+    for t in th:
+        t.start()
+        time.sleep(90)  # ให้การ์ดแรกโหลดโมเดล/RIFE ก่อน ไม่แย่งกัน
+    [t.join() for t in th]
+    log("จบรอบ ทำเสร็จ %d คลิป (%d การ์ด)" % (stat["done"], len(PORTS)))
 
 
 main()

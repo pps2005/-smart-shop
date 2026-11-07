@@ -393,9 +393,9 @@ function renderEp(){const S=ep.shots||[],P=prog(ep);
       <details class="more"><summary>prompt ภาพต้นแบบ</summary>${copyBox('Prompt ภาพต้นแบบ',ep.character_sheet_prompt)}</details>
       <div class="media">${slot('char','image','ภาพต้นแบบ')}</div>${ep.character_sheet_prompt?botBtn('epchar','','🎨 ให้บอทเจนภาพต้นแบบ (3 แบบ)'):''}<div class="botthumbs" data-k="char"></div></div>`;
   if(epTab==='shots')body=`<div class="card"><div class="row"><span class="muted">ภาพคีย์ ${P.img}/${P.N} · คลิป ${P.vid}/${P.N} · ${fmtS(P.doneSec)} / ${fmtS(P.total)}</span></div>
-      <div class="row">${botBtn('epall','','🎨 ให้บอทเจนภาพทุกช็อต (ช็อตละ 3 แบบ)',true)}${botBtn('vall','','🎞️ ทำวิดีโอทุกช็อตที่มีภาพคีย์แล้ว',true)}<button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+'\n'+(s.image_prompt||'')).join('\n\n'))}">คัดลอก image prompt ทั้งหมด</button></div></div>
-    ${S.map((s,i)=>{const k=String(s.n),hi=!!mUrl(k,'image'),hv=!!mUrl(k,'video');return `<div class="shot${i===P.nowIdx?' now':''}"><div class="no"><b>${esc(s.n)}</b><span class="muted small">${esc(s.sec)} วิ</span><span title="ภาพคีย์">${hi?'🖼️':'·'}</span><span title="คลิป">${hv?'🎞️':'·'}</span></div><div class="bd">
-      <div class="row">${s.shot?`<span class="st todo">${esc(s.shot)}</span>`:''}${i===P.nowIdx?'<span class="st doing">กำลังทำช็อตนี้</span>':''}${hv?'<span class="st done">มีคลิปแล้ว</span>':''}</div>
+      ${epAsmHtml()}${lookHtml()}<div class="row">${botBtn('epall','','🎨 ให้บอทเจนภาพทุกช็อต (ช็อตละ 3 แบบ)',true)}${botBtn('vall','','🎞️ ทำวิดีโอทุกช็อตที่มีภาพคีย์แล้ว',true)}<button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+'\n'+(s.image_prompt||'')).join('\n\n'))}">คัดลอก image prompt ทั้งหมด</button></div></div>
+    ${S.map((s,i)=>{const k=String(s.n),hi=!!mUrl(k,'image'),hv=!!mUrl(k,'video');const sc=+s.scene||1,first=i===0||(+S[i-1].scene||1)!==sc;return `${first?sceneHead(sc):''}<div class="shot${i===P.nowIdx?' now':''}"><div class="no"><b>${esc(s.n)}</b><span class="muted small">${esc(s.sec)} วิ</span><span title="ภาพคีย์">${hi?'🖼️':'·'}</span><span title="คลิป">${hv?'🎞️':'·'}</span></div><div class="bd">
+      <div class="row"><span class="st todo">⏱ ${shotSec(s)} วิ${shotSec(s)>5?' (เจน 2 รอบต่อกัน)':''}</span><button class="st ${s.hq?'doing':'todo'}" data-shq="${i}" style="border:0;cursor:pointer">${s.hq?'⭐ ช็อตสำคัญ (คุณภาพสูง)':'☆ ช็อตทั่วไป'}</button>${s.shot?`<span class="st todo">${esc(s.shot)}</span>`:''}${i===P.nowIdx?'<span class="st doing">กำลังทำช็อตนี้</span>':''}${hv?'<span class="st done">มีคลิปแล้ว</span>':''}</div>
       <div>${esc(s.action)}</div>${s.narration?`<div class="muted small">🎙 ${esc(s.narration)}</div>`:''}${s.text?`<div class="small"><b>ตัวอักษรบนจอ:</b> ${esc(s.text)}</div>`:''}
       <div class="media">${slot(k,'image','ภาพคีย์')}${slot(k,'video','คลิปช็อต')}</div>
       <div class="row">${s.image_prompt?botBtn('epone',s.n,'🎨 ให้บอทเจนภาพช็อตนี้'):''}${botBtn('vone',s.n,hi?'🎞️ ทำวิดีโอช็อตนี้':'🎞️ ทำวิดีโอ (ต้องมีภาพคีย์ก่อน)')}</div><div class="botthumbs" data-k="${esc(s.n)}"></div><div class="vidthumbs" data-k="${esc(s.n)}"></div>
@@ -558,7 +558,7 @@ function vidThumbsFill(){const V=BOT.v;document.querySelectorAll('.vidthumbs').f
   const vs=V.videos.filter(v=>v.ep===ep.id&&String(v.shot)===k),js=V.jobs.filter(j=>j.ep===ep.id&&String(j.shot)===k);
   const run=js.filter(j=>j.status==='running').length,q=js.filter(j=>j.status==='queued').length,f=js.filter(j=>j.status==='failed');
   el.innerHTML=(vs.length||js.length)?`<span class="lab">วิดีโอจากบอท ${vs.length}${run?' · กำลังทำ':''}${q?` · รอคิว ${q}`:''}${f.length?` · <span style="color:var(--red)">พัง ${f.length}</span>`:''}</span>${f.length&&f[0].error?`<span class="muted small">${esc(String(f[0].error).slice(0,160))}</span>`:''}
-    ${vs.length?`<div class="vgrid">${vs.map(v=>`<div class="vcard"><video src="${esc(botU('/vid/'+v.id))}" muted loop playsinline controls preload="metadata"></video><div class="bb"><button data-bot="vone" data-n="${esc(k)}" aria-label="ทำใหม่">🔁</button><button data-bot="vdel" data-id="${v.id}" aria-label="ลบ">🗑</button><button class="use" data-vuse="${esc(k)}|${v.id}">ใช้คลิปนี้</button></div></div>`).join('')}</div>`:''}`:'';});}
+    ${vs.length?`<div class="vgrid">${vs.map(v=>`<div class="vcard"><video src="${esc(botU('/vid/'+v.id))}" muted loop playsinline controls preload="metadata"></video><div class="bb">${/^\d+$/.test(k)?`<button data-bot="vone" data-n="${esc(k)}" aria-label="ทำใหม่">🔁</button>`:''}<button data-bot="vdel" data-id="${v.id}" aria-label="ลบ">🗑</button><button class="use" data-vuse="${esc(k)}|${v.id}">ใช้คลิปนี้</button></div></div>`).join('')}</div>`:''}`:'';});}
 function kLine(){const V=BOT.v;if(!V)return '';const K=V.kaggle||{},q=V.jobs.filter(j=>j.status==='queued').length,r=V.jobs.filter(j=>j.status==='running').length,f=V.jobs.filter(j=>j.status==='failed').length;
   if(!K.configured)return `<div class="report">🎞️ ตั้งค่าเครื่องเจนวิดีโอ (Kaggle)${q?` · มีงานรอ ${q} ช็อต`:''}</div>
     <span class="muted small">ชื่อผู้ใช้ Kaggle (คำหลัง kaggle.com/ ในลิงก์โปรไฟล์ — ไม่ใช่ลิงก์บอท)</span><input type="text" id="kUser" name="kaggle-user-x" placeholder="เช่น somchai123" value="${esc(K.user||'')}" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true">
@@ -569,7 +569,7 @@ function kLine(){const V=BOT.v;if(!V)return '';const K=V.kaggle||{},q=V.jobs.fil
   <div class="row">${q?'<button class="btn sm" data-bot="vkick">ปลุกเครื่องเจนวิดีโอ</button>':''}${f?'<button class="btn sm" data-bot="vretry">ลองวิดีโอที่พังใหม่</button>':''}${q||f?'<button class="btn sm" data-bot="vclear">ล้างคิววิดีโอ</button>':''}</div>`;}
 function jpgB64(url,max){return new Promise(async(ok,no)=>{try{const bl=await (await fetch(url)).blob();const im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*r);c.height=Math.round(im.naturalHeight*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.9).split(',')[1]);URL.revokeObjectURL(im.src);};im.onerror=()=>no(new Error('เปิดภาพคีย์ไม่ได้'));im.src=URL.createObjectURL(bl);}catch(e){no(e);}});}
 async function vEnqueue(shots,label){await signMedia();const items=[];
-  for(const s of shots){const u=mUrl(String(s.n),'image');if(!u)continue;items.push({shot:String(s.n),prompt:s.video_prompt||s.image_prompt||s.action||'',image:await jpgB64(u,1024)});}
+  for(const s of shots){const u=mUrl(String(s.n),'image');if(!u)continue;items.push({shot:String(s.n),prompt:s.video_prompt||s.image_prompt||s.action||'',image:await jpgB64(u,1024),frames:Math.round(shotSec(s)*16)+1,hq:!!s.hq,fps:s.fps===12?12:0});}
   if(!items.length)return toast('ยังไม่มีช็อตที่ใส่ภาพคีย์ — กด "ใช้ภาพนี้" ใต้ภาพที่ชอบก่อน');
   const r=await botApi('/api/venqueue',{project:epBotProject(),ep:ep.id,items});
   toast(`ส่ง${label}เข้าคิววิดีโอแล้ว ${r.added} ช็อต · คลิปละประมาณ 15 นาที (รอบแรกเปิดเครื่องเพิ่ม ~20 นาที)`);}
@@ -906,6 +906,39 @@ function shrinkVideo(file,onp){return new Promise((ok,no)=>{
     try{await v.play();}catch(e){v.muted=true;await v.play();} /* Safari อาจไม่ยอมเล่นมีเสียงนอกจังหวะกด → ย่อแบบไม่มีเสียงแทน */
     draw();
   }catch(e){no(e);}};});}
+
+
+/* ---------- ช็อต → ฉาก → ตอน ----------
+   shots[].scene = เลขฉาก · คลิปฉากเก็บที่ media["sc<เลข>"].video · คลิปทั้งตอนเก็บที่ media.final.video
+   รวมคลิปทำบน Kaggle (งานชนิด concat) ส่งลิงก์ไฟล์จาก Supabase (อายุ 24 ชม.) ไปให้ */
+function hasM(k,t){return !!(ep&&ep.media&&ep.media[k]&&ep.media[k][t]);}
+function epScenes(){const S=ep.shots||[],m={};S.forEach(s=>{const sc=+s.scene||1;(m[sc]=m[sc]||[]).push(s);});return m;}
+function sceneHead(sc){const sh=epScenes()[sc]||[],k='sc'+sc,ready=sh.filter(s=>hasM(String(s.n),'video')).length,has=hasM(k,'video');
+  const sec=sh.reduce((a,s)=>a+(+s.sec||5),0),title=(ep.scenes&&ep.scenes[sc-1]&&ep.scenes[sc-1].title)||(sh[0]&&sh[0].shot)||'';
+  return `<div class="card" style="border-color:rgba(143,211,255,.35)"><div class="row" style="justify-content:space-between"><h3>🎬 ฉาก ${sc}${title?' · '+esc(title):''}</h3><span class="muted small">${sh.length} ช็อต · ${fmtS(sec)} · คลิปพร้อม ${ready}/${sh.length}</span></div>
+    <div class="row">${ready===sh.length&&ready?botBtn('vscene',sc,has?'🔁 รวมฉากนี้ใหม่':'🎬 รวมช็อตเป็นฉาก',!has):`<span class="muted small">ใส่คลิปให้ครบทุกช็อตก่อน แล้วปุ่มรวมฉากจะขึ้น</span>`}</div>
+    <div class="media">${slot(k,'video','คลิปฉาก')}</div><div class="vidthumbs" data-k="${k}"></div></div>`;}
+function epAsmHtml(){const M=epScenes(),keys=Object.keys(M).map(Number).sort((a,b)=>a-b),ok=keys.filter(sc=>hasM('sc'+sc,'video')).length;
+  return `<div class="row"><span class="st todo">${keys.length} ฉาก · ฉากที่รวมแล้ว ${ok}/${keys.length}</span>${ok===keys.length&&ok?botBtn('vepisode','','🎞️ รวมทุกฉากเป็นตอน',true):''}</div><div class="media">${slot('final','video','คลิปทั้งตอน')}</div><div class="vidthumbs" data-k="final"></div>`;}
+async function longUrls(paths){const {data}=await sb.storage.from(BUCKET).createSignedUrls(paths,86400);return (data||[]).map(d=>d.signedUrl).filter(Boolean);}
+async function vConcat(key,paths,label){if(!paths.length)return toast('ยังไม่มีคลิปให้รวม');
+  const urls=await longUrls(paths);if(urls.length!==paths.length)return toast('สร้างลิงก์คลิปไม่ครบ ลองใหม่');
+  const r=await botApi('/api/vconcat',{project:epBotProject(),ep:ep.id,key,urls});toast(`ส่ง${label}เข้าคิวแล้ว (${r.clips} คลิป) รอสักครู่ คลิปจะขึ้นใต้${label}`);}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot="vscene"],[data-bot="vepisode"]');if(!b||!ep)return;e.stopImmediatePropagation();
+  try{b.disabled=true;
+    if(b.dataset.bot==='vscene'){const sc=+b.dataset.n,sh=epScenes()[sc]||[];await vConcat('sc'+sc,sh.map(s=>ep.media[String(s.n)].video),`ฉาก ${sc}`);}
+    else{const keys=Object.keys(epScenes()).map(Number).sort((a,b)=>a-b);await vConcat('final',keys.map(sc=>ep.media['sc'+sc].video),'ทั้งตอน');}
+    await botLoad();}catch(err){toast(botErr(err));}finally{b.disabled=false;}},true);
+
+
+/* ---------- ความยาวช็อต · ช็อตสำคัญ · ลุคอนิเมะ ---------- */
+function shotSec(s){return Math.min(10,Math.max(1,Math.round(+s.sec||5)));}
+function lookHtml(){const S=ep.shots||[],a=S.length&&S.every(s=>s.fps===12);
+  return `<div class="row"><button class="btn sm${a?' main':''}" data-look="${a?0:12}">${a?'✓ ลุคอนิเมะ 12 ภาพ/วิ (แบบวาดมือ)':'ลุคลื่น 48 ภาพ/วิ · แตะเพื่อเปลี่ยนเป็นลุคอนิเมะ'}</button><span class="muted small">⭐ ช็อตสำคัญ = ละเอียดขึ้น ใช้เวลา ~2.5 เท่า</span></div>`;}
+document.addEventListener('click',async e=>{const h=e.target.closest('[data-shq],[data-look]');if(!h||!ep)return;e.stopImmediatePropagation();
+  const S=(ep.shots||[]).map(x=>({...x}));
+  if(h.dataset.shq!=null){const s=S[+h.dataset.shq];s.hq=!s.hq;await saveEp({shots:S},s.hq?'ตั้งเป็นช็อตสำคัญแล้ว ⭐':'เปลี่ยนเป็นช็อตทั่วไปแล้ว');}
+  else{const f=+h.dataset.look;S.forEach(s=>{if(f)s.fps=12;else delete s.fps;});await saveEp({shots:S},f?'ใช้ลุคอนิเมะทั้งตอน (มีผลกับคลิปที่สั่งทำใหม่)':'ใช้ลุคลื่นทั้งตอน');}},true);
 
 boot();
 })();
