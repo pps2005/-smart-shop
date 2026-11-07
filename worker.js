@@ -5,6 +5,7 @@
 // Cron Trigger:  * * * * *   (บอทเช็คทุกนาที แต่สร้างภาพตามระยะห่างที่ตั้งในเว็บ)
 // ใช้คู่กับ studio.html แท็บ "เจนภาพ" (เรียก API นี้ข้ามโดเมน จึงเปิด CORS ไว้ · ป้องกันด้วย PASSWORD)
 
+import SCENES from './scenes.json'; // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 export default {
@@ -770,8 +771,12 @@ function castMake2(cat, r, style) {
   const real = style === 'real', tail = real ? 'photorealistic, 50mm photo, vertical 9:16' : 'soft anime style, high quality anime illustration, cinematic lighting, vertical 9:16';
   if (cat === 'pet') { const C = CAST2.pet, a = pick(C.sp, r), c = pick(C.col, r), x = pick(C.acc, r), m = pick(C.mood, r);
     return { name: pick(C.name, r), desc: `${a[1]} ${c[1]}${x[1] ? ' · ' + x[1] : ''} · นิสัย${m[1]}`, prompt: `${real ? 'photorealistic full body photo' : 'full body cute anime character design'} of an original ${c[0]} ${a[0]}${x[0] ? ' wearing a ' + x[0] : ''}, ${m[0]} expression, plain light gray background, ${tail}` }; }
-  if (cat === 'place') { const C = CAST2.place, l = pick(C.loc, r), t = pick(C.time, r), w = pick(C.wx, r);
-    return { name: l[1], desc: `${l[1]} · ${t[1]} · ${w[1]}`, prompt: `${l[0]}, ${t[0]}, ${w[0]}, detailed background art, no people, ${tail}` }; }
+  if (cat === 'place') {
+    const used = castMake2.usedPlaces || new Set();
+    let sc = pick(SCENES, r);
+    for (let k = 0; k < 30 && used.has(sc.n); k++) sc = pick(SCENES, r);
+    used.add(sc.n);
+    return { name: sc.n, desc: `#${sc.i} ${sc.c} · ${sc.m} · เหมาะกับ ${sc.g}`, prompt: `${sc.e}, detailed anime background art, no people, ${tail}` }; }
   const C = CAST2.prop, i = pick(C.it, r), st = pick(C.st, r);
   return { name: i[1], desc: `${i[1]} · ${st[1]}`, prompt: `a ${st[0]} ${i[0]}, single object, centered, plain soft background, ${tail}` };
 }
@@ -786,6 +791,7 @@ async function castBatch(env, n, force, only) {
   n = Math.min(5, Math.max(1, n || +s.cast_n || 4));
   const cats = only ? [only] : String(s.cast_cats || 'char,pet,place,prop').split(',').filter(Boolean);
   const r = rng(Date.now() ^ Math.floor(Math.random() * 1e9)), st = [];
+  castMake2.usedPlaces = new Set((await env.DB.prepare("SELECT name FROM casting WHERE cat='place'").all()).results.map(x => x.name));
   let total = 0;
   for (const cat of cats) {
     const used = new Set();
