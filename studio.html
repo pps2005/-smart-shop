@@ -485,6 +485,8 @@ function renderGen(){const c=botCfg();BOT.filled=false;
 function botParts(){const st=$('#botStat');if(!st)return;
   const keep={};['kUser','kKey'].forEach(id=>{const el=$('#'+id);if(el)keep[id]={v:el.value,f:document.activeElement===el,ss:el.selectionStart};});
   botParts0(st);
+  let dr={};try{dr=JSON.parse(localStorage.getItem('ss_kdraft')||'{}');}catch(e){}
+  ['kUser','kKey'].forEach(id=>{const el=$('#'+id);if(el&&!el.value&&dr[id]&&!(keep[id]&&keep[id].v))el.value=dr[id];});
   for(const id in keep){const el=$('#'+id);if(!el)continue;if(keep[id].v)el.value=keep[id].v;if(keep[id].f){el.focus();try{el.setSelectionRange(keep[id].ss,keep[id].ss);}catch(e){}}}}
 function botParts0(st){const S=BOT.s;
   if(BOT.err&&!S){st.innerHTML=`<h3>เชื่อมบอทไม่ได้</h3><p class="muted" style="margin:0">${esc(BOT.err)}</p><div class="row"><button class="btn sm" data-bot="reload">ลองใหม่</button><button class="btn sm" data-bot="disconnect">แก้ลิงก์/รหัส</button></div>`;return;}
@@ -522,7 +524,7 @@ function vidThumbsFill(){const V=BOT.v;document.querySelectorAll('.vidthumbs').f
 function kLine(){const V=BOT.v;if(!V)return '';const K=V.kaggle||{},q=V.jobs.filter(j=>j.status==='queued').length,r=V.jobs.filter(j=>j.status==='running').length,f=V.jobs.filter(j=>j.status==='failed').length;
   if(!K.configured)return `<div class="report">🎞️ ตั้งค่าเครื่องเจนวิดีโอ (Kaggle)${q?` · มีงานรอ ${q} ช็อต`:''}</div>
     <span class="muted small">ชื่อผู้ใช้ Kaggle (คำหลัง kaggle.com/ ในลิงก์โปรไฟล์ — ไม่ใช่ลิงก์บอท)</span><input type="text" id="kUser" name="kaggle-user-x" placeholder="เช่น somchai123" value="${esc(K.user||'')}" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true">
-    ${K.hasKey?'<span class="muted small">✓ มี API token แล้ว</span>':'<span class="muted small">API token ของ Kaggle (ขึ้นต้นด้วย KGAT_) — อย่าให้ iPad เติมรหัสผ่านให้เอง</span><input type="text" id="kKey" name="kaggle-token-x" placeholder="KGAT_..." autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" style="-webkit-text-security:disc">'}
+    ${K.user?`<span class="muted small">✓ บันทึกชื่อผู้ใช้แล้ว: ${esc(K.user)}</span>`:''}${K.hasKey?'<span class="muted small">✓ มี API token แล้ว</span>':'<span class="muted small">API token ของ Kaggle (ขึ้นต้นด้วย KGAT_) — อย่าให้ iPad เติมรหัสผ่านให้เอง</span><input type="text" id="kKey" name="kaggle-token-x" placeholder="KGAT_..." autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" style="-webkit-text-security:disc">'}
     <div><button class="btn sm main" data-bot="ksave">บันทึกและเริ่มเครื่อง</button></div>`;
   const alive=V.now-(K.seen||0)<20*60000,st=r?'▶️ กำลังทำวิดีโอ':q?(alive||/start|queued|running/.test(K.status)?'⏳ กำลังเปิดเครื่อง (5–20 นาที)':'💤 รอปลุก'):'✅ ว่าง';
   return `<div class="report">🎞️ วิดีโอ: ${st} · รอคิว ${q}${r?' · กำลังทำ '+r:''}${f?` · <span style="color:var(--red)">พัง ${f}</span>`:''} · คลิปในคลัง ${V.videos.length}${K.error?`<br><span class="muted small">${esc(K.error)}</span>`:''}${V.logs&&V.logs[0]?`<br><span class="muted small">ล่าสุด: ${esc(V.logs[0].msg)} · ${tTH(V.logs[0].created)}</span>`:''}</div>
@@ -567,6 +569,13 @@ function botView(src){let v=$('#bview');if(!v){v=document.createElement('div');v
 function sure(b,txt){if(b.dataset.sure==='1')return true;const o=b.textContent;b.dataset.sure='1';b.textContent=txt;setTimeout(()=>{if(b.isConnected){b.dataset.sure='';b.textContent=o;}},4000);return false;}
 
 document.addEventListener('change',e=>{if(e.target.id==='bGP'){BOT.proj=e.target.value;botParts();}});
+/* ช่อง Kaggle: จำค่าที่พิมพ์/วางไว้ในเครื่อง (สลับแอปไปคัดลอกแล้วไม่หาย) + บันทึกเข้าบอททันทีเมื่อค่าดูถูกต้อง */
+function kDraft(id,v){try{const d=JSON.parse(localStorage.getItem('ss_kdraft')||'{}');d[id]=v;localStorage.setItem('ss_kdraft',JSON.stringify(d));}catch(e){}}
+async function kAuto(id,v){v=(v||'').trim();
+  if(id==='kKey'&&/^KGAT_\S{10,}$/i.test(v)){await botApi('/api/vkaggle',{key:v});kDraft('kKey','');toast('บันทึก token แล้ว ✓');botLoad();}
+  if(id==='kUser'&&v&&!/workers\.dev/i.test(v)&&(/kaggle\.com\//i.test(v)||!/[.\/:]/.test(v))){await botApi('/api/vkaggle',{user:v});toast('บันทึกชื่อผู้ใช้แล้ว ✓');botLoad();}}
+['input','change','paste'].forEach(ev=>document.addEventListener(ev,e=>{const t=e.target;if(!t||!['kUser','kKey'].includes(t.id))return;
+  setTimeout(()=>{kDraft(t.id,t.value);if(ev!=='input'||/^KGAT_\S{20,}$/i.test(t.value.trim()))kAuto(t.id,t.value).catch(err=>toast(botErr(err)));},50);}));
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot],[data-use],[data-vuse]');if(!b)return;
   try{
     if(b.dataset.vuse){const [k,id]=b.dataset.vuse.split('|');if(!ep)return;b.disabled=true;b.textContent='กำลังใส่…';
