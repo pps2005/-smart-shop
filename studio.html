@@ -721,7 +721,8 @@ async function upFile(path,blob,type){const {error}=await sb.storage.from(BUCKET
 async function ideasUpload(files){
   if(!IDEA.list)await ideasLoad();let ok=0,bad=0;
   for(let i=0;i<files.length;i++){const f=files[i];IDEA.busy=`กำลังอัปโหลด ${i+1}/${files.length} · ${f.name}`;renderIdeas();
-    try{if(f.size>50*1024*1024)throw new Error('ใหญ่เกิน 50MB');
+    try{const isVid=/^video\//.test(f.type)||/\.(mp4|mov|m4v|webm)$/i.test(f.name||'');
+      if(f.size>48*1024*1024&&!isVid)throw new Error('ใหญ่เกิน 48MB');
       const id=Date.now()+''+Math.floor(Math.random()*90+10),base=`${ideaDir()}/${id}`;
       const nm=(f.name||'ไอเดีย').replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim().slice(0,60)||'ไอเดีย';
       const ext=((f.name.split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,''))||'bin';
@@ -731,7 +732,13 @@ async function ideasUpload(files){
         it.path=`${base}.${big===f?ext:'jpg'}`;await upFile(it.path,big,big===f?f.type:'image/jpeg');
         it.cover=`${base}-cover.jpg`;await upFile(it.cover,await toJpg(im,600,.82),'image/jpeg');}
       else if(/^video\//.test(f.type)||/^(mp4|mov|m4v|webm)$/.test(ext)){it.type='video';
-        it.path=`${base}.${ext}`;await upFile(it.path,f,f.type||'video/mp4');
+        let vf=f,vext=ext,vtype=f.type||'video/mp4';
+        if(f.size>45*1024*1024){
+          vf=await shrinkVideo(f,p=>{IDEA.busy=`กำลังย่อวิดีโอ ${f.name} ${Math.round(p*100)}% (ใช้เวลาเท่าความยาวคลิป อย่าสลับแอป)`;renderIdeas();});
+          vtype=vf.type.split(';')[0];vext=vtype.includes('webm')?'webm':'mp4';
+          if(vf.size>48*1024*1024)throw new Error('ย่อแล้วยังเกิน 48MB ลองตัดคลิปให้สั้นลง');
+          IDEA.busy=`กำลังอัปโหลด ${f.name} (${(vf.size/1048576).toFixed(1)} MB)`;renderIdeas();}
+        it.path=`${base}.${vext}`;await upFile(it.path,vf,vtype);
         const t=await videoThumb(f);if(t.dur)it.dur=t.dur;if(t.blob){it.cover=`${base}-cover.jpg`;await upFile(it.cover,t.blob,'image/jpeg');}}
       else if(f.type==='application/pdf'||ext==='pdf'){it.type='pdf';it.path=`${base}.pdf`;await upFile(it.path,f,'application/pdf');}
       else if(/^text\//.test(f.type)||/^(txt|md)$/.test(ext)){it.type='text';it.text=(await f.text()).slice(0,4000);}
@@ -876,6 +883,29 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-cast
   try{if(b.dataset.cast){const [id,st]=b.dataset.cast.split('|');await botApi('/api/vcastset',{id:+id,status:st});toast(st==='approved'?'ผ่านการคัดเลือก 🎉':'ไม่ผ่าน');}
     else{if(!sure(b,'กดอีกครั้งเพื่อสุ่ม'))return;const r=await botApi('/api/vcastnow',{n:+$('#castN').value,cat:CCAT});toast(`สุ่มเพิ่ม ${r.added} แบบ`);}
     BOT.c=await botApi('/api/vcast');await botLoad();}catch(err){toast(botErr(err));}});
+
+
+/* ย่อวิดีโอในเครื่องก่อนอัปโหลด (ฟรี ไม่ต้องใช้เซิร์ฟเวอร์): เล่นคลิป → วาดลง canvas ≤720p → อัดใหม่ด้วย MediaRecorder ~2.5 Mbps */
+function shrinkVideo(file,onp){return new Promise((ok,no)=>{
+  const v=document.createElement('video');v.src=URL.createObjectURL(file);v.playsInline=true;v.preload='auto';v.setAttribute('playsinline','');
+  v.onerror=()=>no(new Error('เปิดวิดีโอไม่ได้'));
+  v.onloadedmetadata=async()=>{try{
+    const W0=v.videoWidth,H0=v.videoHeight,r=Math.min(1,720/Math.min(W0,H0));
+    const W=Math.round(W0*r/2)*2,H=Math.round(H0*r/2)*2,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+    const st=c.captureStream(30);
+    try{const AC=window.AudioContext||window.webkitAudioContext,ac=new AC();ac.resume&&ac.resume();const src=ac.createMediaElementSource(v),dst=ac.createMediaStreamDestination();src.connect(dst);dst.stream.getAudioTracks().forEach(t=>st.addTrack(t));}catch(e){v.muted=true;}
+    const mt=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));
+    if(!mt)return no(new Error('เบราว์เซอร์นี้ย่อวิดีโอไม่ได้'));
+    const rec=new MediaRecorder(st,{mimeType:mt,videoBitsPerSecond:2500000,audioBitsPerSecond:128000}),parts=[];
+    rec.ondataavailable=e=>{if(e.data&&e.data.size)parts.push(e.data);};
+    rec.onstop=()=>{URL.revokeObjectURL(v.src);ok(new Blob(parts,{type:mt}));};
+    let done=false;const draw=()=>{if(done)return;g.drawImage(v,0,0,W,H);onp&&onp(Math.min(1,v.currentTime/(v.duration||1)));
+      if(v.requestVideoFrameCallback)v.requestVideoFrameCallback(draw);else requestAnimationFrame(draw);};
+    v.onended=()=>{done=true;setTimeout(()=>rec.stop(),300);};
+    rec.start(1000);
+    try{await v.play();}catch(e){v.muted=true;await v.play();} /* Safari อาจไม่ยอมเล่นมีเสียงนอกจังหวะกด → ย่อแบบไม่มีเสียงแทน */
+    draw();
+  }catch(e){no(e);}};});}
 
 boot();
 })();
