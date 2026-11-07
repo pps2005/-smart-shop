@@ -186,6 +186,15 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4p
 .lcard.run .lthumb{border-color:var(--acc);box-shadow:0 0 14px rgba(255,122,168,.45)}
 .shim{position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%);background-size:200% 100%;animation:lshim 1.4s linear infinite}
 @keyframes lshim{to{background-position:-200% 0}}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+@media (max-width:420px){.cgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ccard{display:grid;gap:6px;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:8px;min-width:0}
+.ccard.approved{border-color:rgba(74,222,128,.6);box-shadow:0 0 12px rgba(74,222,128,.25)}
+.ccard.rejected{opacity:.45}
+.ccard .lthumb{cursor:zoom-in}
+.ccard b{font-family:Kanit,sans-serif;font-size:17px}.ccard small{font-size:12.5px;color:var(--muted);line-height:1.4}
+.ccard .row button{flex:1}
+.cbadge{font-size:11px;background:var(--you);color:#1d1400;border-radius:999px;padding:0 6px}
 .lname{font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lbadge{font-size:11.5px;color:var(--muted)}
 .lcard.run .lbadge{color:var(--acc)}.lcard.done .lbadge{color:var(--ok)}
@@ -476,7 +485,7 @@ async function botLoad(){if(!botCfg().url)return;
   try{BOT.s=await botApi('/api/state');BOT.err='';}catch(e){BOT.err=botErr(e);}
   try{BOT.v=await botApi('/api/vstate');}catch(e){BOT.v=null;}
   if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
-  if(view==='lib')renderLib(true);
+  if(view==='lib'){try{BOT.c=await botApi('/api/vcast');}catch(e){}renderLib(true);}
   if(view==='eps'&&ep)botThumbsFill();}
 setInterval(()=>{if(document.hidden||!botCfg().url)return;if(['kUser','kKey'].includes(document.activeElement&&document.activeElement.id))return;
   if(view==='gen'||view==='lib'||(view==='eps'&&ep&&(epTab==='shots'||epTab==='overview')))botLoad();},20000);
@@ -818,7 +827,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  $('#vw').innerHTML=hero+cats;
+  $('#vw').innerHTML=castHtml()+hero+cats;
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -838,6 +847,35 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-lib]
     if(b.dataset.libitem){const [ck,n]=b.dataset.libitem.split('|');return libOpen(ck,n);}
     if(b.dataset.libmore){const [ck,n]=b.dataset.libmore.split('|');const c=LIB.find(x=>x.k===ck),it=c.items.find(i=>i[0]===n);await libEnqueue([[c.n,n,it[1]]],n+' ');const v=$('#iview');if(v){v.innerHTML='';v.hidden=true;}}
   }catch(err){toast(botErr(err));}});
+
+
+/* ---------- แคสติ้ง (คัดนักแสดง) ---------- */
+let CCAT='char';
+const CCATS=[['char','🧑‍🎤','ตัวละคร'],['pet','🐾','สัตว์เลี้ยง'],['place','🏙️','ฉาก'],['prop','🎒','ของประกอบ']];
+function castHtml(){const C=BOT.c;if(!C)return '';
+  const R=C.rows.map(r=>({...r,cat:r.cat||'char'})),inCat=R.filter(r=>r.cat===CCAT);
+  const today=inCat.filter(r=>r.day===C.today),ok=inCat.filter(r=>r.status==='approved');
+  const chips=`<nav class="subtabs">${CCATS.map(([k,ic,n])=>{const p=R.filter(r=>r.cat===k&&r.day===C.today&&r.status==='pending'&&r.img).length;return `<button class="${k===CCAT?'on':''}" data-ccat="${k}">${ic} ${n}${p?` <b class="cbadge">${p}</b>`:''}</button>`;}).join('')}</nav>`;
+  const card=r=>{const st=r.img?'':r.job==='running'?'run':'q';
+    return `<div class="ccard ${r.status}"><div class="lthumb">${r.img?`<img loading="lazy" src="${esc(botU('/img/'+r.img))}" alt="" data-bot="view">`:'<i>🎭</i>'}${st?'<b class="shim"></b>':''}</div>
+      <b>${esc(r.name)}</b><small>${esc(r.descr)}</small>
+      ${r.status==='approved'?'<span class="st done">ผ่านแล้ว 🎉</span>':r.status==='rejected'?'<span class="st todo">ไม่ผ่าน</span>':r.img?`<div class="row"><button class="btn sm ok" data-cast="${r.id}|approved">✓ ผ่าน</button><button class="btn sm" data-cast="${r.id}|rejected">✗</button></div>`:`<span class="lbadge">${st==='run'?'✨ กำลังวาด':'⏳ รอคิว'}</span>`}</div>`;};
+  const cn=CCATS.find(x=>x[0]===CCAT)[2];
+  return `<div class="card lload"><div class="row" style="justify-content:space-between"><h3>🎬 แคสติ้งวันนี้</h3><span class="muted small">${esc(C.today)}</span></div>${chips}
+    ${today.length?`<div class="cgrid">${today.map(card).join('')}</div>`:`<p class="muted" style="margin:0">ยังไม่มี${cn}ให้คัดวันนี้ บอทจะส่งมาหลัง 07:00 หรือกดสุ่มเพิ่มด้านล่าง</p>`}
+    <div class="row"><button class="btn sm" data-castnow>🎲 สุ่ม${cn}เพิ่ม</button>
+      <label class="muted small">วันละ <select id="castN" style="width:auto">${[3,4,5].map(n=>`<option${n===C.cast_n?' selected':''}>${n}</option>`).join('')}</select> แบบ/หมวด</label>
+      <label class="muted small">สไตล์ <select id="castS" style="width:auto"><option value="anime"${C.cast_style==='anime'?' selected':''}>อนิเมะ</option><option value="real"${C.cast_style==='real'?' selected':''}>เหมือนจริง</option></select></label>
+      <label class="muted small"><input type="checkbox" id="castOn"${C.cast_on?' checked':''}> ส่งทุกวัน</label></div></div>
+  ${ok.length?`<div class="card"><div class="row" style="justify-content:space-between"><h3>⭐ ${cn}ที่ผ่านแล้ว</h3><span class="muted small">${ok.length}</span></div>
+    <p class="muted small" style="margin:0">${CCAT==='place'||CCAT==='prop'?'ที่ผ่านแล้วพร้อมใช้ในบทได้ทันที':'ตัวที่ผ่านจะถูกสร้างต่อเป็นตัวเต็มรูปแบบ (หลายมุม พร้อมเคลื่อนไหว) ทันทีที่ระบบล็อกหน้าเสร็จ'}</p><div class="cgrid">${ok.map(card).join('')}</div></div>`:''}`;}
+document.addEventListener('change',async e=>{if(!['castN','castS','castOn'].includes(e.target.id))return;
+  try{await botApi('/api/vcastset',{cast_n:$('#castN').value,cast_style:$('#castS').value,cast_on:$('#castOn').checked?'1':'0'});toast('บันทึกแล้ว');}catch(err){toast(botErr(err));}});
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-cast],[data-castnow],[data-ccat]');if(!b)return;
+  if(b.dataset.ccat){CCAT=b.dataset.ccat;return renderLib(true);}
+  try{if(b.dataset.cast){const [id,st]=b.dataset.cast.split('|');await botApi('/api/vcastset',{id:+id,status:st});toast(st==='approved'?'ผ่านการคัดเลือก 🎉':'ไม่ผ่าน');}
+    else{if(!sure(b,'กดอีกครั้งเพื่อสุ่ม'))return;const r=await botApi('/api/vcastnow',{n:+$('#castN').value,cat:CCAT});toast(`สุ่มเพิ่ม ${r.added} แบบ`);}
+    BOT.c=await botApi('/api/vcast');await botLoad();}catch(err){toast(botErr(err));}});
 
 boot();
 })();

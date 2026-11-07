@@ -19,12 +19,14 @@ export default {
     if (selfUrl !== url.origin) { selfUrl = url.origin; ctx.waitUntil(setSetting(env, 'self_url', url.origin)); }
     try {
       if (p === '/api/vstate' || p.startsWith('/vid/')) return await vApi(req, env, url, ctx, {});
+      if (p === '/api/vcast') return await castApi(req, env, url, {});
       if (p === '/api/ping') return json({ ok: true, bot: 'anime-image-bot', github: !!(env.GH_TOKEN && env.GH_REPO) });
       if (p === '/api/state') return json(await getState(env));
       if (p.startsWith('/img/')) return getImage(env, +p.split('/')[2]);
       if (p === '/api/zip') return makeZip(env, url.searchParams.get('project') || '', url.searchParams.get('starred') === '1');
       if (req.method !== 'POST') return json({ error: 'not found' }, 404);
       const body = await req.json().catch(() => ({}));
+      if (p.startsWith('/api/vcast')) { const cr = await castApi(req, env, url, body); if (cr) return cr; }
       if (p.startsWith('/api/v')) { const vr = await vApi(req, env, url, ctx, body); if (vr) return vr; }
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/settings') {
@@ -53,6 +55,7 @@ export default {
     await ensureSchema(env);
     ctx.waitUntil(tick(env, false));
     ctx.waitUntil(vTick(env, false).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
+    ctx.waitUntil(castBatch(env, 0, false).catch(() => {}));
   },
 };
 
@@ -232,6 +235,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS videos (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, ep TEXT, shot TEXT, prompt TEXT, size INTEGER, sec INTEGER, w INTEGER, h INTEGER, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vchunks (vid INTEGER, idx INTEGER, data TEXT, PRIMARY KEY (vid, idx))'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vlog (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS casting (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, cat TEXT DEFAULT 'char', name TEXT, descr TEXT, prompt TEXT, status TEXT DEFAULT 'pending', created INTEGER)"),
   ]);
   schemaReady = true;
 }
@@ -713,6 +717,113 @@ def main():
 
 main()
 `;
+
+
+// =====================================================================
+// ===== แคสติ้ง: ทุกวันสุ่มออกแบบตัวละครใหม่ 3–5 ตัว ให้ผู้ใช้อนุมัติ =====
+const CAST = {
+  g: [['f', 'หญิง', 7], ['m', 'ชาย', 3]],
+  age: [[19, 'วัยรุ่นตอนปลาย'], [22, 'นักศึกษา'], [25, 'วัยทำงานตอนต้น'], [28, 'วัยทำงาน'], [33, 'ผู้ใหญ่']],
+  hairF: [['short wavy bob', 'ผมบ็อบหยักศก'], ['long straight hair with blunt bangs', 'ผมยาวตรงหน้าม้าตัดตรง'], ['high ponytail', 'ผมหางม้าสูง'], ['low twin braids', 'ผมเปียคู่ต่ำ'], ['messy bun with loose strands', 'ผมมวยหลวมๆ'], ['long layered hair with wispy bangs', 'ผมยาวไล่เลเยอร์หน้าม้าบาง'], ['short pixie cut', 'ผมสั้นพิกซี่'], ['half-up hair with a ribbon', 'ผมมัดครึ่งหัวผูกโบว์']],
+  hairM: [['messy short hair with bangs', 'ผมสั้นยุ่งมีหน้าม้า'], ['spiky hair', 'ผมชี้ฟู'], ['slicked back hair', 'ผมเสยหลัง'], ['wolf cut', 'ผมทรงวูล์ฟคัต'], ['short undercut', 'ผมอันเดอร์คัต'], ['shoulder-length tied hair', 'ผมยาวประบ่ามัดจุก']],
+  hc: [['black', 'ดำ'], ['dark brown', 'น้ำตาลเข้ม'], ['chestnut', 'น้ำตาลเกาลัด'], ['ash blonde', 'บลอนด์หม่น'], ['pastel pink', 'ชมพูพาสเทล'], ['navy blue', 'น้ำเงินกรมท่า'], ['white', 'ขาว'], ['copper red', 'แดงทองแดง'], ['lavender', 'ม่วงลาเวนเดอร์']],
+  eye: [['amber', 'อำพัน'], ['emerald green', 'เขียวมรกต'], ['sky blue', 'ฟ้า'], ['violet', 'ม่วง'], ['dark brown', 'น้ำตาลเข้ม'], ['crimson', 'แดง'], ['gray', 'เทา']],
+  outF: [['oversized hoodie and pleated skirt', 'ฮู้ดดี้ตัวใหญ่กับกระโปรงพลีท'], ['denim jacket over a sundress', 'แจ็กเก็ตยีนส์ทับเดรส'], ['office blouse and slacks', 'เสื้อเชิ้ตทำงานกับกางเกงสแล็ก'], ['cafe apron uniform', 'ชุดพนักงานร้านกาแฟมีผ้ากันเปื้อน'], ['sporty track jacket and shorts', 'แจ็กเก็ตกีฬากับกางเกงขาสั้น'], ['long coat and scarf', 'โค้ทยาวกับผ้าพันคอ'], ['cardigan and long skirt', 'คาร์ดิแกนกับกระโปรงยาว'], ['leather jacket and jeans', 'แจ็กเก็ตหนังกับยีนส์']],
+  outM: [['white shirt and slacks', 'เสื้อเชิ้ตขาวกับกางเกงสแล็ก'], ['hoodie and cargo pants', 'ฮู้ดดี้กับกางเกงคาร์โก'], ['denim jacket and t-shirt', 'แจ็กเก็ตยีนส์กับเสื้อยืด'], ['chef jacket', 'ชุดเชฟ'], ['racing jacket', 'แจ็กเก็ตแข่งรถ'], ['knit sweater and coat', 'สเวตเตอร์ไหมพรมกับโค้ท']],
+  vibe: [['cheerful energetic', 'ร่าเริง พลังเยอะ', 'big bright smile'], ['cool and aloof', 'นิ่ง เท่ เย็นชา', 'calm cool expression'], ['shy and gentle', 'ขี้อาย อ่อนโยน', 'shy soft smile'], ['clumsy and funny', 'โก๊ะ ตลก', 'goofy surprised expression'], ['confident leader', 'มั่นใจ เป็นผู้นำ', 'confident smirk'], ['mysterious', 'ลึกลับ', 'mysterious half smile'], ['sleepy and lazy', 'ขี้เกียจ ง่วงตลอด', 'sleepy half-lidded eyes']],
+  acc: [['', ''], ['', ''], ['round glasses', 'แว่นกลม'], ['hair clip', 'กิ๊บติดผม'], ['headphones around the neck', 'หูฟังคล้องคอ'], ['small earrings', 'ต่างหูเล็ก'], ['choker', 'โชกเกอร์'], ['beanie', 'หมวกไหมพรม']],
+  nameF: ['มิว', 'ใบเตย', 'พิม', 'น้ำหวาน', 'ฟ้าใส', 'ข้าวหอม', 'ปลายฝน', 'มายด์', 'เอิง', 'ญาญ่า', 'แพรวา', 'ไอซ์', 'จูน', 'ลูกพีช', 'เมษา'],
+  nameM: ['ภูมิ', 'ต้นกล้า', 'ไนท์', 'เจ', 'ซัน', 'ธาม', 'คิน', 'ปั้น', 'ไท', 'เรน'],
+};
+const pick = (a, r) => a[Math.floor(r() * a.length)];
+function rng(seed) { let x = seed >>> 0 || 1; return () => ((x = (x * 1664525 + 1013904223) >>> 0) / 4294967296); }
+function castMake(r, style) {
+  const tot = CAST.g.reduce((a, b) => a + b[2], 0); let t = r() * tot, g = CAST.g[0];
+  for (const x of CAST.g) { if ((t -= x[2]) < 0) { g = x; break; } }
+  const f = g[0] === 'f', age = pick(CAST.age, r), hair = pick(f ? CAST.hairF : CAST.hairM, r), hc = pick(CAST.hc, r), eye = pick(CAST.eye, r),
+    out = pick(f ? CAST.outF : CAST.outM, r), vibe = pick(CAST.vibe, r), acc = pick(CAST.acc, r), name = pick(f ? CAST.nameF : CAST.nameM, r);
+  const who = f ? 'young woman' : 'young man';
+  const real = style === 'real';
+  const prompt = `${real ? 'photorealistic full body photo' : 'full body anime character design'} of an original ${who}, ${age[0]} years old, ${hc[0]} ${hair[0]}, ${eye[0]} eyes, ${vibe[2]}, ${vibe[0]} personality, wearing ${out[0]}${acc[0] ? ', ' + acc[0] : ''}, standing in a relaxed natural pose, front view, plain light gray studio background, ${real ? 'soft studio lighting, 50mm photo' : 'clean lineart, soft cel shading, high quality anime illustration'}, vertical 9:16`;
+  const desc = `${g[1]} ${age[0]} ปี (${age[1]}) · ผม${hc[1]} ${hair[1]} · ตา${eye[1]} · ${out[1]}${acc[1] ? ' · ' + acc[1] : ''} · นิสัย${vibe[1]}`;
+  return { name, desc, prompt };
+}
+const CAST2 = {
+  pet: {
+    sp: [['fluffy cat', 'แมวขนฟู'], ['short-haired cat', 'แมวขนสั้น'], ['shiba inu', 'หมาชิบะ'], ['corgi', 'หมาคอร์กี้'], ['pomeranian', 'หมาปอม'], ['golden retriever puppy', 'ลูกหมาโกลเด้น'], ['lop-eared rabbit', 'กระต่ายหูตก'], ['hamster', 'แฮมสเตอร์'], ['parakeet', 'นกแก้ว'], ['baby chick', 'ลูกเจี๊ยบ'], ['duckling', 'ลูกเป็ด'], ['hedgehog', 'เม่นแคระ'], ['red panda', 'แพนด้าแดง'], ['penguin chick', 'ลูกเพนกวิน']],
+    col: [['orange', 'สีส้ม'], ['white', 'สีขาว'], ['gray', 'สีเทา'], ['black', 'สีดำ'], ['cream', 'สีครีม'], ['calico', 'สามสี'], ['brown', 'สีน้ำตาล']],
+    acc: [['', ''], ['red collar with a bell', 'ปลอกคอแดงมีกระดิ่ง'], ['tiny scarf', 'ผ้าพันคอจิ๋ว'], ['ribbon bow', 'โบว์'], ['little knit hat', 'หมวกไหมพรมจิ๋ว']],
+    mood: [['sleepy', 'ขี้เซา'], ['playful', 'ซน'], ['grumpy', 'หน้าบึ้ง'], ['curious', 'ขี้สงสัย'], ['happy', 'อารมณ์ดี']],
+    name: ['ส้มจี๊ด', 'โมจิ', 'ข้าวปั้น', 'ถั่วแดง', 'บัวลอย', 'ทองหยิบ', 'มะพร้าว', 'ปุยฝ้าย', 'ขนมปัง', 'เต้าหู้', 'ช็อกโก', 'มะขาม']
+  },
+  place: {
+    loc: [['cozy apartment bedroom', 'ห้องนอนอพาร์ตเมนต์'], ['small cafe interior', 'ร้านกาแฟเล็กๆ'], ['rooftop with city view', 'ดาดฟ้าวิวเมือง'], ['school classroom', 'ห้องเรียน'], ['convenience store at night', 'ร้านสะดวกซื้อ'], ['train station platform', 'ชานชาลารถไฟ'], ['seaside road', 'ถนนเลียบทะเล'], ['flower field', 'ทุ่งดอกไม้'], ['night market street', 'ถนนตลาดนัดกลางคืน'], ['quiet library', 'ห้องสมุด'], ['laundromat', 'ร้านซักผ้าหยอดเหรียญ'], ['bus stop in the countryside', 'ป้ายรถเมล์ชนบท'], ['shrine stairs in a forest', 'บันไดศาลเจ้ากลางป่า'], ['amusement park', 'สวนสนุก']],
+    time: [['early morning', 'เช้าตรู่'], ['bright noon', 'กลางวัน'], ['golden sunset', 'ยามเย็น'], ['night', 'กลางคืน']],
+    wx: [['clear weather', 'ฟ้าใส'], ['light rain', 'ฝนปรอยๆ'], ['soft snowfall', 'หิมะตกเบาๆ'], ['after the rain with puddles', 'หลังฝนตก'], ['cherry blossom petals falling', 'ซากุระร่วง']]
+  },
+  prop: {
+    it: [['vintage film camera', 'กล้องฟิล์มวินเทจ'], ['bento lunch box', 'กล่องข้าวเบนโตะ'], ['bicycle with a front basket', 'จักรยานมีตะกร้า'], ['retro radio', 'วิทยุเรโทร'], ['handwritten letter', 'จดหมายเขียนมือ'], ['umbrella', 'ร่ม'], ['backpack with keychains', 'เป้มีพวงกุญแจ'], ['smartphone with a cute case', 'มือถือเคสน่ารัก'], ['bubble tea', 'ชานมไข่มุก'], ['music box', 'กล่องดนตรี'], ['scooter', 'สกู๊ตเตอร์'], ['plush toy', 'ตุ๊กตาผ้า']],
+    st: [['pastel', 'โทนพาสเทล'], ['retro', 'สไตล์เรโทร'], ['minimal white', 'มินิมอลขาว'], ['colorful', 'สีสดใส']]
+  }
+};
+function castMake2(cat, r, style) {
+  const real = style === 'real', tail = real ? 'photorealistic, 50mm photo, vertical 9:16' : 'soft anime style, high quality anime illustration, cinematic lighting, vertical 9:16';
+  if (cat === 'pet') { const C = CAST2.pet, a = pick(C.sp, r), c = pick(C.col, r), x = pick(C.acc, r), m = pick(C.mood, r);
+    return { name: pick(C.name, r), desc: `${a[1]} ${c[1]}${x[1] ? ' · ' + x[1] : ''} · นิสัย${m[1]}`, prompt: `${real ? 'photorealistic full body photo' : 'full body cute anime character design'} of an original ${c[0]} ${a[0]}${x[0] ? ' wearing a ' + x[0] : ''}, ${m[0]} expression, plain light gray background, ${tail}` }; }
+  if (cat === 'place') { const C = CAST2.place, l = pick(C.loc, r), t = pick(C.time, r), w = pick(C.wx, r);
+    return { name: l[1], desc: `${l[1]} · ${t[1]} · ${w[1]}`, prompt: `${l[0]}, ${t[0]}, ${w[0]}, detailed background art, no people, ${tail}` }; }
+  const C = CAST2.prop, i = pick(C.it, r), st = pick(C.st, r);
+  return { name: i[1], desc: `${i[1]} · ${st[1]}`, prompt: `a ${st[0]} ${i[0]}, single object, centered, plain soft background, ${tail}` };
+}
+function bkkDay(ts) { return new Date((ts || Date.now()) + 7 * 3600000).toISOString().slice(0, 10); }
+async function castBatch(env, n, force, only) {
+  const s = await getSettings(env), day = bkkDay(), hr = new Date(Date.now() + 7 * 3600000).getUTCHours();
+  if (!force) {
+    if (s.cast_on === '0' || hr < 7) return { skipped: true };
+    const c = await env.DB.prepare('SELECT COUNT(*) n FROM casting WHERE day=?').bind(day).first();
+    if (c.n) return { skipped: 'done today' };
+  }
+  n = Math.min(5, Math.max(1, n || +s.cast_n || 4));
+  const cats = only ? [only] : String(s.cast_cats || 'char,pet,place,prop').split(',').filter(Boolean);
+  const r = rng(Date.now() ^ Math.floor(Math.random() * 1e9)), st = [];
+  let total = 0;
+  for (const cat of cats) {
+    const used = new Set();
+    for (let i = 0; i < n; i++) {
+      const mk = () => cat === 'char' ? castMake(r, s.cast_style || 'anime') : castMake2(cat, r, s.cast_style || 'anime');
+      let c = mk();
+      for (let k = 0; k < 8 && used.has(c.name); k++) c = mk();
+      used.add(c.name);
+      const ins = await env.DB.prepare("INSERT INTO casting (day,cat,name,descr,prompt,status,created) VALUES (?,?,?,?,?,'pending',?)").bind(day, cat, c.name, c.desc, c.prompt, Date.now()).run();
+      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created) VALUES (?,?,?,'queued',?)").bind('แคสติ้ง·' + day, ins.meta.last_row_id, c.prompt, Date.now()));
+      total++;
+    }
+  }
+  await env.DB.batch(st);
+  await notify(env, `🎬 แคสติ้งวันนี้มาแล้ว ${total} รายการ เข้าไปเลือกในแท็บคลัง`);
+  return { ok: true, added: total };
+}
+async function castApi(req, env, url, body) {
+  const p = url.pathname;
+  if (p === '/api/vcast') {
+    const rows = (await env.DB.prepare("SELECT * FROM casting WHERE status!='rejected' OR day>=? ORDER BY id DESC LIMIT 200").bind(bkkDay(Date.now() - 2 * 86400000)).all()).results;
+    const imgs = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE project LIKE 'แคสติ้ง·%'").all()).results;
+    const jobs = (await env.DB.prepare("SELECT project,scene,status FROM jobs WHERE project LIKE 'แคสติ้ง·%'").all()).results;
+    const s = await getSettings(env);
+    for (const r of rows) {
+      r.img = (imgs.find(i => +i.scene === r.id) || {}).id || 0;
+      const j = jobs.find(x => +x.scene === r.id); r.job = j ? j.status : '';
+    }
+    return json({ today: bkkDay(), rows, cast_on: s.cast_on !== '0', cast_n: +s.cast_n || 4, cast_style: s.cast_style || 'anime', cast_cats: s.cast_cats || 'char,pet,place,prop' });
+  }
+  if (p === '/api/vcastset') {
+    if (body.id && ['approved', 'rejected', 'pending'].includes(body.status)) await env.DB.prepare('UPDATE casting SET status=?, name=COALESCE(?,name) WHERE id=?').bind(body.status, body.name || null, body.id).run();
+    for (const k of ['cast_on', 'cast_n', 'cast_style', 'cast_cats']) if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
+    return json({ ok: true });
+  }
+  if (p === '/api/vcastnow') return json(await castBatch(env, +body.n || 0, true, ['char', 'pet', 'place', 'prop'].includes(body.cat) ? body.cat : ''));
+  return null;
+}
 
 // ---------- หน้าเว็บ ----------
 const HTML = `<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
