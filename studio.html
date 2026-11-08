@@ -676,6 +676,8 @@ function renderGen(){const c=botCfg();BOT.filled=false;
     <span class="muted">คำอธิบายตัวละคร (ใส่หน้าทุก prompt เพื่อให้หน้าตาใกล้เคียงกัน)</span><textarea id="bChar" placeholder="1girl, short black bob hair, low side ponytail, brown eyes, white hoodie"></textarea>
     <span class="muted">สไตล์ (ต่อท้ายทุก prompt)</span><textarea id="bStyle"></textarea>
     <div class="row"><label class="muted">ห่างกัน <input id="bInt" type="number" min="1" style="width:80px"> นาที/ภาพ</label><label class="muted">คุณภาพ <input id="bSteps" type="number" min="1" max="8" style="width:70px"> steps (1–8)</label></div>
+    <label class="muted" style="display:flex;gap:8px;align-items:center"><input id="bPace" type="checkbox" checked style="width:22px;height:22px"> แบ่งทำเป็นช่วงเวลา (แนะนำ)</label>
+    <label class="muted">ช่วงเวลา (ชั่วโมงเวลาไทย คั่นด้วยจุลภาค) <input id="bSlots" type="text" placeholder="7,12,18,22" style="width:140px" autocomplete="off"></label><span id="bSlotInfo" class="muted small"></span>
     <div class="row"><button class="btn main" data-bot="save">บันทึก</button><button class="btn sm" data-bot="disconnect">เปลี่ยนลิงก์/รหัสบอท</button></div>
     <p class="muted" style="margin:0">ฟรีประมาณ 200 ภาพ/วันที่ 4 steps (steps มากขึ้น = ละเอียดขึ้นแต่กินโควตามากขึ้น) · โควตารีเซ็ต 07:00 น. · ภาพออกมาเป็นสี่เหลี่ยมจัตุรัส ครอปเป็น 9:16 ตอนตัดต่อ</p></div>`;
   botParts();if(!BOT.s||BOT.err)botLoad();}
@@ -695,7 +697,8 @@ function botParts0(st){const S=BOT.s;
   if(BOT.err&&!S){st.innerHTML=`<h3>เชื่อมบอทไม่ได้</h3><p class="muted" style="margin:0">${esc(BOT.err)}</p><div class="row"><button class="btn sm" data-bot="reload">ลองใหม่</button><button class="btn sm" data-bot="disconnect">แก้ลิงก์/รหัส</button></div>`;return;}
   if(!S){st.innerHTML='<p class="muted" style="margin:0">กำลังเชื่อมบอท…</p>';return;}
   const s=S.settings,qd=S.jobs.filter(j=>j.status!=='failed').length,fail=S.jobs.length-qd,paused=S.now<+s.paused_until;
-  const line=paused?`⏸ พักอยู่ (โควตาฟรีวันนี้หมด) · ทำต่อเองประมาณ ${tTH(s.paused_until)}`:qd?`▶️ กำลังทำงาน · เหลือ ${qd} ภาพ · ภาพถัดไปประมาณ ${tTH(Math.max(S.now,+s.last_run+s.interval_min*60000))}`:'✅ คิวว่าง';
+  const si_=(()=>{try{return JSON.parse(s.slot_info||'null');}catch(e){return null;}})(),slotFull=s.pace!=='0'&&si_&&si_.n>=si_.budget;
+  const line=slotFull&&qd&&!paused?`🕒 ช่วงนี้ทำครบ ${si_.budget} ภาพแล้ว · ช่วงถัดไป ${tTH(si_.next)} (เหลือรอ ${qd} ภาพ)`:paused?`⏸ พักอยู่ (โควตาฟรีวันนี้หมด) · ทำต่อเองประมาณ ${tTH(s.paused_until)}`:qd?`▶️ กำลังทำงาน · เหลือ ${qd} ภาพ · ภาพถัดไปประมาณ ${tTH(Math.max(S.now,+s.last_run+s.interval_min*60000))}`:'✅ คิวว่าง';
   st.innerHTML=`<div class="row"><h3 style="margin-right:auto">🎨 บอทเจนภาพ</h3><span class="chip"><span class="dot"></span>${S.images.length} ภาพในคลัง</span></div>
     <div>${line}${fail?` · <span style="color:var(--red)">พัง ${fail}</span>`:''}${S.hasPassword?'':' · <span style="color:var(--you)">⚠️ บอทยังไม่ได้ตั้งรหัสผ่าน</span>'}</div>
     ${kLine()}
@@ -712,7 +715,8 @@ function botParts0(st){const S=BOT.s;
   im.forEach(i=>{const k=i.project+' · '+(+i.scene?'ฉาก '+i.scene:'ภาพต้นแบบ');(g[k]=g[k]||[]).push(i);});
   $('#botG').innerHTML=Object.keys(g).length?Object.entries(g).map(([k,a],ix)=>det('g|'+k,`${esc(k)} <span class="dn">${a.length}</span>${a.some(i=>i.starred)?'<small>⭐</small>':''}`,`<span class="muted" style="font-size:13px">${esc(String(a[0].prompt).slice(0,140))}</span><div class="bgrid">${a.map(i=>botCard(i)).join('')}</div>`,ix===0)).join(''):'<p class="muted" style="margin:0">ยังไม่มีภาพ</p>';
   const sb_=document.querySelector('[data-bot="staronly"]');if(sb_)sb_.classList.toggle('main',BOT.star);
-  if(!BOT.filled){$('#bChar').value=s.character||'';$('#bStyle').value=s.style||'';$('#bInt').value=s.interval_min||2;$('#bSteps').value=s.steps||4;BOT.filled=true;}}
+  if($('#bSlotInfo')){let si=null;try{si=JSON.parse(s.slot_info||'null');}catch(e){}$('#bSlotInfo').textContent=si&&s.pace!=='0'?`ช่วงนี้ทำแล้ว ${si.n}/${si.budget} ภาพ · ช่วงถัดไป ${tTH(si.next)}`:'';}
+  if(!BOT.filled){$('#bChar').value=s.character||'';$('#bStyle').value=s.style||'';$('#bInt').value=s.interval_min||2;$('#bSteps').value=s.steps||4;$('#bPace').checked=s.pace!=='0';$('#bSlots').value=s.slots||'7,12,18,22';BOT.filled=true;}}
 
 function botThumbsFill(){const els=document.querySelectorAll('.botthumbs');if(!els.length)return;const S=BOT.s,proj=epBotProject();
   els.forEach(el=>{const k=el.dataset.k,sc=k==='char'?0:(+k||0);
@@ -820,7 +824,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot]
       case 'star':await botApi('/api/star',{id});break;
       case 'regen':await botApi('/api/regen',{id});toast('เพิ่มเข้าคิวเจนใหม่แล้ว');break;
       case 'del':if(!sure(b,'ลบ?'))return;await botApi('/api/delete',{id});break;
-      case 'save':await botApi('/api/settings',{character:$('#bChar').value,style:$('#bStyle').value,interval_min:Math.max(1,+$('#bInt').value||1),steps:Math.min(8,Math.max(1,+$('#bSteps').value||4))});toast('บันทึกแล้ว');BOT.filled=false;break;
+      case 'save':await botApi('/api/settings',{character:$('#bChar').value,style:$('#bStyle').value,interval_min:Math.max(1,+$('#bInt').value||1),steps:Math.min(8,Math.max(1,+$('#bSteps').value||4)),pace:$('#bPace').checked?'1':'0',slots:($('#bSlots').value||'').trim()||'7,12,18,22'});toast('บันทึกแล้ว');BOT.filled=false;break;
       case 'epall':await botEnqueueEp((ep.shots||[]).filter(s=>s.image_prompt).map(s=>({scene:+s.n||0,prompt:s.image_prompt})),'ทุกช็อต');break;
       case 'epone':{const s=(ep.shots||[]).find(x=>String(x.n)===b.dataset.n);if(!s)return;await botEnqueueEp([{scene:+s.n||0,prompt:s.image_prompt}],`ช็อต ${s.n} `);break;}
       case 'vall':{b.disabled=true;b.textContent='กำลังส่ง…';await vEnqueue((ep.shots||[]).filter(s=>mUrl(String(s.n),'image')),'ทุกช็อต');b.disabled=false;b.textContent='🎞️ ทำวิดีโอทุกช็อตที่มีภาพคีย์แล้ว';break;}

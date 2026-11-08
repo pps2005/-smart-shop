@@ -37,7 +37,7 @@ export default {
       if (p.startsWith('/api/v')) { const vr = await vApi(req, env, url, ctx, body); if (vr) return vr; }
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/settings') {
-        for (const k of ['interval_min', 'style', 'character', 'steps'])
+        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots'])
           if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
         return json({ ok: true });
       }
@@ -81,12 +81,36 @@ async function autoHeal(env) {
 }
 
 // ---------- core ----------
+// ช่วงเวลาทำภาพ (ชั่วโมงเวลาไทย) เช่น "7,12,18,22" · งบต่อช่วง = โควตาฟรี ~8,500 neurons/วัน ÷ จำนวนช่วง
+function slotList(s) {
+  const a = String(s.slots || '7,12,18,22').split(/[,\s]+/).map(Number).filter(h => h >= 0 && h < 24);
+  return [...new Set(a)].sort((x, y) => x - y).length ? [...new Set(a)].sort((x, y) => x - y) : [7, 12, 18, 22];
+}
+async function slotCheck(env, s, now) {
+  if (s.pace === '0') return { full: false };
+  const hrs = slotList(s), b = new Date(now + 7 * 3600000);
+  const day0 = Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate()) - 7 * 3600000; // 00:00 เวลาไทย
+  const h = b.getUTCHours() + b.getUTCMinutes() / 60;
+  const cur = [...hrs].reverse().find(x => x <= h);
+  const start = cur === undefined ? day0 - 86400000 + hrs[hrs.length - 1] * 3600000 : day0 + cur * 3600000; // ก่อนช่วงแรกของวัน = ยังเป็นช่วงสุดท้ายของเมื่อวาน
+  const nxt = hrs.find(x => x > h);
+  const next = nxt === undefined ? day0 + 86400000 + hrs[0] * 3600000 : day0 + nxt * 3600000;
+  if (String(start) !== s.slot_start) { await setSetting(env, 'slot_start', String(start)); await setSetting(env, 'slot_n', '0'); s.slot_n = '0'; }
+  const nx = await env.DB.prepare("SELECT steps FROM jobs WHERE status='queued' ORDER BY id LIMIT 1").first();
+  const st = Math.min(8, Math.max(1, +(nx && nx.steps) || +s.steps || 4)), per = 19.2 + 9.6 * st;
+  const budget = Math.max(1, Math.floor(8500 / hrs.length / per));
+  const info = JSON.stringify({ start, next, n: +s.slot_n || 0, budget });
+  if (info !== s.slot_info) await setSetting(env, 'slot_info', info);
+  return { full: (+s.slot_n || 0) >= budget };
+}
 async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
   if (!force) {
     if (now < +s.paused_until) return { skipped: 'paused' };
     if (now - +s.last_run < (+s.interval_min || 1) * 60000 - 15000) return { skipped: 'wait' };
+    const sl = await slotCheck(env, s, now); // แบ่งทำเป็นช่วงเวลา แต่ละช่วงมีโควตาของตัวเอง
+    if (sl.full) return { skipped: 'slot full' };
     if (now - +s.last_run > 180000) await env.DB.prepare("UPDATE jobs SET status='queued' WHERE status='running'").run();
   }
   const job = await env.DB.prepare("SELECT * FROM jobs WHERE status='queued' ORDER BY id LIMIT 1").first();
@@ -99,6 +123,7 @@ async function tick(env, force) {
     await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (?,?,?,?,?,0,?)')
       .bind(job.id, job.project, job.scene, job.prompt, out.image, Date.now()).run();
     await env.DB.prepare('DELETE FROM jobs WHERE id=?').bind(job.id).run();
+    if (s.pace !== '0') await setSetting(env, 'slot_n', String((+s.slot_n || 0) + 1));
     const left = await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE status='queued'").first();
     if (left.n === 0) await notify(env, `✅ คิวของโปรเจกต์ "${job.project}" เสร็จครบแล้ว เข้าไปเลือกภาพได้เลย`);
     return { done: true, left: left.n };
@@ -235,7 +260,7 @@ function json(o, status = 200) { return new Response(JSON.stringify(o), { status
 function b64ToBytes(b64) { const s = atob(b64); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
 async function getSettings(env) {
   const r = await env.DB.prepare('SELECT key,value FROM settings').all();
-  const s = { interval_min: '2', style: '', character: '', steps: '4', paused_until: '0', last_run: '0' };
+  const s = { interval_min: '2', style: '', character: '', steps: '4', paused_until: '0', last_run: '0', pace: '1', slots: '7,12,18,22' };
   for (const x of r.results) s[x.key] = x.value;
   return s;
 }
