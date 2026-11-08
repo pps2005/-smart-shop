@@ -584,7 +584,7 @@ async function upload(k,ty,file){if(file.size>50*1024*1024)return toast('ไฟ�
 /* ================= หน้า ตั้งค่า ================= */
 function renderSet(){const c=botCfg();
   $('#vw').innerHTML=`<div class="card"><h2>ตั้งค่า</h2></div>
-  <div class="card"><h3>🎨 บอทเจนภาพ</h3>${c.url?`<div class="mem"><span style="min-width:0"><b>เชื่อมแล้ว</b><small>${esc(c.url)}</small></span><span class="on" style="color:var(--ok)">●</span></div><div class="row"><button class="btn sm" data-bot="disconnect">เปลี่ยนลิงก์/รหัส</button><button class="btn sm" data-v2="gen">ไปหน้าเจนภาพ</button></div>`:`<p class="muted" style="margin:0">ยังไม่ได้เชื่อม ไปที่แท็บ "เจนภาพ" เพื่อใส่ลิงก์บอทและรหัสผ่าน</p><div><button class="btn sm" data-v2="gen">ไปเชื่อมบอท</button></div>`}</div>
+  <div class="card"><h3>🎨 บอทเจนภาพ</h3>${c.url?`<div class="mem"><span style="min-width:0"><b>เชื่อมแล้ว</b><small>${esc(c.url)}</small></span><span class="on" style="color:var(--ok)">●</span></div><div class="row"><button class="btn sm" data-bot="disconnect">เปลี่ยนลิงก์/รหัส</button><button class="btn sm" data-v2="gen">ไปหน้าเจนภาพ</button><button class="btn sm main" data-fkgo="1">🤝 เพิ่มผู้ช่วย Flux</button></div>`:`<p class="muted" style="margin:0">ยังไม่ได้เชื่อม ไปที่แท็บ "เจนภาพ" เพื่อใส่ลิงก์บอทและรหัสผ่าน</p><div><button class="btn sm" data-v2="gen">ไปเชื่อมบอท</button></div>`}</div>
   <div class="card"><h3>📤 ส่งงานให้ Claude (GitHub)</h3><p class="muted" style="margin:0">ปุ่ม "ส่งภาพและคลิปให้ Claude" ในหน้าเรื่อง จะส่งไฟล์ผ่านบอทขึ้น repo สาธารณะ ตั้ง GH_TOKEN และ GH_REPO ใน Cloudflare (Worker anime-image-bot → Settings → Variables and Secrets)</p></div>
   <div class="card"><h3>บัญชี</h3><div class="muted small">${esc(user&&user.email||'')}</div><div><button class="btn sm" data-act="logout">ออกจากระบบ</button></div></div>`;}
 
@@ -1698,6 +1698,10 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-fk]'
     if(a==='set')await botApi('/api/fluxkeys',{act:'set',id:+id,on:v==='1'});
     if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ')){b.disabled=false;return;}await botApi('/api/fluxkeys',{act:'del',id:+id});}
     await fkLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
+
+
+document.addEventListener('click',e=>{if(!e.target.closest('[data-fkgo]'))return;SV.gen='set';try{localStorage.setItem('ss_sv',JSON.stringify(SV));}catch(_){}
+  const t=document.querySelector('#tabs [data-v=gen]');if(t)t.click();setTimeout(()=>{gpApply();const b=document.getElementById('fkBox');if(b)b.scrollIntoView({behavior:'smooth'});},600);});
 
 boot();
 })();
