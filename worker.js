@@ -1300,6 +1300,15 @@ async function castApi(req, env, url, body) {
     for (const x of r.results) { try { out[x.name] = JSON.parse(x.data); } catch (e) { } }
     return json({ profiles: out });
   }
+  if (p === '/api/vcastoutfitup') { // อัปภาพชุดของตัวละครเข้าแฟ้ม (ติดดาว)
+    const b = body || {}, name = String(b.name || '').trim().slice(0, 60), outfit = String(b.outfit || '').trim().slice(0, 60);
+    const data = String(b.data || '').replace(/^data:[^,]*,/, '');
+    if (!name || !outfit) return json({ error: 'ไม่มีชื่อ' }, 400);
+    if (data.length < 2000) return json({ error: 'ไฟล์ภาพเล็กผิดปกติ' }, 400);
+    if (data.length > 1900000) return json({ error: 'ภาพใหญ่เกินไป ลองใหม่อีกครั้ง' }, 400);
+    const ins = await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (0,?,?,?,?,1,?)').bind('แฟ้ม·' + name + '·' + outfit, 1, '', data, Date.now()).run();
+    return json({ ok: true, image_id: ins.meta.last_row_id });
+  }
   if (p === '/api/vcastsfx') { // คลังเสียงจริง (CC0 ที่ผู้ใช้โหลดมาอัปเอง)
     const b = body || {}, act = b.act || 'list';
     if (act === 'add') {

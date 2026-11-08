@@ -1564,7 +1564,7 @@ function profHtml(){
       <div class="muted small">ตอนแรกเป็น</div><div class="row" style="flex-wrap:wrap;gap:6px">${['เพื่อนสนิท','คนแปลกหน้า','คู่แข่ง','ครอบครัว','เพื่อนร่วมงาน','ไม่ถูกกัน'].map(v=>ch('rel',v)).join('')}</div>
       <div class="muted small">สุดท้ายกลายเป็น</div><div class="row" style="flex-wrap:wrap;gap:6px">${['คนรัก','เพื่อนสนิท','คู่หู','ครอบครัว','ไม่เปลี่ยน'].map(v=>ch('rel2',v)).join('')}</div>
       <div class="muted small">สาเหตุที่ความรู้สึกเปลี่ยน</div><div class="row" style="flex-wrap:wrap;gap:6px">${['ช่วยเหลือยามลำบาก','อยู่ด้วยกันนานขึ้น','เห็นด้านที่ไม่เคยเห็น','เป็นคนเดียวที่เข้าใจ','ความเสียสละ','เข้าใจผิดแล้วคลี่คลาย','ค่อยๆ ชินโดยไม่รู้ตัว'].map(v=>ch('why',v)).join('')}</div></div>`;}).join(''):'')
-    +`<div class="muted small" style="margin-top:8px"><b>อื่นๆ ที่อยากเพิ่ม (ไม่บังคับ)</b></div><textarea data-profnote="${esc(n)}" placeholder="เช่น ชอบกินของหวาน กลัวความสูง มีแมวชื่อโมจิ">${esc(p.note||'')}</textarea>`;
+    +`<div class="muted small" style="margin-top:8px"><b>อื่นๆ ที่อยากเพิ่ม (ไม่บังคับ)</b></div><textarea data-profnote="${esc(n)}" placeholder="เช่น ชอบกินของหวาน กลัวความสูง มีแมวชื่อโมจิ">${esc(p.note||'')}</textarea>`+outfitHtml(n,p);
    const done=Object.keys(p).filter(k=>p[k]&&(!Array.isArray(p[k])||p[k].length)).length;
    return det('pf|'+n,`${im?`<img src="${esc(im)}" alt="" style="width:34px;height:34px;object-fit:cover;object-position:top;border-radius:50%;vertical-align:middle;margin-right:6px">`:'👤 '}${esc(n)}<small>${done?`กรอกแล้ว ${done} ข้อ`:'ยังไม่กรอก'}</small>`,body);}).join('');}
 function profImg(n){const t=(HAND||[]).find(t=>t.kind==='char'&&t.image_id&&String(t.title||'').replace(/\s*\(.*\)\s*$/,'').trim()===n);return t?botU('/img/'+t.image_id):'';}
@@ -1575,6 +1575,43 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-prof
   else p[f]===v?delete p[f]:p[f]=v;
   const y=window.scrollY;renderLib(true);window.scrollTo(0,y);await profSave(n);});
 document.addEventListener('change',async e=>{const t=e.target.closest('[data-profnote]');if(!t||!PROF)return;const n=t.dataset.profnote;(PROF[n]=PROF[n]||{}).note=t.value.trim().slice(0,300);await profSave(n);toast('บันทึกแล้ว');});
+
+
+/* ---------- แฟ้มชุดตัวละคร: พรอมต์พร้อมใช้หลายชุด เพิ่มชุดเองได้ ระบบทำร่างให้ได้ (มีสถานะหมุน) ---------- */
+const OFD=[['ชุดตามอาชีพ','work'],['ชุดลำลองทั่วไป','casual everyday clothes (comfortable top, jeans or skirt, sneakers)'],['ชุดนอน/อยู่บ้าน','cozy loungewear or pajamas'],['ชุดออกงาน','elegant formal evening outfit'],['ชุดกลางแจ้ง/เดินทาง','outdoor travel outfit with a jacket and a backpack'],['ชุดฤดูหนาว','warm winter outfit with a coat and a scarf']];
+const GEN={'หญิง':'woman','ชาย':'man'},JOBE={'นักเรียนมหาลัย':'university student','พนักงานออฟฟิศ':'office worker','ศิลปิน/นักดนตรี':'artist or musician','นักสืบ/นักวิจัย':'detective or researcher','เจ้าของร้าน':'shop owner','นักผจญภัย':'adventurer'};
+function ofList(p){return [...OFD.map(([n,d])=>({n,d,auto:1})),...(p.outfitx||[]).map(o=>({n:o.n,d:o.d||o.n,auto:0}))];}
+function ofDesc(o,p){if(o.d!=='work')return o.d;const j=JOBE[p.job];return j?`a work outfit suitable for a ${j}`:'a smart-casual work outfit';}
+function ofPrompt(n,o,p){const g=GEN[p.gender]||'person',age=String(p.age||'').split(' ')[0];
+  return `Use the attached character model sheet of "${n}" as the exact reference: keep the SAME face, eye colour, hairstyle and hair colour, and body proportions. Create ONE new character model sheet of this same original adult anime character (${g}${age?', age '+age:', adult'}) wearing: ${ofDesc(o,p)}. Show on a plain light background: full-body front view, side view and back view, plus four face close-ups (neutral, smiling, angry, surprised). Only the clothes change. Modern TV anime style, clean lineart, cel shading, no text, no watermark.`;}
+function ofProj(n,o){return 'แฟ้ม·'+n+'·'+o;}
+function ofState(n,o){const S=BOT.s;if(!S)return {};const pr=ofProj(n,o),busy=(S.jobs||[]).filter(j=>j.project===pr&&(j.status==='queued'||j.status==='running')),ims=(S.images||[]).filter(i=>i.project===pr);return {busy:busy.length,run:busy.some(j=>j.status==='running'),img:ims.length?ims[ims.length-1].id:0};}
+function outfitHtml(n,p){
+  const cards=ofList(p).map(o=>{const st=ofState(n,o.n),ps=ofPrompt(n,o,p),key=esc(n)+'|'+esc(o.n);
+    return det('of|'+n+'|'+o.n,`👗 ${esc(o.n)}<small>${st.busy?'⏳ ระบบกำลังทำ':st.img?'มีภาพแล้ว':'ยังไม่มีภาพ'}</small>`,
+      (st.busy?`<div class="row"><span class="spin"></span><span class="muted small">ระบบกำลังทำร่างชุดนี้ (${st.run?'กำลังสร้าง':'รอคิว'}) ภาพจะขึ้นเองด้านล่าง</span></div>`:'')
+      +(st.img?`<img src="${esc(botU('/img/'+st.img))}" alt="${esc(o.n)}" style="width:100%;max-height:420px;object-fit:contain;border-radius:10px;background:#f4f1fb" loading="lazy">`:'')
+      +`<pre class="hcell" style="user-select:all">${esc(ps)}</pre><span class="muted small">แนบชีตตัวละครเดิมของ ${esc(n)} ใน GPT/Gemini ก่อนส่งพรอมต์นี้</span>
+      <div class="row"><button class="btn sm main" data-of="copy|${key}">📋 คัดลอกพรอมต์</button><label class="btn sm" style="cursor:pointer">📤 อัปโหลดภาพ<input type="file" accept="image/*" hidden data-ofup="${key}"></label><button class="btn sm" data-of="gen|${key}"${st.busy?' disabled':''}>🤖 ให้ระบบทำร่าง</button>${o.auto?'':`<button class="btn sm" data-of="del|${key}">🗑</button>`}</div>`);}).join('');
+  return `<div class="muted small" style="margin-top:12px"><b>👗 แฟ้มชุดของ ${esc(n)}</b></div><span class="muted small">ระบบเตรียมพรอมต์ให้แล้วทีละชุด ใช้กับ GPT/Gemini แล้วอัปโหลดภาพกลับ ปุ่ม 🤖 ให้ระบบทำร่าง เป็นแค่ภาพคร่าวๆ จากข้อความ หน้าอาจไม่ตรงต้นแบบ ชุดจริงควรทำด้วย GPT โดยแนบชีต</span>${cards}
+  <div class="ofadd" data-ofadd="${esc(n)}"><div class="muted small" style="margin-top:6px"><b>➕ เพิ่มชุดเอง</b></div><input type="text" class="ofn" placeholder="ชื่อชุด เช่น ชุดเมด / ชุดว่ายน้ำ / ชุดนักสืบ" autocomplete="off"><textarea class="ofd" placeholder="อธิบายชุด (ไทยหรืออังกฤษก็ได้) เช่น เสื้อโค้ทยาวสีเทา ผ้าพันคอแดง"></textarea><button class="btn sm main" data-of="add|${esc(n)}|">เพิ่มชุด</button></div>`;}
+(function(){const st=document.createElement('style');st.textContent='.spin{display:inline-block;width:16px;height:16px;border:3px solid #d9cff5;border-top-color:#8b5cf6;border-radius:50%;animation:spn 1s linear infinite;vertical-align:middle;margin-right:6px}@keyframes spn{to{transform:rotate(360deg)}}';document.head.appendChild(st);})();
+let OFPOLL=0;
+function ofPoll(){if(OFPOLL)return;OFPOLL=setInterval(async()=>{if(!(view==='lib'&&SV.lib==='prof')){clearInterval(OFPOLL);OFPOLL=0;return;}
+  await botLoad();const S=BOT.s;const any=S&&(S.jobs||[]).some(j=>String(j.project).startsWith('แฟ้ม·')&&(j.status==='queued'||j.status==='running'));
+  const y=window.scrollY;renderLib(true);window.scrollTo(0,y);if(!any){clearInterval(OFPOLL);OFPOLL=0;}},8000);}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-of]');if(!b||!PROF)return;const [a,n,o]=b.dataset.of.split('|'),p=PROF[n]=PROF[n]||{},def=ofList(p).find(x=>x.n===o);
+  try{
+    if(a==='copy'&&def)return copy(ofPrompt(n,def,p));
+    if(a==='add'){const box=b.closest('.ofadd'),nm=(box.querySelector('.ofn').value||'').trim(),ds=(box.querySelector('.ofd').value||'').trim();if(!nm)return toast('ใส่ชื่อชุดก่อน');
+      if(ofList(p).some(x=>x.n===nm))return toast('มีชุดชื่อนี้แล้ว');p.outfitx=[...(p.outfitx||[]),{n:nm.slice(0,40),d:ds.slice(0,300)}];await profSave(n);const y=window.scrollY;renderLib(true);window.scrollTo(0,y);toast('เพิ่มชุดแล้ว');return;}
+    if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ'))return;p.outfitx=(p.outfitx||[]).filter(x=>x.n!==o);await profSave(n);const y=window.scrollY;renderLib(true);window.scrollTo(0,y);return;}
+    if(a==='gen'&&def){b.disabled=true;const desc=ofDesc(def,p),g=GEN[p.gender]||'person',tr=(p.traits||[]).length?'':'' ;
+      const pr=`${(BOT.s&&BOT.s.settings&&BOT.s.settings.style)||'anime style, cel shading, clean lineart'}, character design sheet of an original adult ${g} anime character, wearing ${desc}, full body front view, side view and back view, plain light background, no text, no watermark`;
+      await botApi('/api/enqueue',{project:ofProj(n,o),items:[{scene:1,prompt:pr}],variants:1,raw:true});toast('ส่งให้ระบบทำแล้ว ⏳');await botLoad();const y=window.scrollY;renderLib(true);window.scrollTo(0,y);ofPoll();return;}
+  }catch(err){toast(botErr(err));}});
+document.addEventListener('change',async e=>{const i=e.target.closest('[data-ofup]');if(!i||!i.files[0])return;const [n,o]=i.dataset.ofup.split('|');
+  try{toast('กำลังอัปโหลด…');const data=await imgToJpegB64(i.files[0],1600);await botApi('/api/vcastoutfitup',{name:n,outfit:o,data});toast('บันทึกภาพชุดแล้ว ✅');await botLoad();const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}catch(err){toast(botErr(err));}});
 
 boot();
 })();
