@@ -318,11 +318,12 @@ textarea,input[type=text],input[type=email],input[type=password],select,input[ty
 .vxinfo{position:absolute;left:10px;right:10px;bottom:58px;z-index:3;background:rgba(255,255,255,.96);border-radius:16px;padding:10px 12px;box-shadow:0 8px 24px rgba(43,23,69,.25);display:grid;gap:4px}
 .vxinfo[hidden]{display:none}
 
-.seg{position:sticky;top:calc(118px + env(safe-area-inset-top));z-index:5;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:4px;box-shadow:0 6px 16px rgba(124,77,255,.10)}
+.seg{position:sticky;top:calc(118px + env(safe-area-inset-top));z-index:5;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(64px,1fr);gap:4px;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;background:#fff;border:1px solid var(--line);border-radius:14px;padding:4px;box-shadow:0 6px 16px rgba(124,77,255,.10)}
 .seg button{border:0;background:none;border-radius:10px;min-height:44px;font-weight:600;font-size:14px;color:#8A7BA6;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
 .seg button i{font-style:normal;font-size:17px}
+.seg::-webkit-scrollbar{display:none}
 .seg button.on{background:linear-gradient(135deg,#FF5FA2,#8C6BFF);color:#fff;box-shadow:0 4px 12px rgba(255,79,147,.3)}
-@media (max-width:480px){.seg button{flex-direction:column;gap:0;font-size:12px;min-height:50px}}
+@media (max-width:480px){.seg button{flex-direction:column;gap:0;font-size:11.5px;min-height:50px;padding:0 6px}}
 
 details.fold{background:var(--card2,#F7F2FF);border:1px solid var(--line);border-radius:12px;margin:6px 0}
 details.fold>summary{list-style:none;cursor:pointer;padding:12px 40px 12px 14px;font-weight:600;position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:44px;box-sizing:border-box}
@@ -1790,6 +1791,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-keep
     if(a==='unassign')await botApi('/api/vcastaud',{act:'unassign',id:+v});
     await Promise.all([styLoad(),audLoad()]);}catch(err){toast(botErr(err));b.disabled=false;}});
 
+new MutationObserver(()=>{document.querySelectorAll('.seg').forEach(n=>{const on=n.querySelector('button.on');if(on&&!n.dataset.sc){n.dataset.sc='1';const l=on.offsetLeft-n.clientWidth/2+on.clientWidth/2;if(l>0)n.scrollLeft=l;}});}).observe(document.body,{childList:true,subtree:true});
 boot();
 })();
 </script>
