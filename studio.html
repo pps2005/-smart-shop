@@ -1558,14 +1558,18 @@ function profHtml(){
   <span class="muted small">แตะเลือกตัวเลือกได้เลย บันทึกอัตโนมัติ Claude จะอ่านข้อมูลนี้ไปเขียนเรื่อง บทพูด และพรอมต์ภาพ ไม่ต้องบอกซ้ำ ตัวละครทุกตัวต้องเป็นผู้ใหญ่ (18+)</span></div>`
   +names.map(n=>{const p=PROF[n]||{},chip=(f,v,multi)=>{const on=multi?(p[f]||[]).includes(v):p[f]===v;return `<button class="btn sm${on?' main':''}" data-prof="${esc(n)}|${f}|${esc(v)}|${multi?1:0}">${esc(v)}</button>`;};
    const im=profImg(n),body=(im?`<img src="${esc(im)}" alt="${esc(n)}" style="width:100%;max-height:420px;object-fit:contain;border-radius:10px;background:#f4f1fb" loading="lazy">`:'')+PF.map(([f,l,opts,m])=>`<div class="muted small" style="margin-top:8px"><b>${l}</b></div><div class="row" style="flex-wrap:wrap;gap:6px">${opts.map(o=>chip(f,o,m)).join('')}</div>`).join('')
-    +(others(n).length?`<div class="muted small" style="margin-top:8px"><b>ความสัมพันธ์กับตัวละครอื่น</b></div>`+others(n).map(o=>`<div class="row" style="flex-wrap:wrap;gap:6px;align-items:center"><span class="small">${esc(o)}:</span>${['เพื่อนสนิท','คนรัก','ครอบครัว','คู่แข่ง','เพื่อนร่วมงาน','ไม่รู้จักกัน'].map(v=>{const on=(p.rel||{})[o]===v;return `<button class="btn sm${on?' main':''}" data-prof="${esc(n)}|rel:${esc(o)}|${v}|0">${v}</button>`;}).join('')}</div>`).join(''):'')
+    +(others(n).length?`<div class="muted small" style="margin-top:8px"><b>ความสัมพันธ์กับตัวละครอื่น</b> (ตอนแรก → ตอนหลัง และเหตุที่เปลี่ยน)</div>`+others(n).map(o=>{const ch=(k,v)=>{const on=(p[k]||{})[o]===v;return `<button class="btn sm${on?' main':''}" data-prof="${esc(n)}|${k}:${esc(o)}|${v}|0">${v}</button>`;};
+      return `<div style="margin:6px 0;padding:8px;border:1px solid #e5e0f3;border-radius:10px"><b class="small">${esc(o)}</b>
+      <div class="muted small">ตอนแรกเป็น</div><div class="row" style="flex-wrap:wrap;gap:6px">${['เพื่อนสนิท','คนแปลกหน้า','คู่แข่ง','ครอบครัว','เพื่อนร่วมงาน','ไม่ถูกกัน'].map(v=>ch('rel',v)).join('')}</div>
+      <div class="muted small">สุดท้ายกลายเป็น</div><div class="row" style="flex-wrap:wrap;gap:6px">${['คนรัก','เพื่อนสนิท','คู่หู','ครอบครัว','ไม่เปลี่ยน'].map(v=>ch('rel2',v)).join('')}</div>
+      <div class="muted small">สาเหตุที่ความรู้สึกเปลี่ยน</div><div class="row" style="flex-wrap:wrap;gap:6px">${['ช่วยเหลือยามลำบาก','อยู่ด้วยกันนานขึ้น','เห็นด้านที่ไม่เคยเห็น','เป็นคนเดียวที่เข้าใจ','ความเสียสละ','เข้าใจผิดแล้วคลี่คลาย','ค่อยๆ ชินโดยไม่รู้ตัว'].map(v=>ch('why',v)).join('')}</div></div>`;}).join(''):'')
     +`<div class="muted small" style="margin-top:8px"><b>อื่นๆ ที่อยากเพิ่ม (ไม่บังคับ)</b></div><textarea data-profnote="${esc(n)}" placeholder="เช่น ชอบกินของหวาน กลัวความสูง มีแมวชื่อโมจิ">${esc(p.note||'')}</textarea>`;
    const done=Object.keys(p).filter(k=>p[k]&&(!Array.isArray(p[k])||p[k].length)).length;
    return det('pf|'+n,`${im?`<img src="${esc(im)}" alt="" style="width:34px;height:34px;object-fit:cover;object-position:top;border-radius:50%;vertical-align:middle;margin-right:6px">`:'👤 '}${esc(n)}<small>${done?`กรอกแล้ว ${done} ข้อ`:'ยังไม่กรอก'}</small>`,body);}).join('');}
 function profImg(n){const t=(HAND||[]).find(t=>t.kind==='char'&&t.image_id&&String(t.title||'').replace(/\s*\(.*\)\s*$/,'').trim()===n);return t?botU('/img/'+t.image_id):'';}
 async function profSave(n){try{await botApi('/api/vcastprofile',{act:'set',name:n,data:PROF[n]||{}});}catch(e){toast(botErr(e));}}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-prof]');if(!b||!PROF)return;const [n,f,v,m]=b.dataset.prof.split('|'),p=PROF[n]=PROF[n]||{};
-  if(f.startsWith('rel:')){const o=f.slice(4);p.rel=p.rel||{};p.rel[o]===v?delete p.rel[o]:p.rel[o]=v;}
+  const mm=f.match(/^(rel2?|why):(.*)$/);if(mm){const k=mm[1],o=mm[2];p[k]=p[k]||{};p[k][o]===v?delete p[k][o]:p[k][o]=v;}
   else if(m==='1'){const a=p[f]=p[f]||[],i=a.indexOf(v);i>=0?a.splice(i,1):a.push(v);}
   else p[f]===v?delete p[f]:p[f]=v;
   const y=window.scrollY;renderLib(true);window.scrollTo(0,y);await profSave(n);});
