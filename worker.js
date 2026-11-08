@@ -1285,34 +1285,56 @@ const CAST = {
   mouth: [['small gentle smile', 'ยิ้มเล็กอ่อนโยน'], ['soft pout', 'ปากเม้มงอนเบาๆ'], ['sharp confident smirk', 'ยิ้มมุมปากมั่นใจ'], ['thin neutral line', 'ปากเส้นตรงนิ่ง'], ['lips slightly parted, dazed', 'ปากเผยอเล็กน้อย เหม่อ'], ['bright open-mouth grin with small fangs', 'ยิ้มกว้างมีเขี้ยวเล็ก'], ['shy wobbly smile', 'ยิ้มเขินๆ สั่นนิดๆ'], ['tight clenched frown', 'ปากเม้มแน่น หน้าตึง']],
   aura: [['warm glowing sparkles around the character', 'ออร่าอบอุ่น ประกายระยิบ'], ['calm cool pale-blue aura', 'ออร่าเย็นสงบ โทนฟ้า'], ['dangerous dark aura with sharp shadows', 'ออร่าอันตราย เงาคม'], ['dreamy pastel haze and soft bloom', 'ออร่าฝันๆ หมอกพาสเทล'], ['elegant noble aura with soft rim light', 'ออร่าสง่าสูงศักดิ์ แสงขอบนุ่ม'], ['mysterious faint purple mist', 'ออร่าลึกลับ หมอกม่วงจางๆ'], ['sunny cheerful golden glow', 'ออร่าสดใส เรืองทอง'], ['quiet lonely moody atmosphere', 'ออร่าเงียบเหงา มีอารมณ์']],
   face: [['sweet', 'หวาน', 'sweet round soft face, big sparkling eyes, rosy cheeks'], ['sharp', 'เข้ม', 'sharp defined face, narrow intense eyes, strong brows'], ['gentle', 'อ่อนโยน', 'gentle kind face, soft droopy eyes, relaxed brows'], ['nerd', 'เด็กเนิร์ด', 'bookish face with glasses, slightly awkward earnest look, light freckles'], ['fierce', 'ดุ', 'fierce stern face, glaring upturned eyes, furrowed brows'], ['deadpan', 'หน้านิ่ง', 'deadpan expressionless face, flat half-lidded eyes'], ['dazed', 'หน้ามึน', 'blank dazed face, vacant spaced-out eyes, slightly open mouth'], ['elegant', 'สง่า เรียบหรู', 'mature elegant face, long lashes, composed refined gaze'], ['playful', 'ซนกวนๆ', 'mischievous face, teasing gaze, one raised brow'], ['tsundere', 'ปากแข็งใจอ่อน', 'flustered pouting face, blushing, eyes looking away']],
+  // ---- ช่วงอายุ 10–70 ปี (ไม่มี 18 เพื่อแยกวัยเด็ก/วัยรุ่นกับผู้ใหญ่ให้ชัด) น้ำหนักการสุ่ม ----
+  ageG: [['child', 10, 12, 0.9, 'เด็ก'], ['teen', 13, 17, 1.2, 'วัยรุ่น'], ['young', 19, 22, 1.6, 'วัยรุ่นตอนปลาย/นักศึกษา'], ['adult', 25, 33, 2, 'วัยทำงาน'], ['mid', 35, 45, 1.4, 'วัยกลางคน'], ['senior', 46, 55, 1, 'ผู้ใหญ่อาวุโส'], ['elder', 56, 70, 1, 'ผู้สูงวัย']],
+  bodyK: [['small slim childlike frame', 'ตัวเล็กผอมบางตามวัย'], ['sturdy active kid build', 'ตัวแน่น ซนคล่องแคล่ว'], ['lanky growing frame with long limbs', 'โตเร็ว แขนขายาวเก้งก้าง'], ['soft round cheeks and a chubby cute build', 'แก้มกลม ตัวนุ่มน่ารัก'], ['average healthy build for the age', 'สมส่วนตามวัย']],
+  bodyMid: [['mature balanced figure', 'หุ่นสมส่วนแบบผู้ใหญ่'], ['broad sturdy mature build', 'ตัวหนา แข็งแรง'], ['slim refined mature build', 'ผอมเพรียวดูดี'], ['soft comfortable build with a gentle belly', 'หุ่นนุ่มมีพุงนิดๆ'], ['tall lean mature build', 'สูงเพรียวแบบผู้ใหญ่'], ['fit toned mature build', 'หุ่นฟิตกระชับ']],
+  bodyE: [['slim elderly build with a slight stoop', 'ผอมเพรียว หลังค่อมเล็กน้อย'], ['sturdy elderly build, still strong', 'ตัวแน่น แข็งแรงตามวัย'], ['plump kindly elderly build', 'อวบอบอุ่นใจดี'], ['tall lean elderly build, upright posture', 'สูงเพรียว หลังตรง'], ['small frail-looking elderly build', 'ตัวเล็กบอบบาง']],
+  hcE: [['silver gray', 'เทาเงิน'], ['white', 'ขาว'], ['salt-and-pepper gray', 'หงอกแซมดำ'], ['gray', 'เทา']],
   nameF: ['มิว', 'ใบเตย', 'พิม', 'น้ำหวาน', 'ฟ้าใส', 'ข้าวหอม', 'ปลายฝน', 'มายด์', 'เอิง', 'ญาญ่า', 'แพรวา', 'ไอซ์', 'จูน', 'ลูกพีช', 'เมษา'],
   nameM: ['ภูมิ', 'ต้นกล้า', 'ไนท์', 'เจ', 'ซัน', 'ธาม', 'คิน', 'ปั้น', 'ไท', 'เรน'],
 };
 const pick = (a, r) => a[Math.floor(r() * a.length)];
 function rng(seed) { let x = seed >>> 0 || 1; return () => ((x = (x * 1664525 + 1013904223) >>> 0) / 4294967296); }
+function castHeight(f, a, r) { // ส่วนสูง (ซม.) เฉลี่ยตามวัยและเพศ แล้วสุ่มเบี่ยง ±6
+  const M = [138, 144, 150, 156, 162, 167, 170, 172], F = [138, 145, 152, 157, 159, 160, 161, 161]; // อายุ 10..17
+  let base;
+  if (a <= 17) base = (f ? F : M)[Math.max(0, a - 10)] - 0; // 10→index 0
+  else if (a <= 45) base = f ? 161 : 173; else if (a <= 55) base = f ? 160 : 172; else if (a <= 65) base = f ? 158 : 170; else base = f ? 156 : 168;
+  const h = Math.round(base + (r() * 12 - 6)), d = h - base;
+  return [h, d >= 4 ? 'สูงกว่าเพื่อนวัยเดียวกัน' : d <= -4 ? 'เตี้ยกว่าเพื่อนวัยเดียวกัน' : 'ส่วนสูงปกติตามวัย', d >= 4 ? 'taller than most people of the same age' : d <= -4 ? 'shorter than most people of the same age' : 'average height for the age'];
+}
+const MINOR_BAN = /ออกเดต|ไอดอล|โกธิก|ไซเบอร์พังก์|คาเฟ่/;
 function castMake(r, style) {
   const tot = CAST.g.reduce((a, b) => a + b[2], 0); let t = r() * tot, g = CAST.g[0];
   for (const x of CAST.g) { if ((t -= x[2]) < 0) { g = x; break; } }
-  const f = g[0] === 'f', age = pick(CAST.age, r), hc = pick(CAST.hc, r), eye = pick(CAST.eye, r),
+  const f = g[0] === 'f';
+  // เลือกช่วงวัยตามน้ำหนัก แล้วสุ่มอายุจริงในช่วง
+  const gt = CAST.ageG.reduce((a, x) => a + x[3], 0); let tt = r() * gt, grp = CAST.ageG[0];
+  for (const x of CAST.ageG) { if ((tt -= x[3]) < 0) { grp = x; break; } }
+  const ageN = grp[1] + Math.floor(r() * (grp[2] - grp[1] + 1)), minor = ageN < 18, elder = ageN >= 56;
+  const hc = elder ? pick(CAST.hcE, r) : pick(CAST.hc, r), eye = pick(CAST.eye, r),
     vibe = pick(CAST.vibe, r), acc = pick(CAST.acc, r), name = pick(f ? CAST.nameF : CAST.nameM, r),
-    body = pick(f ? CAST.bodyF : CAST.bodyM, r), mouth = pick(CAST.mouth, r), aura = pick(CAST.aura, r), face = pick(CAST.face, r);
+    body = minor ? pick(CAST.bodyK, r) : elder ? pick(CAST.bodyE, r) : ageN >= 35 ? pick(CAST.bodyMid, r) : pick(f ? CAST.bodyF : CAST.bodyM, r),
+    mouth = pick(CAST.mouth, r), aura = pick(CAST.aura, r), face = pick(CAST.face, r), ht = castHeight(f, ageN, r);
   const U = castMake.used || (castMake.used = { cos: new Set(), look: new Set() });
-  // ทรงผม+สีผม ไม่ซ้ำกับที่เคยแคสต์ (ลองสูงสุด 20 ครั้ง)
   let hair = pick(f ? CAST.hairF : CAST.hairM, r), hcc = hc;
-  for (let k = 0; k < 20 && U.look.has(hair[0] + '|' + hcc[0]); k++) { hair = pick(f ? CAST.hairF : CAST.hairM, r); hcc = pick(CAST.hc, r); }
+  for (let k = 0; k < 20 && U.look.has(hair[0] + '|' + hcc[0]); k++) { hair = pick(f ? CAST.hairF : CAST.hairM, r); hcc = elder ? pick(CAST.hcE, r) : pick(CAST.hc, r); }
   U.look.add(hair[0] + '|' + hcc[0]);
-  const arch = pick(IDEAS.char, r);
-  // ชุดไม่ซ้ำ: เลือกจากชุดที่ยังไม่เคยใช้ ถ้าใช้ครบทั้งคลังค่อยเริ่มรอบใหม่
-  let pool = IDEAS.costume.filter(c => !U.cos.has(c.id));
-  if (!pool.length) { U.cos.clear(); pool = IDEAS.costume.slice(); }
-  let cos = pick(pool, r);
-  for (let k = 0; k < 12 && /นักเรียน/.test(cos.n); k++) cos = pick(pool, r); // ผู้ใหญ่ 19+ เท่านั้น ไม่ใช้ชุดนักเรียน
-  U.cos.add(cos.id);
+  let arch = pick(IDEAS.char, r);
+  for (let k = 0; k < 15 && ageN > 22 && /นักเรียน|เด็ก/.test(arch.n); k++) arch = pick(IDEAS.char, r); // บทนักเรียนเฉพาะอายุ ≤ 22
+  // ชุดไม่ซ้ำ + เหมาะวัย: เด็ก/วัยรุ่นตัดชุดออกเดต/ไอดอล/โกธิก/ไซเบอร์พังก์/คาเฟ่ · ชุดนักเรียนเฉพาะอายุ ≤ 22
+  const okCos = c => (!minor || !MINOR_BAN.test(c.n)) && (ageN <= 22 || !/นักเรียน/.test(c.n));
+  let pool = IDEAS.costume.filter(c => okCos(c) && !U.cos.has(c.id));
+  if (!pool.length) { for (const c of IDEAS.costume) U.cos.delete(c.id); pool = IDEAS.costume.filter(okCos); }
+  const cos = pick(pool, r); U.cos.add(cos.id);
   const out = [cos.e, `${cos.n} (${cos.id})`];
-  const who = f ? 'adult woman' : 'adult man';
+  const who = minor ? (ageN <= 12 ? (f ? 'young girl' : 'young boy') : (f ? 'teenage girl' : 'teenage boy')) : elder ? (f ? 'elderly woman' : 'elderly man') : (f ? 'woman' : 'man');
   const real = style === 'real';
-  const prompt = `${real ? 'photorealistic full body photo' : 'full body anime character design'} of an original ${who} as a ${arch.e}, ${age[0]} years old adult, ${hcc[0]} ${hair[0]}, ${eye[0]} eyes, ${face[2]}, ${mouth[0]}, ${vibe[2]}, ${vibe[0]} personality, ${body[0]}, ${aura[0]}, wearing ${out[0]}${acc[0] ? ', ' + acc[0] : ''}, fully clothed, tasteful, standing in a relaxed natural pose, front view, plain light gray studio background, ${real ? 'soft studio lighting, 50mm photo' : 'clean lineart, soft cel shading, high quality anime illustration'}, vertical 9:16`;
-  const desc = `${arch.id} ${arch.n} · ${g[1]} ${age[0]} ปี · หุ่น: ${body[1]} · หน้า: ${face[1]} · ผม${hcc[1]} ${hair[1]} · ตา${eye[1]} · ปาก: ${mouth[1]} · ออร่า: ${aura[1]} · ${out[1]}${acc[1] ? ' · ' + acc[1] : ''} · นิสัย${vibe[1]}`;
+  const ageTxt = elder ? `${ageN} years old, elderly, gentle wrinkles and laugh lines` : ageN >= 46 ? `${ageN} years old, mature, subtle age lines` : ageN >= 35 ? `${ageN} years old, mature adult` : minor ? `${ageN} years old, age-appropriate childlike proportions` : `${ageN} years old adult`;
+  const safe = minor ? 'wholesome, age-appropriate, modest everyday clothing, fully covered' : 'fully clothed, tasteful';
+  const prompt = `${real ? 'photorealistic full body photo' : 'full body anime character design'} of an original ${who} as a ${arch.e}, ${ageTxt}, about ${ht[0]} cm tall, ${ht[2]}, ${hcc[0]} ${hair[0]}, ${eye[0]} eyes, ${face[2]}, ${mouth[0]}, ${vibe[2]}, ${vibe[0]} personality, ${body[0]}, ${aura[0]}, wearing ${out[0]}${acc[0] ? ', ' + acc[0] : ''}, ${safe}, standing in a relaxed natural pose, front view, plain light gray studio background, ${real ? 'soft studio lighting, 50mm photo' : 'clean lineart, soft cel shading, high quality anime illustration'}, vertical 9:16`;
+  const desc = `${arch.id} ${arch.n} · ${g[1]} ${ageN} ปี (${grp[4]}) · สูง ${ht[0]} ซม. ${ht[1]} · หุ่น: ${body[1]} · หน้า: ${face[1]} · ผม${hcc[1]} ${hair[1]} · ตา${eye[1]} · ปาก: ${mouth[1]} · ออร่า: ${aura[1]} · ${out[1]}${acc[1] ? ' · ' + acc[1] : ''} · นิสัย${vibe[1]}`;
   return { name, desc, prompt };
 }
 const CAST2 = {
