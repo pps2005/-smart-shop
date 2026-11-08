@@ -1167,10 +1167,22 @@ def heal(port, err):
     log("🔧 ซ่อมอัตโนมัติ (การ์ด %d): ล้างหน่วยความจำแล้วลองงานเดิมอีกครั้ง" % (port - 8187))
 
 
+def claim_wait(stat):
+    # การ์ดว่าง: รองานใหม่ระหว่างที่การ์ดอื่นยังทำงานอยู่ (สูงสุด 15 นาที) แทนที่จะปิดทิ้ง ให้ใช้การ์ดคู่ได้เต็ม
+    job = J("/k/claim").get("job")
+    waited = 0
+    while not job and waited < 900 and stat.get("busy", 0) > 0 and time.time() - T0 < MAXH * 3600:
+        time.sleep(45)
+        waited += 45
+        job = J("/k/claim").get("job")
+    return job
+
+
 def worker(port, first, stat):
-    job = first
+    job = first if first else (claim_wait(stat) if port else None)
     healed = None
     while job:
+        stat["busy"] = stat.get("busy", 0) + 1
         try:
             mp4, sec, W, H = work(job, port)
             data = open(mp4, "rb").read()
@@ -1183,6 +1195,7 @@ def worker(port, first, stat):
             if port and healed != job["id"]:  # ซ่อมแล้วลองใหม่ในเครื่องก่อน 1 ครั้ง
                 healed = job["id"]
                 heal(port, str(e))
+                stat["busy"] -= 1
                 continue
             try:
                 J("/k/fail/%s" % job["id"], {"error": str(e)[:500]})
@@ -1192,11 +1205,13 @@ def worker(port, first, stat):
                 urllib.request.urlopen("http://127.0.0.1:%d/system_stats" % port, timeout=10).read()
             except Exception:
                 log("การ์ด %d หยุดทำงาน การ์ดที่เหลือทำต่อ" % (port - 8187))
+                stat["busy"] -= 1
                 return
+        stat["busy"] = stat.get("busy", 1) - 1
         if time.time() - T0 > MAXH * 3600:
             log("ใกล้หมดเวลารอบนี้ จะเริ่มรอบใหม่ให้เอง")
             return
-        job = J("/k/claim").get("job")
+        job = claim_wait(stat) if port else J("/k/claim").get("job")
 
 
 def main():
@@ -1219,7 +1234,7 @@ def main():
         raise
     th = [threading.Thread(target=worker, args=(PORTS[0], job, stat))]
     for port in PORTS[1:]:
-        th.append(threading.Thread(target=lambda p=port: worker(p, J("/k/claim").get("job"), stat)))
+        th.append(threading.Thread(target=lambda p=port: worker(p, None, stat)))
     for t in th:
         t.start()
         time.sleep(90)  # ให้การ์ดแรกโหลดโมเดล/RIFE ก่อน ไม่แย่งกัน
