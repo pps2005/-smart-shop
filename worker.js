@@ -174,7 +174,6 @@ async function audApi(env, b) {
       const cid = ins.meta.last_row_id, proj = `ออดิชัน·${R.key}·${cid}·${name}`;
       const sty = '[[STYLE]], original adult character, no text, no watermark'; // ผู้ใช้ชอบลายเส้นนุ่ม ละเอียด (แบบภาพสาวถือแก้วกาแฟ)
       st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,1,?,'queued',?,4)").bind(jid--, proj, `character design, full body standing front view, ${look}, wearing ${R.outfit}, personality: ${tr.join(', ')}, softly blurred simple pastel background, ${sty}`.slice(0, 2000), Date.now()));
-      st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,2,?,'queued',?,4)").bind(jid--, proj, `anime key frame, medium shot, ${look}, wearing ${R.outfit}, ${R.shot}, cinematic lighting, ${sty}`.slice(0, 2000), Date.now()));
     }
     await env.DB.batch(st);
     return { ok: true, added: n };
