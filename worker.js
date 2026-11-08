@@ -138,6 +138,7 @@ const AUD = {
   names_m: ['เร็นจิ', 'ไคโตะ', 'ฮารุ', 'โซรา', 'ยูโตะ', 'ทาคุมิ', 'ริคุ', 'เคนจิ', 'โทมะ', 'ชิน', 'อิซึมิ', 'ซึบาสะ'],
 };
 const pk = (r, a) => a[Math.floor(r() * a.length)];
+const TR_EN = { 'เงียบ': 'quiet', 'ลึกลับ': 'mysterious', 'เย็นชา': 'aloof', 'ขี้อายลึกๆ': 'secretly shy', 'ดื้อ': 'stubborn', 'มุ่งมั่น': 'determined', 'ขี้เหงา': 'lonely', 'ร่าเริง': 'cheerful', 'เสียงดัง': 'loud', 'ใจดี': 'kind', 'ขี้กลัว': 'timid', 'ซุ่มซ่าม': 'clumsy', 'จริงใจ': 'sincere', 'มีความลับ': 'secretive', 'สุขุม': 'calm', 'ฉลาด': 'clever', 'สุภาพ': 'polite', 'จริงจัง': 'serious', 'ช่างสังเกต': 'observant', 'เก็บความรู้สึก': 'reserved', 'ขี้อาย': 'shy', 'ขี้ตกใจ': 'easily startled', 'อบอุ่น': 'warm', 'พูดตรง': 'blunt', 'ขี้เล่น': 'playful', 'เจ้าเล่ห์': 'sly', 'ใจดีแบบแปลกๆ': 'oddly kind', 'มีอดีต': 'with a hidden past' };
 function audIntro(name, tr) {
   const L = { 'เงียบ': 'ฉันพูดไม่เก่ง แต่จะแสดงให้ดูค่ะ', 'ร่าเริง': 'สวัสดีครับ! ผมเล่นได้ทุกฉากเลย จริงๆ นะ!', 'สุขุม': 'ผมอ่านบทครบทุกหน้าแล้วครับ', 'ขี้อาย': 'ข-ขอโทษค่ะ ตื่นเต้นนิดหน่อย…', 'ขี้เล่น': 'บทนี้ตั้งใจเขียนมาให้ผมเลยใช่ไหม?', 'ลึกลับ': 'บทนี้… ฉันรู้จักเขาดีกว่าที่คุณคิด', 'เจ้าเล่ห์': 'ลองให้ผมเล่นสักฉาก แล้วคุณจะไม่ลืม', 'ดื้อ': 'ถ้าไม่ให้บทนี้ ฉันจะมาอีกพรุ่งนี้', 'ใจดี': 'ยินดีที่ได้รู้จักนะคะ ฝากตัวด้วย', 'จริงจัง': 'ผมพร้อมเริ่มเมื่อคุณพร้อมครับ' };
   for (const t of tr) if (L[t]) return L[t];
@@ -173,7 +174,7 @@ async function audApi(env, b) {
       const ins = await env.DB.prepare('INSERT INTO aud_cands (role,name,age,traits,intro,look,created) VALUES (?,?,?,?,?,?,?)').bind(R.key, name, age, tr.join(','), audIntro(name, tr), look, Date.now()).run();
       const cid = ins.meta.last_row_id, proj = `ออดิชัน·${R.key}·${cid}·${name}`;
       const sty = '[[STYLE]], original adult character, no text, no watermark'; // ผู้ใช้ชอบลายเส้นนุ่ม ละเอียด (แบบภาพสาวถือแก้วกาแฟ)
-      st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,1,?,'queued',?,4)").bind(jid--, proj, `anime illustration, three-quarter body shot with the face and outfit clearly visible, ${look}, wearing ${R.outfit}, ${R.shot}, personality: ${tr.join(', ')}, cinematic warm lighting, detailed background, ${sty}`.slice(0, 2000), Date.now()));
+      st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,1,?,'queued',?,4)").bind(jid--, proj, `anime illustration, three-quarter body shot with the face and outfit clearly visible, ${look}, wearing ${R.outfit}, ${R.shot}, personality: ${tr.map(t => TR_EN[t] || '').filter(Boolean).join(', ')}, cinematic warm lighting, detailed background, ${sty}`.slice(0, 2000), Date.now()));
     }
     await env.DB.batch(st);
     return { ok: true, added: n };
@@ -326,7 +327,8 @@ async function getState(env) {
   const im = await env.DB.prepare('SELECT id,project,scene,prompt,starred,created FROM images ORDER BY project, scene, id').all();
   const n = await env.DB.prepare('SELECT id,msg,created FROM notices ORDER BY id DESC LIMIT 20').all();
   const safe = {}; for (const k in s) if (!/key|token|secret|pass/i.test(k)) safe[k] = s[k]; // ไม่ส่งรหัส/token ไปที่เบราว์เซอร์
-  return { settings: safe, jobs: q.results, images: im.results, notices: n.results, now: Date.now(), hasPassword: !!env.PASSWORD };
+  const fk = (await env.DB.prepare('SELECT name,on_,paused_until,n,day FROM fluxkeys').all().catch(() => ({ results: [] }))).results;
+  return { settings: safe, jobs: q.results, images: im.results, notices: n.results, now: Date.now(), hasPassword: !!env.PASSWORD, helpers: fk.filter(k => +k.on_).map(k => ({ name: k.name, ready: +k.paused_until < Date.now(), n: +k.n || 0, day: k.day })) };
 }
 
 async function getImage(env, id) {

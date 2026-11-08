@@ -714,7 +714,7 @@ function botParts0(st){const S=BOT.s;
   if(!S){st.innerHTML='<p class="muted" style="margin:0">กำลังเชื่อมบอท…</p>';return;}
   const s=S.settings,qd=S.jobs.filter(j=>j.status!=='failed').length,fail=S.jobs.length-qd,paused=S.now<+s.paused_until;
   const si_=(()=>{try{return JSON.parse(s.slot_info||'null');}catch(e){return null;}})(),slotFull=s.pace!=='0'&&si_&&si_.n>=si_.budget;
-  const line=slotFull&&qd&&!paused?`🕒 ช่วงนี้ทำครบ ${si_.budget} ภาพแล้ว · ช่วงถัดไป ${tTH(si_.next)} (เหลือรอ ${qd} ภาพ)`:paused?`⏸ พักอยู่ (โควตาฟรีวันนี้หมด) · ทำต่อเองประมาณ ${tTH(s.paused_until)}`:qd?`▶️ กำลังทำงาน · เหลือ ${qd} ภาพ · ภาพถัดไปประมาณ ${tTH(Math.max(S.now,+s.last_run+s.interval_min*60000))}`:'✅ คิวว่าง';
+  const line=slotFull&&qd&&!paused?`🕒 ช่วงนี้ทำครบ ${si_.budget} ภาพแล้ว · ช่วงถัดไป ${tTH(si_.next)} (เหลือรอ ${qd} ภาพ)`:paused&&(S.helpers||[]).some(h=>h.ready)?`▶️ โควตาเราวันนี้หมด กำลังใช้โควตาผู้ช่วย ${esc((S.helpers||[]).filter(h=>h.ready).map(h=>h.name).join(', '))} · เหลือ ${qd} ภาพ`:paused?`⏸ พักอยู่ (โควตาฟรีวันนี้หมด) · ทำต่อเองประมาณ ${tTH(s.paused_until)}`:qd?`▶️ กำลังทำงาน · เหลือ ${qd} ภาพ · ภาพถัดไปประมาณ ${tTH(Math.max(S.now,+s.last_run+s.interval_min*60000))}`:'✅ คิวว่าง';
   st.innerHTML=`<div class="row"><h3 style="margin-right:auto">🎨 บอทเจนภาพ</h3><span class="chip"><span class="dot"></span>${S.images.length} ภาพในคลัง</span></div>
     <div>${line}${fail?` · <span style="color:var(--red)">พัง ${fail}</span>`:''}${S.hasPassword?'':' · <span style="color:var(--you)">⚠️ บอทยังไม่ได้ตั้งรหัสผ่าน</span>'}</div>
     ${kLine()}
