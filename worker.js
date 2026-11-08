@@ -1328,7 +1328,7 @@ function castMake2(cat, r, style) {
     used.add(sc.n);
     return { name: sc.n, desc: `#${sc.i} ${sc.c} · ${sc.m} · เหมาะกับ ${sc.g}`, prompt: `${sc.e}, detailed anime background art, no people, ${tail}` }; }
   const it = pick(r() < 0.5 ? IDEAS.prop : IDEAS.element, r);
-  return { name: it.n, desc: `${it.id} · ${it.d} · เหมาะกับ${it.fit}`, prompt: `a ${it.e}, single object design, centered, plain soft background, ${tail}` };
+  return { name: it.n, desc: `${it.id} · ${it.d} · เหมาะกับ${it.fit}`, prompt: `a ${it.e}, single object design, centered, plain soft background, the item alone as a product design sheet, laid flat or floating, not worn, no person, no face, no head, no body, no hands, no mannequin, ${tail}` };
 }
 
 // ---------- คลังเสียง: เพลงบรรเลง (ACE-Step) + เสียงประกอบ (Stable Audio Open) ----------
@@ -1377,7 +1377,7 @@ const LIB_TAIL = '[[STYLE]], high quality';
 const LIBD = [
   ['ฉาก', () => SCENES, it => `${it.e}, no people, detailed anime background art, cinematic lighting, ${LIB_TAIL}`],
   ['สัตว์และอสูร', () => IDEAS.creature, it => `a ${it.e}, full body, creature design, front view, plain soft background, ${LIB_TAIL}`],
-  ['ของประกอบ', () => IDEAS.prop, it => `a ${it.e}, single object design, centered, plain soft background, ${LIB_TAIL}`],
+  ['ของประกอบ', () => IDEAS.prop, it => `a ${it.e}, single object design, centered, plain soft background, the item alone as a product design sheet, laid flat or floating, not worn, no person, no face, no head, no body, no hands, no mannequin, ${LIB_TAIL}`],
   ['ชุด', () => IDEAS.costume, it => `${it.e} outfit displayed on a faceless mannequin, fashion design sheet, front and back view, plain soft background, ${LIB_TAIL}`],
   ['องค์ประกอบฉาก', () => IDEAS.element, it => `a ${it.e}, environment element design, no people, ${LIB_TAIL}`],
   ['อาวุธ', () => WORLD.weapon, it => `a ${it.e}, weapon design, single object, centered, plain soft background, ${LIB_TAIL}`],
