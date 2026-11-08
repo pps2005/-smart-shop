@@ -1271,14 +1271,20 @@ main()
 const CAST = {
   g: [['f', 'หญิง', 7], ['m', 'ชาย', 3]],
   age: [[19, 'วัยรุ่นตอนปลาย'], [22, 'นักศึกษา'], [25, 'วัยทำงานตอนต้น'], [28, 'วัยทำงาน'], [33, 'ผู้ใหญ่']],
-  hairF: [['short wavy bob', 'ผมบ็อบหยักศก'], ['long straight hair with blunt bangs', 'ผมยาวตรงหน้าม้าตัดตรง'], ['high ponytail', 'ผมหางม้าสูง'], ['low twin braids', 'ผมเปียคู่ต่ำ'], ['messy bun with loose strands', 'ผมมวยหลวมๆ'], ['long layered hair with wispy bangs', 'ผมยาวไล่เลเยอร์หน้าม้าบาง'], ['short pixie cut', 'ผมสั้นพิกซี่'], ['half-up hair with a ribbon', 'ผมมัดครึ่งหัวผูกโบว์']],
-  hairM: [['messy short hair with bangs', 'ผมสั้นยุ่งมีหน้าม้า'], ['spiky hair', 'ผมชี้ฟู'], ['slicked back hair', 'ผมเสยหลัง'], ['wolf cut', 'ผมทรงวูล์ฟคัต'], ['short undercut', 'ผมอันเดอร์คัต'], ['shoulder-length tied hair', 'ผมยาวประบ่ามัดจุก']],
+  hairF: [['short wavy bob', 'ผมบ็อบหยักศก'], ['long straight hair with blunt bangs', 'ผมยาวตรงหน้าม้าตัดตรง'], ['high ponytail', 'ผมหางม้าสูง'], ['low twin braids', 'ผมเปียคู่ต่ำ'], ['messy bun with loose strands', 'ผมมวยหลวมๆ'], ['long layered hair with wispy bangs', 'ผมยาวไล่เลเยอร์หน้าม้าบาง'], ['short pixie cut', 'ผมสั้นพิกซี่'], ['half-up hair with a ribbon', 'ผมมัดครึ่งหัวผูกโบว์'], ['long twin tails', 'ผมทวินเทลยาว'], ['side ponytail over the shoulder', 'ผมหางม้าข้างพาดไหล่'], ['hime cut with long side locks', 'ผมทรงฮิเมะ'], ['curly shoulder-length hair', 'ผมหยิกประบ่า'], ['long wavy hair with a side braid', 'ผมยาวลอนมีเปียข้าง'], ['asymmetrical bob with an undercolor', 'ผมบ็อบเฉียงไฮไลต์สีด้านใน']],
+  hairM: [['messy short hair with bangs', 'ผมสั้นยุ่งมีหน้าม้า'], ['spiky hair', 'ผมชี้ฟู'], ['slicked back hair', 'ผมเสยหลัง'], ['wolf cut', 'ผมทรงวูล์ฟคัต'], ['short undercut', 'ผมอันเดอร์คัต'], ['shoulder-length tied hair', 'ผมยาวประบ่ามัดจุก'], ['curly textured hair', 'ผมหยิกเท็กซ์เจอร์'], ['long loose hair with a center part', 'ผมยาวสยายแสกกลาง'], ['buzz-cut sides with a fringe top', 'ผมข้างสั้นเกรียนด้านบนมีหน้าม้า'], ['messy man bun', 'ผมมวยยุ่งๆ']],
   hc: [['black', 'ดำ'], ['dark brown', 'น้ำตาลเข้ม'], ['chestnut', 'น้ำตาลเกาลัด'], ['ash blonde', 'บลอนด์หม่น'], ['pastel pink', 'ชมพูพาสเทล'], ['navy blue', 'น้ำเงินกรมท่า'], ['white', 'ขาว'], ['copper red', 'แดงทองแดง'], ['lavender', 'ม่วงลาเวนเดอร์']],
   eye: [['amber', 'อำพัน'], ['emerald green', 'เขียวมรกต'], ['sky blue', 'ฟ้า'], ['violet', 'ม่วง'], ['dark brown', 'น้ำตาลเข้ม'], ['crimson', 'แดง'], ['gray', 'เทา']],
   outF: [['oversized hoodie and pleated skirt', 'ฮู้ดดี้ตัวใหญ่กับกระโปรงพลีท'], ['denim jacket over a sundress', 'แจ็กเก็ตยีนส์ทับเดรส'], ['office blouse and slacks', 'เสื้อเชิ้ตทำงานกับกางเกงสแล็ก'], ['cafe apron uniform', 'ชุดพนักงานร้านกาแฟมีผ้ากันเปื้อน'], ['sporty track jacket and shorts', 'แจ็กเก็ตกีฬากับกางเกงขาสั้น'], ['long coat and scarf', 'โค้ทยาวกับผ้าพันคอ'], ['cardigan and long skirt', 'คาร์ดิแกนกับกระโปรงยาว'], ['leather jacket and jeans', 'แจ็กเก็ตหนังกับยีนส์']],
   outM: [['white shirt and slacks', 'เสื้อเชิ้ตขาวกับกางเกงสแล็ก'], ['hoodie and cargo pants', 'ฮู้ดดี้กับกางเกงคาร์โก'], ['denim jacket and t-shirt', 'แจ็กเก็ตยีนส์กับเสื้อยืด'], ['chef jacket', 'ชุดเชฟ'], ['racing jacket', 'แจ็กเก็ตแข่งรถ'], ['knit sweater and coat', 'สเวตเตอร์ไหมพรมกับโค้ท']],
   vibe: [['cheerful energetic', 'ร่าเริง พลังเยอะ', 'big bright smile'], ['cool and aloof', 'นิ่ง เท่ เย็นชา', 'calm cool expression'], ['shy and gentle', 'ขี้อาย อ่อนโยน', 'shy soft smile'], ['clumsy and funny', 'โก๊ะ ตลก', 'goofy surprised expression'], ['confident leader', 'มั่นใจ เป็นผู้นำ', 'confident smirk'], ['mysterious', 'ลึกลับ', 'mysterious half smile'], ['sleepy and lazy', 'ขี้เกียจ ง่วงตลอด', 'sleepy half-lidded eyes']],
   acc: [['', ''], ['', ''], ['round glasses', 'แว่นกลม'], ['hair clip', 'กิ๊บติดผม'], ['headphones around the neck', 'หูฟังคล้องคอ'], ['small earrings', 'ต่างหูเล็ก'], ['choker', 'โชกเกอร์'], ['beanie', 'หมวกไหมพรม']],
+  // ---- มิติออดิชัน: หุ่น / ปาก / ออร่า / แนวหน้าตา (ทุกตัวเป็นผู้ใหญ่ 19+) ----
+  bodyF: [['curvy hourglass figure with a full bust and slim waist', 'หุ่นนาฬิกาทราย อกอวบ เอวคอด'], ['slim elegant model figure, long legs, modest bust', 'หุ่นเพรียวสูงแบบนางแบบ ขายาว'], ['petite cute figure with a soft small frame', 'ตัวเล็กน่ารัก โครงเล็ก'], ['athletic toned figure with defined abs and a firm bust', 'หุ่นนักกีฬา กล้ามท้องเบาๆ'], ['soft plump figure with a generous bust and gentle curves', 'หุ่นอวบนุ่ม อกใหญ่ สัดส่วนโค้งมน'], ['tall strong figure with broad shoulders and long legs', 'สูงแข็งแรง ไหล่กว้าง ขายาว'], ['balanced average figure with a natural bust', 'หุ่นสมส่วนธรรมชาติ']],
+  bodyM: [['muscular bodybuilder physique with broad chest and thick arms', 'กล้ามใหญ่ อกกว้าง แขนหนา'], ['lean athletic swimmer build with defined abs', 'หุ่นนักว่ายน้ำ ซิกแพ็ก'], ['tall slim elegant build with long limbs', 'สูงเพรียวสง่า แขนขายาว'], ['broad-shouldered sturdy build', 'ไหล่กว้าง ตัวแน่น'], ['wiry runner build, lean muscle', 'หุ่นนักวิ่ง กล้ามเรียว'], ['soft cuddly build with a gentle frame', 'หุ่นนุ่มนิ่ม ท่าทางอบอุ่น'], ['bulky strong build with thick thighs and shoulders', 'หุ่นบึกบึน ต้นขา ไหล่หนา']],
+  mouth: [['small gentle smile', 'ยิ้มเล็กอ่อนโยน'], ['soft pout', 'ปากเม้มงอนเบาๆ'], ['sharp confident smirk', 'ยิ้มมุมปากมั่นใจ'], ['thin neutral line', 'ปากเส้นตรงนิ่ง'], ['lips slightly parted, dazed', 'ปากเผยอเล็กน้อย เหม่อ'], ['bright open-mouth grin with small fangs', 'ยิ้มกว้างมีเขี้ยวเล็ก'], ['shy wobbly smile', 'ยิ้มเขินๆ สั่นนิดๆ'], ['tight clenched frown', 'ปากเม้มแน่น หน้าตึง']],
+  aura: [['warm glowing sparkles around the character', 'ออร่าอบอุ่น ประกายระยิบ'], ['calm cool pale-blue aura', 'ออร่าเย็นสงบ โทนฟ้า'], ['dangerous dark aura with sharp shadows', 'ออร่าอันตราย เงาคม'], ['dreamy pastel haze and soft bloom', 'ออร่าฝันๆ หมอกพาสเทล'], ['elegant noble aura with soft rim light', 'ออร่าสง่าสูงศักดิ์ แสงขอบนุ่ม'], ['mysterious faint purple mist', 'ออร่าลึกลับ หมอกม่วงจางๆ'], ['sunny cheerful golden glow', 'ออร่าสดใส เรืองทอง'], ['quiet lonely moody atmosphere', 'ออร่าเงียบเหงา มีอารมณ์']],
+  face: [['sweet', 'หวาน', 'sweet round soft face, big sparkling eyes, rosy cheeks'], ['sharp', 'เข้ม', 'sharp defined face, narrow intense eyes, strong brows'], ['gentle', 'อ่อนโยน', 'gentle kind face, soft droopy eyes, relaxed brows'], ['nerd', 'เด็กเนิร์ด', 'bookish face with glasses, slightly awkward earnest look, light freckles'], ['fierce', 'ดุ', 'fierce stern face, glaring upturned eyes, furrowed brows'], ['deadpan', 'หน้านิ่ง', 'deadpan expressionless face, flat half-lidded eyes'], ['dazed', 'หน้ามึน', 'blank dazed face, vacant spaced-out eyes, slightly open mouth'], ['elegant', 'สง่า เรียบหรู', 'mature elegant face, long lashes, composed refined gaze'], ['playful', 'ซนกวนๆ', 'mischievous face, teasing gaze, one raised brow'], ['tsundere', 'ปากแข็งใจอ่อน', 'flustered pouting face, blushing, eyes looking away']],
   nameF: ['มิว', 'ใบเตย', 'พิม', 'น้ำหวาน', 'ฟ้าใส', 'ข้าวหอม', 'ปลายฝน', 'มายด์', 'เอิง', 'ญาญ่า', 'แพรวา', 'ไอซ์', 'จูน', 'ลูกพีช', 'เมษา'],
   nameM: ['ภูมิ', 'ต้นกล้า', 'ไนท์', 'เจ', 'ซัน', 'ธาม', 'คิน', 'ปั้น', 'ไท', 'เรน'],
 };
@@ -1287,16 +1293,26 @@ function rng(seed) { let x = seed >>> 0 || 1; return () => ((x = (x * 1664525 + 
 function castMake(r, style) {
   const tot = CAST.g.reduce((a, b) => a + b[2], 0); let t = r() * tot, g = CAST.g[0];
   for (const x of CAST.g) { if ((t -= x[2]) < 0) { g = x; break; } }
-  const f = g[0] === 'f', age = pick(CAST.age, r), hair = pick(f ? CAST.hairF : CAST.hairM, r), hc = pick(CAST.hc, r), eye = pick(CAST.eye, r),
-    vibe = pick(CAST.vibe, r), acc = pick(CAST.acc, r), name = pick(f ? CAST.nameF : CAST.nameM, r);
+  const f = g[0] === 'f', age = pick(CAST.age, r), hc = pick(CAST.hc, r), eye = pick(CAST.eye, r),
+    vibe = pick(CAST.vibe, r), acc = pick(CAST.acc, r), name = pick(f ? CAST.nameF : CAST.nameM, r),
+    body = pick(f ? CAST.bodyF : CAST.bodyM, r), mouth = pick(CAST.mouth, r), aura = pick(CAST.aura, r), face = pick(CAST.face, r);
+  const U = castMake.used || (castMake.used = { cos: new Set(), look: new Set() });
+  // ทรงผม+สีผม ไม่ซ้ำกับที่เคยแคสต์ (ลองสูงสุด 20 ครั้ง)
+  let hair = pick(f ? CAST.hairF : CAST.hairM, r), hcc = hc;
+  for (let k = 0; k < 20 && U.look.has(hair[0] + '|' + hcc[0]); k++) { hair = pick(f ? CAST.hairF : CAST.hairM, r); hcc = pick(CAST.hc, r); }
+  U.look.add(hair[0] + '|' + hcc[0]);
   const arch = pick(IDEAS.char, r);
-  let cos = pick(IDEAS.costume, r);
-  for (let k = 0; k < 10 && age[0] > 22 && /นักเรียน/.test(cos.n); k++) cos = pick(IDEAS.costume, r); // ชุดนักเรียนเฉพาะคนอายุไม่เกิน 22
+  // ชุดไม่ซ้ำ: เลือกจากชุดที่ยังไม่เคยใช้ ถ้าใช้ครบทั้งคลังค่อยเริ่มรอบใหม่
+  let pool = IDEAS.costume.filter(c => !U.cos.has(c.id));
+  if (!pool.length) { U.cos.clear(); pool = IDEAS.costume.slice(); }
+  let cos = pick(pool, r);
+  for (let k = 0; k < 12 && /นักเรียน/.test(cos.n); k++) cos = pick(pool, r); // ผู้ใหญ่ 19+ เท่านั้น ไม่ใช้ชุดนักเรียน
+  U.cos.add(cos.id);
   const out = [cos.e, `${cos.n} (${cos.id})`];
-  const who = f ? 'young woman' : 'young man';
+  const who = f ? 'adult woman' : 'adult man';
   const real = style === 'real';
-  const prompt = `${real ? 'photorealistic full body photo' : 'full body anime character design'} of an original ${who} as a ${arch.e}, ${age[0]} years old, ${hc[0]} ${hair[0]}, ${eye[0]} eyes, ${vibe[2]}, ${vibe[0]} personality, wearing ${out[0]}${acc[0] ? ', ' + acc[0] : ''}, standing in a relaxed natural pose, front view, plain light gray studio background, ${real ? 'soft studio lighting, 50mm photo' : 'clean lineart, soft cel shading, high quality anime illustration'}, vertical 9:16`;
-  const desc = `${arch.id} ${arch.n} · ${g[1]} ${age[0]} ปี · ผม${hc[1]} ${hair[1]} · ตา${eye[1]} · ${out[1]}${acc[1] ? ' · ' + acc[1] : ''} · นิสัย${vibe[1]}`;
+  const prompt = `${real ? 'photorealistic full body photo' : 'full body anime character design'} of an original ${who} as a ${arch.e}, ${age[0]} years old adult, ${hcc[0]} ${hair[0]}, ${eye[0]} eyes, ${face[2]}, ${mouth[0]}, ${vibe[2]}, ${vibe[0]} personality, ${body[0]}, ${aura[0]}, wearing ${out[0]}${acc[0] ? ', ' + acc[0] : ''}, fully clothed, tasteful, standing in a relaxed natural pose, front view, plain light gray studio background, ${real ? 'soft studio lighting, 50mm photo' : 'clean lineart, soft cel shading, high quality anime illustration'}, vertical 9:16`;
+  const desc = `${arch.id} ${arch.n} · ${g[1]} ${age[0]} ปี · หุ่น: ${body[1]} · หน้า: ${face[1]} · ผม${hcc[1]} ${hair[1]} · ตา${eye[1]} · ปาก: ${mouth[1]} · ออร่า: ${aura[1]} · ${out[1]}${acc[1] ? ' · ' + acc[1] : ''} · นิสัย${vibe[1]}`;
   return { name, desc, prompt };
 }
 const CAST2 = {
@@ -1431,6 +1447,10 @@ async function castBatch(env, n, force, only) {
   n = Math.min(5, Math.max(1, n || +s.cast_n || 4));
   const cats = only ? [only] : String(s.cast_cats || 'char,pet,place,prop').split(',').filter(Boolean);
   const r = rng(Date.now() ^ Math.floor(Math.random() * 1e9)), st = [];
+  { const old = (await env.DB.prepare("SELECT descr FROM casting WHERE cat='char' ORDER BY id DESC LIMIT 400").all()).results.map(x => x.descr || '');
+    castMake.used = { cos: new Set(), look: new Set() };
+    for (const d of old) { const m = d.match(/COS-\d+/); if (m) castMake.used.cos.add(m[0]); }
+    if (castMake.used.cos.size >= IDEAS.costume.length) castMake.used.cos.clear(); }
   castMake2.usedPlaces = new Set((await env.DB.prepare("SELECT name FROM casting WHERE cat='place'").all()).results.map(x => x.name));
   let total = 0;
   for (const cat of cats) {
