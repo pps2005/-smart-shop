@@ -1,0 +1,327 @@
+{
+ "1": {
+  "tag": "ตอน 1",
+  "title": "ตอนที่ 1 · ร่มที่ถูกทิ้งไว้",
+  "outfit": {
+   "อายะ": "plain dark long-sleeve top with a light rain jacket, simple university-student look",
+   "อาเคยะ": "hoodie under a casual jacket, soaked by rain, university-student look",
+   "ซานะ": "neat casual blouse and cardigan with a small shoulder bag, university-student look",
+   "กาซึ": "office-worker white shirt with sleeves rolled up, loosened tie, tired but gentle look",
+   "โยมะ": "dark long jacket over a plain shirt, holding a small notebook, calm researcher look"
+  },
+  "panels": [
+   {
+    "s": "w",
+    "chars": [],
+    "shot": "Wide establishing shot of a university campus in heavy rain, grey sky, wet courtyard with reflections, nobody close to the camera, melancholic mood.",
+    "cap": "ฝนตกตั้งแต่เช้า วันที่ฉันไม่ได้พกร่ม",
+    "dlg": []
+   },
+   {
+    "s": "s",
+    "chars": [
+     "อายะ"
+    ],
+    "shot": "Aya sits alone by a large library window, chin on her hand, looking at the rain outside, cool and quiet expression, soft grey light.",
+    "cap": "",
+    "dlg": [
+     [
+      "อายะ",
+      "...เสียงฝนดังกว่าเสียงคนทั้งตึกอีก"
+     ]
+    ]
+   },
+   {
+    "s": "w",
+    "chars": [
+     "ซานะ",
+     "อายะ"
+    ],
+    "shot": "Sana bursts through the library door with a stern face pointing at the clock, Aya at the table calmly not looking up, warm library interior.",
+    "cap": "",
+    "dlg": [
+     [
+      "ซานะ",
+      "ออกมาได้แล้ว ห้องสมุดจะปิดแล้วนะ"
+     ],
+     [
+      "อายะ",
+      "...อีกห้านาที"
+     ]
+    ]
+   },
+   {
+    "s": "s",
+    "chars": [
+     "ซานะ"
+    ],
+    "shot": "Close-up of Sana with an exasperated curt expression, arms crossed, slightly shy blush.",
+    "cap": "",
+    "dlg": [
+     [
+      "ซานะ",
+      "เธอพูดแบบนี้ทุกวันเลย"
+     ]
+    ]
+   },
+   {
+    "s": "t",
+    "chars": [
+     "อายะ"
+    ],
+    "shot": "Close-up of Aya's phone screen glow on her face as a message arrives, her hand holding the phone, subtle softening of her expression.",
+    "cap": "ข้อความจากพี่กาซึ",
+    "dlg": [
+     [
+      "กาซึ (ข้อความ)",
+      "ฝนตกหนัก รีบกลับบ้านนะ พี่ต้มจืดไว้ให้"
+     ],
+     [
+      "อายะ",
+      "...ค่ะ"
+     ]
+    ]
+   },
+   {
+    "s": "w",
+    "chars": [
+     "ซานะ",
+     "อายะ"
+    ],
+    "shot": "The two girls stand at the building entrance under the eaves, a curtain of rain in front of them, Sana opens one umbrella.",
+    "cap": "",
+    "dlg": [
+     [
+      "ซานะ",
+      "ฉันมีร่มอันเดียว ไปด้วยกัน"
+     ]
+    ]
+   },
+   {
+    "s": "w",
+    "chars": [
+     "อาเคยะ",
+     "อายะ"
+    ],
+    "shot": "Akeya runs into frame from the rain, completely soaked and grinning, holding out a second umbrella toward Aya, Aya looking away coldly.",
+    "cap": "",
+    "dlg": [
+     [
+      "อาเคยะ",
+      "อายะ! วันนี้ฝนแรงมาก เอาร่มนี้ไปสิ!"
+     ],
+     [
+      "อายะ",
+      "ไม่เอา"
+     ]
+    ]
+   },
+   {
+    "s": "s",
+    "chars": [
+     "อาเคยะ"
+    ],
+    "shot": "Close-up of Akeya's awkward smile fading slightly, rain dripping from his hair, kind but a little hurt eyes.",
+    "cap": "",
+    "dlg": [
+     [
+      "อาเคยะ",
+      "อ๋อ... งั้นก็ไม่เป็นไร"
+     ]
+    ]
+   },
+   {
+    "s": "s",
+    "chars": [
+     "ซานะ",
+     "อายะ"
+    ],
+    "shot": "Sana whispering to Aya under the umbrella while glancing back, Aya looking straight ahead with a flat expression.",
+    "cap": "",
+    "dlg": [
+     [
+      "ซานะ",
+      "ใจร้ายไปหน่อยไหม"
+     ],
+     [
+      "อายะ",
+      "เขาเสียงดัง"
+     ]
+    ]
+   },
+   {
+    "s": "w",
+    "chars": [
+     "อาเคยะ"
+    ],
+    "shot": "Wide shot from behind: Akeya stands alone in the rain holding the unused umbrella closed, two girls walking away in the distance under one umbrella, a flash of lightning in the dark clouds.",
+    "cap": "",
+    "dlg": []
+   },
+   {
+    "s": "t",
+    "chars": [
+     "อาเคยะ"
+    ],
+    "shot": "Dramatic close-up of Akeya flinching and covering his ears as thunder cracks, eyes squeezed shut, fear clearly visible.",
+    "cap": "",
+    "dlg": [
+     [
+      "อาเคยะ",
+      "...ฟ้าร้องอีกแล้ว"
+     ]
+    ]
+   },
+   {
+    "s": "w",
+    "chars": [
+     "โยมะ"
+    ],
+    "shot": "Second-floor window of a faculty building, Yoma stands calmly looking down at the rainy courtyard with a notebook in hand, cool blue tones.",
+    "cap": "มีสายตาอีกคู่ มองมาจากชั้นสอง",
+    "dlg": []
+   },
+   {
+    "s": "s",
+    "chars": [
+     "โยมะ"
+    ],
+    "shot": "Close-up of Yoma's calm serious face, reflection of rain on the window glass over his eyes.",
+    "cap": "",
+    "dlg": [
+     [
+      "โยมะ",
+      "...เหมือนมาก"
+     ]
+    ]
+   },
+   {
+    "s": "s",
+    "chars": [
+     "ซานะ",
+     "อายะ"
+    ],
+    "shot": "Sana stops under the umbrella and looks up toward the faculty building with a puzzled face, Aya beside her indifferent.",
+    "cap": "",
+    "dlg": [
+     [
+      "ซานะ",
+      "รู้สึกเหมือนมีคนมองอยู่"
+     ],
+     [
+      "อายะ",
+      "คิดไปเอง"
+     ]
+    ]
+   },
+   {
+    "s": "w",
+    "chars": [
+     "ซานะ",
+     "อายะ"
+    ],
+    "shot": "A bus stop in the rain at dusk, Sana waving curtly as she boards a bus, Aya standing alone under the shelter.",
+    "cap": "",
+    "dlg": [
+     [
+      "ซานะ",
+      "พรุ่งนี้เจอกัน ห้ามหลับในห้องสมุดนะ"
+     ]
+    ]
+   },
+   {
+    "s": "t",
+    "chars": [
+     "อายะ"
+    ],
+    "shot": "Aya walking alone along a wet garden path between campus buildings, stopping and turning her head toward a faint sound.",
+    "cap": "",
+    "dlg": [
+     [
+      "อายะ",
+      "...เสียงอะไร"
+     ]
+    ]
+   },
+   {
+    "s": "w",
+    "chars": [
+     "อาเคยะ"
+    ],
+    "shot": "Akeya crouches beside a garden bench in the pouring rain, tilting his open umbrella over a tiny stray kitten, himself drenched and trembling, lightning in the sky.",
+    "cap": "",
+    "dlg": []
+   },
+   {
+    "s": "s",
+    "chars": [
+     "อาเคยะ"
+    ],
+    "shot": "Close-up of Akeya's gentle face whispering to the kitten, a nervous but warm smile.",
+    "cap": "",
+    "dlg": [
+     [
+      "อาเคยะ",
+      "ไม่เป็นไรนะ ฉันก็กลัวเหมือนกัน แต่ไปด้วยกันได้"
+     ]
+    ]
+   },
+   {
+    "s": "t",
+    "chars": [
+     "อายะ"
+    ],
+    "shot": "Aya hiding half behind a stone pillar watching, eyes wide, her expression softening for the first time.",
+    "cap": "ฉันเพิ่งรู้ว่า เสียงดังๆ ของเขา ซ่อนความกลัวเอาไว้",
+    "dlg": []
+   },
+   {
+    "s": "w",
+    "chars": [
+     "อายะ",
+     "อาเคยะ"
+    ],
+    "shot": "Aya steps forward and silently holds her hand on the handle of Akeya's umbrella so it covers both of them and the kitten, Akeya looking up surprised.",
+    "cap": "",
+    "dlg": [
+     [
+      "อาเคยะ",
+      "อายะ? เธอ..."
+     ],
+     [
+      "อายะ",
+      "ถือให้มั่นๆ สิ เดี๋ยวแมวเปียก"
+     ]
+    ]
+   },
+   {
+    "s": "s",
+    "chars": [
+     "อายะ"
+    ],
+    "shot": "Aya carrying the wrapped kitten, face lit softly by a street lamp, the faintest smile.",
+    "cap": "นั่นเป็นครั้งแรก ที่ร่มคันเดียว ไม่ได้ทำให้ฉันอึดอัด",
+    "dlg": []
+   },
+   {
+    "s": "w",
+    "chars": [
+     "กาซึ",
+     "อายะ"
+    ],
+    "shot": "Night, warm light at an apartment doorway: Kazu in a rolled-sleeve office shirt holds a towel and raises an eyebrow, Aya stands damp with the kitten in her arms, rain behind her.",
+    "cap": "",
+    "dlg": [
+     [
+      "กาซึ",
+      "มีแขกเพิ่มอีกหนึ่งเหรอ"
+     ],
+     [
+      "อายะ",
+      "...ชั่วคราวค่ะ"
+     ]
+    ]
+   }
+  ]
+ }
+}

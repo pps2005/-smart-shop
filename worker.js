@@ -10,7 +10,8 @@ import IDEAS from './ideas.json';
 import SFXLIB from './sfx.json';
 import MUSICLIB from './music.json';
 import VFXLIB from './vfx.json';
-import WORLD from './world.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
+import WORLD from './world.json';
+import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 export default {
@@ -1299,6 +1300,24 @@ async function castApi(req, env, url, body) {
     const r = await env.DB.prepare('SELECT name,data FROM char_profiles').all(), out = {};
     for (const x of r.results) { try { out[x.name] = JSON.parse(x.data); } catch (e) { } }
     return json({ profiles: out });
+  }
+  if (p === '/api/vcastmanga') { // มังงะรายตอน: สร้างภารกิจภาพรายช่อง (ครั้งเดียว) แล้วส่งช่อง+สถานะภาพกลับ
+    const ep = MANGA[String((body || {}).ep || 1)];
+    if (!ep) return json({ error: 'ไม่มีตอนนี้' }, 404);
+    const pr = {}; for (const x of (await env.DB.prepare('SELECT name,data FROM char_profiles').all()).results) { try { pr[x.name] = JSON.parse(x.data); } catch (e) { } }
+    const RT = { w: 'widescreen landscape 16:9', t: 'tall vertical portrait 3:4', s: 'square 1:1' };
+    const tt = n => `${ep.tag} · ช่อง ${String(n).padStart(2, '0')}`;
+    const sel = () => env.DB.prepare('SELECT id,title,status,image_id,prompt FROM manual_tasks WHERE title LIKE ?').bind(ep.tag + ' · ช่อง%').all();
+    let have = new Map((await sel()).results.map(r => [r.title, r]));
+    const ins = [];
+    ep.panels.forEach((pn, i) => {
+      const t = tt(i + 1); if (have.has(t)) return;
+      const cl = pn.chars.map(n => { const q = pr[n] || {}; return `${n} (${q.gender === 'หญิง' ? 'woman' : q.gender === 'ชาย' ? 'man' : 'person'}${q.age ? ', age ' + String(q.age).split(' ')[0] : ', adult'}${ep.outfit[n] ? ', wearing: ' + ep.outfit[n] : ''})`; });
+      const prompt = `Create ONE manga/anime panel illustration, ${RT[pn.s] || RT.w} composition. Scene: ${pn.shot}${cl.length ? ' Characters in this panel: ' + cl.join('; ') + '. Attach the character sheet of each of them and keep their faces, hairstyles, eye and hair colours exactly the same as the sheets.' : ''} Rainy-day mood, cinematic lighting, modern TV anime style, clean lineart, cel shading. Draw NO speech bubbles, NO text, NO watermark. All characters are original adults (university-age or older).`.slice(0, 1800);
+      ins.push(env.DB.prepare('INSERT INTO manual_tasks (kind,title,descr,prompt,pri,status,created) VALUES (?,?,?,?,?,?,?)').bind('key', t, pn.shot.slice(0, 300), prompt, 100 + i, 'todo', Date.now()));
+    });
+    if (ins.length) { await env.DB.batch(ins); have = new Map((await sel()).results.map(r => [r.title, r])); }
+    return json({ title: ep.title, panels: ep.panels.map((pn, i) => { const t = have.get(tt(i + 1)) || {}; return { n: i + 1, s: pn.s, cap: pn.cap, dlg: pn.dlg, chars: pn.chars, task_id: t.id || 0, status: t.status || 'todo', image_id: t.image_id || 0, prompt: t.prompt || '' }; }) });
   }
   if (p === '/api/vcastoutfitup') { // อัปภาพชุดของตัวละครเข้าแฟ้ม (ติดดาว)
     const b = body || {}, name = String(b.name || '').trim().slice(0, 60), outfit = String(b.outfit || '').trim().slice(0, 60);

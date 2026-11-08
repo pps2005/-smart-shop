@@ -1031,7 +1031,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['hand','🎯','ภารกิจ'],['prof','👥','ตัวละคร'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
+  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['hand','🎯','ภารกิจ'],['prof','👥','ตัวละคร'],['mg','📖','มังงะ'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -1612,6 +1612,31 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-of]'
   }catch(err){toast(botErr(err));}});
 document.addEventListener('change',async e=>{const i=e.target.closest('[data-ofup]');if(!i||!i.files[0])return;const [n,o]=i.dataset.ofup.split('|');
   try{toast('กำลังอัปโหลด…');const data=await imgToJpegB64(i.files[0],1600);await botApi('/api/vcastoutfitup',{name:n,outfit:o,data});toast('บันทึกภาพชุดแล้ว ✅');await botLoad();const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}catch(err){toast(botErr(err));}});
+
+
+/* ---------- อ่านมังงะ: เลื่อนลงอ่านทั้งตอน ช่องไหนยังไม่มีภาพขึ้นกรอบเปล่า ---------- */
+let MG=null,MGHIDE=localStorage.getItem('ss_mghide')==='1',MGERR='';
+async function mgLoad(){try{MG=await botApi('/api/vcastmanga',{ep:1});MGERR='';}catch(e){MGERR=botErr(e);MG=MG||{title:'',panels:[]};}
+  if(view==='lib'&&SV.lib==='mg'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
+function mangaHtml(){
+  if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
+  if(!MG){mgLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดมังงะ…</p></div>';}
+  const P=MG.panels||[],have=P.filter(x=>x.image_id).length,AR={w:'16/9',t:'3/4',s:'1/1'};
+  const bub=(d)=>d.map(([w,t])=>`<div style="margin:6px 4px;padding:8px 12px;background:#fff;color:#222;border:2px solid #222;border-radius:16px;font-size:14px;line-height:1.45"><b>${esc(w)}</b> ${esc(t)}</div>`).join('');
+  const list=P.filter(x=>!MGHIDE||x.image_id);
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>📖 ${esc(MG.title||'มังงะ')}</h3><span class="muted small">มีภาพ ${have}/${P.length} ช่อง</span></div>
+  <span class="muted small">เลื่อนลงอ่านทั้งตอน ช่องที่ยังไม่มีภาพจะเป็นกรอบเปล่าพร้อมคำบรรยายและบทพูด ภาพของแต่ละช่องทำได้ที่ปุ่มในกรอบ (คัดลอกพรอมต์ไปให้ GPT/Gemini แล้วอัปโหลดกลับ)</span>
+  <label class="muted"><input type="checkbox" id="mgHide"${MGHIDE?' checked':''}> ซ่อนช่องที่ยังไม่มีภาพ</label>${MGERR?`<div class="errl">⚠️ ${esc(MGERR)}</div>`:''}</div>
+  <div style="max-width:560px;margin:0 auto;background:#111;padding:8px;border-radius:12px">`+
+  list.map(x=>{const img=x.image_id?`<img src="${esc(botU('/img/'+x.image_id))}" alt="ช่อง ${x.n}" style="width:100%;display:block;border-radius:6px" loading="lazy">`
+    :`<div style="width:100%;aspect-ratio:${AR[x.s]||'16/9'};border:2px dashed #666;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;text-align:center;padding:10px">ช่อง ${x.n} · ยังไม่มีภาพ${x.chars&&x.chars.length?'<br>ตัวละคร: '+esc(x.chars.join(', ')):''}</div>`;
+    const cap=x.cap?`<div style="margin:6px 4px;padding:6px 10px;background:#f6e9a8;color:#333;font-size:13px;border-radius:4px"><i>${esc(x.cap)}</i></div>`:'';
+    const tools=x.image_id?'':`<div class="row" style="margin:4px"><button class="btn sm" data-mg="copy|${x.n}">📋 พรอมต์</button><label class="btn sm" style="cursor:pointer">📤 อัปโหลดภาพ<input type="file" accept="image/*" hidden data-mgup="${x.task_id}"></label></div>`;
+    return `<div style="margin-bottom:14px">${img}${cap}${bub(x.dlg||[])}${tools}</div>`;}).join('')+`</div>`;}
+document.addEventListener('change',async e=>{if(e.target.id==='mgHide'){MGHIDE=e.target.checked;localStorage.setItem('ss_mghide',MGHIDE?'1':'0');renderLib(true);return;}
+  const i=e.target.closest('[data-mgup]');if(!i||!i.files[0])return;
+  try{toast('กำลังอัปโหลด…');const data=await imgToJpegB64(i.files[0],1600);await botApi('/api/vcastmanualup',{id:+i.dataset.mgup,data});toast('ใส่ภาพในช่องแล้ว ✅');await mgLoad();HAND=null;}catch(err){toast(botErr(err));}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-mg]');if(!b||!MG)return;const [a,n]=b.dataset.mg.split('|'),x=(MG.panels||[]).find(q=>q.n===+n);if(a==='copy'&&x)copy(x.prompt);});
 
 boot();
 })();
