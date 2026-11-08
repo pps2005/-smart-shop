@@ -1825,7 +1825,7 @@ function flipHtml(){
     return `<div class="arow"><div class="row" style="justify-content:space-between"><b>✨ ${esc(f.name)}</b><span class="muted small">${fr.length}/${f.n} แบบ</span></div>
       ${f.pending?'<div class="row"><span class="spin"></span><span class="muted small">กำลังวาด…</span></div>':''}${f.failed?`<div class="errl">มี ${f.failed} แบบไม่สำเร็จ</div>`:''}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${fr.map(id=>{const im=((BOT.s&&BOT.s.images)||[]).find(i=>i.id===id)||{};return `<div style="border-radius:10px;overflow:hidden;${chk}"><img data-fx="${id}" alt="" style="width:100%;aspect-ratio:1;object-fit:contain;display:block"><div class="row" style="gap:4px;padding:4px;background:#fff"><button class="btn sm" style="flex:1;padding:4px" data-fxdl="${id}|${esc(f.name)}">⬇️ PNG</button><button class="btn sm" style="padding:4px 8px" data-bot="star" data-id="${id}">${+im.starred?'⭐':'☆'}</button></div></div>`;}).join('')}</div>
-      <div class="row" style="margin-top:6px"><button class="btn sm" data-flip="more|${f.id}">➕ เพิ่มอีก 4 แบบ</button><button class="btn sm" data-flip="del|${f.id}">🗑 ลบชุด</button></div></div>`;}).join('');
+      ${fr.length?`<div class="row" style="margin-top:6px;gap:6px;align-items:center"><button class="btn sm main" data-anim="${f.id}">🎞️ ทำเป็นภาพเคลื่อนไหว</button><select data-animmode="${f.id}" style="width:auto">${[["auto","อัตโนมัติ"],["fire","ไฟลุกไหว"],["flash","แลบ/ผ่า"],["spin","หมุน"],["pulse","เต้นเบาๆ"]].map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div><div data-animbox="${f.id}"></div>`:""}<div class="row" style="margin-top:6px"><button class="btn sm" data-flip="more|${f.id}">➕ เพิ่มอีก 4 แบบ</button><button class="btn sm" data-flip="del|${f.id}">🗑 ลบชุด</button></div></div>`;}).join('');
   setTimeout(()=>document.querySelectorAll('img[data-fx]').forEach(el=>{if(!el.src)fxAlpha(+el.dataset.fx,el);}),0);
   return `<div class="card"><h3>✨ เอฟเฟกต์ PNG</h3><span class="muted small">Flux วาดเอฟเฟกต์เดี่ยวบนพื้นดำ แล้วแปลงเป็น PNG พื้นโปร่งใสให้อัตโนมัติ (พื้นลายตารางคือส่วนที่โปร่งใส) ใช้ซ้อนบนฉากตอนตัดต่อ ให้ขยับด้วยการซูม สั่น จาง กะพริบ ไม่ใช้ Kaggle กด ⭐ แบบที่ชอบเพื่อเก็บเข้าคลัง</span>
     ${FLIP.err?`<div class="errl">⚠️ ${esc(FLIP.err)}</div>`:''}
@@ -1840,6 +1840,44 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-flip
     if(a==='more'){const f=(FLIP.items||[]).find(x=>x.id===+v);if(f)await botApi('/api/vcastflip',{act:'make',name:f.name,desc:f.descr,n:4});toast('ส่งวาดเพิ่มแล้ว ⏳');}
     if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ')){b.disabled=false;return;}await botApi('/api/vcastflip',{act:'del',id:+v});}
     await flipLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
+
+
+/* ---------- ภาพเคลื่อนไหวโปร่งใสจากเอฟเฟกต์ PNG (ทำในเบราว์เซอร์) → APNG พื้นโปร่งใส ---------- */
+const CRCT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xedb88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(b){let c=0xffffffff;for(let i=0;i<b.length;i++)c=CRCT[(c^b[i])&255]^(c>>>8);return (c^0xffffffff)>>>0;}
+function u32(n){return [(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255];}
+function chunk(type,data){const t=[...type].map(c=>c.charCodeAt(0)),body=new Uint8Array(4+data.length);body.set(t,0);body.set(data,4);return [...u32(data.length),...body,...u32(crc32(body))];}
+function pngChunks(u8){const out=[];let p=8;while(p<u8.length){const len=(u8[p]<<24|u8[p+1]<<16|u8[p+2]<<8|u8[p+3])>>>0,type=String.fromCharCode(u8[p+4],u8[p+5],u8[p+6],u8[p+7]);out.push({type,data:u8.subarray(p+8,p+8+len)});p+=12+len;}return out;}
+async function makeApng(canvases,fps){const bufs=[];for(const c of canvases){const bl=await new Promise(r=>c.toBlob(r,'image/png'));bufs.push(new Uint8Array(await bl.arrayBuffer()));}
+  const W=canvases[0].width,H=canvases[0].height,out=[137,80,78,71,13,10,26,10];let seq=0;
+  const ih=pngChunks(bufs[0]).find(c=>c.type==='IHDR');out.push(...chunk('IHDR',ih.data));out.push(...chunk('acTL',new Uint8Array([...u32(bufs.length),...u32(0)])));
+  bufs.forEach((b,i)=>{out.push(...chunk('fcTL',new Uint8Array([...u32(seq++),...u32(W),...u32(H),...u32(0),...u32(0),0,1,0,fps,1,0])));
+    pngChunks(b).filter(c=>c.type==='IDAT').forEach(c=>{if(i===0)out.push(...chunk('IDAT',c.data));else{const d=new Uint8Array(4+c.data.length);d.set(u32(seq++),0);d.set(c.data,4);out.push(...chunk('fdAT',d));}});});
+  out.push(...chunk('IEND',new Uint8Array(0)));return new Blob([new Uint8Array(out)],{type:'image/apng'});}
+function loadImg(src){return new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=src;});}
+function animMode(name,m){if(m&&m!=='auto')return m;return /ไฟ|fire|flame|ควัน/i.test(name)?'fire':/ฟ้า|light|สายฟ้า/i.test(name)?'flash':/วง|circle|ring|คลื่น/i.test(name)?'spin':'pulse';}
+async function renderFx(ids,mode){const S=384,N=mode==='flash'?16:24,imgs=[];
+  for(const id of ids){if(!FXCACHE[id])await new Promise(r=>{const el=new Image();fxAlpha(id,el);let k=0;const t=setInterval(()=>{if(FXCACHE[id]||++k>60){clearInterval(t);r();}},100);});if(FXCACHE[id])imgs.push(await loadImg(FXCACHE[id]));}
+  if(!imgs.length)throw new Error('ยังโหลดภาพไม่ได้');const frames=[];
+  for(let t=0;t<N;t++){const c=document.createElement('canvas');c.width=c.height=S;const x=c.getContext('2d'),ph=t/N*Math.PI*2;
+    const draw=(im,a)=>{x.globalAlpha=a;x.drawImage(im,0,0,S,S);};
+    if(mode==='fire'){const a=imgs[Math.floor(t/N*imgs.length)%imgs.length],b=imgs[(Math.floor(t/N*imgs.length)+1)%imgs.length],m=(t/N*imgs.length)%1;
+      const tmp=document.createElement('canvas');tmp.width=tmp.height=S;const tx=tmp.getContext('2d');tx.globalAlpha=1-m;tx.drawImage(a,0,0,S,S);tx.globalAlpha=m;tx.drawImage(b,0,0,S,S);
+      const sy=1+0.05*Math.sin(ph*2);for(let y=0;y<S;y+=4){const up=1-y/S,dx=Math.sin(y*0.045+ph*3)*7*up+Math.sin(y*0.11-ph*5)*3*up;x.globalAlpha=0.88+0.12*Math.sin(ph*4+y*0.01);x.drawImage(tmp,0,y,S,4,dx,S-(S-y)*sy,S,4*sy);}}
+    else if(mode==='flash'){const seg=Math.floor(t/8),k=t%8,im=imgs[seg%imgs.length],al=[1,0.35,1,0.9,0.6,0.35,0.15,0][k];draw(im,al);}
+    else if(mode==='spin'){x.translate(S/2,S/2);x.rotate(ph);x.scale(1+0.03*Math.sin(ph*2),1+0.03*Math.sin(ph*2));x.translate(-S/2,-S/2);draw(imgs[0],0.85+0.15*Math.sin(ph*3));}
+    else{const sc=1+0.05*Math.sin(ph);x.translate(S/2,S/2);x.scale(sc,sc);x.rotate(0.05*Math.sin(ph));x.translate(-S/2,-S/2);draw(imgs[Math.floor(t/N*imgs.length)%imgs.length],0.8+0.2*Math.sin(ph*2));}
+    frames.push(c);}
+  return frames;}
+const ANIMT={};
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-anim]');if(!b)return;const fid=+b.dataset.anim,f=(FLIP.items||[]).find(x=>x.id===fid);if(!f)return;
+  const box=document.querySelector(`[data-animbox="${fid}"]`),sel=document.querySelector(`[data-animmode="${fid}"]`),mode=animMode(f.name,sel&&sel.value);
+  try{b.disabled=true;box.innerHTML='<div class="row"><span class="spin"></span><span class="muted small">กำลังทำภาพเคลื่อนไหว…</span></div>';
+    const fr=await renderFx((f.frames||[]).filter(Boolean),mode),fps=mode==='flash'?16:12;
+    box.innerHTML=`<div style="margin-top:6px;border-radius:10px;overflow:hidden;background-color:#2a2440;background-image:linear-gradient(45deg,#3a3456 25%,transparent 25%,transparent 75%,#3a3456 75%),linear-gradient(45deg,#3a3456 25%,transparent 25%,transparent 75%,#3a3456 75%);background-size:16px 16px;background-position:0 0,8px 8px;max-width:340px"><canvas width="384" height="384" style="width:100%;display:block"></canvas></div><div class="row" style="margin-top:6px"><button class="btn sm main" data-apng="${fid}">⬇️ ดาวน์โหลดภาพเคลื่อนไหว (PNG โปร่งใส)</button></div>`;
+    const cv=box.querySelector('canvas'),cx=cv.getContext('2d');clearInterval(ANIMT[fid]);let k=0;ANIMT[fid]=setInterval(()=>{if(!cv.isConnected)return clearInterval(ANIMT[fid]);cx.clearRect(0,0,384,384);cx.drawImage(fr[k++%fr.length],0,0);},1000/fps);
+    box.querySelector('[data-apng]').onclick=async()=>{toast('กำลังสร้างไฟล์…');const bl=await makeApng(fr,fps),a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=`fx-${f.name}-${mode}.png`;document.body.appendChild(a);a.click();a.remove();};
+  }catch(err){box.innerHTML=`<div class="errl">${esc(String(err.message||err))}</div>`;}finally{b.disabled=false;}});
 
 boot();
 })();
