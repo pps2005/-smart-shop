@@ -503,7 +503,7 @@ function renderStudio(quiet){
     <textarea id="cmd" placeholder="เช่น ทำเรื่องใหม่: ลูกเพนกวินสามตัว ฉบับแม่เล่าให้ลูกฟัง หรือ แก้ช็อต 4 ให้ตลกขึ้น"></textarea>
     <div class="row"><button class="btn main" data-cmd>ส่งให้ Claude</button><span class="muted small">แล้วไปบอก Claude ในแชทว่า "ทำงานในสตูดิโอ"</span></div>
     <div id="claudeList" class="sec">${claudeListHtml()}</div></div>`}[sv]||'';
-  $('#vw').innerHTML=segHtml('studio',[['city','🏙️','เมือง'],['team','👩‍💼','ทีม'],['stat','📊','สถานะ'],['work','🎬','งาน'],['cmd','💬','สั่งงาน']])+`<div id="stuBody" class="sec" style="gap:14px">${body}</div>`;
+  vwSet(segHtml('studio',[['city','🏙️','เมือง'],['team','👩‍💼','ทีม'],['stat','📊','สถานะ'],['work','🎬','งาน'],['cmd','💬','สั่งงาน']])+`<div id="stuBody" class="sec" style="gap:14px">${body}</div>`,quiet);
   setTimeout(()=>{if($('#vxw'))cityUpdate();},0);
 }
 function roomHtml(lv,live){const u=lv&&(/^https?:/.test(lv.p)?lv.p:urls[lv.p]);
@@ -1026,7 +1026,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  const lv2=SV.lib;$('#vw').innerHTML=segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats);
+  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -1328,6 +1328,12 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-city]');if
   document.addEventListener('pointerup',()=>{if(d){d=null;const v=$('#vx');if(v)v.classList.remove('drag');}});})();
 
 
+/* ---------- วาดหน้าใหม่แบบไม่เด้งกลับขึ้นบน: ถ้าเนื้อหาเหมือนเดิมไม่วาดซ้ำ ถ้าเปลี่ยนก็จำตำแหน่งเลื่อนไว้ ---------- */
+let VWH='';
+function vwSet(h,quiet){const vw=$('#vw');if(!vw)return;
+  if(quiet&&vw.dataset.vwk===view&&h===VWH)return;
+  const y=window.scrollY;vw.innerHTML=h;VWH=h;vw.dataset.vwk=view;
+  if(quiet){window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y));}}
 /* ---------- แถบย่อยแบบกด (ลดการเลื่อนหน้า) ---------- */
 const SV=(()=>{try{return Object.assign({studio:'city',lib:'cast',gen:'stat'},JSON.parse(localStorage.getItem('ss_sv')||'{}'));}catch(e){return {studio:'city',lib:'cast',gen:'stat'};}})();
 function segHtml(pg,items){return `<nav class="seg">${items.map(([k,ic,n])=>`<button class="${SV[pg]===k?'on':''}" data-seg="${pg}|${k}"><i>${ic}</i>${n}</button>`).join('')}</nav>`;}
