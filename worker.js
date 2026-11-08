@@ -1207,6 +1207,9 @@ const LIBD = [
   ['โลกและจักรวาล', () => WORLD.realm, it => `${it.e}, epic anime world landscape, no people, cinematic lighting, detailed background art, ${LIB_TAIL}`],
   ['เอฟเฟกต์', () => VFXLIB, it => `${it.e}, visual effect artwork for anime and film, isolated effect on a dark background, no people, high quality`],
 ];
+// สเต็ปภาพคลัง: ฉาก/เอฟเฟกต์/พลังงาน 4 สเต็ป (พอแล้วสำหรับโมเดลนี้) ส่วนงานออกแบบที่ต้องละเอียดกว่า (สัตว์ ชุด อาวุธ ของ) 6 สเต็ป
+const LIB_STEP4 = new Set(['ฉาก', 'องค์ประกอบฉาก', 'พลังอาคม', 'โลกและจักรวาล', 'เอฟเฟกต์']);
+function libSteps(cat) { return LIB_STEP4.has(cat) ? 4 : 6; }
 function libName(it) { return (typeof it.i === 'number' ? String(it.i).padStart(4, '0') + ' ' : '') + String(it.n).replace(' — ', ' · ').replace(/·/g, '-').replace(' - ', ' · '); }
 async function libDaily(env, force) {
   const s = await getSettings(env), day = bkkDay(), hr = new Date(Date.now() + 7 * 3600000).getUTCHours();
@@ -1228,7 +1231,7 @@ async function libDaily(env, force) {
       nm = `${base} · รอบ ${n + 1}`;
     }
     const proj = `คลัง·${cat}·${nm}`, pr = mk(it).slice(0, 2000);
-    for (let v = 0; v < 2; v++) st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,8)").bind(proj, 1, pr, Date.now()));
+    for (let v = 0; v < 2; v++) st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,?)").bind(proj, 1, pr, Date.now(), libSteps(cat)));
     made.push(`${cat}: ${nm}`);
   }
   if (st.length) await env.DB.batch(st);
@@ -1377,7 +1380,7 @@ async function castApi(req, env, url, body) {
     const row = LIBD.find(x => x[0] === b.cat); if (!row) return json({ error: 'ไม่รู้จักหมวด' }, 400);
     const it = (row[1]() || []).find(x => x.i === +b.i); if (!it) return json({ error: 'ไม่พบรายการ' }, 400);
     const proj = `คลัง·${b.cat}·${libName(it)}`, pr = row[2](it).slice(0, 2000);
-    await env.DB.batch([0, 1].map(() => env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,8)").bind(proj, 1, pr, Date.now())));
+    await env.DB.batch([0, 1].map(() => env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,?)").bind(proj, 1, pr, Date.now(), libSteps(b.cat))));
     return json({ ok: true, project: proj });
   }
   if (p === '/api/vcastaudio') {
