@@ -185,7 +185,8 @@ async function getState(env) {
   const q = await env.DB.prepare("SELECT id,project,scene,prompt,status,error FROM jobs ORDER BY id LIMIT 200").all();
   const im = await env.DB.prepare('SELECT id,project,scene,prompt,starred,created FROM images ORDER BY project, scene, id').all();
   const n = await env.DB.prepare('SELECT id,msg,created FROM notices ORDER BY id DESC LIMIT 20').all();
-  return { settings: s, jobs: q.results, images: im.results, notices: n.results, now: Date.now(), hasPassword: !!env.PASSWORD };
+  const safe = {}; for (const k in s) if (!/key|token|secret|pass/i.test(k)) safe[k] = s[k]; // ไม่ส่งรหัส/token ไปที่เบราว์เซอร์
+  return { settings: safe, jobs: q.results, images: im.results, notices: n.results, now: Date.now(), hasPassword: !!env.PASSWORD };
 }
 
 async function getImage(env, id) {

@@ -350,6 +350,11 @@ html,body{overflow-x:hidden}
 pre.hcell{white-space:pre-wrap;word-break:break-all;background:#2A1F3D;color:#FFE9F6;border-radius:10px;padding:10px;font-size:12px;margin:0;user-select:all;-webkit-user-select:all}
 
 .gp[hidden]{display:none!important}
+
+.plan{display:flex;flex-direction:column;gap:8px;background:linear-gradient(135deg,#FFF0F8,#F1EBFF);border-color:#E4D5FF}
+.prow{display:flex;flex-direction:column;gap:2px;background:#fff;border:1px solid var(--line);border-left:4px solid #7CD6A8;border-radius:10px;padding:8px 10px;font-size:14px}
+.prow.warn{border-left-color:#FFB020}
+.prow span{color:var(--muted);font-size:13px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -1167,7 +1172,7 @@ function statusHtml(){
   const quota=Math.min(100,Math.round(imgT/170*100));
   const errs=[...fl.map(j=>`🎨 ${j.project}: ${j.error||''}`),...vf.map(j=>`🎞️ ${j.project}${j.shot&&j.shot!=='1'?' ช็อต '+j.shot:''}: ${j.error||''}`)].slice(0,3);
   const last=V&&V.logs&&V.logs[0];
-  return `<div class="hero"><span class="ic">📊</span><div><h3>สถานะเครื่อง</h3><p class="muted small">อัปเดตเองทุก 20 วินาที</p></div></div>
+  return planHtml()+`<div class="hero"><span class="ic">📊</span><div><h3>สถานะเครื่อง</h3><p class="muted small">อัปเดตเองทุก 20 วินาที</p></div></div>
   <div class="stat">
     <div class="t${paused?' warn':''}"><span>🎨 ภาพวันนี้ (Flux)</span><b>${imgT} รูป</b><div class="mini"><i style="width:${quota}%"></i></div><span>${paused?'⏸ โควตาเต็ม ทำต่อ '+tTH(st.paused_until):'ราว '+Math.max(0,170-imgT)+' รูปที่เหลือ (คุณภาพ 4)'}</span></div>
     <div class="t"><span>⏳ คิวภาพ</span><b>${q}</b><span>${fl.length?`<span style="color:var(--red)">พัง ${fl.length}</span>`:'ไม่มีงานพัง'}</span></div>
@@ -1179,6 +1184,38 @@ function statusHtml(){
   ${errs.map(e=>`<div class="errl">⚠️ ${esc(e.slice(0,200))}</div>`).join('')}
   <div class="row"><button class="btn sm" data-v-go="lib">📦 ไปคลัง</button><button class="btn sm" data-v-go="gen">🎨 จัดการคิวภาพ</button></div>`;}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-v-go]');if(!b)return;const t=$('#tabs [data-v="'+b.dataset.vGo+'"]');if(t)t.click();});
+
+
+/* ---------- คาดการณ์: วันนี้จะทำอะไรได้บ้าง ---------- */
+function planHtml(){const S=BOT.s,V=BOT.v;if(!S)return '';
+  const st=S.settings||{},now=S.now||Date.now(),hm=t=>tTH(t),pad=n=>String(n).padStart(2,'0');
+  const bk=new Date(now+7*3600000),hr=bk.getUTCHours()+bk.getUTCMinutes()/60,endDay=Date.UTC(bk.getUTCFullYear(),bk.getUTCMonth(),bk.getUTCDate()+1)-7*3600000;
+  const rows=[];
+  // ภาพ
+  const q=S.jobs.filter(j=>j.status==='queued').length,paused=now<+st.paused_until;
+  let si=null;try{si=JSON.parse(st.slot_info||'null');}catch(e){}
+  const slots=String(st.slots||'7,12,18,22').split(/[,\s]+/).map(Number).filter(h=>h>=0&&h<24).sort((a,b)=>a-b);
+  if(!q)rows.push(['🖼️','ภาพ','ไม่มีภาพรอคิว','ok']);
+  else if(paused&&(+st.paused_until-now>3*3600000))rows.push(['🖼️','ภาพ',`รอ ${q} ภาพ · โควตา Cloudflare เต็ม ทำต่อ ${hm(st.paused_until)}`,'warn']);
+  else if(paused)rows.push(['🖼️','ภาพ',`รอ ${q} ภาพ · โควตาเต็ม กำลังลองใหม่ทุก 30 นาที (ลองถัดไป ${hm(st.paused_until)})`,'warn']);
+  else if(st.pace!=='0'&&si){const left=Math.max(0,si.budget-si.n),later=slots.filter(h=>h>hr).length,cap=left+si.budget*later,done=Math.min(q,cap);
+    rows.push(['🖼️','ภาพ',`คาดว่าวันนี้ได้ ~${done} ภาพ จากที่รอ ${q} · ช่วงนี้เหลือ ${left}/${si.budget} · ช่วงถัดไป ${hm(si.next)}${q>cap?` · ที่เหลือ ${q-cap} ภาพ ไปต่อพรุ่งนี้`:''}`,'ok']);}
+  else rows.push(['🖼️','ภาพ',`รอ ${q} ภาพ · ทำต่อเนื่องห่างกัน ${st.interval_min||2} นาที`,'ok']);
+  // เสียง/วิดีโอ
+  if(V){const K=V.kaggle||{},vj=V.jobs||[],cnt=(k,s_)=>vj.filter(j=>(j.kind||'gen')===k&&j.status===s_).length;
+    const aq=cnt('audio','queued'),ah=cnt('audio','hold'),af=cnt('audio','failed'),ar=cnt('audio','running'),vq=cnt('gen','queued')+cnt('gen','running'),vf=cnt('gen','failed');
+    const ok=V.videos.filter(v=>String(v.project).startsWith('คลัง·เสียงประกอบ')||String(v.project).startsWith('คลัง·เพลง')).length;
+    if(aq+ar+ah+af===0)rows.push(['🔊','เสียง','ไม่มีงานเสียงค้าง','ok']);
+    else rows.push(['🔊','เสียง',`${ar+aq?`ทำอยู่/รอ ${ar+aq}`:'ยังไม่มีงานวิ่ง'}${ah?` · พักไว้ ${ah} (จะปล่อยทยอยหลังทดสอบผ่าน)`:''}${af?` · พัง ${af}`:''} · ทำเสร็จแล้ว ${ok}`,af&&!ok?'warn':'ok']);
+    rows.push(['🎞️','วิดีโอ',vq?`รอ/กำลังทำ ${vq} ช็อต${vf?` · พัง ${vf}`:''}`:'ไม่มีช็อตค้าง','ok']);
+    const hp=(V.helpers||[]),on=hp.filter(h=>h.on_).length,live=hp.filter(h=>h.on_&&now-(h.seen||0)<20*60000).length;
+    if(hp.length)rows.push(['🤝','ผู้ช่วย',`${hp.length} คน · เปิดสิทธิ์ ${on} · ออนไลน์ ${live}${on?'':' (ยังปิดสิทธิ์ทั้งหมด)'}`,'ok']);
+    const nm=+st.aud_music_n||20,ns=+st.aud_sfx_n||200,nv=Math.min(3,Math.max(1,+st.aud_var||2));
+    const nextDay=Math.max(endDay+7*3600000,0);
+    rows.push(['📅','พรุ่งนี้ 07:00',`ระบบเพิ่มของใหม่: ภาพคลัง 11 หมวด (22 ภาพ) · เสียงประกอบ ${ns} (${nv} แบบ) · เพลง ${nm}`,'ok']);}
+  return `<div class="card plan"><div class="row" style="justify-content:space-between"><h3>🔮 แผนและคาดการณ์วันนี้</h3><span class="muted small">เวลาไทย ${pad(bk.getUTCHours())}:${pad(bk.getUTCMinutes())}</span></div>
+  ${rows.map(([ic,t,d,k])=>`<div class="prow ${k}"><b>${ic} ${t}</b><span>${esc(d)}</span></div>`).join('')}
+  <span class="muted small">เป็นการประมาณจากคิวและโควตาตอนนี้ อาจเปลี่ยนถ้าเครื่องหรือโควตามีปัญหา</span></div>`;}
 
 /* ================= วางบท → สร้างตอน ================= */
 const SCRIPT_PROMPT=`เขียนบทอนิเมะตอนนี้เป็นภาษาไทย แบ่งเป็นฉาก แต่ละช็อตเขียน 1 บรรทัดตามรูปแบบนี้เท่านั้น (คั่นด้วย |):
