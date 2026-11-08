@@ -108,7 +108,9 @@ async function tick(env, force) {
       await env.DB.prepare("UPDATE jobs SET status='queued' WHERE id=?").bind(job.id).run();
       await setSetting(env, 'img_err', new Date().toISOString() + ' ' + msg.slice(0, 400));
       const d = new Date(); d.setUTCHours(24, 2, 0, 0);
-      await setSetting(env, 'paused_until', String(d.getTime()));
+      // เพิ่งผ่านเที่ยงคืน UTC ไม่นาน แต่ Cloudflare ยังบอกว่าโควตาหมด → โควตาอาจรีเซ็ตช้า ลองใหม่ทุก 30 นาที แทนที่จะรอข้ามวัน
+      const early = new Date().getUTCHours() < 6;
+      await setSetting(env, 'paused_until', String(early ? Date.now() + 30 * 60000 : d.getTime()));
       await notify(env, '⏸ โควตาสร้างภาพฟรีของวันนี้หมดแล้ว บอทจะกลับมาทำต่อเองประมาณ 07:00 น. (เวลาไทย)');
       return { paused: true };
     }
