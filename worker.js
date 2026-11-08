@@ -133,7 +133,7 @@ const AUD = {
   eye: ['grey', 'amber', 'emerald green', 'ice blue', 'violet', 'gold', 'dark brown', 'heterochromia blue and gold'],
   face: ['sharp narrow eyes', 'large gentle eyes', 'droopy sleepy eyes', 'fierce upturned eyes', 'soft round face', 'sharp jawline', 'freckles', 'a small beauty mark'],
   extra: ['a single earring', 'round glasses', 'a choker', 'a scar across the eyebrow', 'a hair clip', 'a scarf', 'fingerless gloves', 'a beaded bracelet', 'none'],
-  build: ['slim', 'tall and lean', 'petite', 'athletic', 'broad-shouldered'],
+  build: ['tall and slender with model-like proportions', 'tall with long legs and an elegant figure', 'slim and graceful', 'tall, fit and well-proportioned'],
   names_f: ['ฮินะ', 'มิซากิ', 'เร็น', 'ชิซุกุ', 'อาโออิ', 'ยูกิ', 'คาเอเดะ', 'ซากุระ', 'นัตสึ', 'มิโอ', 'รุย', 'สึบากิ'],
   names_m: ['เร็นจิ', 'ไคโตะ', 'ฮารุ', 'โซรา', 'ยูโตะ', 'ทาคุมิ', 'ริคุ', 'เคนจิ', 'โทมะ', 'ชิน', 'อิซึมิ', 'ซึบาสะ'],
 };
@@ -174,7 +174,7 @@ async function audApi(env, b) {
       const ins = await env.DB.prepare('INSERT INTO aud_cands (role,name,age,traits,intro,look,created) VALUES (?,?,?,?,?,?,?)').bind(R.key, name, age, tr.join(','), audIntro(name, tr), look, Date.now()).run();
       const cid = ins.meta.last_row_id, proj = `ออดิชัน·${R.key}·${cid}·${name}`;
       const sty = '[[STYLE]], original adult character, no text, no watermark'; // ผู้ใช้ชอบลายเส้นนุ่ม ละเอียด (แบบภาพสาวถือแก้วกาแฟ)
-      st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,1,?,'queued',?,4)").bind(jid--, proj, `anime illustration, three-quarter body shot with the face and outfit clearly visible, ${look}, wearing ${R.outfit}, ${R.shot}, personality: ${tr.map(t => TR_EN[t] || '').filter(Boolean).join(', ')}, cinematic warm lighting, detailed background, ${sty}`.slice(0, 2000), Date.now()));
+      st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,1,?,'queued',?,4)").bind(jid--, proj, `korean manhwa style illustration, three-quarter body shot with the face and outfit clearly visible, ${fem ? 'a beautiful woman with an elegant refined face' : 'a handsome man with sharp refined features'}, attractive manhwa protagonist look, fashionable, ${look}, wearing ${R.outfit}, ${R.shot}, personality: ${tr.map(t => TR_EN[t] || '').filter(Boolean).join(', ')}, cinematic warm lighting, detailed background, ${sty}`.slice(0, 2000), Date.now()));
     }
     await env.DB.batch(st);
     return { ok: true, added: n };
