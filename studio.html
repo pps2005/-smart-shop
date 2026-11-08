@@ -1141,7 +1141,8 @@ document.addEventListener('click',async e=>{const h=e.target.closest('[data-shq]
 
 
 /* ---------- คลังเสียง (เพลงบรรเลง · เสียงประกอบ) ทำบน Kaggle เก็บเป็นไฟล์ในบอท ---------- */
-function audioHtml(){const V=BOT.v;if(!V)return '';
+function audioHtml(){const V=BOT.v;if(!V)return '';return sfxRealHtml()+audioHtml0();}
+function audioHtml0(){const V=BOT.v;if(!V)return '';
   const CATS=[['เพลง','🎵','เพลงบรรเลง (ACE-Step)'],['เสียงประกอบ','🔊','เสียงประกอบ: สัตว์ ธรรมชาติ ชีวิตประจำวัน อนิเมะ ต่อสู้ อาคม (Stable Audio Open)']];
   const body=CATS.map(([c,ic,d])=>{const pre='คลัง·'+c+'·';
     const vs=V.videos.filter(v=>String(v.project).startsWith(pre)),js=V.jobs.filter(j=>String(j.project).startsWith(pre)&&j.status!=='done');
@@ -1491,6 +1492,46 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-hand
     if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ'))return;await botApi('/api/vcastmanual',{act:'del',id:+id});await handLoad();return;}
     if(a==='skip'||a==='redo'){await botApi('/api/vcastmanual',{act:'set',id:+id,status:a==='skip'?'skip':'todo'});await handLoad();return;}
   }catch(err){toast(botErr(err));}finally{if(b.isConnected)b.disabled=false;}});
+
+
+/* ---------- คลังเสียงจริง (CC0) ---------- */
+let SFXR=null,SFXQ='',SFXBUSY='';
+async function sfxLoad(){try{const r=await botApi('/api/vcastsfx',{act:'list'});SFXR=r.items||[];}catch(e){SFXR=SFXR||[];}
+  if(view==='lib'&&SV.lib==='snd'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
+function sfxRealHtml(){
+  if(!SFXR){sfxLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดคลังเสียงจริง…</p></div>';}
+  const q=SFXQ.trim().toLowerCase(),list=SFXR.filter(x=>!q||x.name.toLowerCase().includes(q)),shown=list.slice(0,60);
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>🎧 คลังเสียงจริง</h3><span class="muted small">${SFXR.length} ไฟล์</span></div>
+  <span class="muted small">โหลดชุดเสียง CC0 มาเอง (เช่น HZSMITH Free SFX Pack, OpenGameArt) แล้วอัปโหลดไฟล์ OGG/MP3 หรือไฟล์ .zip ที่นี่ รองรับหลายไฟล์พร้อมกัน ไฟล์ละไม่เกิน ~1.4MB</span>
+  <div class="row"><label class="btn sm main" style="cursor:pointer">📥 อัปโหลดเสียง / zip<input type="file" id="sfxUp" multiple accept="audio/*,.zip,.ogg,.mp3,.wav" hidden></label></div>
+  ${SFXBUSY?`<div class="muted small">${esc(SFXBUSY)}</div>`:''}
+  ${SFXR.length?`<input type="text" id="sfxQ" placeholder="ค้นหาชื่อเสียง" value="${esc(SFXQ)}" autocomplete="off">`+det('sfxl',`📚 รายการเสียง <span class="dn">${list.length}</span>`,shown.map(x=>`<div class="arow"><div class="row" style="justify-content:space-between"><b>${esc(x.name)}</b><span class="muted small">${Math.round(x.size*.75/1024)} KB</span></div><div class="row"><button class="btn sm" data-sfx="play|${x.id}">▶️ ฟัง</button><button class="btn sm" data-sfx="del|${x.id}">🗑</button></div></div>`).join('')+(list.length>shown.length?`<span class="muted small">แสดง ${shown.length} จาก ${list.length} พิมพ์ค้นหาเพื่อกรอง</span>`:'')):''}</div>`;}
+function sfxClean(n){return n.replace(/\.[a-z0-9]+$/i,'').replace(/[_\-]+/g,' ').replace(/\s+/g,' ').trim().slice(0,80);}
+function sfxMime(n){const e=(n.match(/\.([a-z0-9]+)$/i)||[])[1];return {ogg:'audio/ogg',mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',aac:'audio/aac',flac:'audio/flac'}[(e||'').toLowerCase()]||'';}
+function u8b64(u){let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);}
+async function unzipAll(file){const buf=new Uint8Array(await file.arrayBuffer()),dv=new DataView(buf.buffer),out=[];
+  let e=buf.length-22;while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;if(e<0)throw new Error('zip เสีย');
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);
+  for(let i=0;i<n;i++){if(dv.getUint32(p,true)!==0x02014b50)break;const meth=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    const name=new TextDecoder().decode(buf.subarray(p+46,p+46+nl));p+=46+nl+el+cl;
+    const base=name.split('/').pop();if(!base||name.endsWith('/')||name.startsWith('__MACOSX')||base.startsWith('.')||!sfxMime(base))continue;
+    const lo=off+30+dv.getUint16(off+26,true)+dv.getUint16(off+28,true),raw=buf.subarray(lo,lo+csz);let data=raw;
+    if(meth===8){data=new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());}else if(meth!==0)continue;
+    out.push({name:base,data});}
+  return out;}
+document.addEventListener('change',async e=>{const inp=e.target;if(inp.id!=='sfxUp'||!inp.files.length)return;const files=[...inp.files];inp.value='';
+  let ok=0,dup=0,bad=0,items=[];
+  try{for(const f of files){if(/\.zip$/i.test(f.name)){SFXBUSY='กำลังแตก zip…';renderLib(true);(await unzipAll(f)).forEach(x=>items.push(x));}else if(sfxMime(f.name)||/^audio\//.test(f.type))items.push({name:f.name,data:new Uint8Array(await f.arrayBuffer()),mime:f.type});}
+    for(let i=0;i<items.length;i++){const it=items[i];SFXBUSY=`กำลังอัปโหลด ${i+1}/${items.length}…`;
+      try{const r=await botApi('/api/vcastsfx',{act:'add',name:sfxClean(it.name),mime:it.mime||sfxMime(it.name),data:u8b64(it.data)});r.dup?dup++:ok++;}catch(er){bad++;}
+      if(i%10===9)renderLib(true);}
+    SFXBUSY='';toast(`เพิ่ม ${ok} ไฟล์${dup?` · ซ้ำ ${dup}`:''}${bad?` · ไม่ผ่าน ${bad} (ใหญ่เกินหรือเสีย)`:''}`);}catch(er){SFXBUSY='';toast(botErr(er));}
+  await sfxLoad();});
+document.addEventListener('input',e=>{if(e.target.id==='sfxQ'){SFXQ=e.target.value;const p=e.target.selectionStart;renderLib(true);const n=$('#sfxQ');if(n){n.focus();n.setSelectionRange(p,p);}}});
+let SFXAUD=null;
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-sfx]');if(!b)return;const [a,id]=b.dataset.sfx.split('|');
+  try{if(a==='play'){const r=await botApi('/api/vcastsfx',{act:'get',id:+id});if(SFXAUD)SFXAUD.pause();SFXAUD=new Audio(`data:${r.mime};base64,${r.data}`);SFXAUD.play().catch(()=>toast('เล่นเสียงไม่ได้'));}
+    if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ'))return;await botApi('/api/vcastsfx',{act:'del',id:+id});await sfxLoad();}}catch(er){toast(botErr(er));}});
 
 boot();
 })();

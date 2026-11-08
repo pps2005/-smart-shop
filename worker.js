@@ -282,6 +282,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT, helper INTEGER DEFAULT 0)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS sfx_real (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, mime TEXT, size INTEGER, data TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS manual_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, title TEXT, descr TEXT, prompt TEXT, pri INTEGER DEFAULT 50, status TEXT DEFAULT 'todo', image_id INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS helpers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, key TEXT UNIQUE, on_ INTEGER DEFAULT 1, created INTEGER, seen INTEGER DEFAULT 0, done INTEGER DEFAULT 0, cur TEXT DEFAULT '')"),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS videos (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, ep TEXT, shot TEXT, prompt TEXT, size INTEGER, sec INTEGER, w INTEGER, h INTEGER, created INTEGER)'),
@@ -1283,6 +1284,23 @@ async function castApi(req, env, url, body) {
     if (act === 'del') { await env.DB.prepare('DELETE FROM manual_tasks WHERE id=?').bind(+b.id).run(); return json({ ok: true }); }
     const r = await env.DB.prepare("SELECT id,kind,title,descr,prompt,pri,status,image_id,created FROM manual_tasks ORDER BY CASE status WHEN 'todo' THEN 0 WHEN 'skip' THEN 1 ELSE 2 END, pri, id LIMIT 300").all();
     return json({ tasks: r.results });
+  }
+  if (p === '/api/vcastsfx') { // คลังเสียงจริง (CC0 ที่ผู้ใช้โหลดมาอัปเอง)
+    const b = body || {}, act = b.act || 'list';
+    if (act === 'add') {
+      const name = String(b.name || '').trim().slice(0, 80), data = String(b.data || '').replace(/^data:[^,]*,/, '');
+      const mime = /^audio\/(ogg|mpeg|wav|x-wav|mp4|aac|flac)$/.test(b.mime) ? b.mime : 'audio/ogg';
+      if (!name || data.length < 200) return json({ error: 'ไฟล์ไม่ถูกต้อง' }, 400);
+      if (data.length > 1900000) return json({ error: 'ไฟล์ใหญ่เกิน (เกิน ~1.4MB) ใช้ชุด OGG/MP3 แทน WAV' }, 400);
+      const dup = await env.DB.prepare('SELECT id FROM sfx_real WHERE name=? AND size=?').bind(name, data.length).first();
+      if (dup) return json({ ok: true, dup: true });
+      await env.DB.prepare('INSERT INTO sfx_real (name,mime,size,data,created) VALUES (?,?,?,?,?)').bind(name, mime, data.length, data, Date.now()).run();
+      return json({ ok: true });
+    }
+    if (act === 'del') { await env.DB.prepare('DELETE FROM sfx_real WHERE id=?').bind(+b.id).run(); return json({ ok: true }); }
+    if (act === 'get') { const r = await env.DB.prepare('SELECT mime,data FROM sfx_real WHERE id=?').bind(+b.id).first(); return r ? json(r) : json({ error: 'ไม่พบ' }, 404); }
+    const r = await env.DB.prepare('SELECT id,name,mime,size,created FROM sfx_real ORDER BY name LIMIT 2000').all();
+    return json({ items: r.results });
   }
   if (p === '/api/vcastmanualup') { // อัปโหลดภาพที่ได้จาก GPT/Gemini เข้าคลัง (ย่อภาพมาแล้วจากเบราว์เซอร์)
     const b = body || {}, t = await env.DB.prepare('SELECT id,title,prompt FROM manual_tasks WHERE id=?').bind(+b.id).first();
