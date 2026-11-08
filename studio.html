@@ -1445,7 +1445,7 @@ async function handLoad(){try{const r=await botApi('/api/vcastmanual',{act:'list
 function handItem(t,open){const k=HKIND[t.kind]||HKIND.other;
   const body=t.status==='done'&&t.image_id?`<img src="${esc(botU('/img/'+t.image_id))}" alt="${esc(t.title)}" style="width:100%;border-radius:10px" loading="lazy" data-bot="view">`
     :`<span class="muted small">เอาพรอมต์ไปวางใน GPT หรือ Gemini ได้เลย ถ้าเป็นภาพคีย์ฉาก ให้แนบชีตตัวละครไปด้วย หน้าจะได้เหมือนกัน</span><pre class="hcell" style="user-select:all">${esc(t.prompt)}</pre>`;
-  const btns=t.status==='done'?`<div class="row"><button class="btn sm" data-hand="redo|${t.id}">↩️ ทำใหม่</button><button class="btn sm" data-hand="del|${t.id}">🗑 ลบ</button></div>`
+  const btns=t.status==='done'?`<div class="row"><select id="hm${t.id}" style="width:auto"><option value="idle">ยืนหายใจ/กะพริบตา</option><option value="wave">โบกมือ</option><option value="turn">หันมามอง</option><option value="walk">เดิน</option></select><button class="btn sm main" data-hand="anim|${t.id}">🎬 ทำให้ขยับ</button><button class="btn sm" data-hand="redo|${t.id}">↩️ ทำใหม่</button><button class="btn sm" data-hand="del|${t.id}">🗑 ลบ</button></div>`
    :`<div class="row"><button class="btn sm main" data-hand="copy|${t.id}">📋 คัดลอกพรอมต์</button><label class="btn sm" style="cursor:pointer">📤 ส่งภารกิจ<input type="file" accept="image/*" hidden data-handup="${t.id}"></label><button class="btn sm" data-hand="${t.status==='skip'?'redo':'skip'}|${t.id}">${t.status==='skip'?'↩️ ทำต่อ':'💤 พักไว้'}</button><button class="btn sm" data-hand="del|${t.id}">🗑</button></div>`;
   return det('hd|'+t.id,`${k[0]} ${esc(t.title)}<small>${k[1]} · +${k[2]} XP${t.status==='skip'?' · พักไว้':''}</small>`,body+btns,open);}
 function handHtml(){
@@ -1481,6 +1481,7 @@ document.addEventListener('change',e=>{if(e.target.id==='handN'){localStorage.se
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-hand]');if(!b)return;const [a,id]=b.dataset.hand.split('|'),t=(HAND||[]).find(x=>x.id===+id);
   try{
     if(a==='copy'&&t)return copy(t.prompt);
+    if(a==='anim'&&t){b.disabled=true;await botApi('/api/vcastanimate',{id:t.image_id,motion:($('#hm'+t.id)||{}).value||'idle'});toast('ส่งเข้าคิววิดีโอแล้ว 🎬 ดูผลที่แท็บเจนภาพ → วิดีโอ');return;}
     if(a==='add'){const title=($('#hTitle').value||'').trim(),desc=($('#hDesc').value||'').trim();if(!title||!desc)return toast('ใส่ชื่อและคำอธิบายก่อน');b.disabled=true;
       const r=await botApi('/api/vcastmanual',{act:'add',kind:$('#hKind').value,title,desc});toast(r.dup?'มีงานชื่อนี้อยู่แล้ว':'เพิ่มงานแล้ว');await handLoad();return;}
     if(a==='shots'){b.disabled=true;let n=0;

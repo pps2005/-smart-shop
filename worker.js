@@ -1294,6 +1294,21 @@ async function castApi(req, env, url, body) {
     await env.DB.prepare("UPDATE manual_tasks SET status='done', image_id=? WHERE id=?").bind(ins.meta.last_row_id, t.id).run();
     return json({ ok: true, image_id: ins.meta.last_row_id });
   }
+  if (p === '/api/vcastanimate') { // ทำให้ภาพในคลังขยับ: ส่งเข้าคิววิดีโอ (Wan 2.2 บน Kaggle ฟรี)
+    const b = body || {}, im = await env.DB.prepare('SELECT id,project,data FROM images WHERE id=?').bind(+b.id).first();
+    if (!im || !im.data) return json({ error: 'ไม่พบภาพนี้' }, 404);
+    const MOT = {
+      idle: 'the character stands naturally, blinks softly, breathes gently, hair and clothes sway in a light breeze, subtle head movement',
+      wave: 'the character smiles and waves one hand at the viewer, hair and clothes sway gently',
+      turn: 'the character slowly turns the head and looks toward the viewer with a soft smile, hair sways',
+      walk: 'the character walks forward in place with a relaxed step, arms swinging lightly, hair and clothes flowing'
+    };
+    const mo = MOT[b.motion] ? b.motion : 'idle';
+    const prompt = ('anime style, same character design, ' + MOT[mo] + ', static camera, smooth natural motion, consistent face and outfit, no morphing').slice(0, 600);
+    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,81,'queued',0,?,?)")
+      .bind('ภาพขยับ·' + String(im.project || '').replace(/^✋·/, '').slice(0, 40), 'anim', String(im.id), prompt, VNEG, im.data, Date.now(), JSON.stringify({ hq: 0, fps: 0 })).run();
+    return json({ ok: true });
+  }
   if (p === '/api/vcastlibone') { // สั่งสร้างภาพรายการเดียวจากคลังทันที
     const b = body || {};
     const row = LIBD.find(x => x[0] === b.cat); if (!row) return json({ error: 'ไม่รู้จักหมวด' }, 400);
