@@ -348,6 +348,8 @@ html,body{overflow-x:hidden}
 .wph{aspect-ratio:1;border-radius:10px;background:linear-gradient(135deg,#FFE3F1,#E9E1FF);display:grid;place-items:center;font-size:40px}
 
 pre.hcell{white-space:pre-wrap;word-break:break-all;background:#2A1F3D;color:#FFE9F6;border-radius:10px;padding:10px;font-size:12px;margin:0;user-select:all;-webkit-user-select:all}
+
+.gp[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -661,18 +663,18 @@ function renderGen(){const c=botCfg();BOT.filled=false;
     <input type="text" id="botUrl" placeholder="https://anime-image-bot.xxxx.workers.dev" autocapitalize="off" autocomplete="off" spellcheck="false">
     <input type="password" id="botKey" placeholder="รหัสผ่านบอท (PASSWORD ที่ตั้งใน Cloudflare)">
     <div class="row"><button class="btn main" data-bot="connect">เชื่อมต่อ</button></div><p class="muted" id="botMsg" style="margin:0"></p></div>`;return;}
-  $('#vw').innerHTML=`<div class="card" id="botStat"></div>
-  <div class="card"><h3>สั่งเจนภาพ</h3>
+  $('#vw').innerHTML=segHtml('gen',[['stat','📊','สถานะ'],['make','✏️','สั่งงาน'],['queue','⏳','คิว'],['gal','🖼️','คลังภาพ'],['set','⚙️','ตั้งค่า']])+`<div class="card gp" data-gp="stat" id="botStat"></div>
+  <div class="card gp" data-gp="make"><h3>สั่งเจนภาพ</h3>
     <input type="text" id="bProj" placeholder="ชื่อโปรเจกต์ / ตอน เช่น EP01">
     <textarea id="bLines" placeholder="prompt ฉากละ 1 บรรทัด (ภาษาอังกฤษได้ผลดีที่สุด)&#10;standing on a train platform, winter morning&#10;pointing at the sky, smiling, snow falling"></textarea>
     <div class="row"><label class="muted">ฉากละ <select id="bVar" style="width:auto"><option>1</option><option>2</option><option selected>3</option><option>4</option></select> แบบ</label>
       <label class="muted"><input type="checkbox" id="bAdd" checked> เติมคำอธิบายตัวละคร + สไตล์ให้</label></div>
     <div><button class="btn main" data-bot="enqueue">เพิ่มเข้าคิว</button></div>
     <p class="muted" style="margin:0">มีตอนที่ Claude เขียนแล้ว? เปิดแท็บ "ตอน" → "ช็อตและ prompt" แล้วกด "ให้บอทเจนภาพทุกช็อต" ได้เลย</p></div>
-  <div class="card"><h3>คิว</h3><div id="botQ"></div></div>
-  <div class="card"><div class="row"><h3 style="margin-right:auto">คลังภาพ</h3><select id="bGP" style="width:auto;max-width:60%"></select><button class="btn sm" data-bot="staronly">⭐ เฉพาะที่เลือก</button></div>
+  <div class="card gp" data-gp="queue"><h3>คิว</h3><div id="botQ"></div></div>
+  <div class="card gp" data-gp="gal"><div class="row"><h3 style="margin-right:auto">คลังภาพ</h3><select id="bGP" style="width:auto;max-width:60%"></select><button class="btn sm" data-bot="staronly">⭐ เฉพาะที่เลือก</button></div>
     <div class="row"><button class="btn sm" data-bot="zipstar">⬇️ โหลด ZIP เฉพาะ ⭐</button><button class="btn sm" data-bot="zipall">⬇️ โหลด ZIP ทั้งหมด</button></div><div id="botG" style="display:grid;gap:14px"></div></div>
-  <div class="card"><h3>ตั้งค่าบอท</h3>
+  <div class="card gp" data-gp="set"><h3>ตั้งค่าบอท</h3>
     <span class="muted">คำอธิบายตัวละคร (ใส่หน้าทุก prompt เพื่อให้หน้าตาใกล้เคียงกัน)</span><textarea id="bChar" placeholder="1girl, short black bob hair, low side ponytail, brown eyes, white hoodie"></textarea>
     <span class="muted">สไตล์ (ต่อท้ายทุก prompt)</span><textarea id="bStyle"></textarea>
     <div class="row"><label class="muted">ห่างกัน <input id="bInt" type="number" min="1" style="width:80px"> นาที/ภาพ</label><label class="muted">คุณภาพ <input id="bSteps" type="number" min="1" max="8" style="width:70px"> steps (1–8)</label></div>
@@ -680,7 +682,11 @@ function renderGen(){const c=botCfg();BOT.filled=false;
     <label class="muted">ช่วงเวลา (ชั่วโมงเวลาไทย คั่นด้วยจุลภาค) <input id="bSlots" type="text" placeholder="7,12,18,22" style="width:140px" autocomplete="off"></label><span id="bSlotInfo" class="muted small"></span>
     <div class="row"><button class="btn main" data-bot="save">บันทึก</button><button class="btn sm" data-bot="disconnect">เปลี่ยนลิงก์/รหัสบอท</button></div>
     <p class="muted" style="margin:0">ฟรีประมาณ 200 ภาพ/วันที่ 4 steps (steps มากขึ้น = ละเอียดขึ้นแต่กินโควตามากขึ้น) · โควตารีเซ็ต 07:00 น. · ภาพออกมาเป็นสี่เหลี่ยมจัตุรัส ครอปเป็น 9:16 ตอนตัดต่อ</p></div>`;
-  botParts();if(!BOT.s||BOT.err)botLoad();}
+  gpApply();botParts();if(!BOT.s||BOT.err)botLoad();}
+function gpApply(){document.querySelectorAll('.gp').forEach(el=>{el.hidden=el.dataset.gp!==SV.gen;});}
+function gpCounts(){const S=BOT.s;if(!S)return;const q=S.jobs.length,g=S.images.length;
+  const set=(k,t)=>{const b=document.querySelector(`[data-seg="gen|${k}"]`);if(b)b.innerHTML=t;};
+  set('queue',`<i>⏳</i>คิว${q?' '+q:''}`);set('gal',`<i>🖼️</i>คลังภาพ${g?' '+g:''}`);}
 
 /* ---------- กล่องพับได้ (จำว่าเปิดอันไหนไว้) ---------- */
 const DOPEN={};
@@ -716,6 +722,7 @@ function botParts0(st){const S=BOT.s;
   $('#botG').innerHTML=Object.keys(g).length?Object.entries(g).map(([k,a],ix)=>det('g|'+k,`${esc(k)} <span class="dn">${a.length}</span>${a.some(i=>i.starred)?'<small>⭐</small>':''}`,`<span class="muted" style="font-size:13px">${esc(String(a[0].prompt).slice(0,140))}</span><div class="bgrid">${a.map(i=>botCard(i)).join('')}</div>`,ix===0)).join(''):'<p class="muted" style="margin:0">ยังไม่มีภาพ</p>';
   const sb_=document.querySelector('[data-bot="staronly"]');if(sb_)sb_.classList.toggle('main',BOT.star);
   if($('#bSlotInfo')){let si=null;try{si=JSON.parse(s.slot_info||'null');}catch(e){}$('#bSlotInfo').textContent=si&&s.pace!=='0'?`ช่วงนี้ทำแล้ว ${si.n}/${si.budget} ภาพ · ช่วงถัดไป ${tTH(si.next)}`:'';}
+  gpCounts();
   if(!BOT.filled){$('#bChar').value=s.character||'';$('#bStyle').value=s.style||'';$('#bInt').value=s.interval_min||2;$('#bSteps').value=s.steps||4;$('#bPace').checked=s.pace!=='0';$('#bSlots').value=s.slots||'7,12,18,22';BOT.filled=true;}}
 
 function botThumbsFill(){const els=document.querySelectorAll('.botthumbs');if(!els.length)return;const S=BOT.s,proj=epBotProject();
@@ -1322,11 +1329,11 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-city]');if
 
 
 /* ---------- แถบย่อยแบบกด (ลดการเลื่อนหน้า) ---------- */
-const SV=(()=>{try{return Object.assign({studio:'city',lib:'cast'},JSON.parse(localStorage.getItem('ss_sv')||'{}'));}catch(e){return {studio:'city',lib:'cast'};}})();
+const SV=(()=>{try{return Object.assign({studio:'city',lib:'cast',gen:'stat'},JSON.parse(localStorage.getItem('ss_sv')||'{}'));}catch(e){return {studio:'city',lib:'cast',gen:'stat'};}})();
 function segHtml(pg,items){return `<nav class="seg">${items.map(([k,ic,n])=>`<button class="${SV[pg]===k?'on':''}" data-seg="${pg}|${k}"><i>${ic}</i>${n}</button>`).join('')}</nav>`;}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-seg]');if(!b)return;const [pg,k]=b.dataset.seg.split('|');SV[pg]=k;
   try{localStorage.setItem('ss_sv',JSON.stringify(SV));}catch(err){}
-  if(pg==='studio')renderStudio();else if(pg==='lib')renderLib();window.scrollTo({top:0});});
+  if(pg==='studio')renderStudio();else if(pg==='lib')renderLib();else if(pg==='gen'){gpApply();document.querySelectorAll('[data-seg^="gen|"]').forEach(x=>x.classList.toggle('on',x.dataset.seg==='gen|'+k));}window.scrollTo({top:0});});
 
 
 /* ---------- คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล ---------- */
