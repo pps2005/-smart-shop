@@ -648,6 +648,7 @@ async function botApi(p,body){
 async function botLoad(){if(!botCfg().url)return;
   try{BOT.s=await botApi('/api/state');BOT.err='';}catch(e){BOT.err=botErr(e);}
   try{BOT.v=await botApi('/api/vstate');}catch(e){BOT.v=null;}
+  try{vidBoxFill();}catch(e){}
   if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
   if(view==='studio'&&$('#statCard'))$('#statCard').innerHTML=statusHtml();
   if(view==='studio'&&$('#desks'))$('#desks').innerHTML=desksHtml();
@@ -668,7 +669,8 @@ function renderGen(){const c=botCfg();BOT.filled=false;
     <input type="text" id="botUrl" placeholder="https://anime-image-bot.xxxx.workers.dev" autocapitalize="off" autocomplete="off" spellcheck="false">
     <input type="password" id="botKey" placeholder="รหัสผ่านบอท (PASSWORD ที่ตั้งใน Cloudflare)">
     <div class="row"><button class="btn main" data-bot="connect">เชื่อมต่อ</button></div><p class="muted" id="botMsg" style="margin:0"></p></div>`;return;}
-  $('#vw').innerHTML=segHtml('gen',[['stat','📊','สถานะ'],['make','✏️','สั่งงาน'],['queue','⏳','คิว'],['gal','🖼️','คลังภาพ'],['set','⚙️','ตั้งค่า']])+`<div class="card gp" data-gp="stat" id="botStat"></div>
+  $('#vw').innerHTML=segHtml('gen',[['stat','📊','สถานะ'],['make','✏️','สั่งงาน'],['queue','⏳','คิว'],['gal','🖼️','คลังภาพ'],['vid','🎬','คลิป'],['set','⚙️','ตั้งค่า']])+`<div class="card gp" data-gp="stat" id="botStat"></div>
+  <div class="card gp" data-gp="vid" id="vidBox"></div>
   <div class="card gp" data-gp="make"><h3>สั่งเจนภาพ</h3>
     <input type="text" id="bProj" placeholder="ชื่อโปรเจกต์ / ตอน เช่น EP01">
     <textarea id="bLines" placeholder="prompt ฉากละ 1 บรรทัด (ภาษาอังกฤษได้ผลดีที่สุด)&#10;standing on a train platform, winter morning&#10;pointing at the sky, smiling, snow falling"></textarea>
@@ -688,7 +690,7 @@ function renderGen(){const c=botCfg();BOT.filled=false;
     <div class="row"><button class="btn main" data-bot="save">บันทึก</button><button class="btn sm" data-bot="disconnect">เปลี่ยนลิงก์/รหัสบอท</button></div>
     <p class="muted" style="margin:0">ฟรีประมาณ 200 ภาพ/วันที่ 4 steps (steps มากขึ้น = ละเอียดขึ้นแต่กินโควตามากขึ้น) · โควตารีเซ็ต 07:00 น. · ภาพออกมาเป็นสี่เหลี่ยมจัตุรัส ครอปเป็น 9:16 ตอนตัดต่อ</p></div>`;
   gpApply();botParts();if(!BOT.s||BOT.err)botLoad();}
-function gpApply(){document.querySelectorAll('.gp').forEach(el=>{el.hidden=el.dataset.gp!==SV.gen;});}
+function gpApply(){document.querySelectorAll('.gp').forEach(el=>{el.hidden=el.dataset.gp!==SV.gen;});vidBoxFill();}
 function gpCounts(){const S=BOT.s;if(!S)return;const q=S.jobs.length,g=S.images.length;
   const set=(k,t)=>{const b=document.querySelector(`[data-seg="gen|${k}"]`);if(b)b.innerHTML=t;};
   set('queue',`<i>⏳</i>คิว${q?' '+q:''}`);set('gal',`<i>🖼️</i>คลังภาพ${g?' '+g:''}`);}
@@ -1657,6 +1659,23 @@ function mgPlanHtml(){
   return `<div class="card"><div class="row" style="justify-content:space-between"><h3>📖 แผนมังงะ 3 วัน</h3><span class="muted small">มีภาพ ${have}/${P.length}</span></div>
   ${days.join('<hr style="border:0;border-top:1px solid #eee;margin:6px 0">')}
   <span class="muted small">ทำวันละ ${n} ภาพ ${rest>0?`หลัง 3 วันนี้ยังเหลืออีก ${rest} ช่อง จะครบในประมาณ ${all} วัน`:`ครบทั้งตอนภายใน ${all} วัน`} · เรียงช่องสำคัญของเรื่องก่อน ปรับจำนวนต่อวันได้ที่แท็บ 🎯 ภารกิจ (ภารกิจเด่นที่แนะนำ) วันไหนไม่ว่างก็ข้ามได้ ตารางเลื่อนตามเอง</span></div>`;}
+
+
+/* ---------- แท็บคลิป: คลิปภาพขยับทั้งหมด (ไม่รวมเสียง) + งานที่กำลังทำ ---------- */
+let VIDHTML='';
+function vidBoxFill(){const el=document.getElementById('vidBox');if(!el)return;const V=BOT.v;
+  if(!V){el.innerHTML='<p class="muted" style="margin:0">กำลังโหลด…</p>';return;}
+  const isA=p=>/^คลัง·(เสียงประกอบ|เพลง)/.test(String(p));
+  const run=V.jobs.filter(j=>!isA(j.project)&&j.kind!=='audio'&&(j.status==='running'||j.status==='queued'));
+  const fail=V.jobs.filter(j=>!isA(j.project)&&j.kind!=='audio'&&j.status==='failed');
+  const vids=V.videos.filter(v=>!isA(v.project));
+  const last=(V.logs||[])[0];
+  const h=`<h3>🎬 คลิปภาพขยับ</h3>`+
+   (run.length?run.map(j=>`<div class="row" style="margin:6px 0"><span class="spin"></span><span><b>${esc(String(j.project).replace(/^ภาพขยับ·/,''))}</b> <span class="muted small">${j.status==='running'?'กำลังทำ':'รอคิว'}</span></span></div>`).join('')+(last?`<div class="muted small">ล่าสุด: ${esc(String(last.msg).split('\n')[0])} (${tTH(last.created)})</div>`:''):'')+
+   (fail.length?fail.map(j=>`<div class="errl">⚠️ ${esc(j.project)} ล้มเหลว: ${esc(shortMsg?shortMsg(j.error||''):String(j.error||'').slice(0,120))}</div>`).join(''):'')+
+   (vids.length?vids.map(v=>`<div style="margin:10px 0"><b class="small">${esc(String(v.project).replace(/^ภาพขยับ·/,''))}</b> <span class="muted small">${v.sec?Math.round(v.sec/60)+' นาทีทำ · ':''}${Math.round((v.size||0)/1024)} KB</span><video src="${esc(botU('/vid/'+v.id))}" controls playsinline loop preload="metadata" style="width:100%;border-radius:10px;background:#000;margin-top:4px"></video></div>`).join('')
+    :(run.length?'':'<p class="muted" style="margin:0">ยังไม่มีคลิป กด 🎬 ทำให้ขยับ ที่ภาพในแท็บ 🎯 ภารกิจ</p>'));
+  if(h!==VIDHTML){VIDHTML=h;el.innerHTML=h;}}
 
 boot();
 })();

@@ -389,7 +389,7 @@ async function vApi(req, env, url, ctx, body) {
   kEnv(env, await getSettings(env));
   if (p === '/api/vstate') {
     const s = await getSettings(env);
-    const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started,kind FROM vjobs WHERE status!='done' ORDER BY id LIMIT 300").all()).results;
+    const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started,kind FROM vjobs WHERE status NOT IN ('done','hold') ORDER BY id LIMIT 300").all()).results;
     const videos = (await env.DB.prepare('SELECT id,job_id,project,ep,shot,prompt,size,sec,w,h,created FROM videos ORDER BY id DESC LIMIT 500').all()).results;
     const logs = (await env.DB.prepare('SELECT msg,created FROM vlog ORDER BY id DESC LIMIT 12').all()).results;
     const helpers = (await env.DB.prepare('SELECT id,name,key,on_,created,seen,done,cur FROM helpers ORDER BY id').all()).results;
