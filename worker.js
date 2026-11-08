@@ -1581,11 +1581,11 @@ async function castApi(req, env, url, body) {
       const seed = 1 + Math.floor(Math.random() * 2147483000);
       const ins = await env.DB.prepare("INSERT INTO flipbooks (name,descr,n,seed,status,created) VALUES (?,?,?,?,'making',?)").bind(name, desc, n, seed, Date.now()).run();
       const fid = ins.meta.last_row_id, mn = (await env.DB.prepare('SELECT MIN(id) m FROM jobs').first()) || {}; let jid = Math.min(+mn.m || 1000000, 1000000) - n;
-      const PH = ['', 'variation with a different shape', 'larger and more intense variation', 'smaller and softer variation', 'wide spreading variation', 'close-up variation', 'thin delicate variation', 'explosive variation'];
+      const PH = ['', 'variation with a different shape and more jagged sharp edges', 'larger and more intense variation, dramatic impact frame', 'smaller and thinner variation with fine sharp lines', 'wide spreading variation with strong radial motion lines', 'close-up variation, dense and detailed', 'thin delicate variation with long trailing streaks', 'explosive peak-moment variation with a bright white flash core'];
       const st = [];
       for (let k = 0; k < n; k++) {
         // เอฟเฟกต์เดี่ยวบนพื้นดำสนิท → หน้าเว็บแปลงเป็น PNG โปร่งใสได้ (ความสว่าง = ความทึบ) ใช้ซ้อนบนฉากตอนตัดต่อ
-        st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,?,?,'queued',?,4)").bind(jid++, `ฟลิปบุ๊ก·${fid}·${name}`, k + 1, `${desc}${PH[k % PH.length] ? ', ' + PH[k % PH.length] : ''}, isolated visual effect element only, centered with empty space around it, on a pure solid black background, no ground, no floor, no objects, no people, glowing bright colours, high contrast, anime visual effect art, clean anime FX style, no text, no watermark`, Date.now()));
+        st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,?,?,'queued',?,4)").bind(jid++, `ฟลิปบุ๊ก·${fid}·${name}`, k + 1, `${desc}${PH[k % PH.length] ? ', ' + PH[k % PH.length] : ''}, isolated visual effect element only, centered with empty space around it, on a pure solid black background, no ground, no floor, no objects, no people, hand-drawn 2D Japanese TV anime action-scene VFX style (anime FX animation key frame), cel-shaded flat colour shapes with a bright white-hot core and a saturated coloured glow around it, bold crisp sharp-edged angular shapes, dynamic motion and impact lines, strong contrast, not photorealistic, not a 3D render, not a smoke simulation, no text, no watermark`, Date.now()));
       }
       await env.DB.batch(st);
       return json({ ok: true, id: fid });
