@@ -648,7 +648,7 @@ async function botApi(p,body){
 async function botLoad(){if(!botCfg().url)return;
   try{BOT.s=await botApi('/api/state');BOT.err='';}catch(e){BOT.err=botErr(e);}
   try{BOT.v=await botApi('/api/vstate');}catch(e){BOT.v=null;}
-  try{vidBoxFill();}catch(e){}
+  try{vidBoxFill();if(SV.gen==='set')stFill();}catch(e){}
   if(view==='gen'){if($('#botStat'))botParts();else renderGen();}
   if(view==='studio'&&$('#statCard'))$('#statCard').innerHTML=statusHtml();
   if(view==='studio'&&$('#desks'))$('#desks').innerHTML=desksHtml();
@@ -1745,7 +1745,7 @@ const STYLES=[
 function stCur(){const st=(BOT.s&&BOT.s.settings)||{};return STYLES.find(x=>x[0]===st.style_preset)||(st.style?['custom','✏️ กำหนดเอง','ข้อความสไตล์ที่พิมพ์เอง',st.style]:STYLES[0]);}
 function stFill(){const el=document.getElementById('stBox');if(!el)return;const c=stCur();
   el.innerHTML=`<h3>🎨 สไตล์ลายเส้น (ใช้กับทุกอย่าง)</h3><span class="muted small">เลือกครั้งเดียว ใช้กับภาพที่ระบบสร้าง (คลัง ออดิชัน ชุด ภาพร่าง) และพรอมต์ที่ให้ GPT (ชีตตัวละคร มังงะ ภารกิจ) รวมถึงงานที่ยังรอคิว ภาพที่เสร็จแล้วไม่เปลี่ยน</span>
-  ${STYLES.map(x=>`<div class="arow" style="border:2px solid ${c[0]===x[0]?'#8b5cf6':'transparent'};border-radius:10px"><div class="row" style="justify-content:space-between"><b>${x[1]}</b>${c[0]===x[0]?'<span class="st done">ใช้อยู่</span>':`<button class="btn sm main" data-sty="${x[0]}">ใช้สไตล์นี้</button>`}</div><div class="muted small">${x[2]}</div></div>`).join('')}
+  ${STYLES.map(x=>{const im=((BOT.s&&BOT.s.images)||[]).filter(i=>i.project==='ตัวอย่างสไตล์·'+x[0]).pop(),pend=((BOT.s&&BOT.s.jobs)||[]).some(j=>j.project==='ตัวอย่างสไตล์·'+x[0]);return `<div class="arow" style="border:2px solid ${c[0]===x[0]?'#8b5cf6':'transparent'};border-radius:10px">${im?`<img src="${esc(botU('/img/'+im.id))}" alt="${esc(x[1])}" loading="lazy" data-bot="view" style="width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin-bottom:6px">`:pend?'<div class="row" style="margin-bottom:6px"><span class="spin"></span><span class="muted small">กำลังวาดภาพตัวอย่าง…</span></div>':''}<div class="row" style="justify-content:space-between"><b>${x[1]}</b>${c[0]===x[0]?'<span class="st done">ใช้อยู่</span>':`<button class="btn sm main" data-sty="${x[0]}">ใช้สไตล์นี้</button>`}</div><div class="muted small">${x[2]}</div></div>`;}).join('')}
   <span class="muted small">ปรับละเอียดเองได้ที่ช่อง "สไตล์" ในการ์ดตั้งค่าบอทด้านบน</span>`;}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-sty]');if(!b)return;const x=STYLES.find(q=>q[0]===b.dataset.sty);if(!x)return;
   try{b.disabled=true;await botApi('/api/settings',{style:x[3],style_preset:x[0]});await botLoad();const t=$('#bStyle');if(t)t.value=x[3];stFill();toast('เปลี่ยนสไตล์เป็น '+x[1]);}catch(err){toast(botErr(err));b.disabled=false;}});
