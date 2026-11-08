@@ -1533,16 +1533,16 @@ async function castApi(req, env, url, body) {
   if (p === '/api/vcastflip') { // flipbook เอฟเฟกต์จาก Flux (ไม่ใช้ Kaggle): ล็อกค่าสุ่มเดียวกันทุกเฟรม แล้วให้ผู้ใช้ตรวจผ่านก่อนเข้าคลัง
     const b = body || {}, act = b.act || 'list';
     if (act === 'make') {
-      const name = String(b.name || '').trim().slice(0, 40), desc = String(b.desc || '').trim().slice(0, 400), n = Math.min(8, Math.max(4, +b.n || 6));
+      const name = String(b.name || '').trim().slice(0, 40), desc = String(b.desc || '').trim().slice(0, 400), n = Math.min(8, Math.max(2, +b.n || 4));
       if (!name || !desc) return json({ error: 'ใส่ชื่อและคำอธิบาย' }, 400);
       const seed = 1 + Math.floor(Math.random() * 2147483000);
       const ins = await env.DB.prepare("INSERT INTO flipbooks (name,descr,n,seed,status,created) VALUES (?,?,?,?,'making',?)").bind(name, desc, n, seed, Date.now()).run();
       const fid = ins.meta.last_row_id, mn = (await env.DB.prepare('SELECT MIN(id) m FROM jobs').first()) || {}; let jid = Math.min(+mn.m || 1000000, 1000000) - n;
-      const PH = ['beginning, faint and small', 'growing', 'building up', 'strong', 'at its peak, brightest', 'still strong', 'fading slightly', 'calming down'];
+      const PH = ['', 'variation with a different shape', 'larger and more intense variation', 'smaller and softer variation', 'wide spreading variation', 'close-up variation', 'thin delicate variation', 'explosive variation'];
       const st = [];
       for (let k = 0; k < n; k++) {
-        const phase = PH[Math.round(k * (PH.length - 1) / Math.max(1, n - 1))];
-        st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps,seed) VALUES (?,?,?,?,'queued',?,4,?)").bind(jid++, `ฟลิปบุ๊ก·${fid}·${name}`, k + 1, `${desc}, animation keyframe ${k + 1} of ${n}, the effect is ${phase}, same composition and camera as the other frames, centered, dark simple background, no people, [[STYLE]], no text, no watermark`, Date.now(), seed));
+        // เอฟเฟกต์เดี่ยวบนพื้นดำสนิท → หน้าเว็บแปลงเป็น PNG โปร่งใสได้ (ความสว่าง = ความทึบ) ใช้ซ้อนบนฉากตอนตัดต่อ
+        st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,?,?,'queued',?,4)").bind(jid++, `ฟลิปบุ๊ก·${fid}·${name}`, k + 1, `${desc}${PH[k % PH.length] ? ', ' + PH[k % PH.length] : ''}, isolated visual effect element only, centered with empty space around it, on a pure solid black background, no ground, no floor, no objects, no people, glowing bright colours, high contrast, anime visual effect art, clean anime FX style, no text, no watermark`, Date.now()));
       }
       await env.DB.batch(st);
       return json({ ok: true, id: fid });

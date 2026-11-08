@@ -1808,32 +1808,36 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-keep
 
 new MutationObserver(()=>{document.querySelectorAll('.seg').forEach(n=>{const on=n.querySelector('button.on');if(on&&!n.dataset.sc){n.dataset.sc='1';const l=on.offsetLeft-n.clientWidth/2+on.clientWidth/2;if(l>0)n.scrollLeft=l;}});}).observe(document.body,{childList:true,subtree:true});
 
-/* ---------- 📽️ flipbook เอฟเฟกต์จาก Flux (ไม่ใช้ Kaggle) ต้องตรวจผ่านก่อนใช้ ---------- */
-let FLIP=null,FLIPT=0,FLIPP=0;
-const FLIPPRE=[['ยันต์ไฟลุก','a paper talisman catching fire and burning with bright orange flames and glowing embers'],['วงเวทหมุน','a glowing cyan magic rune circle hovering in the air, rotating, with floating glyphs'],['ฟ้าแลบ','a lightning bolt striking from dark storm clouds, bright electric flash'],['ประกายแสงลอย','soft glowing light particles and sparkles floating upward in the dark'],['เปลวตะเกียง','a small lantern flame flickering inside a glass lantern'],['พลังอาคมระเบิด','an explosion of violet magic energy bursting outward with sparks']];
+/* ---------- ✨ เอฟเฟกต์ PNG จาก Flux: เอฟเฟกต์เดี่ยวบนพื้นดำ → แปลงเป็น PNG โปร่งใส ไว้ซ้อนบนฉาก (ไม่ใช้ Kaggle) ---------- */
+let FLIP=null,FLIPT=0;
+const FLIPPRE=[['ไฟลุก','a burst of bright orange fire flames with glowing embers'],['ไฟเผากระดาษ','burning edges of fire and floating embers, curling flames'],['ฟ้าผ่า','a jagged bright blue-white lightning bolt strike with electric sparks'],['ฟ้าแลบ','branching electric lightning arcs and crackling sparks'],['วงเวท','a glowing cyan magic rune circle with floating glyphs and light particles'],['ระเบิดเวท','an explosion of violet magic energy bursting outward with sparks'],['ประกายแสง','soft glowing light particles and sparkles floating'],['คลื่นพลัง','a shockwave ring of white energy with speed streaks'],['ควันเวท','swirling glowing purple magic smoke'],['เส้นฟันดาบ','a bright crescent sword slash trail of light']];
 async function flipLoad(){try{FLIP=await botApi('/api/vcastflip',{act:'list'});}catch(e){FLIP=FLIP||{items:[],err:botErr(e)};}
   if(view==='lib'&&SV.lib==='world'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}
   clearTimeout(FLIPT);if((FLIP.items||[]).some(f=>f.pending)&&view==='lib'&&SV.lib==='world')FLIPT=setTimeout(flipLoad,20000);}
+const FXCACHE={};
+function fxAlpha(id,el){if(FXCACHE[id]){el.src=FXCACHE[id];return;}const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext('2d');x.drawImage(im,0,0);
+  try{const d=x.getImageData(0,0,c.width,c.height),p=d.data;for(let k=0;k<p.length;k+=4){const a=Math.max(p[k],p[k+1],p[k+2]);if(a<8){p[k+3]=0;continue;}const f=255/a;p[k]=Math.min(255,p[k]*f);p[k+1]=Math.min(255,p[k+1]*f);p[k+2]=Math.min(255,p[k+2]*f);p[k+3]=a;}x.putImageData(d,0,0);FXCACHE[id]=c.toDataURL('image/png');el.src=FXCACHE[id];}catch(e){el.src=im.src;}};im.src=botU('/img/'+id);}
 function flipHtml(){
   if(!botCfg().url)return '';
-  if(!FLIP){flipLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลด flipbook…</p></div>';}
-  const L=FLIP.items||[],ST={making:'⏳ กำลังวาด',review:'👀 รอตรวจ',ok:'✅ ผ่าน ใช้ได้',rejected:'❌ ไม่ผ่าน'};
-  const rows=L.map(f=>{const fr=(f.frames||[]).filter(Boolean),done=!f.pending&&fr.length,st=f.status==='making'&&done?'review':f.status;
-    const player=fr.length?`<div style="position:relative;width:100%;aspect-ratio:1;background:#111;border-radius:10px;overflow:hidden">${fr.map((id,i)=>`<img src="${esc(botU('/img/'+id))}" alt="" class="flipfr" data-fb="${f.id}" data-k="${i}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:${i?0:1}">`).join('')}</div>`:'';
-    return `<div class="arow"><div class="row" style="justify-content:space-between"><b>📽️ ${esc(f.name)}</b><span class="muted small">${ST[st]||st} · ${fr.length}/${f.n} เฟรม</span></div>
-      ${f.pending?'<div class="row"><span class="spin"></span><span class="muted small">กำลังวาดเฟรม…</span></div>':''}${f.failed?`<div class="errl">มี ${f.failed} เฟรมไม่สำเร็จ</div>`:''}${player}
-      <div class="row" style="margin-top:6px">${done&&st!=='ok'?`<button class="btn sm main" data-flip="ok|${f.id}">✅ ผ่าน เก็บเข้าคลัง</button>`:''}${done&&st!=='rejected'?`<button class="btn sm" data-flip="rejected|${f.id}">❌ ไม่ผ่าน</button>`:''}<button class="btn sm" data-flip="del|${f.id}">🗑</button></div></div>`;}).join('');
-  return `<div class="card"><h3>📽️ เอฟเฟกต์ flipbook</h3><span class="muted small">Flux วาดเอฟเฟกต์ 6 เฟรมต่อชุด แล้วเล่นต่อกันเป็นภาพเคลื่อนไหว ไม่ใช้ Kaggle เหมาะกับไฟ วงเวท ฟ้าแลบ ประกายแสง ชุดที่ยังไม่กด ✅ ผ่าน จะไม่ถูกนำไปใช้ งานนี้ยังเป็นการทดลอง บางชุดอาจกระตุก</span>
+  if(!FLIP){flipLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดเอฟเฟกต์…</p></div>';}
+  const L=FLIP.items||[],chk='background-color:#2a2440;background-image:linear-gradient(45deg,#3a3456 25%,transparent 25%,transparent 75%,#3a3456 75%),linear-gradient(45deg,#3a3456 25%,transparent 25%,transparent 75%,#3a3456 75%);background-size:16px 16px;background-position:0 0,8px 8px';
+  const rows=L.map(f=>{const fr=(f.frames||[]).filter(Boolean);
+    return `<div class="arow"><div class="row" style="justify-content:space-between"><b>✨ ${esc(f.name)}</b><span class="muted small">${fr.length}/${f.n} แบบ</span></div>
+      ${f.pending?'<div class="row"><span class="spin"></span><span class="muted small">กำลังวาด…</span></div>':''}${f.failed?`<div class="errl">มี ${f.failed} แบบไม่สำเร็จ</div>`:''}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${fr.map(id=>{const im=((BOT.s&&BOT.s.images)||[]).find(i=>i.id===id)||{};return `<div style="border-radius:10px;overflow:hidden;${chk}"><img data-fx="${id}" alt="" style="width:100%;aspect-ratio:1;object-fit:contain;display:block"><div class="row" style="gap:4px;padding:4px;background:#fff"><button class="btn sm" style="flex:1;padding:4px" data-fxdl="${id}|${esc(f.name)}">⬇️ PNG</button><button class="btn sm" style="padding:4px 8px" data-bot="star" data-id="${id}">${+im.starred?'⭐':'☆'}</button></div></div>`;}).join('')}</div>
+      <div class="row" style="margin-top:6px"><button class="btn sm" data-flip="more|${f.id}">➕ เพิ่มอีก 4 แบบ</button><button class="btn sm" data-flip="del|${f.id}">🗑 ลบชุด</button></div></div>`;}).join('');
+  setTimeout(()=>document.querySelectorAll('img[data-fx]').forEach(el=>{if(!el.src)fxAlpha(+el.dataset.fx,el);}),0);
+  return `<div class="card"><h3>✨ เอฟเฟกต์ PNG</h3><span class="muted small">Flux วาดเอฟเฟกต์เดี่ยวบนพื้นดำ แล้วแปลงเป็น PNG พื้นโปร่งใสให้อัตโนมัติ (พื้นลายตารางคือส่วนที่โปร่งใส) ใช้ซ้อนบนฉากตอนตัดต่อ ให้ขยับด้วยการซูม สั่น จาง กะพริบ ไม่ใช้ Kaggle กด ⭐ แบบที่ชอบเพื่อเก็บเข้าคลัง</span>
     ${FLIP.err?`<div class="errl">⚠️ ${esc(FLIP.err)}</div>`:''}
     <div class="row" style="flex-wrap:wrap;gap:6px;margin:6px 0">${FLIPPRE.map((p,i)=>`<button class="btn sm" data-flip="pre|${i}">✨ ${p[0]}</button>`).join('')}</div>
-    <input type="text" id="flN" placeholder="ชื่อเอฟเฟกต์เอง" autocomplete="off"><input type="text" id="flD" placeholder="อธิบายเป็นภาษาอังกฤษ เช่น blue fire swirling around a sword" autocomplete="off"><button class="btn sm main" data-flip="make|0">สร้าง flipbook</button>
-    ${rows?det('flips',`📚 ชุด flipbook <span class="dn">${L.length}</span>`,rows,true):''}</div>`;}
-setInterval(()=>{FLIPP++;document.querySelectorAll('.flipfr').forEach(im=>{const sib=document.querySelectorAll(`.flipfr[data-fb="${im.dataset.fb}"]`).length;im.style.opacity=(+im.dataset.k===FLIPP%sib)?1:0;});},125);
+    <input type="text" id="flN" placeholder="ชื่อเอฟเฟกต์เอง" autocomplete="off"><input type="text" id="flD" placeholder="อธิบายเป็นภาษาอังกฤษ เช่น blue fire swirling" autocomplete="off"><button class="btn sm main" data-flip="make|0">สร้าง 4 แบบ</button>
+    ${rows?det('flips',`📚 ชุดเอฟเฟกต์ <span class="dn">${L.length}</span>`,rows,true):''}</div>`;}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-fxdl]');if(!b)return;const [id,nm]=b.dataset.fxdl.split('|');const u=FXCACHE[id];if(!u)return toast('รอให้ภาพโหลดก่อน');const a=document.createElement('a');a.href=u;a.download=`fx-${nm}-${id}.png`;document.body.appendChild(a);a.click();a.remove();});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-flip]');if(!b)return;const [a,v]=b.dataset.flip.split('|');
   try{b.disabled=true;
-    if(a==='pre'){const p=FLIPPRE[+v];await botApi('/api/vcastflip',{act:'make',name:p[0],desc:p[1],n:6});toast('ส่งวาดแล้ว 6 เฟรม ⏳');}
-    if(a==='make'){const n=($('#flN').value||'').trim(),d=($('#flD').value||'').trim();if(!n||!d){toast('ใส่ชื่อและคำอธิบาย');b.disabled=false;return;}await botApi('/api/vcastflip',{act:'make',name:n,desc:d,n:6});toast('ส่งวาดแล้ว ⏳');}
-    if(a==='ok'||a==='rejected')await botApi('/api/vcastflip',{act:'set',id:+v,status:a});
+    if(a==='pre'){const p=FLIPPRE[+v];await botApi('/api/vcastflip',{act:'make',name:p[0],desc:p[1],n:4});toast('ส่งวาดแล้ว 4 แบบ ⏳');}
+    if(a==='make'){const n=($('#flN').value||'').trim(),d=($('#flD').value||'').trim();if(!n||!d){toast('ใส่ชื่อและคำอธิบาย');b.disabled=false;return;}await botApi('/api/vcastflip',{act:'make',name:n,desc:d,n:4});toast('ส่งวาดแล้ว ⏳');}
+    if(a==='more'){const f=(FLIP.items||[]).find(x=>x.id===+v);if(f)await botApi('/api/vcastflip',{act:'make',name:f.name,desc:f.descr,n:4});toast('ส่งวาดเพิ่มแล้ว ⏳');}
     if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ')){b.disabled=false;return;}await botApi('/api/vcastflip',{act:'del',id:+v});}
     await flipLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
 
