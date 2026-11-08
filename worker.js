@@ -39,7 +39,7 @@ export default {
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/fluxkeys') return json(await fluxKeysApi(env, body));
       if (p === '/api/settings') {
-        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots'])
+        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset'])
           if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
         return json({ ok: true });
       }
@@ -172,7 +172,7 @@ async function audApi(env, b) {
       const look = `${pk(r, AUD.build)} ${R.g} aged ${age}, ${pk(r, AUD.hairC)} ${pk(r, fem ? AUD.hairS_f : AUD.hairS_m)}, ${pk(r, AUD.eye)} eyes, ${pk(r, AUD.face)}${ex === 'none' ? '' : ', ' + ex}`;
       const ins = await env.DB.prepare('INSERT INTO aud_cands (role,name,age,traits,intro,look,created) VALUES (?,?,?,?,?,?,?)').bind(R.key, name, age, tr.join(','), audIntro(name, tr), look, Date.now()).run();
       const cid = ins.meta.last_row_id, proj = `ออดิชัน·${R.key}·${cid}·${name}`;
-      const sty = 'soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading, original adult character, no text, no watermark'; // ผู้ใช้ชอบลายเส้นนุ่ม ละเอียด (แบบภาพสาวถือแก้วกาแฟ)
+      const sty = '[[STYLE]], original adult character, no text, no watermark'; // ผู้ใช้ชอบลายเส้นนุ่ม ละเอียด (แบบภาพสาวถือแก้วกาแฟ)
       st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,1,?,'queued',?,4)").bind(jid--, proj, `character design, full body standing front view, ${look}, wearing ${R.outfit}, personality: ${tr.join(', ')}, softly blurred simple pastel background, ${sty}`.slice(0, 2000), Date.now()));
       st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,2,?,'queued',?,4)").bind(jid--, proj, `anime key frame, medium shot, ${look}, wearing ${R.outfit}, ${R.shot}, cinematic lighting, ${sty}`.slice(0, 2000), Date.now()));
     }
@@ -184,7 +184,7 @@ async function audApi(env, b) {
     const c = await env.DB.prepare('SELECT * FROM aud_cands WHERE id=?').bind(+b.id).first(); if (!c) return { error: 'ไม่พบผู้สมัคร' };
     const R = AUD_ROLES.find(x => x.key === c.role) || {};
     await env.DB.prepare('UPDATE aud_cands SET chosen=CASE WHEN id=? THEN 1 ELSE 0 END WHERE role=?').bind(c.id, c.role).run();
-    const prompt = `Create ONE character model sheet for an original anime series, bright colourful modern TV fantasy anime style, crisp clean line art, cel shading with soft gradients, vivid colours, plain light background. Layout: full-body front view, side view and back view in a row; below them six face close-ups (neutral, smiling, angry, surprised, sad, determined); plus one full-body dynamic action pose. Use the ATTACHED casting image as the exact reference for this character: keep the same face, hairstyle, hair colour, eye colour and accessories. Original adult character, not based on any existing anime. No text, no labels, no watermark.\n\nCharacter: ${c.role}, ${c.look}. Personality: ${c.traits}. Outfit: ${R.outfit || ''}. Action pose: ${R.shot || ''}.`;
+    const prompt = `Create ONE character model sheet for an original anime series, art style: [[STYLE]]. Plain light background. Layout: full-body front view, side view and back view in a row; below them six face close-ups (neutral, smiling, angry, surprised, sad, determined); plus one full-body dynamic action pose. Use the ATTACHED casting image as the exact reference for this character: keep the same face, hairstyle, hair colour, eye colour and accessories. Original adult character, not based on any existing anime. No text, no labels, no watermark.\n\nCharacter: ${c.role}, ${c.look}. Personality: ${c.traits}. Outfit: ${R.outfit || ''}. Action pose: ${R.shot || ''}.`;
     const title = 'ชีตใหม่ · ' + c.role, ex = await env.DB.prepare('SELECT id FROM manual_tasks WHERE title=?').bind(title).first();
     if (ex) await env.DB.prepare("UPDATE manual_tasks SET prompt=?, descr=? WHERE id=? AND status!='done'").bind(prompt, `แนบภาพออดิชันของ ${c.name}`, ex.id).run();
     else await env.DB.prepare("INSERT INTO manual_tasks (kind,title,descr,prompt,pri,status,created) VALUES ('char',?,?,?,1,'todo',?)").bind(title, `แนบภาพออดิชันของ ${c.name}`, prompt, Date.now()).run();
@@ -236,6 +236,10 @@ async function genImage(env, s, prompt, steps) {
   }
   const qe = new Error('quota: โควตาเราและผู้ช่วยหมดทุกบัญชี'); qe.allQuota = true; throw qe;
 }
+// ---- สไตล์ลายเส้นกลาง: พรอมต์เก็บ [[STYLE]] ไว้ แล้วแทนด้วยสไตล์ปัจจุบันตอนสร้าง/แสดง เปลี่ยนสไตล์ทีเดียวมีผลกับทุกอย่าง (รวมงานที่ยังรอคิว) ----
+const DEF_STYLE = 'soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading';
+function curStyle(s) { return String((s && s.style) || '').trim() || DEF_STYLE; }
+function withStyle(p, s) { p = String(p || ''); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
 async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
@@ -251,7 +255,7 @@ async function tick(env, force) {
   await setSetting(env, 'last_run', String(now));
   await env.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(job.id).run();
   try {
-    const out = await genImage(env, s, job.prompt.slice(0, 2048), Math.min(8, Math.max(1, +job.steps || +s.steps || 4)));
+    const out = await genImage(env, s, withStyle(job.prompt, s).slice(0, 2048), Math.min(8, Math.max(1, +job.steps || +s.steps || 4)));
     await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (?,?,?,?,?,0,?)')
       .bind(job.id, job.project, job.scene, job.prompt, out.image, Date.now()).run();
     await env.DB.prepare('DELETE FROM jobs WHERE id=?').bind(job.id).run();
@@ -285,7 +289,7 @@ async function enqueue(env, b) {
     for (const it of b.items.slice(0, 200)) {
       const pr = String(it.prompt || '').trim();
       if (!pr) continue;
-      const full = b.raw ? pr : [s0.character, pr, s0.style].filter(x => x && x.trim()).join(', ');
+      const full = b.raw ? pr : [s0.character, pr, '[[STYLE]]'].filter(x => x && x.trim()).join(', ');
       for (let v = 0; v < variants; v++)
         stmts.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created) VALUES (?,?,?,'queued',?)").bind(project, +it.scene || 0, full, Date.now()));
     }
@@ -1319,13 +1323,13 @@ async function audioDaily(env, have) {
 
 // ---------- คลังอัตโนมัติรายวัน: ทุกวันหลัง 07:00 สร้างของใหม่หมวดละ 1 ชิ้น (ยกเว้นตัวละคร) ครบรายการแล้ววนรอบใหม่ ----------
 function manualPrompt(kind, desc, chars) {
-  const base = 'modern TV anime style, clean lineart, cel shading, high quality, no text, no watermark. All characters are ORIGINAL adults, not based on any existing anime, manga or game character.';
+  const base = 'Art style: [[STYLE]], high quality, no text, no watermark. All characters are ORIGINAL adults, not based on any existing anime, manga or game character.';
   if (kind === 'char') return `Create ONE character model sheet image of an original adult anime character. Show on a plain light background: full-body front view, side view and back view, plus four face close-ups (neutral, smiling, angry, surprised). Keep the design identical in every view. Character: ${desc}. ${base}`;
   if (kind === 'cover') return `Create a vertical key-visual / cover illustration for an original anime series, dramatic composition, cinematic lighting, space left clear for a title (but draw NO text). Subject: ${desc}. ${base}`;
   if (kind === 'key') return `Create ONE widescreen 16:9 anime key-frame illustration, cinematic composition and lighting. Scene: ${desc}.${chars ? ' Character design to follow: ' + String(chars).slice(0, 400) + '.' : ''} If I attach a character sheet, keep the faces and outfits exactly the same as the sheet. ${base}`;
   return `Create ONE anime illustration. Subject: ${desc}. ${base}`;
 }
-const LIB_TAIL = 'modern TV anime style, clean lineart, cel shading, high quality';
+const LIB_TAIL = '[[STYLE]], high quality';
 const LIBD = [
   ['ฉาก', () => SCENES, it => `${it.e}, no people, detailed anime background art, cinematic lighting, ${LIB_TAIL}`],
   ['สัตว์และอสูร', () => IDEAS.creature, it => `a ${it.e}, full body, creature design, front view, plain soft background, ${LIB_TAIL}`],
@@ -1421,6 +1425,7 @@ async function castApi(req, env, url, body) {
     if (act === 'set') { await env.DB.prepare('UPDATE manual_tasks SET status=? WHERE id=?').bind(['todo', 'skip', 'done'].includes(b.status) ? b.status : 'todo', +b.id).run(); return json({ ok: true }); }
     if (act === 'del') { await env.DB.prepare('DELETE FROM manual_tasks WHERE id=?').bind(+b.id).run(); return json({ ok: true }); }
     const r = await env.DB.prepare("SELECT id,kind,title,descr,prompt,pri,status,image_id,created FROM manual_tasks ORDER BY CASE status WHEN 'todo' THEN 0 WHEN 'skip' THEN 1 ELSE 2 END, pri, id LIMIT 300").all();
+    { const s = await getSettings(env); for (const t of r.results) t.prompt = withStyle(t.prompt, s); }
     return json({ tasks: r.results });
   }
   if (p === '/api/vcastprofile') { // ข้อมูลตัวละครที่ผู้ใช้เลือกจากตัวเลือก (Claude อ่านไปเขียนเรื่อง/พรอมต์)
@@ -1447,13 +1452,14 @@ async function castApi(req, env, url, body) {
     ep.panels.forEach((pn, i) => {
       const t = tt(i + 1);
       const cl = pn.chars.map(n => { const q = pr[n] || {}; return `${n} (${q.gender === 'หญิง' ? 'woman' : q.gender === 'ชาย' ? 'man' : 'person'}${q.age ? ', age ' + String(q.age).split(' ')[0] : ', adult'}${ep.outfit[n] ? ', wearing: ' + ep.outfit[n] : ''})`; });
-      const prompt = `Create ONE manga/anime panel illustration, ${RT[pn.s] || RT.w} composition. Scene: ${pn.shot}${cl.length ? ' Characters in this panel: ' + cl.join('; ') + '. Attach the character sheet of each of them and keep their faces, hairstyles, eye and hair colours exactly the same as the sheets.' : ''} Rainy-day mood, cinematic lighting, modern TV anime style, clean lineart, cel shading. Draw NO speech bubbles, NO text, NO watermark. All characters are original adults (university-age or older). Background people wear casual university clothes, NOT school uniforms.`.slice(0, 1800);
+      const prompt = `Create ONE manga/anime panel illustration, ${RT[pn.s] || RT.w} composition. Scene: ${pn.shot}${cl.length ? ' Characters in this panel: ' + cl.join('; ') + '. Attach the character sheet of each of them and keep their faces, hairstyles, eye and hair colours exactly the same as the sheets.' : ''} Cinematic lighting, art style: [[STYLE]]. Draw NO speech bubbles, NO text, NO watermark. All characters are original adults (university-age or older). Background people wear casual university clothes, NOT school uniforms.`.slice(0, 1800);
       const ex = have.get(t);
       if (ex) { if (ex.status === 'todo' && ex.prompt !== prompt) ins.push(env.DB.prepare('UPDATE manual_tasks SET prompt=? WHERE id=?').bind(prompt, ex.id)); return; }
       ins.push(env.DB.prepare('INSERT INTO manual_tasks (kind,title,descr,prompt,pri,status,created) VALUES (?,?,?,?,?,?,?)').bind('key', t, pn.shot.slice(0, 300), prompt, 100 + i, 'todo', Date.now()));
     });
     if (ins.length) { await env.DB.batch(ins); have = new Map((await sel()).results.map(r => [r.title, r])); }
-    return json({ title: ep.title, panels: ep.panels.map((pn, i) => { const t = have.get(tt(i + 1)) || {}; return { n: i + 1, s: pn.s, cap: pn.cap, dlg: pn.dlg, chars: pn.chars, task_id: t.id || 0, status: t.status || 'todo', image_id: t.image_id || 0, prompt: t.prompt || '' }; }) });
+    const s9 = await getSettings(env);
+    return json({ title: ep.title, panels: ep.panels.map((pn, i) => { const t = have.get(tt(i + 1)) || {}; if (t.prompt) t.prompt = withStyle(t.prompt, s9); return { n: i + 1, s: pn.s, cap: pn.cap, dlg: pn.dlg, chars: pn.chars, task_id: t.id || 0, status: t.status || 'todo', image_id: t.image_id || 0, prompt: t.prompt || '' }; }) });
   }
   if (p === '/api/vcastoutfitup') { // อัปภาพชุดของตัวละครเข้าแฟ้ม (ติดดาว)
     const b = body || {}, name = String(b.name || '').trim().slice(0, 60), outfit = String(b.outfit || '').trim().slice(0, 60);

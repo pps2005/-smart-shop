@@ -689,9 +689,10 @@ function renderGen(){const c=botCfg();BOT.filled=false;
     <label class="muted">ช่วงเวลา (ชั่วโมงเวลาไทย คั่นด้วยจุลภาค) <input id="bSlots" type="text" placeholder="7,12,18,22" style="width:140px" autocomplete="off"></label><span id="bSlotInfo" class="muted small"></span>
     <div class="row"><button class="btn main" data-bot="save">บันทึก</button><button class="btn sm" data-bot="disconnect">เปลี่ยนลิงก์/รหัสบอท</button></div>
     <p class="muted" style="margin:0">ฟรีประมาณ 200 ภาพ/วันที่ 4 steps (steps มากขึ้น = ละเอียดขึ้นแต่กินโควตามากขึ้น) · โควตารีเซ็ต 07:00 น. · ภาพออกมาเป็นสี่เหลี่ยมจัตุรัส ครอปเป็น 9:16 ตอนตัดต่อ</p></div>
-  <div class="card gp" data-gp="set" id="fkBox"></div>`;
+  <div class="card gp" data-gp="set" id="fkBox"></div>
+  <div class="card gp" data-gp="set" id="stBox"></div>`;
   gpApply();botParts();if(!BOT.s||BOT.err)botLoad();}
-function gpApply(){document.querySelectorAll('.gp').forEach(el=>{el.hidden=el.dataset.gp!==SV.gen;});vidBoxFill();if(SV.gen==='set')fkLoad();}
+function gpApply(){document.querySelectorAll('.gp').forEach(el=>{el.hidden=el.dataset.gp!==SV.gen;});vidBoxFill();if(SV.gen==='set'){fkLoad();stFill();}}
 function gpCounts(){const S=BOT.s;if(!S)return;const q=S.jobs.length,g=S.images.length;
   const set=(k,t)=>{const b=document.querySelector(`[data-seg="gen|${k}"]`);if(b)b.innerHTML=t;};
   set('queue',`<i>⏳</i>คิว${q?' '+q:''}`);set('gal',`<i>🖼️</i>คลังภาพ${g?' '+g:''}`);}
@@ -1612,7 +1613,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-of]'
       if(ofList(p).some(x=>x.n===nm))return toast('มีชุดชื่อนี้แล้ว');p.outfitx=[...(p.outfitx||[]),{n:nm.slice(0,40),d:ds.slice(0,300)}];await profSave(n);const y=window.scrollY;renderLib(true);window.scrollTo(0,y);toast('เพิ่มชุดแล้ว');return;}
     if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ'))return;p.outfitx=(p.outfitx||[]).filter(x=>x.n!==o);await profSave(n);const y=window.scrollY;renderLib(true);window.scrollTo(0,y);return;}
     if(a==='gen'&&def){b.disabled=true;const desc=ofDesc(def,p),g=GEN[p.gender]||'person',tr=(p.traits||[]).length?'':'' ;
-      const pr=`${(BOT.s&&BOT.s.settings&&BOT.s.settings.style)||'anime style, cel shading, clean lineart'}, character design sheet of an original adult ${g} anime character, wearing ${desc}, full body front view, side view and back view, plain light background, no text, no watermark`;
+      const pr=`[[STYLE]], character design sheet of an original adult ${g} anime character, wearing ${desc}, full body front view, side view and back view, plain light background, no text, no watermark`;
       await botApi('/api/enqueue',{project:ofProj(n,o),items:[{scene:1,prompt:pr}],variants:1,raw:true});toast('ส่งให้ระบบทำแล้ว ⏳');await botLoad();const y=window.scrollY;renderLib(true);window.scrollTo(0,y);ofPoll();return;}
   }catch(err){toast(botErr(err));}});
 document.addEventListener('change',async e=>{const i=e.target.closest('[data-ofup]');if(!i||!i.files[0])return;const [n,o]=i.dataset.ofup.split('|');
@@ -1714,7 +1715,7 @@ function audHtml(){
   if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
   if(!AUDS){audLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังเปิดห้องออดิชัน…</p></div>';}
   const img=(id,alt)=>id?`<img src="${esc(botU('/img/'+id))}" alt="${esc(alt)}" loading="lazy" data-bot="view" style="width:100%;aspect-ratio:1;object-fit:cover;object-position:top;border-radius:8px;background:#eee">`:`<div style="width:100%;aspect-ratio:1;border-radius:8px;background:#f1eef9;display:flex;align-items:center;justify-content:center"><span class="spin"></span></div>`;
-  return `<div class="card"><h3>🎭 ห้องออดิชัน</h3><span class="muted small">แต่ละบทมีผู้สมัครที่หน้าตาและบุคลิกต่างกัน ภาพซ้ายคือภาพโปรไฟล์ ภาพขวาคือภาพออดิชัน (ทุกคนในบทเดียวกันเล่นช็อตเดียวกัน) กด ⭐ เลือก แล้วภารกิจ "ชีตใหม่" ของบทนั้นจะเปลี่ยนพรอมต์ให้ตรงกับผู้สมัคร ให้แนบภาพของเขาไปใน GPT</span><label class="muted">ผู้สมัครใหม่ทุกวันหลัง 07:00 รวม <select id="audDaily" style="width:auto">${[4,5,6,7,8].map(x=>`<option${x===(AUDS.daily||6)?' selected':''}>${x}</option>`).join('')}</select> คน (เฉพาะบทที่ยังไม่ได้เลือก)</label>${AUDS.err?`<div class="errl">⚠️ ${esc(AUDS.err)}</div>`:''}</div>`+
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>🎭 ห้องออดิชัน</h3><button class="btn sm" data-fkgo2="1">🎨 ${esc(stCur()[1])}</button></div><span class="muted small">แต่ละบทมีผู้สมัครที่หน้าตาและบุคลิกต่างกัน ภาพซ้ายคือภาพโปรไฟล์ ภาพขวาคือภาพออดิชัน (ทุกคนในบทเดียวกันเล่นช็อตเดียวกัน) กด ⭐ เลือก แล้วภารกิจ "ชีตใหม่" ของบทนั้นจะเปลี่ยนพรอมต์ให้ตรงกับผู้สมัคร ให้แนบภาพของเขาไปใน GPT</span><label class="muted">ผู้สมัครใหม่ทุกวันหลัง 07:00 รวม <select id="audDaily" style="width:auto">${[4,5,6,7,8].map(x=>`<option${x===(AUDS.daily||6)?' selected':''}>${x}</option>`).join('')}</select> คน (เฉพาะบทที่ยังไม่ได้เลือก)</label>${AUDS.err?`<div class="errl">⚠️ ${esc(AUDS.err)}</div>`:''}</div>`+
   (AUDS.roles||[]).map(R=>{const cs=(AUDS.cands||[]).filter(c=>c.role===R.key),ch=cs.find(c=>+c.chosen);
     const body=(cs.length?`<div style="display:grid;grid-template-columns:1fr;gap:12px">`+cs.map(c=>`<div style="border:2px solid ${+c.chosen?'#f5b301':'#e5e0f3'};border-radius:12px;padding:8px;background:${+c.chosen?'#fffbea':'#fff'}">
       <div class="row" style="justify-content:space-between"><b>${+c.chosen?'⭐ ':''}${esc(c.name)}</b><span class="muted small">อายุ ${c.age} · ${esc(String(c.traits).split(',').join(' · '))}</span></div>
@@ -1731,6 +1732,25 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-aud]
     await audLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
 
 document.addEventListener('change',async e=>{if(e.target.id!=='audDaily')return;try{await botApi('/api/vcastaud',{act:'daily',n:+e.target.value});toast('บันทึกแล้ว');}catch(err){toast(botErr(err));}});
+
+/* ---------- สไตล์ลายเส้นกลาง (ใช้กับทุกอย่าง) ---------- */
+const STYLES=[
+ ['soft','🌸 นุ่มละเอียด','ลายเส้นบาง นุ่ม ผมแยกเส้น แสงนุ่มแบบภาพยนตร์ (แบบภาพสาวถือแก้วกาแฟ)','soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading'],
+ ['tv','📺 อนิเมะทีวีสีสด','เส้นคม ลงสีเซล สีอิ่ม สดใส แบบอนิเมะแฟนตาซีทีวี','bright colourful modern TV fantasy anime style, crisp clean line art, cel shading with soft gradients, vivid saturated colours, sparkling light'],
+ ['film','🎬 อนิเมะภาพยนตร์','แสงเงาลึก ฉากหลังละเอียดแบบภาพวาด ท้องฟ้าสวย บรรยากาศอลังการ','cinematic anime film style, painterly highly detailed backgrounds, dramatic volumetric lighting, rich atmospheric colours, fine line art, emotional mood'],
+ ['webtoon','📱 เว็บตูน','ลงสีพาสเทลนุ่ม เส้นบาง ตัวละครหน้าสวยหล่อ แบบเว็บตูนเกาหลี','korean webtoon style, soft pastel colouring, thin clean line art, pretty refined faces, airy light, gentle gradients'],
+ ['dark','🌑 ดาร์กแฟนตาซี','เส้นหนักคม คอนทราสต์สูง เงาเข้ม แสงเรืองในที่มืด','dark fantasy anime style, bold sharp line art, high contrast, deep shadows, glowing rim light, gritty atmospheric detail'],
+ ['chibi','🍡 จิบิน่ารัก','ตัวเตี้ย หัวโต ตาโตเงา สีหวาน ใช้กับฉากตลก','cute chibi anime style, super deformed proportions, big glossy eyes, soft pastel colours, rounded clean lines, playful'],
+];
+function stCur(){const st=(BOT.s&&BOT.s.settings)||{};return STYLES.find(x=>x[0]===st.style_preset)||(st.style?['custom','✏️ กำหนดเอง','ข้อความสไตล์ที่พิมพ์เอง',st.style]:STYLES[0]);}
+function stFill(){const el=document.getElementById('stBox');if(!el)return;const c=stCur();
+  el.innerHTML=`<h3>🎨 สไตล์ลายเส้น (ใช้กับทุกอย่าง)</h3><span class="muted small">เลือกครั้งเดียว ใช้กับภาพที่ระบบสร้าง (คลัง ออดิชัน ชุด ภาพร่าง) และพรอมต์ที่ให้ GPT (ชีตตัวละคร มังงะ ภารกิจ) รวมถึงงานที่ยังรอคิว ภาพที่เสร็จแล้วไม่เปลี่ยน</span>
+  ${STYLES.map(x=>`<div class="arow" style="border:2px solid ${c[0]===x[0]?'#8b5cf6':'transparent'};border-radius:10px"><div class="row" style="justify-content:space-between"><b>${x[1]}</b>${c[0]===x[0]?'<span class="st done">ใช้อยู่</span>':`<button class="btn sm main" data-sty="${x[0]}">ใช้สไตล์นี้</button>`}</div><div class="muted small">${x[2]}</div></div>`).join('')}
+  <span class="muted small">ปรับละเอียดเองได้ที่ช่อง "สไตล์" ในการ์ดตั้งค่าบอทด้านบน</span>`;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-sty]');if(!b)return;const x=STYLES.find(q=>q[0]===b.dataset.sty);if(!x)return;
+  try{b.disabled=true;await botApi('/api/settings',{style:x[3],style_preset:x[0]});await botLoad();const t=$('#bStyle');if(t)t.value=x[3];stFill();toast('เปลี่ยนสไตล์เป็น '+x[1]);}catch(err){toast(botErr(err));b.disabled=false;}});
+
+document.addEventListener('click',e=>{if(!e.target.closest('[data-fkgo2]'))return;SV.gen='set';try{localStorage.setItem('ss_sv',JSON.stringify(SV));}catch(_){}const t=document.querySelector('#tabs [data-v=gen]');if(t)t.click();setTimeout(()=>{gpApply();const b=document.getElementById('stBox');if(b)b.scrollIntoView({behavior:'smooth'});},600);});
 boot();
 })();
 </script>
