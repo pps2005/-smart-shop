@@ -875,7 +875,7 @@ def gen_pass(j, im, k, port=8188, F=81, opt=None):
     fps = 16
     if M.get("rife") and opt.get("fps") != 12:
         # เติมเฟรม 16 → 48 fps ให้ลื่น (ถ้าพัง ใช้ผลเดิมจาก cache ไม่ต้องเจนใหม่)
-        wf["17"] = {"class_type": "RIFE VFI", "inputs": {"ckpt_name": "rife47.pth", "frames": ["15", 0], "clear_cache_after_n_frames": 10, "multiplier": 3, "fast_mode": True, "ensemble": True, "scale_factor": 1.0}}
+        wf["17"] = {"class_type": "RIFE VFI", "inputs": {"ckpt_name": "rife47.pth", "frames": ["15", 0], "clear_cache_after_n_frames": 10, "multiplier": 3, "fast_mode": True, "ensemble": True, "scale_factor": 1.0, "dtype": "float16", "torch_compile": False, "batch_size": 1}}
         wf["16"]["inputs"]["images"] = ["17", 0]
         fps = 48
     t = time.time()
