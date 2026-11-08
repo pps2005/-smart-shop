@@ -1035,7 +1035,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['hand','🎯','ภารกิจ'],['aud','🎭','ออดิชัน'],['prof','👥','ตัวละคร'],['mg','📖','มังงะ'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='aud'?audHtml():lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
+  const lv2=SV.lib;vwSet(segHtml('lib',[['world','🌌','โลก'],['hand','🎯','ภารกิจ'],['aud','🎭','ออดิชัน'],['prof','👥','ตัวละคร'],['mg','📖','มังงะ'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='aud'?audHtml():lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -1378,7 +1378,8 @@ function vwSet(h,quiet){const vw=$('#vw');if(!vw)return;
   const y=window.scrollY;vw.innerHTML=h;VWH=h;vw.dataset.vwk=view;
   if(quiet){window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y));}}
 /* ---------- แถบย่อยแบบกด (ลดการเลื่อนหน้า) ---------- */
-const SV=(()=>{try{return Object.assign({studio:'city',lib:'cast',gen:'stat'},JSON.parse(localStorage.getItem('ss_sv')||'{}'));}catch(e){return {studio:'city',lib:'cast',gen:'stat'};}})();
+const SV=(()=>{try{return Object.assign({studio:'city',lib:'aud',gen:'stat'},JSON.parse(localStorage.getItem('ss_sv')||'{}'));}catch(e){return {studio:'city',lib:'aud',gen:'stat'};}})();
+if(SV.lib==='cast')SV.lib='aud';
 function segHtml(pg,items){return `<nav class="seg">${items.map(([k,ic,n])=>`<button class="${SV[pg]===k?'on':''}" data-seg="${pg}|${k}"><i>${ic}</i>${n}</button>`).join('')}</nav>`;}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-seg]');if(!b)return;const [pg,k]=b.dataset.seg.split('|');SV[pg]=k;
   try{localStorage.setItem('ss_sv',JSON.stringify(SV));}catch(err){}
