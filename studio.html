@@ -688,9 +688,10 @@ function renderGen(){const c=botCfg();BOT.filled=false;
     <label class="muted" style="display:flex;gap:8px;align-items:center"><input id="bPace" type="checkbox" checked style="width:22px;height:22px"> แบ่งทำเป็นช่วงเวลา (แนะนำ)</label>
     <label class="muted">ช่วงเวลา (ชั่วโมงเวลาไทย คั่นด้วยจุลภาค) <input id="bSlots" type="text" placeholder="7,12,18,22" style="width:140px" autocomplete="off"></label><span id="bSlotInfo" class="muted small"></span>
     <div class="row"><button class="btn main" data-bot="save">บันทึก</button><button class="btn sm" data-bot="disconnect">เปลี่ยนลิงก์/รหัสบอท</button></div>
-    <p class="muted" style="margin:0">ฟรีประมาณ 200 ภาพ/วันที่ 4 steps (steps มากขึ้น = ละเอียดขึ้นแต่กินโควตามากขึ้น) · โควตารีเซ็ต 07:00 น. · ภาพออกมาเป็นสี่เหลี่ยมจัตุรัส ครอปเป็น 9:16 ตอนตัดต่อ</p></div>`;
+    <p class="muted" style="margin:0">ฟรีประมาณ 200 ภาพ/วันที่ 4 steps (steps มากขึ้น = ละเอียดขึ้นแต่กินโควตามากขึ้น) · โควตารีเซ็ต 07:00 น. · ภาพออกมาเป็นสี่เหลี่ยมจัตุรัส ครอปเป็น 9:16 ตอนตัดต่อ</p></div>
+  <div class="card gp" data-gp="set" id="fkBox"></div>`;
   gpApply();botParts();if(!BOT.s||BOT.err)botLoad();}
-function gpApply(){document.querySelectorAll('.gp').forEach(el=>{el.hidden=el.dataset.gp!==SV.gen;});vidBoxFill();}
+function gpApply(){document.querySelectorAll('.gp').forEach(el=>{el.hidden=el.dataset.gp!==SV.gen;});vidBoxFill();if(SV.gen==='set')fkLoad();}
 function gpCounts(){const S=BOT.s;if(!S)return;const q=S.jobs.length,g=S.images.length;
   const set=(k,t)=>{const b=document.querySelector(`[data-seg="gen|${k}"]`);if(b)b.innerHTML=t;};
   set('queue',`<i>⏳</i>คิว${q?' '+q:''}`);set('gal',`<i>🖼️</i>คลังภาพ${g?' '+g:''}`);}
@@ -1676,6 +1677,27 @@ function vidBoxFill(){const el=document.getElementById('vidBox');if(!el)return;c
    (vids.length?vids.map(v=>`<div style="margin:10px 0"><b class="small">${esc(String(v.project).replace(/^ภาพขยับ·/,''))}</b> <span class="muted small">${v.sec?Math.round(v.sec/60)+' นาทีทำ · ':''}${Math.round((v.size||0)/1024)} KB</span><video src="${esc(botU('/vid/'+v.id))}" controls playsinline loop preload="metadata" style="width:100%;border-radius:10px;background:#000;margin-top:4px"></video></div>`).join('')
     :(run.length?'':'<p class="muted" style="margin:0">ยังไม่มีคลิป กด 🎬 ทำให้ขยับ ที่ภาพในแท็บ 🎯 ภารกิจ</p>'));
   if(h!==VIDHTML){VIDHTML=h;el.innerHTML=h;}}
+
+
+/* ---------- โควตา Flux จากผู้ช่วย ---------- */
+let FK=null;
+async function fkLoad(){try{FK=await botApi('/api/fluxkeys',{act:'list'});}catch(e){FK={keys:[],err:botErr(e)};}fkFill();}
+function fkFill(){const el=document.getElementById('fkBox');if(!el||!FK)return;const now=FK.now||Date.now();
+  const rows=(FK.keys||[]).map(k=>{const p=+k.paused_until>now,today=k.day===new Date(Date.now()+7*3600000).toISOString().slice(0,10)?(+k.n||0):0;
+    return `<div class="arow"><div class="row" style="justify-content:space-between"><b>🤝 ${esc(k.name)}</b><span class="muted small">${esc(k.acct)} · วันนี้ ${today} ภาพ</span></div>
+    <div class="muted small">${!+k.on_?'⏸ ปิดอยู่':p?`⏳ โควตาหมด กลับมา ${tTH(k.paused_until)}`:'✅ พร้อมใช้ (ใช้เมื่อโควตาเราหมด)'}${k.last_err?` · ล่าสุด: ${esc(String(k.last_err).slice(0,90))}`:''}</div>
+    <div class="row"><button class="btn sm${+k.on_?'':' main'}" data-fk="set|${k.id}|${+k.on_?0:1}">${+k.on_?'⏸ ปิด':'▶️ เปิดใช้'}</button><button class="btn sm" data-fk="del|${k.id}">🗑 ลบ</button></div></div>`;}).join('');
+  el.innerHTML=`<h3>🤝 โควตา Flux จากผู้ช่วย</h3><span class="muted small">ผู้ช่วยแต่ละคนใช้บัญชี Cloudflare ฟรีของตัวเอง สร้าง API Token แบบแม่แบบ "Workers AI" แล้วส่ง Account ID กับรหัสมา ระบบใช้โควตาเราก่อน หมดแล้วจึงใช้ของผู้ช่วย รหัสเก็บที่บอทเท่านั้น ไม่แสดงบนเว็บ เพิ่มแล้วจะปิดไว้ก่อน ต้องกดเปิดเอง</span>
+  ${FK.err?`<div class="errl">⚠️ ${esc(FK.err)}</div>`:''}${rows||'<p class="muted small" style="margin:6px 0">ยังไม่มีผู้ช่วย</p>'}
+  <div class="muted small" style="margin-top:8px"><b>➕ เพิ่มผู้ช่วย</b></div>
+  <input type="text" id="fkName" placeholder="ชื่อผู้ช่วย" autocomplete="off"><input type="text" id="fkAcct" placeholder="Account ID (ตัวอักษร 32 ตัว)" autocomplete="off" autocapitalize="off"><input type="password" id="fkTok" placeholder="API Token" autocomplete="off">
+  <button class="btn sm main" data-fk="add|0">ทดสอบรหัสแล้วเพิ่ม</button>`;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-fk]');if(!b)return;const [a,id,v]=b.dataset.fk.split('|');
+  try{b.disabled=true;
+    if(a==='add'){const r=await botApi('/api/fluxkeys',{act:'add',name:$('#fkName').value,acct:$('#fkAcct').value,token:$('#fkTok').value});if(r.error)throw new Error(r.error);toast('เพิ่มแล้ว · '+(r.msg||''));}
+    if(a==='set')await botApi('/api/fluxkeys',{act:'set',id:+id,on:v==='1'});
+    if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ')){b.disabled=false;return;}await botApi('/api/fluxkeys',{act:'del',id:+id});}
+    await fkLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
 
 boot();
 })();

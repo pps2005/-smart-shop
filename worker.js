@@ -37,6 +37,7 @@ export default {
       if (p.startsWith('/api/vcast')) { const cr = await castApi(req, env, url, body); if (cr) return cr; }
       if (p.startsWith('/api/v')) { const vr = await vApi(req, env, url, ctx, body); if (vr) return vr; }
       if (p === '/api/enqueue') return json(await enqueue(env, body));
+      if (p === '/api/fluxkeys') return json(await fluxKeysApi(env, body));
       if (p === '/api/settings') {
         for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots'])
           if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
@@ -99,16 +100,61 @@ async function slotCheck(env, s, now) {
   if (String(start) !== s.slot_start) { await setSetting(env, 'slot_start', String(start)); await setSetting(env, 'slot_n', '0'); s.slot_n = '0'; }
   const nx = await env.DB.prepare("SELECT steps FROM jobs WHERE status='queued' ORDER BY id LIMIT 1").first();
   const st = Math.min(8, Math.max(1, +(nx && nx.steps) || +s.steps || 4)), per = 19.2 + 9.6 * st;
-  const budget = Math.max(1, Math.floor(8500 / hrs.length / per));
+  const nk = (await env.DB.prepare('SELECT COUNT(*) n FROM fluxkeys WHERE on_=1').first().catch(() => ({ n: 0 }))) || { n: 0 };
+  const budget = Math.max(1, Math.floor(8500 * (1 + (+nk.n || 0)) / hrs.length / per));
   const info = JSON.stringify({ start, next, n: +s.slot_n || 0, budget });
   if (info !== s.slot_info) await setSetting(env, 'slot_info', info);
   return { full: (+s.slot_n || 0) >= budget };
+}
+// ---- โควตา Flux จากผู้ช่วย: บัญชี Cloudflare ของแต่ละคน (token สิทธิ์ Workers AI อย่างเดียว) ใช้ต่อเมื่อโควตาเราหมด ----
+const isQuota = m => /neuron|allocation|quota|exceed|limit|4006|3036|429/i.test(m);
+function nextReset() { const early = new Date().getUTCHours() < 6, d = new Date(); d.setUTCHours(24, 2, 0, 0); return early ? Date.now() + 30 * 60000 : d.getTime(); }
+async function activeKeys(env, now) { return (await env.DB.prepare('SELECT * FROM fluxkeys WHERE on_=1 AND COALESCE(paused_until,0)<? ORDER BY id').bind(now).all()).results; }
+async function runHelper(k, prompt, steps) {
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(k.acct)}/ai/run/${MODEL}`, { method: 'POST', headers: { authorization: 'Bearer ' + k.token, 'content-type': 'application/json' }, body: JSON.stringify({ prompt, steps }) });
+  const j = await r.json().catch(() => ({}));
+  if (r.ok && j.result && j.result.image) return j.result.image;
+  throw new Error(`[${r.status}] ` + JSON.stringify(j.errors || j).slice(0, 300));
+}
+async function fluxKeysApi(env, b) {
+  const act = (b || {}).act || 'list';
+  if (act === 'add') {
+    const name = String(b.name || '').trim().slice(0, 40), acct = String(b.acct || '').trim(), token = String(b.token || '').trim();
+    if (!name || !/^[0-9a-f]{32}$/i.test(acct) || token.length < 20) return { error: 'ตรวจชื่อ Account ID (32 ตัว) และรหัสอีกครั้ง' };
+    let ok = '', err = '';
+    try { await runHelper({ acct, token }, 'a small blue flower, simple illustration', 1); ok = 'ทดสอบผ่าน'; } catch (e) { err = String(e.message || e); if (!isQuota(err)) return { error: 'ทดสอบรหัสไม่ผ่าน: ' + err.slice(0, 200) }; ok = 'รหัสใช้ได้ แต่โควตาวันนี้ของบัญชีนี้หมดแล้ว'; }
+    await env.DB.prepare('INSERT INTO fluxkeys (name,acct,token,on_,created) VALUES (?,?,?,0,?)').bind(name, acct, token, Date.now()).run();
+    return { ok: true, msg: ok };
+  }
+  if (act === 'set') { await env.DB.prepare('UPDATE fluxkeys SET on_=? WHERE id=?').bind(b.on ? 1 : 0, +b.id).run(); return { ok: true }; }
+  if (act === 'del') { await env.DB.prepare('DELETE FROM fluxkeys WHERE id=?').bind(+b.id).run(); return { ok: true }; }
+  const r = await env.DB.prepare('SELECT id,name,acct,on_,paused_until,day,n,last_err,created FROM fluxkeys ORDER BY id').all();
+  return { keys: r.results.map(k => ({ ...k, acct: k.acct.slice(0, 4) + '…' + k.acct.slice(-4) })), now: Date.now() };
+}
+async function genImage(env, s, prompt, steps) {
+  const now = Date.now();
+  if (now >= +s.paused_until) {
+    try { const out = await env.AI.run(MODEL, { prompt, steps }); if (out && out.image) return { image: out.image, by: '' }; throw new Error('AI ไม่ได้ส่งภาพกลับมา'); }
+    catch (e) { const m = String(e.message || e); if (!isQuota(m)) throw e; await setSetting(env, 'img_err', new Date().toISOString() + ' ' + m.slice(0, 400)); await setSetting(env, 'paused_until', String(nextReset())); s.paused_until = String(nextReset()); }
+  }
+  const day = new Date(now + 7 * 3600000).toISOString().slice(0, 10);
+  for (const k of await activeKeys(env, now)) {
+    try {
+      const img = await runHelper(k, prompt, steps);
+      await env.DB.prepare('UPDATE fluxkeys SET n=CASE WHEN day=? THEN COALESCE(n,0)+1 ELSE 1 END, day=?, last_err=NULL WHERE id=?').bind(day, day, k.id).run();
+      return { image: img, by: k.name };
+    } catch (e) {
+      const m = String(e.message || e);
+      await env.DB.prepare('UPDATE fluxkeys SET last_err=?, paused_until=? WHERE id=?').bind(m.slice(0, 200), isQuota(m) ? nextReset() : now + 60 * 60000, k.id).run();
+    }
+  }
+  const qe = new Error('quota: โควตาเราและผู้ช่วยหมดทุกบัญชี'); qe.allQuota = true; throw qe;
 }
 async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
   if (!force) {
-    if (now < +s.paused_until) return { skipped: 'paused' };
+    if (now < +s.paused_until && !(await activeKeys(env, now)).length) return { skipped: 'paused' };
     if (now - +s.last_run < (+s.interval_min || 1) * 60000 - 15000) return { skipped: 'wait' };
     const sl = await slotCheck(env, s, now); // แบ่งทำเป็นช่วงเวลา แต่ละช่วงมีโควตาของตัวเอง
     if (sl.full) return { skipped: 'slot full' };
@@ -119,8 +165,7 @@ async function tick(env, force) {
   await setSetting(env, 'last_run', String(now));
   await env.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(job.id).run();
   try {
-    const out = await env.AI.run(MODEL, { prompt: job.prompt.slice(0, 2048), steps: Math.min(8, Math.max(1, +job.steps || +s.steps || 4)) });
-    if (!out || !out.image) throw new Error('AI ไม่ได้ส่งภาพกลับมา');
+    const out = await genImage(env, s, job.prompt.slice(0, 2048), Math.min(8, Math.max(1, +job.steps || +s.steps || 4)));
     await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (?,?,?,?,?,0,?)')
       .bind(job.id, job.project, job.scene, job.prompt, out.image, Date.now()).run();
     await env.DB.prepare('DELETE FROM jobs WHERE id=?').bind(job.id).run();
@@ -130,13 +175,11 @@ async function tick(env, force) {
     return { done: true, left: left.n };
   } catch (e) {
     const msg = String(e.message || e);
-    if (/neuron|allocation|quota|exceed|limit|4006|3036/i.test(msg)) {
+    if (e.allQuota || isQuota(msg)) {
       await env.DB.prepare("UPDATE jobs SET status='queued' WHERE id=?").bind(job.id).run();
-      await setSetting(env, 'img_err', new Date().toISOString() + ' ' + msg.slice(0, 400));
-      const d = new Date(); d.setUTCHours(24, 2, 0, 0);
-      // เพิ่งผ่านเที่ยงคืน UTC ไม่นาน แต่ Cloudflare ยังบอกว่าโควตาหมด → โควตาอาจรีเซ็ตช้า ลองใหม่ทุก 30 นาที แทนที่จะรอข้ามวัน
-      const early = new Date().getUTCHours() < 6;
-      await setSetting(env, 'paused_until', String(early ? Date.now() + 30 * 60000 : d.getTime()));
+      if (!e.allQuota) await setSetting(env, 'img_err', new Date().toISOString() + ' ' + msg.slice(0, 400));
+      // เพิ่งผ่านเที่ยงคืน UTC ไม่นาน แต่ Cloudflare ยังบอกว่าโควตาหมด → ลองใหม่ทุก 30 นาที แทนที่จะรอข้ามวัน
+      if (Date.now() >= +s.paused_until) await setSetting(env, 'paused_until', String(nextReset()));
       await notify(env, '⏸ โควตาสร้างภาพฟรีของวันนี้หมดแล้ว บอทจะกลับมาทำต่อเองประมาณ 07:00 น. (เวลาไทย)');
       return { paused: true };
     }
@@ -284,6 +327,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT, helper INTEGER DEFAULT 0)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS char_profiles (name TEXT PRIMARY KEY, data TEXT, updated INTEGER)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS fluxkeys (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, acct TEXT, token TEXT, on_ INTEGER DEFAULT 0, paused_until INTEGER DEFAULT 0, day TEXT, n INTEGER DEFAULT 0, last_err TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS sfx_real (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, mime TEXT, size INTEGER, data TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS manual_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, title TEXT, descr TEXT, prompt TEXT, pri INTEGER DEFAULT 50, status TEXT DEFAULT 'todo', image_id INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS helpers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, key TEXT UNIQUE, on_ INTEGER DEFAULT 1, created INTEGER, seen INTEGER DEFAULT 0, done INTEGER DEFAULT 0, cur TEXT DEFAULT '')"),
