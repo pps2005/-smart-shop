@@ -1442,7 +1442,7 @@ const HKIND={char:['🧑‍🎤','ชีตตัวละคร',30],key:['🎬
 function handXp(a){return a.filter(t=>t.status==='done').reduce((x,t)=>x+((HKIND[t.kind]||HKIND.other)[2]),0);}
 function handN(){return Math.min(8,Math.max(2,+(localStorage.getItem('ss_handn')||4)));}
 async function handLoad(){try{const r=await botApi('/api/vcastmanual',{act:'list'});HAND=r.tasks||[];HANDERR='';}catch(e){HANDERR=botErr(e);if(!HAND)HAND=[];}
-  if(view==='lib'&&SV.lib==='hand'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
+  if(view==='lib'&&(SV.lib==='hand'||SV.lib==='mg'||SV.lib==='prof')){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
 function handItem(t,open){const k=HKIND[t.kind]||HKIND.other;
   const body=t.status==='done'&&t.image_id?`<img src="${esc(botU('/img/'+t.image_id))}" alt="${esc(t.title)}" style="width:100%;border-radius:10px" loading="lazy" data-bot="view">`
     :`<span class="muted small">เอาพรอมต์ไปวางใน GPT หรือ Gemini ได้เลย ถ้าเป็นภาพคีย์ฉาก ให้แนบชีตตัวละครไปด้วย หน้าจะได้เหมือนกัน</span><pre class="hcell" style="user-select:all">${esc(t.prompt)}</pre>`;
@@ -1621,6 +1621,7 @@ async function mgLoad(){try{MG=await botApi('/api/vcastmanga',{ep:1});MGERR='';}
 function mangaHtml(){
   if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
   if(!MG){mgLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดมังงะ…</p></div>';}
+  if(!HAND)handLoad();
   const P=MG.panels||[],have=P.filter(x=>x.image_id).length,AR={w:'16/9',t:'3/4',s:'1/1'};
   const bub=(d)=>d.map(([w,t])=>`<div style="margin:6px 4px;padding:8px 12px;background:#fff;color:#222;border:2px solid #222;border-radius:16px;font-size:14px;line-height:1.45"><b>${esc(w)}</b> ${esc(t)}</div>`).join('');
   const list=P.filter(x=>!MGHIDE||x.image_id);
@@ -1631,8 +1632,9 @@ function mangaHtml(){
   list.map(x=>{const img=x.image_id?`<img src="${esc(botU('/img/'+x.image_id))}" alt="ช่อง ${x.n}" style="width:100%;display:block;border-radius:6px" loading="lazy">`
     :`<div style="width:100%;aspect-ratio:${AR[x.s]||'16/9'};border:2px dashed #666;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;text-align:center;padding:10px">ช่อง ${x.n} · ยังไม่มีภาพ${x.chars&&x.chars.length?'<br>ตัวละคร: '+esc(x.chars.join(', ')):''}</div>`;
     const cap=x.cap?`<div style="margin:6px 4px;padding:6px 10px;background:#f6e9a8;color:#333;font-size:13px;border-radius:4px"><i>${esc(x.cap)}</i></div>`:'';
+    const att=(!x.image_id&&x.chars&&x.chars.length)?`<div style="margin:6px 4px;color:#ddd;font-size:12px">แนบชีตตัวละครเหล่านี้ให้ GPT (แตะรูป เปิดเต็ม แล้วกดค้างเพื่อบันทึก):<div class="row" style="gap:10px;flex-wrap:wrap;margin-top:4px">${x.chars.map(c=>{const u=profImg(c);return `<a href="${esc(u||'#')}" target="_blank" rel="noopener" style="text-align:center;color:#ddd;text-decoration:none;width:64px">${u?`<img src="${esc(u)}" alt="${esc(c)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;object-position:top;border:2px solid #8b5cf6;display:block;margin:0 auto 2px">`:`<div style="width:56px;height:56px;border-radius:50%;background:#333;margin:0 auto 2px"></div>`}<span style="font-size:11px">${esc(c)}</span></a>`;}).join('')}</div></div>`:'';
     const tools=x.image_id?'':`<div class="row" style="margin:4px"><button class="btn sm" data-mg="copy|${x.n}">📋 พรอมต์</button><label class="btn sm" style="cursor:pointer">📤 อัปโหลดภาพ<input type="file" accept="image/*" hidden data-mgup="${x.task_id}"></label></div>`;
-    return `<div style="margin-bottom:14px">${img}${cap}${bub(x.dlg||[])}${tools}</div>`;}).join('')+`</div>`;}
+    return `<div style="margin-bottom:14px">${img}${cap}${bub(x.dlg||[])}${att}${tools}</div>`;}).join('')+`</div>`;}
 document.addEventListener('change',async e=>{if(e.target.id==='mgHide'){MGHIDE=e.target.checked;localStorage.setItem('ss_mghide',MGHIDE?'1':'0');renderLib(true);return;}
   const i=e.target.closest('[data-mgup]');if(!i||!i.files[0])return;
   try{toast('กำลังอัปโหลด…');const data=await imgToJpegB64(i.files[0],1600);await botApi('/api/vcastmanualup',{id:+i.dataset.mgup,data});toast('ใส่ภาพในช่องแล้ว ✅');await mgLoad();HAND=null;}catch(err){toast(botErr(err));}});
