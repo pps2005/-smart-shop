@@ -1392,7 +1392,8 @@ const WCATS=[['weapon','อาวุธ','⚔️'],['power','พลังอา�
 let WORLD=null;
 function loadWorld(){if(WORLD)return;WORLD={};fetch('world.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{WORLD=d;if(view==='lib')renderLib();}).catch(()=>{WORLD={err:1};if(view==='lib')renderLib();});}
 function libNm(it){return String(it.i).padStart(4,'0')+' '+String(it.n).replace(' — ',' · ').replace(/·/g,'-').replace(' - ',' · ');}
-function worldHtml(){loadWorld();
+function worldHtml(){loadWorld();return flipHtml()+worldHtml0();}
+function worldHtml0(){
   if(WORLD.err)return '<div class="card"><p class="muted" style="margin:0">โหลดรายการคลังโลกไม่ได้ ลองรีเฟรชอีกครั้ง</p></div>';
   if(!WORLD.weapon)return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดคลังโลก…</p></div>';
   const S=BOT.s||{images:[],jobs:[]};
@@ -1792,6 +1793,36 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-keep
     await Promise.all([styLoad(),audLoad()]);}catch(err){toast(botErr(err));b.disabled=false;}});
 
 new MutationObserver(()=>{document.querySelectorAll('.seg').forEach(n=>{const on=n.querySelector('button.on');if(on&&!n.dataset.sc){n.dataset.sc='1';const l=on.offsetLeft-n.clientWidth/2+on.clientWidth/2;if(l>0)n.scrollLeft=l;}});}).observe(document.body,{childList:true,subtree:true});
+
+/* ---------- 📽️ flipbook เอฟเฟกต์จาก Flux (ไม่ใช้ Kaggle) ต้องตรวจผ่านก่อนใช้ ---------- */
+let FLIP=null,FLIPT=0,FLIPP=0;
+const FLIPPRE=[['ยันต์ไฟลุก','a paper talisman catching fire and burning with bright orange flames and glowing embers'],['วงเวทหมุน','a glowing cyan magic rune circle hovering in the air, rotating, with floating glyphs'],['ฟ้าแลบ','a lightning bolt striking from dark storm clouds, bright electric flash'],['ประกายแสงลอย','soft glowing light particles and sparkles floating upward in the dark'],['เปลวตะเกียง','a small lantern flame flickering inside a glass lantern'],['พลังอาคมระเบิด','an explosion of violet magic energy bursting outward with sparks']];
+async function flipLoad(){try{FLIP=await botApi('/api/vcastflip',{act:'list'});}catch(e){FLIP=FLIP||{items:[],err:botErr(e)};}
+  if(view==='lib'&&SV.lib==='world'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}
+  clearTimeout(FLIPT);if((FLIP.items||[]).some(f=>f.pending)&&view==='lib'&&SV.lib==='world')FLIPT=setTimeout(flipLoad,20000);}
+function flipHtml(){
+  if(!botCfg().url)return '';
+  if(!FLIP){flipLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลด flipbook…</p></div>';}
+  const L=FLIP.items||[],ST={making:'⏳ กำลังวาด',review:'👀 รอตรวจ',ok:'✅ ผ่าน ใช้ได้',rejected:'❌ ไม่ผ่าน'};
+  const rows=L.map(f=>{const fr=(f.frames||[]).filter(Boolean),done=!f.pending&&fr.length,st=f.status==='making'&&done?'review':f.status;
+    const player=fr.length?`<div style="position:relative;width:100%;aspect-ratio:1;background:#111;border-radius:10px;overflow:hidden">${fr.map((id,i)=>`<img src="${esc(botU('/img/'+id))}" alt="" class="flipfr" data-fb="${f.id}" data-k="${i}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:${i?0:1}">`).join('')}</div>`:'';
+    return `<div class="arow"><div class="row" style="justify-content:space-between"><b>📽️ ${esc(f.name)}</b><span class="muted small">${ST[st]||st} · ${fr.length}/${f.n} เฟรม</span></div>
+      ${f.pending?'<div class="row"><span class="spin"></span><span class="muted small">กำลังวาดเฟรม…</span></div>':''}${f.failed?`<div class="errl">มี ${f.failed} เฟรมไม่สำเร็จ</div>`:''}${player}
+      <div class="row" style="margin-top:6px">${done&&st!=='ok'?`<button class="btn sm main" data-flip="ok|${f.id}">✅ ผ่าน เก็บเข้าคลัง</button>`:''}${done&&st!=='rejected'?`<button class="btn sm" data-flip="rejected|${f.id}">❌ ไม่ผ่าน</button>`:''}<button class="btn sm" data-flip="del|${f.id}">🗑</button></div></div>`;}).join('');
+  return `<div class="card"><h3>📽️ เอฟเฟกต์ flipbook</h3><span class="muted small">Flux วาดเอฟเฟกต์ 6 เฟรมต่อชุด แล้วเล่นต่อกันเป็นภาพเคลื่อนไหว ไม่ใช้ Kaggle เหมาะกับไฟ วงเวท ฟ้าแลบ ประกายแสง ชุดที่ยังไม่กด ✅ ผ่าน จะไม่ถูกนำไปใช้ งานนี้ยังเป็นการทดลอง บางชุดอาจกระตุก</span>
+    ${FLIP.err?`<div class="errl">⚠️ ${esc(FLIP.err)}</div>`:''}
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin:6px 0">${FLIPPRE.map((p,i)=>`<button class="btn sm" data-flip="pre|${i}">✨ ${p[0]}</button>`).join('')}</div>
+    <input type="text" id="flN" placeholder="ชื่อเอฟเฟกต์เอง" autocomplete="off"><input type="text" id="flD" placeholder="อธิบายเป็นภาษาอังกฤษ เช่น blue fire swirling around a sword" autocomplete="off"><button class="btn sm main" data-flip="make|0">สร้าง flipbook</button>
+    ${rows?det('flips',`📚 ชุด flipbook <span class="dn">${L.length}</span>`,rows,true):''}</div>`;}
+setInterval(()=>{FLIPP++;document.querySelectorAll('.flipfr').forEach(im=>{const sib=document.querySelectorAll(`.flipfr[data-fb="${im.dataset.fb}"]`).length;im.style.opacity=(+im.dataset.k===FLIPP%sib)?1:0;});},125);
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-flip]');if(!b)return;const [a,v]=b.dataset.flip.split('|');
+  try{b.disabled=true;
+    if(a==='pre'){const p=FLIPPRE[+v];await botApi('/api/vcastflip',{act:'make',name:p[0],desc:p[1],n:6});toast('ส่งวาดแล้ว 6 เฟรม ⏳');}
+    if(a==='make'){const n=($('#flN').value||'').trim(),d=($('#flD').value||'').trim();if(!n||!d){toast('ใส่ชื่อและคำอธิบาย');b.disabled=false;return;}await botApi('/api/vcastflip',{act:'make',name:n,desc:d,n:6});toast('ส่งวาดแล้ว ⏳');}
+    if(a==='ok'||a==='rejected')await botApi('/api/vcastflip',{act:'set',id:+v,status:a});
+    if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ')){b.disabled=false;return;}await botApi('/api/vcastflip',{act:'del',id:+v});}
+    await flipLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
+
 boot();
 })();
 </script>

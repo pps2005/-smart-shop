@@ -111,8 +111,8 @@ async function slotCheck(env, s, now) {
 const isQuota = m => /neuron|allocation|quota|exceed|limit|4006|3036|429/i.test(m);
 function nextReset() { const early = new Date().getUTCHours() < 6, d = new Date(); d.setUTCHours(24, 2, 0, 0); return early ? Date.now() + 30 * 60000 : d.getTime(); }
 async function activeKeys(env, now) { return (await env.DB.prepare('SELECT * FROM fluxkeys WHERE on_=1 AND COALESCE(paused_until,0)<? ORDER BY id').bind(now).all()).results; }
-async function runHelper(k, prompt, steps) {
-  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(k.acct)}/ai/run/${MODEL}`, { method: 'POST', headers: { authorization: 'Bearer ' + k.token, 'content-type': 'application/json' }, body: JSON.stringify({ prompt, steps }) });
+async function runHelper(k, prompt, steps, seed) {
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(k.acct)}/ai/run/${MODEL}`, { method: 'POST', headers: { authorization: 'Bearer ' + k.token, 'content-type': 'application/json' }, body: JSON.stringify(seed ? { prompt, steps, seed } : { prompt, steps }) });
   const j = await r.json().catch(() => ({}));
   if (r.ok && j.result && j.result.image) return j.result.image;
   throw new Error(`[${r.status}] ` + JSON.stringify(j.errors || j).slice(0, 300));
@@ -222,16 +222,16 @@ async function fluxKeysApi(env, b) {
   const r = await env.DB.prepare('SELECT id,name,acct,on_,paused_until,day,n,last_err,created FROM fluxkeys ORDER BY id').all();
   return { keys: r.results.map(k => ({ ...k, acct: k.acct.slice(0, 4) + '…' + k.acct.slice(-4) })), now: Date.now() };
 }
-async function genImage(env, s, prompt, steps) {
+async function genImage(env, s, prompt, steps, seed) {
   const now = Date.now();
   if (now >= +s.paused_until) {
-    try { const out = await env.AI.run(MODEL, { prompt, steps }); if (out && out.image) return { image: out.image, by: '' }; throw new Error('AI ไม่ได้ส่งภาพกลับมา'); }
+    try { const out = await env.AI.run(MODEL, seed ? { prompt, steps, seed } : { prompt, steps }); if (out && out.image) return { image: out.image, by: '' }; throw new Error('AI ไม่ได้ส่งภาพกลับมา'); }
     catch (e) { const m = String(e.message || e); if (!isQuota(m)) throw e; await setSetting(env, 'img_err', new Date().toISOString() + ' ' + m.slice(0, 400)); await setSetting(env, 'paused_until', String(nextReset())); s.paused_until = String(nextReset()); }
   }
   const day = new Date(now + 7 * 3600000).toISOString().slice(0, 10);
   for (const k of await activeKeys(env, now)) {
     try {
-      const img = await runHelper(k, prompt, steps);
+      const img = await runHelper(k, prompt, steps, seed);
       await env.DB.prepare('UPDATE fluxkeys SET n=CASE WHEN day=? THEN COALESCE(n,0)+1 ELSE 1 END, day=?, last_err=NULL WHERE id=?').bind(day, day, k.id).run();
       return { image: img, by: k.name };
     } catch (e) {
@@ -262,7 +262,7 @@ async function tick(env, force) {
   await setSetting(env, 'last_run', String(now));
   await env.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(job.id).run();
   try {
-    const out = await genImage(env, s, withStyle(job.prompt, s).slice(0, 2048), Math.min(8, Math.max(1, +job.steps || +s.steps || 4)));
+    const out = await genImage(env, s, withStyle(job.prompt, s).slice(0, 2048), Math.min(8, Math.max(1, +job.steps || +s.steps || 4)), +job.seed || 0);
     await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (?,?,?,?,?,0,?)')
       .bind(job.id, job.project, job.scene, job.prompt, out.image, Date.now()).run();
     await env.DB.prepare('DELETE FROM jobs WHERE id=?').bind(job.id).run();
@@ -428,6 +428,7 @@ async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS fluxkeys (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, acct TEXT, token TEXT, on_ INTEGER DEFAULT 0, paused_until INTEGER DEFAULT 0, day TEXT, n INTEGER DEFAULT 0, last_err TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS aud_cands (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, name TEXT, age INTEGER, traits TEXT, intro TEXT, look TEXT, chosen INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS story_assets (id INTEGER PRIMARY KEY AUTOINCREMENT, story TEXT, cat TEXT, image_id INTEGER, cand_id INTEGER, label TEXT, created INTEGER)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS flipbooks (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, descr TEXT, n INTEGER, seed INTEGER, status TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS sfx_real (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, mime TEXT, size INTEGER, data TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS manual_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, title TEXT, descr TEXT, prompt TEXT, pri INTEGER DEFAULT 50, status TEXT DEFAULT 'todo', image_id INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS helpers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, key TEXT UNIQUE, on_ INTEGER DEFAULT 1, created INTEGER, seen INTEGER DEFAULT 0, done INTEGER DEFAULT 0, cur TEXT DEFAULT '')"),
@@ -436,7 +437,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vlog (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS casting (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, cat TEXT DEFAULT 'char', name TEXT, descr TEXT, prompt TEXT, status TEXT DEFAULT 'pending', created INTEGER)"),
   ]);
-  for (const q of ['ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT']) await env.DB.prepare(q).run().catch(() => {});
+  for (const q of ['ALTER TABLE jobs ADD COLUMN seed INTEGER', 'ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT']) await env.DB.prepare(q).run().catch(() => {});
   schemaReady = true;
 }
 
@@ -1512,6 +1513,30 @@ async function castApi(req, env, url, body) {
     if (act === 'del') { await env.DB.prepare('DELETE FROM story_assets WHERE id=?').bind(+b.id).run(); return json({ ok: true }); }
     const a = (await env.DB.prepare('SELECT * FROM story_assets ORDER BY story, cat, id').all()).results;
     return json({ stories, assets: a });
+  }
+  if (p === '/api/vcastflip') { // flipbook เอฟเฟกต์จาก Flux (ไม่ใช้ Kaggle): ล็อกค่าสุ่มเดียวกันทุกเฟรม แล้วให้ผู้ใช้ตรวจผ่านก่อนเข้าคลัง
+    const b = body || {}, act = b.act || 'list';
+    if (act === 'make') {
+      const name = String(b.name || '').trim().slice(0, 40), desc = String(b.desc || '').trim().slice(0, 400), n = Math.min(8, Math.max(4, +b.n || 6));
+      if (!name || !desc) return json({ error: 'ใส่ชื่อและคำอธิบาย' }, 400);
+      const seed = 1 + Math.floor(Math.random() * 2147483000);
+      const ins = await env.DB.prepare("INSERT INTO flipbooks (name,descr,n,seed,status,created) VALUES (?,?,?,?,'making',?)").bind(name, desc, n, seed, Date.now()).run();
+      const fid = ins.meta.last_row_id, mn = (await env.DB.prepare('SELECT MIN(id) m FROM jobs').first()) || {}; let jid = Math.min(+mn.m || 1000000, 1000000) - n;
+      const PH = ['beginning, faint and small', 'growing', 'building up', 'strong', 'at its peak, brightest', 'still strong', 'fading slightly', 'calming down'];
+      const st = [];
+      for (let k = 0; k < n; k++) {
+        const phase = PH[Math.round(k * (PH.length - 1) / Math.max(1, n - 1))];
+        st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps,seed) VALUES (?,?,?,?,'queued',?,4,?)").bind(jid++, `ฟลิปบุ๊ก·${fid}·${name}`, k + 1, `${desc}, animation keyframe ${k + 1} of ${n}, the effect is ${phase}, same composition and camera as the other frames, centered, dark simple background, no people, [[STYLE]], no text, no watermark`, Date.now(), seed));
+      }
+      await env.DB.batch(st);
+      return json({ ok: true, id: fid });
+    }
+    if (act === 'set') { await env.DB.prepare('UPDATE flipbooks SET status=? WHERE id=?').bind(['ok', 'rejected', 'review'].includes(b.status) ? b.status : 'review', +b.id).run(); return json({ ok: true }); }
+    if (act === 'del') { await env.DB.prepare('DELETE FROM flipbooks WHERE id=?').bind(+b.id).run(); await env.DB.prepare("DELETE FROM jobs WHERE instr(project,?)=1 AND status!='running'").bind(`ฟลิปบุ๊ก·${+b.id}·`).run(); await env.DB.prepare('DELETE FROM images WHERE instr(project,?)=1').bind(`ฟลิปบุ๊ก·${+b.id}·`).run(); return json({ ok: true }); }
+    const fb = (await env.DB.prepare('SELECT * FROM flipbooks ORDER BY id DESC LIMIT 60').all()).results;
+    const ims = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE instr(project,'ฟลิปบุ๊ก·')=1 ORDER BY scene, id").all()).results;
+    const jb = (await env.DB.prepare("SELECT project,status FROM jobs WHERE instr(project,'ฟลิปบุ๊ก·')=1").all()).results;
+    return json({ items: fb.map(f => { const pre = `ฟลิปบุ๊ก·${f.id}·`, fr = []; ims.filter(i => i.project.startsWith(pre)).forEach(i => { fr[i.scene - 1] = i.id; }); return { ...f, frames: fr, pending: jb.filter(j => j.project.startsWith(pre) && j.status !== 'failed').length, failed: jb.filter(j => j.project.startsWith(pre) && j.status === 'failed').length }; }) });
   }
   if (p === '/api/vcastsfx') { // คลังเสียงจริง (CC0 ที่ผู้ใช้โหลดมาอัปเอง)
     const b = body || {}, act = b.act || 'list';
