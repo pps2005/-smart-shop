@@ -116,6 +116,76 @@ async function runHelper(k, prompt, steps) {
   if (r.ok && j.result && j.result.image) return j.result.image;
   throw new Error(`[${r.status}] ` + JSON.stringify(j.errors || j).slice(0, 300));
 }
+
+// ---------- ออดิชันตัวละคร: แต่ละบทมีผู้สมัครหน้าตา/บุคลิกต่างกันจริง + ภาพออดิชันช็อตเดียวกันให้เทียบ ----------
+const AUD_ROLES = [
+  { key: 'อายะ', role: 'นางเอก · นักผนึกเถื่อน', g: 'woman', age: [20, 24], outfit: 'a long dark sealer coat over a simple shirt, fitted trousers, boots, a belt pouch of paper talismans', shot: 'standing on a stone street of a fantasy town at dusk, holding a glowing paper talisman between two fingers, magic rune circle forming around her hand, cool determined look', traits: ['เงียบ', 'ลึกลับ', 'เย็นชา', 'ขี้อายลึกๆ', 'ดื้อ', 'มุ่งมั่น', 'ขี้เหงา'] },
+  { key: 'อาเคยะ', role: 'พระเอก · หนุ่มร่าเริงที่ซ่อนอสูรไว้ในตัว', g: 'young man', age: [20, 23], outfit: 'casual layered streetwear (hoodie or sweater with a light jacket), jeans, sneakers, a folded umbrella', shot: 'grinning brightly and offering an umbrella toward the viewer in light rain, one eye faintly glowing red in the shadow', traits: ['ร่าเริง', 'เสียงดัง', 'ใจดี', 'ขี้กลัว', 'ซุ่มซ่าม', 'จริงใจ', 'มีความลับ'] },
+  { key: 'โยมะ', role: 'สารวัตรแฝงตัว · สุขุม', g: 'man', age: [25, 30], outfit: 'a long investigator coat, waistcoat, shirt and tie, a silver patrol badge, gloves', shot: 'reading a small leather case notebook under a street lamp at night, glancing sharply at the viewer', traits: ['สุขุม', 'ฉลาด', 'สุภาพ', 'จริงจัง', 'ช่างสังเกต', 'เก็บความรู้สึก'] },
+  { key: 'ซานะ', role: 'เพื่อนสนิทนางเอก · สาวร้านขนมปัง', g: 'young woman', age: [19, 22], outfit: 'a cosy blouse and cardigan with a long skirt and a bakery apron with flour marks', shot: 'in a warm bakery holding up a basket of fresh bread, flour on her cheek, shy but stubborn smile', traits: ['ขี้อาย', 'ใจดี', 'ดื้อ', 'ขี้ตกใจ', 'อบอุ่น', 'พูดตรง'] },
+  { key: 'กาซึ', role: 'ผู้ใหญ่ลึกลับที่คอยดูแล · อาจเป็นตัวร้าย', g: 'man', age: [32, 38], outfit: 'a dark shirt with rolled sleeves and a long open coat, a pocket watch chain', shot: 'leaning against a doorway at night, flicking a glowing talisman between his fingers with a sly smile', traits: ['ขี้เล่น', 'เจ้าเล่ห์', 'ลึกลับ', 'ใจดีแบบแปลกๆ', 'ฉลาด', 'มีอดีต'] },
+];
+const AUD = {
+  hairC: ['jet black', 'silver white', 'ash grey', 'deep navy', 'chestnut brown', 'honey blonde', 'copper orange', 'crimson red', 'soft pink', 'lavender', 'dark teal', 'two-tone black and white'],
+  hairS_f: ['very long straight hair', 'long wavy hair', 'shoulder-length bob', 'short pixie cut', 'high ponytail', 'twin low braids', 'side-swept long bangs with a half-up bun', 'messy wolf cut'],
+  hairS_m: ['short messy hair', 'swept-back hair', 'shaggy medium hair', 'undercut', 'neat side part', 'long hair tied in a low ponytail', 'spiky hair', 'curly short hair'],
+  eye: ['grey', 'amber', 'emerald green', 'ice blue', 'violet', 'gold', 'dark brown', 'heterochromia blue and gold'],
+  face: ['sharp narrow eyes', 'large gentle eyes', 'droopy sleepy eyes', 'fierce upturned eyes', 'soft round face', 'sharp jawline', 'freckles', 'a small beauty mark'],
+  extra: ['a single earring', 'round glasses', 'a choker', 'a scar across the eyebrow', 'a hair clip', 'a scarf', 'fingerless gloves', 'a beaded bracelet', 'none'],
+  build: ['slim', 'tall and lean', 'petite', 'athletic', 'broad-shouldered'],
+  names_f: ['ฮินะ', 'มิซากิ', 'เร็น', 'ชิซุกุ', 'อาโออิ', 'ยูกิ', 'คาเอเดะ', 'ซากุระ', 'นัตสึ', 'มิโอ', 'รุย', 'สึบากิ'],
+  names_m: ['เร็นจิ', 'ไคโตะ', 'ฮารุ', 'โซรา', 'ยูโตะ', 'ทาคุมิ', 'ริคุ', 'เคนจิ', 'โทมะ', 'ชิน', 'อิซึมิ', 'ซึบาสะ'],
+};
+const pk = (r, a) => a[Math.floor(r() * a.length)];
+function audIntro(name, tr) {
+  const L = { 'เงียบ': 'ฉันพูดไม่เก่ง แต่จะแสดงให้ดูค่ะ', 'ร่าเริง': 'สวัสดีครับ! ผมเล่นได้ทุกฉากเลย จริงๆ นะ!', 'สุขุม': 'ผมอ่านบทครบทุกหน้าแล้วครับ', 'ขี้อาย': 'ข-ขอโทษค่ะ ตื่นเต้นนิดหน่อย…', 'ขี้เล่น': 'บทนี้ตั้งใจเขียนมาให้ผมเลยใช่ไหม?', 'ลึกลับ': 'บทนี้… ฉันรู้จักเขาดีกว่าที่คุณคิด', 'เจ้าเล่ห์': 'ลองให้ผมเล่นสักฉาก แล้วคุณจะไม่ลืม', 'ดื้อ': 'ถ้าไม่ให้บทนี้ ฉันจะมาอีกพรุ่งนี้', 'ใจดี': 'ยินดีที่ได้รู้จักนะคะ ฝากตัวด้วย', 'จริงจัง': 'ผมพร้อมเริ่มเมื่อคุณพร้อมครับ' };
+  for (const t of tr) if (L[t]) return L[t];
+  return `ฉันชื่อ${name} ขอโอกาสสักครั้งนะ`;
+}
+async function audApi(env, b) {
+  const act = b.act || 'list';
+  if (act === 'gen') {
+    const R = AUD_ROLES.find(x => x.key === b.role); if (!R) return { error: 'ไม่รู้จักบท' };
+    const n = Math.min(6, Math.max(1, +b.n || 4)), r = rng(Date.now() ^ 0x2f6a1c3d), fem = /woman/.test(R.g);
+    const used = new Set((await env.DB.prepare('SELECT name FROM aud_cands WHERE role=?').bind(R.key).all()).results.map(x => x.name));
+    const mn = (await env.DB.prepare('SELECT MIN(id) m FROM jobs').first()) || {}; let jid = Math.min(+mn.m || 1000000, 1000000) - 1;
+    const st = [];
+    for (let k = 0; k < n; k++) {
+      let name = pk(r, fem ? AUD.names_f : AUD.names_m); for (let t = 0; t < 20 && used.has(name); t++) name = pk(r, fem ? AUD.names_f : AUD.names_m); used.add(name);
+      const age = R.age[0] + Math.floor(r() * (R.age[1] - R.age[0] + 1));
+      const tr = [...R.traits].sort(() => r() - 0.5).slice(0, 3);
+      const ex = pk(r, AUD.extra);
+      const look = `${pk(r, AUD.build)} ${R.g} aged ${age}, ${pk(r, AUD.hairC)} ${pk(r, fem ? AUD.hairS_f : AUD.hairS_m)}, ${pk(r, AUD.eye)} eyes, ${pk(r, AUD.face)}${ex === 'none' ? '' : ', ' + ex}`;
+      const ins = await env.DB.prepare('INSERT INTO aud_cands (role,name,age,traits,intro,look,created) VALUES (?,?,?,?,?,?,?)').bind(R.key, name, age, tr.join(','), audIntro(name, tr), look, Date.now()).run();
+      const cid = ins.meta.last_row_id, proj = `ออดิชัน·${R.key}·${cid}·${name}`;
+      const sty = 'bright colourful modern TV fantasy anime style, crisp clean line art, cel shading, vivid colours, original adult character, no text, no watermark';
+      st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,1,?,'queued',?,4)").bind(jid--, proj, `character design, full body standing front view, ${look}, wearing ${R.outfit}, personality: ${tr.join(', ')}, plain light grey background, ${sty}`.slice(0, 2000), Date.now()));
+      st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,2,?,'queued',?,4)").bind(jid--, proj, `anime key frame, medium shot, ${look}, wearing ${R.outfit}, ${R.shot}, cinematic lighting, ${sty}`.slice(0, 2000), Date.now()));
+    }
+    await env.DB.batch(st);
+    return { ok: true, added: n };
+  }
+  if (act === 'pick') {
+    const c = await env.DB.prepare('SELECT * FROM aud_cands WHERE id=?').bind(+b.id).first(); if (!c) return { error: 'ไม่พบผู้สมัคร' };
+    const R = AUD_ROLES.find(x => x.key === c.role) || {};
+    await env.DB.prepare('UPDATE aud_cands SET chosen=CASE WHEN id=? THEN 1 ELSE 0 END WHERE role=?').bind(c.id, c.role).run();
+    const prompt = `Create ONE character model sheet for an original anime series, bright colourful modern TV fantasy anime style, crisp clean line art, cel shading with soft gradients, vivid colours, plain light background. Layout: full-body front view, side view and back view in a row; below them six face close-ups (neutral, smiling, angry, surprised, sad, determined); plus one full-body dynamic action pose. Use the ATTACHED casting image as the exact reference for this character: keep the same face, hairstyle, hair colour, eye colour and accessories. Original adult character, not based on any existing anime. No text, no labels, no watermark.\n\nCharacter: ${c.role}, ${c.look}. Personality: ${c.traits}. Outfit: ${R.outfit || ''}. Action pose: ${R.shot || ''}.`;
+    const title = 'ชีตใหม่ · ' + c.role, ex = await env.DB.prepare('SELECT id FROM manual_tasks WHERE title=?').bind(title).first();
+    if (ex) await env.DB.prepare("UPDATE manual_tasks SET prompt=?, descr=? WHERE id=? AND status!='done'").bind(prompt, `แนบภาพออดิชันของ ${c.name}`, ex.id).run();
+    else await env.DB.prepare("INSERT INTO manual_tasks (kind,title,descr,prompt,pri,status,created) VALUES ('char',?,?,?,1,'todo',?)").bind(title, `แนบภาพออดิชันของ ${c.name}`, prompt, Date.now()).run();
+    return { ok: true };
+  }
+  if (act === 'del') { await env.DB.prepare('DELETE FROM aud_cands WHERE id=?').bind(+b.id).run(); await env.DB.prepare("DELETE FROM jobs WHERE instr(project,'ออดิชัน·')=1 AND instr(project,?)>0 AND status='queued'").bind(`·${+b.id}·`).run(); return { ok: true }; }
+  { // บทที่ยังไม่มีผู้สมัครเลย เรียกให้ 4 คนอัตโนมัติ (ครั้งแรกที่เปิดห้องออดิชัน)
+    const have = new Set((await env.DB.prepare('SELECT DISTINCT role FROM aud_cands').all()).results.map(x => x.role));
+    for (const R of AUD_ROLES) if (!have.has(R.key)) await audApi(env, { act: 'gen', role: R.key, n: 4 });
+  }
+  const cs = (await env.DB.prepare('SELECT * FROM aud_cands ORDER BY id').all()).results;
+  const ims = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE instr(project,'ออดิชัน·')=1 ORDER BY id").all()).results;
+  const jb = (await env.DB.prepare("SELECT project,status FROM jobs WHERE instr(project,'ออดิชัน·')=1").all()).results;
+  return { roles: AUD_ROLES.map(x => ({ key: x.key, role: x.role })), cands: cs.map(c => { const pre = `ออดิชัน·${c.role}·${c.id}·`; return { ...c, card: (ims.filter(i => i.project.startsWith(pre) && i.scene === 1).pop() || {}).id || 0, aud: (ims.filter(i => i.project.startsWith(pre) && i.scene === 2).pop() || {}).id || 0, pending: jb.filter(j => j.project.startsWith(pre)).length }; }) };
+}
+
 async function fluxKeysApi(env, b) {
   const act = (b || {}).act || 'list';
   if (act === 'add') {
@@ -328,6 +398,7 @@ async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT, helper INTEGER DEFAULT 0)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS char_profiles (name TEXT PRIMARY KEY, data TEXT, updated INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS fluxkeys (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, acct TEXT, token TEXT, on_ INTEGER DEFAULT 0, paused_until INTEGER DEFAULT 0, day TEXT, n INTEGER DEFAULT 0, last_err TEXT, created INTEGER)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS aud_cands (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, name TEXT, age INTEGER, traits TEXT, intro TEXT, look TEXT, chosen INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS sfx_real (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, mime TEXT, size INTEGER, data TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS manual_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, title TEXT, descr TEXT, prompt TEXT, pri INTEGER DEFAULT 50, status TEXT DEFAULT 'todo', image_id INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS helpers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, key TEXT UNIQUE, on_ INTEGER DEFAULT 1, created INTEGER, seen INTEGER DEFAULT 0, done INTEGER DEFAULT 0, cur TEXT DEFAULT '')"),
@@ -1377,6 +1448,7 @@ async function castApi(req, env, url, body) {
     const ins = await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (0,?,?,?,?,1,?)').bind('แฟ้ม·' + name + '·' + outfit, 1, '', data, Date.now()).run();
     return json({ ok: true, image_id: ins.meta.last_row_id });
   }
+  if (p === '/api/vcastaud') return json(await audApi(env, body || {}));
   if (p === '/api/vcastsfx') { // คลังเสียงจริง (CC0 ที่ผู้ใช้โหลดมาอัปเอง)
     const b = body || {}, act = b.act || 'list';
     if (act === 'add') {

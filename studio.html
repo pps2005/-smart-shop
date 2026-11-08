@@ -1034,7 +1034,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['hand','🎯','ภารกิจ'],['prof','👥','ตัวละคร'],['mg','📖','มังงะ'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
+  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['hand','🎯','ภารกิจ'],['aud','🎭','ออดิชัน'],['prof','👥','ตัวละคร'],['mg','📖','มังงะ'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='aud'?audHtml():lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -1703,6 +1703,32 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-fk]'
 
 document.addEventListener('click',e=>{if(!e.target.closest('[data-fkgo]'))return;SV.gen='set';try{localStorage.setItem('ss_sv',JSON.stringify(SV));}catch(_){}
   const t=document.querySelector('#tabs [data-v=gen]');if(t)t.click();setTimeout(()=>{gpApply();const b=document.getElementById('fkBox');if(b)b.scrollIntoView({behavior:'smooth'});},600);});
+
+
+/* ---------- ออดิชันตัวละคร ---------- */
+let AUDS=null,AUDT=0;
+async function audLoad(){try{AUDS=await botApi('/api/vcastaud',{act:'list'});}catch(e){AUDS=AUDS||{roles:[],cands:[],err:botErr(e)};}
+  if(view==='lib'&&SV.lib==='aud'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}
+  clearTimeout(AUDT);if(AUDS&&(AUDS.cands||[]).some(c=>c.pending)&&view==='lib'&&SV.lib==='aud')AUDT=setTimeout(audLoad,20000);}
+function audHtml(){
+  if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
+  if(!AUDS){audLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังเปิดห้องออดิชัน…</p></div>';}
+  const img=(id,alt)=>id?`<img src="${esc(botU('/img/'+id))}" alt="${esc(alt)}" loading="lazy" data-bot="view" style="width:100%;aspect-ratio:1;object-fit:cover;object-position:top;border-radius:8px;background:#eee">`:`<div style="width:100%;aspect-ratio:1;border-radius:8px;background:#f1eef9;display:flex;align-items:center;justify-content:center"><span class="spin"></span></div>`;
+  return `<div class="card"><h3>🎭 ห้องออดิชัน</h3><span class="muted small">แต่ละบทมีผู้สมัครที่หน้าตาและบุคลิกต่างกัน ภาพซ้ายคือภาพโปรไฟล์ ภาพขวาคือภาพออดิชัน (ทุกคนในบทเดียวกันเล่นช็อตเดียวกัน) กด ⭐ เลือก แล้วภารกิจ "ชีตใหม่" ของบทนั้นจะเปลี่ยนพรอมต์ให้ตรงกับผู้สมัคร ให้แนบภาพของเขาไปใน GPT</span>${AUDS.err?`<div class="errl">⚠️ ${esc(AUDS.err)}</div>`:''}</div>`+
+  (AUDS.roles||[]).map(R=>{const cs=(AUDS.cands||[]).filter(c=>c.role===R.key),ch=cs.find(c=>+c.chosen);
+    const body=(cs.length?`<div style="display:grid;grid-template-columns:1fr;gap:12px">`+cs.map(c=>`<div style="border:2px solid ${+c.chosen?'#f5b301':'#e5e0f3'};border-radius:12px;padding:8px;background:${+c.chosen?'#fffbea':'#fff'}">
+      <div class="row" style="justify-content:space-between"><b>${+c.chosen?'⭐ ':''}${esc(c.name)}</b><span class="muted small">อายุ ${c.age} · ${esc(String(c.traits).split(',').join(' · '))}</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0">${img(c.card,c.name)}${img(c.aud,c.name)}</div>
+      <div class="small" style="font-style:italic;margin:4px 0">“${esc(c.intro)}”</div>
+      <div class="row">${+c.chosen?'<span class="muted small">ได้รับเลือกแล้ว</span>':`<button class="btn sm main" data-aud="pick|${c.id}"${c.pending?' disabled':''}>⭐ เลือกคนนี้</button>`}<button class="btn sm" data-aud="del|${c.id}">🗑</button></div></div>`).join('')+`</div>`:'<p class="muted small" style="margin:6px 0">ยังไม่มีผู้สมัคร</p>')
+      +`<div class="row" style="margin-top:8px"><button class="btn sm main" data-aud="gen|${esc(R.key)}">🔄 เรียกผู้สมัครเพิ่ม 4 คน</button></div>`;
+    return det('aud|'+R.key,`🎬 ${esc(R.key)}<small>${esc(R.role)}${ch?` · เลือก ${esc(ch.name)}`:cs.length?` · ผู้สมัคร ${cs.length} คน`:''}</small>`,body,!ch);}).join('');}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-aud]');if(!b)return;const [a,v]=b.dataset.aud.split('|');
+  try{b.disabled=true;
+    if(a==='gen'){const r=await botApi('/api/vcastaud',{act:'gen',role:v,n:4});if(r.error)throw new Error(r.error);toast('เรียกผู้สมัครแล้ว ⏳ ภาพจะทยอยขึ้น (ราว 2 นาทีต่อภาพ)');}
+    if(a==='pick'){const r=await botApi('/api/vcastaud',{act:'pick',id:+v});if(r.error)throw new Error(r.error);toast('เลือกแล้ว ⭐ ภารกิจชีตใหม่อัปเดตพรอมต์ให้แล้ว');HAND=null;}
+    if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ')){b.disabled=false;return;}await botApi('/api/vcastaud',{act:'del',id:+v});}
+    await audLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
 
 boot();
 })();
