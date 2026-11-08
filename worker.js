@@ -162,6 +162,17 @@ const LOOK = {
   hairS_f: ['very long straight hair', 'long wavy hair', 'shoulder-length bob', 'short pixie cut', 'high ponytail', 'twin low braids', 'side-swept long bangs with a half-up bun', 'messy wolf cut', 'twin tails', 'a side braid over the shoulder', 'a short layered cut with an ahoge', 'long hair with hime-cut bangs', 'curly voluminous hair', 'a high bun with loose strands'],
   hairS_m: ['short messy hair', 'swept-back hair', 'shaggy medium hair', 'undercut', 'neat side part', 'long hair tied in a low ponytail', 'spiky hair', 'curly short hair', 'a two-block cut with curtain bangs', 'a wolf cut', 'slicked-back hair with loose strands', 'a medium wavy cut with an ahoge'],
 };
+
+// ---------- ช่วงอายุ 10–60: ต่ำกว่า 18 = แต่งตัวสุภาพตามวัย ไม่เซ็กซี่/วาบหวิวเด็ดขาด · 18+ จึงมีแนวเซ็กซี่เล็กน้อยได้ ----------
+const AGEB = [
+  { id: 'child', a: [10, 12], w: 1, minor: true, vibes: ['cute'], bf: ['a small child-like body with a childlike figure', 'a slim and energetic child figure'], bm: ['a small boyish child figure', 'a slim energetic child figure'], of: ['a colorful hoodie with shorts and sneakers', 'a casual dress with a cardigan and a hair clip', 'a school-style jacket with a backpack', 'a raincoat with boots and a cute hat'], om: ['a colorful hoodie with shorts and sneakers', 'a t-shirt with overalls and a cap', 'a school-style jacket with a backpack', 'a raincoat with boots and a cute hat'] },
+  { id: 'teen', a: [13, 17], w: 2, minor: true, vibes: ['cute', 'cool'], bf: ['a slim teenage figure', 'a lanky teenage figure'], bm: ['a slim teenage figure', 'a lanky teenage figure'], of: ['a neat school uniform with a ribbon or tie', 'a hoodie with jeans and sneakers', 'a casual sweater with a pleated skirt, fully modest', 'a sporty jacket and track pants', 'a summer yukata at a festival'], om: ['a neat school uniform with a tie', 'a hoodie with jeans and sneakers', 'a casual jacket with a tee and cargo pants', 'a sporty jersey and track pants', 'a summer yukata at a festival'] },
+  { id: 'young', a: [18, 29], w: 4, vibes: ['cute', 'sexy', 'cool', 'elegant', 'mixed'] },
+  { id: 'adult', a: [30, 44], w: 3, vibes: ['sexy', 'cool', 'elegant', 'mixed'] },
+  { id: 'mature', a: [45, 60], w: 2, vibes: ['elegant', 'cool', 'sexy'], bf: ['a mature graceful figure with soft lines', 'a mature elegant figure'], bm: ['a mature distinguished build with broad shoulders', 'a mature lean distinguished build'], of: ['a tailored jacket with a silk blouse and long skirt, mature and refined', 'a traditional kimono with an obi', 'a cardigan, a blouse and wide trousers with a scarf', 'a sleek evening dress with a shawl'], om: ['a tailored suit with a vest', 'a long coat over a sweater and slacks', 'a traditional haori with a kimono', 'a casual shirt with a blazer and glasses'] },
+];
+const pickAge = r => { let t = AGEB.reduce((a, b) => a + b.w, 0) * r(); for (const b of AGEB) { if ((t -= b.w) < 0) return b; } return AGEB[2]; };
+const genderWord = (fem, age) => fem ? (age < 13 ? 'girl' : age < 18 ? 'teenage girl' : age < 30 ? 'young woman' : age < 45 ? 'woman' : 'mature woman') : (age < 13 ? 'boy' : age < 18 ? 'teenage boy' : age < 30 ? 'young man' : age < 45 ? 'man' : 'mature man');
 const pickU = (r, a, u) => { let v = pk(r, a); for (let t = 0; t < 30 && u.has(v); t++) v = pk(r, a); u.add(v); return v; };
 const TR_EN = { 'เงียบ': 'quiet', 'ลึกลับ': 'mysterious', 'เย็นชา': 'aloof', 'ขี้อายลึกๆ': 'secretly shy', 'ดื้อ': 'stubborn', 'มุ่งมั่น': 'determined', 'ขี้เหงา': 'lonely', 'ร่าเริง': 'cheerful', 'เสียงดัง': 'loud', 'ใจดี': 'kind', 'ขี้กลัว': 'timid', 'ซุ่มซ่าม': 'clumsy', 'จริงใจ': 'sincere', 'มีความลับ': 'secretive', 'สุขุม': 'calm', 'ฉลาด': 'clever', 'สุภาพ': 'polite', 'จริงจัง': 'serious', 'ช่างสังเกต': 'observant', 'เก็บความรู้สึก': 'reserved', 'ขี้อาย': 'shy', 'ขี้ตกใจ': 'easily startled', 'อบอุ่น': 'warm', 'พูดตรง': 'blunt', 'ขี้เล่น': 'playful', 'เจ้าเล่ห์': 'sly', 'ใจดีแบบแปลกๆ': 'oddly kind', 'มีอดีต': 'with a hidden past' };
 function audIntro(name, tr) {
@@ -193,18 +204,18 @@ async function audApi(env, b) {
     const vibeKeys = Object.keys(LOOK.vibes); let vq = [...vibeKeys].sort(() => r() - 0.5); // วนลุคให้ครบ ไม่ซ้ำกันในชุดเดียวกัน
     for (let k = 0; k < n; k++) {
       let name = pk(r, fem ? AUD.names_f : AUD.names_m); for (let t = 0; t < 20 && used.has(name); t++) name = pk(r, fem ? AUD.names_f : AUD.names_m); used.add(name);
-      const age = R.age[0] + Math.floor(r() * (R.age[1] - R.age[0] + 1));
+      const AB = pickAge(r), age = AB.a[0] + Math.floor(r() * (AB.a[1] - AB.a[0] + 1)), gw = genderWord(fem, age);
       const tr = [...R.traits].sort(() => r() - 0.5).slice(0, 3);
-      const vibe = vq.length ? vq.pop() : pk(r, vibeKeys), og = fem ? LOOK.outfit_f : LOOK.outfit_m, bd = fem ? LOOK.build_f : LOOK.build_m;
-      const outfit = pickU(r, og[vibe] || og[pk(r, ['cute', 'sexy', 'cool', 'elegant'])], U.out); // mixed ใช้ชุดแนวน่ารักหรือเซ็กซี่แบบสุ่ม
-      const bg = pickU(r, LOOK.bg, U.bg), pose = pickU(r, LOOK.pose, U.pose), build = pickU(r, bd[vibe], U.build);
+      const vibe = pk(r, AB.vibes), og = fem ? LOOK.outfit_f : LOOK.outfit_m, bd = fem ? LOOK.build_f : LOOK.build_m;
+      const outfit = pickU(r, AB.of ? (fem ? AB.of : AB.om) : (og[vibe] || og[pk(r, ['cute', 'sexy', 'cool', 'elegant'])]), U.out);
+      const bg = pickU(r, LOOK.bg, U.bg), pose = pickU(r, LOOK.pose, U.pose), build = pickU(r, AB.bf ? (fem ? AB.bf : AB.bm) : bd[vibe], U.build);
       const ex = pk(r, AUD.extra), hc = pickU(r, LOOK.hairC, U.hc), hs = pickU(r, fem ? LOOK.hairS_f : LOOK.hairS_m, U.hs);
-      const look = `${build} ${R.g} aged ${age}, ${hc} ${hs}, ${pk(r, AUD.eye)} eyes, ${pk(r, AUD.face)}${ex === 'none' ? '' : ', ' + ex}`;
+      const look = `${build} ${gw} aged ${age}, ${hc} ${hs}, ${pk(r, AUD.eye)} eyes, ${pk(r, AUD.face)}${ex === 'none' ? '' : ', ' + ex}`;
       const ins = await env.DB.prepare('INSERT INTO aud_cands (role,name,age,traits,intro,look,created) VALUES (?,?,?,?,?,?,?)').bind(R.key, name, age, tr.join(','), audIntro(name, tr), look, Date.now()).run();
       const cid = ins.meta.last_row_id, proj = `ออดิชัน·${R.key}·${cid}·${name}`;
-      const sty = '[[STYLE]], original adult character, fully clothed, no nudity, no text, no watermark';
-      const face = fem ? 'a beautiful woman with a pretty refined face' : 'a handsome man with sharp refined features';
-      st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,1,?,'queued',?,4)").bind(jid--, proj, `modern anime illustration, current-era Japanese TV anime and light-novel key visual style, clean crisp lineart, detailed shiny eyes, cel shading with soft gradients, vibrant colors, three-quarter body shot with the face, outfit and figure clearly visible, ${face}, ${LOOK.vibes[vibe]}, ${look}, wearing ${outfit}, ${pose}, background: ${bg}, personality: ${tr.map(t => TR_EN[t] || '').filter(Boolean).join(', ')}, ${sty}`.slice(0, 2000), Date.now()));
+      const sty = '[[STYLE]], original character, ' + (AB.minor ? 'a minor, wholesome and age-appropriate, modest clothing, strictly non-sexual, ' : '') + 'fully clothed, no nudity, no text, no watermark';
+      const face = AB.minor ? (fem ? 'a cute girl with a sweet face' : 'a cute boy with a bright face') : fem ? 'a beautiful ' + gw + ' with a pretty refined face' : 'a handsome ' + gw + ' with refined features';
+      st.push(env.DB.prepare("INSERT INTO jobs (id,project,scene,prompt,status,created,steps) VALUES (?,?,1,?,'queued',?,4)").bind(jid--, proj, `character illustration, clean lineart, expressive detailed eyes, vibrant colors, three-quarter body shot with the face, outfit and figure clearly visible, ${face}, ${LOOK.vibes[vibe]}, ${look}, wearing ${outfit}, ${pose}, background: ${bg}, personality: ${tr.map(t => TR_EN[t] || '').filter(Boolean).join(', ')}, ${sty}`.slice(0, 2000), Date.now()));
     }
     await env.DB.batch(st);
     return { ok: true, added: n };
