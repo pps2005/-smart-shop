@@ -529,6 +529,8 @@ async function vRoutes(req, env, url, ctx) {
 }
 
 // ---- ฝั่งสตูดิโอ (ผ่าน PASSWORD แล้ว) ----
+// ความยาวคลิป 2–5 วินาที (ค่าเริ่ม 3) → จำนวนเฟรมแบบ 4k+1 ที่ 16 fps
+function vFrames(sec) { const s = Math.min(5, Math.max(2, +sec || 3)); return Math.round(s * 16 / 4) * 4 + 1; }
 async function vApi(req, env, url, ctx, body) {
   const p = url.pathname;
   kEnv(env, await getSettings(env));
@@ -550,7 +552,7 @@ async function vApi(req, env, url, ctx, body) {
       if (!img || img.length > 1800000) continue;
       const opt = JSON.stringify({ hq: it.hq ? 1 : 0, fps: +it.fps === 12 ? 12 : 0 });
       st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)")
-        .bind(String(body.project || 'โปรเจกต์').slice(0, 60), String(body.ep || ''), String(it.shot ?? ''), String(it.prompt || '').slice(0, 2000), String(it.neg || VNEG).slice(0, 800), img, Math.min(161, Math.max(17, +it.frames || 81)), Date.now(), opt));
+        .bind(String(body.project || 'โปรเจกต์').slice(0, 60), String(body.ep || ''), String(it.shot ?? ''), String(it.prompt || '').slice(0, 2000), String(it.neg || VNEG).slice(0, 800), img, vFrames(it.frames ? (+it.frames - 1) / 16 : 3), Date.now(), opt));
     }
     if (!st.length) return json({ error: 'ไม่มีช็อตที่มีภาพคีย์' });
     await env.DB.batch(st);
@@ -1549,8 +1551,8 @@ async function castApi(req, env, url, body) {
     };
     const mo = MOT[b.motion] ? b.motion : 'idle';
     const prompt = ('anime style, same character design, ' + MOT[mo] + ', static camera, smooth natural motion, consistent face and outfit, no morphing').slice(0, 600);
-    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,81,'queued',0,?,?)")
-      .bind('ภาพขยับ·' + String(im.project || '').replace(/^✋·/, '').slice(0, 40), 'anim', String(im.id), prompt, VNEG, im.data, Date.now(), JSON.stringify({ hq: 0, fps: 0 })).run();
+    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)")
+      .bind('ภาพขยับ·' + String(im.project || '').replace(/^✋·/, '').slice(0, 40), 'anim', String(im.id), prompt, VNEG, im.data, vFrames(b.sec), Date.now(), JSON.stringify({ hq: 0, fps: 0 })).run();
     return json({ ok: true });
   }
   if (p === '/api/vcastlibone') { // สั่งสร้างภาพรายการเดียวจากคลังทันที
