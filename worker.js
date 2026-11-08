@@ -150,7 +150,7 @@ async function audDaily(env) {
   await setSetting(env, 'aud_day', day);
   const first = await env.DB.prepare('SELECT COUNT(*) n FROM aud_cands').first();
   if (!first || !+first.n) return; // วันแรกเรียกครบทุกบทตอนเปิดห้องออดิชันอยู่แล้ว
-  const chosen = new Set((await env.DB.prepare('SELECT role FROM aud_cands WHERE chosen=1').all()).results.map(x => x.role));
+  const chosen = new Set((await env.DB.prepare('SELECT cast_role FROM aud_cands WHERE cast_role IS NOT NULL').all()).results.map(x => x.cast_role));
   const open = AUD_ROLES.filter(R => !chosen.has(R.key)); if (!open.length) return;
   const total = Math.min(8, Math.max(4, +s.aud_daily || 6)), per = {};
   for (let k = 0; k < total; k++) { const R = open[k % open.length]; per[R.key] = (per[R.key] || 0) + 1; }
@@ -179,10 +179,15 @@ async function audApi(env, b) {
     return { ok: true, added: n };
   }
   if (act === 'daily') { await setSetting(env, 'aud_daily', String(Math.min(8, Math.max(4, +b.n || 6)))); return { ok: true }; }
-  if (act === 'pick') {
+  if (act === 'keep') { await env.DB.prepare('UPDATE aud_cands SET kept=CASE WHEN COALESCE(kept,0)=1 THEN 0 ELSE 1 END WHERE id=?').bind(+b.id).run(); return { ok: true }; }
+  if (act === 'unassign') { await env.DB.prepare('UPDATE aud_cands SET cast_role=NULL, cast_story=NULL, chosen=0 WHERE id=?').bind(+b.id).run(); return { ok: true }; }
+  if (act === 'pick') { // ใส่นักแสดงจากคลังลงบทในเรื่อง (บทอะไรก็ได้ ไม่จำเป็นต้องตรงกับบทที่มาออดิชัน)
     const c = await env.DB.prepare('SELECT * FROM aud_cands WHERE id=?').bind(+b.id).first(); if (!c) return { error: 'ไม่พบผู้สมัคร' };
-    const R = AUD_ROLES.find(x => x.key === c.role) || {};
-    await env.DB.prepare('UPDATE aud_cands SET chosen=CASE WHEN id=? THEN 1 ELSE 0 END WHERE role=?').bind(c.id, c.role).run();
+    const roleKey = String(b.role || c.role), story = String(b.story || 'สาเหตุที่ฉันรัก').slice(0, 60);
+    const R = AUD_ROLES.find(x => x.key === roleKey) || { outfit: '', shot: '' };
+    await env.DB.prepare('UPDATE aud_cands SET cast_role=NULL, cast_story=NULL, chosen=0 WHERE cast_role=? AND cast_story=?').bind(roleKey, story).run();
+    await env.DB.prepare('UPDATE aud_cands SET cast_role=?, cast_story=?, chosen=1, kept=1 WHERE id=?').bind(roleKey, story, c.id).run();
+    c.role = roleKey;
     const prompt = `Create ONE character model sheet for an original anime series, art style: [[STYLE]]. Plain light background. Layout: full-body front view, side view and back view in a row; below them six face close-ups (neutral, smiling, angry, surprised, sad, determined); plus one full-body dynamic action pose. Use the ATTACHED casting image as the exact reference for this character: keep the same face, hairstyle, hair colour, eye colour and accessories. Original adult character, not based on any existing anime. No text, no labels, no watermark.\n\nCharacter: ${c.role}, ${c.look}. Personality: ${c.traits}. Outfit: ${R.outfit || ''}. Action pose: ${R.shot || ''}.`;
     const title = 'ชีตใหม่ · ' + c.role, ex = await env.DB.prepare('SELECT id FROM manual_tasks WHERE title=?').bind(title).first();
     if (ex) await env.DB.prepare("UPDATE manual_tasks SET prompt=?, descr=? WHERE id=? AND status!='done'").bind(prompt, `แนบภาพออดิชันของ ${c.name}`, ex.id).run();
@@ -420,6 +425,7 @@ async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS char_profiles (name TEXT PRIMARY KEY, data TEXT, updated INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS fluxkeys (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, acct TEXT, token TEXT, on_ INTEGER DEFAULT 0, paused_until INTEGER DEFAULT 0, day TEXT, n INTEGER DEFAULT 0, last_err TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS aud_cands (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, name TEXT, age INTEGER, traits TEXT, intro TEXT, look TEXT, chosen INTEGER DEFAULT 0, created INTEGER)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS story_assets (id INTEGER PRIMARY KEY AUTOINCREMENT, story TEXT, cat TEXT, image_id INTEGER, cand_id INTEGER, label TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS sfx_real (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, mime TEXT, size INTEGER, data TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS manual_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, title TEXT, descr TEXT, prompt TEXT, pri INTEGER DEFAULT 50, status TEXT DEFAULT 'todo', image_id INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS helpers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, key TEXT UNIQUE, on_ INTEGER DEFAULT 1, created INTEGER, seen INTEGER DEFAULT 0, done INTEGER DEFAULT 0, cur TEXT DEFAULT '')"),
@@ -428,6 +434,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vlog (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS casting (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, cat TEXT DEFAULT 'char', name TEXT, descr TEXT, prompt TEXT, status TEXT DEFAULT 'pending', created INTEGER)"),
   ]);
+  for (const q of ['ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT']) await env.DB.prepare(q).run().catch(() => {});
   schemaReady = true;
 }
 
@@ -1472,6 +1479,21 @@ async function castApi(req, env, url, body) {
     return json({ ok: true, image_id: ins.meta.last_row_id });
   }
   if (p === '/api/vcastaud') return json(await audApi(env, body || {}));
+  if (p === '/api/vcaststory') { // ของที่เก็บไว้ (⭐) เอามาใช้ในเรื่อง: ฉาก อาวุธ เวท โลก ฯลฯ
+    const b = body || {}, act = b.act || 'list', s = await getSettings(env);
+    let stories = []; try { stories = JSON.parse(s.stories || '[]'); } catch (e) { }
+    if (!stories.length) stories = ['สาเหตุที่ฉันรัก'];
+    if (act === 'newstory') { const n = String(b.name || '').trim().slice(0, 60); if (n && !stories.includes(n)) { stories.push(n); await setSetting(env, 'stories', JSON.stringify(stories)); } return json({ ok: true }); }
+    if (act === 'add') {
+      const story = String(b.story || stories[0]).slice(0, 60), cat = String(b.cat || 'อื่นๆ').slice(0, 30), label = String(b.label || '').slice(0, 60);
+      const ex = await env.DB.prepare('SELECT id FROM story_assets WHERE story=? AND image_id=?').bind(story, +b.image_id).first();
+      if (!ex) await env.DB.prepare('INSERT INTO story_assets (story,cat,image_id,label,created) VALUES (?,?,?,?,?)').bind(story, cat, +b.image_id, label, Date.now()).run();
+      return json({ ok: true });
+    }
+    if (act === 'del') { await env.DB.prepare('DELETE FROM story_assets WHERE id=?').bind(+b.id).run(); return json({ ok: true }); }
+    const a = (await env.DB.prepare('SELECT * FROM story_assets ORDER BY story, cat, id').all()).results;
+    return json({ stories, assets: a });
+  }
   if (p === '/api/vcastsfx') { // คลังเสียงจริง (CC0 ที่ผู้ใช้โหลดมาอัปเอง)
     const b = body || {}, act = b.act || 'list';
     if (act === 'add') {
