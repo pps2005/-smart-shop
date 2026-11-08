@@ -1253,7 +1253,7 @@ const LIBD = [
 ];
 // สเต็ปภาพคลัง: ฉาก/เอฟเฟกต์/พลังงาน 4 สเต็ป (พอแล้วสำหรับโมเดลนี้) ส่วนงานออกแบบที่ต้องละเอียดกว่า (สัตว์ ชุด อาวุธ ของ) 6 สเต็ป
 const LIB_STEP4 = new Set(['ฉาก', 'องค์ประกอบฉาก', 'พลังอาคม', 'โลกและจักรวาล', 'เอฟเฟกต์']);
-function libSteps(cat) { return LIB_STEP4.has(cat) ? 4 : 6; }
+function libSteps(cat) { return 4; } // ผู้ใช้เลือก: คุณภาพ 4 พอสำหรับทุกหมวด
 function libName(it) { return (typeof it.i === 'number' ? String(it.i).padStart(4, '0') + ' ' : '') + String(it.n).replace(' — ', ' · ').replace(/·/g, '-').replace(' - ', ' · '); }
 async function libDaily(env, force) {
   const s = await getSettings(env), day = bkkDay(), hr = new Date(Date.now() + 7 * 3600000).getUTCHours();
