@@ -1311,9 +1311,11 @@ async function castApi(req, env, url, body) {
     let have = new Map((await sel()).results.map(r => [r.title, r]));
     const ins = [];
     ep.panels.forEach((pn, i) => {
-      const t = tt(i + 1); if (have.has(t)) return;
+      const t = tt(i + 1);
       const cl = pn.chars.map(n => { const q = pr[n] || {}; return `${n} (${q.gender === 'หญิง' ? 'woman' : q.gender === 'ชาย' ? 'man' : 'person'}${q.age ? ', age ' + String(q.age).split(' ')[0] : ', adult'}${ep.outfit[n] ? ', wearing: ' + ep.outfit[n] : ''})`; });
-      const prompt = `Create ONE manga/anime panel illustration, ${RT[pn.s] || RT.w} composition. Scene: ${pn.shot}${cl.length ? ' Characters in this panel: ' + cl.join('; ') + '. Attach the character sheet of each of them and keep their faces, hairstyles, eye and hair colours exactly the same as the sheets.' : ''} Rainy-day mood, cinematic lighting, modern TV anime style, clean lineart, cel shading. Draw NO speech bubbles, NO text, NO watermark. All characters are original adults (university-age or older).`.slice(0, 1800);
+      const prompt = `Create ONE manga/anime panel illustration, ${RT[pn.s] || RT.w} composition. Scene: ${pn.shot}${cl.length ? ' Characters in this panel: ' + cl.join('; ') + '. Attach the character sheet of each of them and keep their faces, hairstyles, eye and hair colours exactly the same as the sheets.' : ''} Rainy-day mood, cinematic lighting, modern TV anime style, clean lineart, cel shading. Draw NO speech bubbles, NO text, NO watermark. All characters are original adults (university-age or older). Background people wear casual university clothes, NOT school uniforms.`.slice(0, 1800);
+      const ex = have.get(t);
+      if (ex) { if (ex.status === 'todo' && ex.prompt !== prompt) ins.push(env.DB.prepare('UPDATE manual_tasks SET prompt=? WHERE id=?').bind(prompt, ex.id)); return; }
       ins.push(env.DB.prepare('INSERT INTO manual_tasks (kind,title,descr,prompt,pri,status,created) VALUES (?,?,?,?,?,?,?)').bind('key', t, pn.shot.slice(0, 300), prompt, 100 + i, 'todo', Date.now()));
     });
     if (ins.length) { await env.DB.batch(ins); have = new Map((await sel()).results.map(r => [r.title, r])); }
