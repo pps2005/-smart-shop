@@ -1755,18 +1755,34 @@ const STYLES=[
  ['romcom','💗 โรมคอมทีวี','อนิเมะทีวียุคใหม่แนวรักวัยรุ่น เส้นบางคม ลงสีเซลนุ่ม ตาโตเป็นประกาย แก้มแดง แสงกลางวันสดใส','modern romantic comedy TV anime style, clean thin crisp line art, soft cel shading with gentle gradients, big expressive glossy sparkling eyes, rosy blushing cheeks, bright airy daylight, soft bloom and light leaks, pastel clean colours, high quality anime screenshot'],
  ['gloss','💎 มังฮวาเงาใส (ใหม่)','ลายเส้นบางสะอาด ผมเงาเป็นประกาย ผิวเรียบนุ่ม ตาแดงใสฉ่ำ แก้มแดงเรื่อ แสงนุ่มแบบมังฮวาโรแมนซ์ หน้าหวาน/เข้มชัดเจน หุ่นสมส่วนสวย','korean manhwa romance webtoon style, ultra clean thin crisp line art, glossy luminous hair with highlights, smooth soft skin shading, large glossy watery eyes with detailed irises, rosy blush on cheeks and nose, soft diffused lighting, polished digital colouring, beautiful well-proportioned adult figures'],
  ['cozy','🌙 สไลซ์ออฟไลฟ์อบอุ่น (ใหม่)','ฉากห้อง/ร้านโทนอุ่น แสงไฟเหลืองนุ่ม เส้นบางสะอาด ท่าทางเป็นธรรมชาติ แบบอนิเมะทีวีรักใสๆ','cozy slice-of-life romance TV anime style, warm golden indoor lighting, soft cel shading, thin clean line art, natural relaxed posture, gentle blush, detailed everyday props, clean modern anime screenshot'],
- ['soft','🌸 นุ่มละเอียด','ลายเส้นบาง นุ่ม ผมแยกเส้น แสงนุ่มแบบภาพยนตร์ (แบบภาพสาวถือแก้วกาแฟ)','soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading'],
- ['tv','📺 อนิเมะทีวีสีสด','เส้นคม ลงสีเซล สีอิ่ม สดใส แบบอนิเมะแฟนตาซีทีวี','bright colourful modern TV fantasy anime style, crisp clean line art, cel shading with soft gradients, vivid saturated colours, sparkling light'],
- ['film','🎬 อนิเมะภาพยนตร์','แสงเงาลึก ฉากหลังละเอียดแบบภาพวาด ท้องฟ้าสวย บรรยากาศอลังการ','cinematic anime film style, painterly highly detailed backgrounds, dramatic volumetric lighting, rich atmospheric colours, fine line art, emotional mood'],
- ['webtoon','📱 มังฮวา/เว็บตูน','หน้าสวยหล่อแบบมังฮวาเกาหลี หุ่นสูงเพรียว เส้นบาง ลงสีนุ่ม','korean manhwa webtoon style, beautiful and handsome refined faces, tall elegant well-proportioned figures, thin clean line art, soft polished colouring, glossy hair, gentle light'],
- ['dark','🌑 ดาร์กแฟนตาซี','เส้นหนักคม คอนทราสต์สูง เงาเข้ม แสงเรืองในที่มืด','dark fantasy anime style, bold sharp line art, high contrast, deep shadows, glowing rim light, gritty atmospheric detail'],
- ['chibi','🍡 จิบิน่ารัก','ตัวเตี้ย หัวโต ตาโตเงา สีหวาน ใช้กับฉากตลก','cute chibi anime style, super deformed proportions, big glossy eyes, soft pastel colours, rounded clean lines, playful'],
 ];
-function stCur(){const st=(BOT.s&&BOT.s.settings)||{};return STYLES.find(x=>x[0]===st.style_preset)||(st.style?['custom','✏️ กำหนดเอง','ข้อความสไตล์ที่พิมพ์เอง',st.style]:STYLES[0]);}
+function stCur(){const st=(BOT.s&&BOT.s.settings)||{};return STYLES.find(x=>x[0]===st.style_preset)||(st.style_preset==='mix'&&st.style?['mix','🎲 ผสมสไตล์','สไตล์ที่สุ่มผสมไว้',st.style]:st.style?['custom','✏️ กำหนดเอง','ข้อความสไตล์ที่พิมพ์เอง',st.style]:STYLES[0]);}
 function stFill(){const el=document.getElementById('stBox');if(!el)return;const c=stCur();
-  el.innerHTML=`<h3>🎨 สไตล์ลายเส้น (ใช้กับทุกอย่าง)</h3><span class="muted small">เลือกครั้งเดียว ใช้กับภาพที่ระบบสร้าง (คลัง ออดิชัน ชุด ภาพร่าง) และพรอมต์ที่ให้ GPT (ชีตตัวละคร มังงะ ภารกิจ) รวมถึงงานที่ยังรอคิว ภาพที่เสร็จแล้วไม่เปลี่ยน</span>
+  let mixLbl='';try{mixLbl=localStorage.getItem('ss_mixlbl')||'';}catch(_){}
+  const isMix=((BOT.s&&BOT.s.settings)||{}).style_preset==='mix';
+  el.innerHTML=`<div class="arow" style="border:2px solid ${isMix?'#8b5cf6':'transparent'};border-radius:10px;margin-bottom:10px"><div class="row" style="justify-content:space-between"><b>🎲 สุ่มผสมสไตล์</b>${isMix?'<span class="st done">ใช้อยู่</span>':''}</div><div class="muted small" style="margin:4px 0 8px">กดแล้วระบบสุ่มหยิบ 2–3 สไตล์มารวมกันเป็นสไตล์ใหม่ ใช้กับทุกอย่างทันที กดซ้ำเพื่อสุ่มใหม่${isMix&&mixLbl?'<br>ตอนนี้: <b>'+esc(mixLbl)+'</b>':''}</div><button class="btn sm main" data-stymix="1">🎲 สุ่มผสม</button></div><h3>🎨 สไตล์ลายเส้น (ใช้กับทุกอย่าง)</h3><span class="muted small">เลือกครั้งเดียว ใช้กับภาพที่ระบบสร้าง (คลัง ออดิชัน ชุด ภาพร่าง) และพรอมต์ที่ให้ GPT (ชีตตัวละคร มังงะ ภารกิจ) รวมถึงงานที่ยังรอคิว ภาพที่เสร็จแล้วไม่เปลี่ยน</span>
   ${STYLES.map(x=>{const im=((BOT.s&&BOT.s.images)||[]).filter(i=>i.project==='ตัวอย่างสไตล์·'+x[0]).pop(),pend=((BOT.s&&BOT.s.jobs)||[]).some(j=>j.project==='ตัวอย่างสไตล์·'+x[0]);return `<div class="arow" style="border:2px solid ${c[0]===x[0]?'#8b5cf6':'transparent'};border-radius:10px">${im?`<img src="${esc(botU('/img/'+im.id))}" alt="${esc(x[1])}" loading="lazy" data-bot="view" style="width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin-bottom:6px">`:pend?'<div class="row" style="margin-bottom:6px"><span class="spin"></span><span class="muted small">กำลังวาดภาพตัวอย่าง…</span></div>':''}<div class="row" style="justify-content:space-between"><b>${x[1]}</b>${c[0]===x[0]?'<span class="st done">ใช้อยู่</span>':`<button class="btn sm main" data-sty="${x[0]}">ใช้สไตล์นี้</button>`}</div><div class="muted small">${x[2]}</div></div>`;}).join('')}
-  <span class="muted small">ปรับละเอียดเองได้ที่ช่อง "สไตล์" ในการ์ดตั้งค่าบอทด้านบน</span>`;}
+  <span class="muted small">ปรับละเอียดเองได้ที่ช่อง "สไตล์" ในการ์ดตั้งค่าบอทด้านบน</span>`;setTimeout(()=>{if(typeof stEnsure==='function')stEnsure();},300);}
+
+/* ตัวอย่างภาพของแต่ละสไตล์: ถ้ายังไม่มีภาพ/ไม่มีงานรอ ระบบสั่งวาดให้เอง (ครั้งละ 1 ภาพ ผู้ใหญ่ 19+) */
+let stAsked={},stTry=0;
+async function stEnsure(){try{const imgs=(BOT.s&&BOT.s.images)||[],jobs=(BOT.s&&BOT.s.jobs)||[];let n=0;
+  for(const x of STYLES){const P='ตัวอย่างสไตล์·'+x[0];if(stAsked[x[0]]||imgs.some(i=>i.project===P)||jobs.some(j=>j.project===P))continue;stAsked[x[0]]=1;
+    const pr='two original adult characters, a beautiful adult woman with long hair and a handsome adult man, upper body portrait, fully clothed, '+x[3]+', no text, no watermark';
+    await botApi('/api/enqueue',{project:P,items:[{scene:1,prompt:pr}],variants:1,raw:true});n++;}
+  if(n){await botLoad();stFill();}
+  if(stTry++<30&&document.getElementById('stBox')&&STYLES.some(x=>!((BOT.s&&BOT.s.images)||[]).some(i=>i.project==='ตัวอย่างสไตล์·'+x[0])))setTimeout(async()=>{try{await botLoad();stFill();stEnsure();}catch(_){}},20000);
+ }catch(e){}}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-stymix]');if(!b)return;
+  try{b.disabled=true;
+    const pool=STYLES.slice().sort(()=>Math.random()-.5),k=Math.min(pool.length,2+Math.floor(Math.random()*2)),ch=pool.slice(0,k);
+    const seen=new Set(),parts=[];
+    ch.forEach((x,i)=>{x[3].split(',').map(t=>t.trim()).filter(Boolean).forEach(t=>{if(seen.has(t))return;if(i===0||Math.random()<.55){seen.add(t);parts.push(t);}});});
+    const txt=parts.join(', '),lbl=ch.map(x=>x[1].replace(/\s*\(ใหม่\)/,'')).join(' + ');
+    await botApi('/api/settings',{style:txt,style_preset:'mix'});
+    try{localStorage.setItem('ss_mixlbl',lbl);}catch(_){}
+    await botLoad();const t=$('#bStyle');if(t)t.value=txt;stFill();toast('ผสมสไตล์: '+lbl);}
+  catch(err){toast(botErr(err));b.disabled=false;}});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-sty]');if(!b)return;const x=STYLES.find(q=>q[0]===b.dataset.sty);if(!x)return;
   try{b.disabled=true;await botApi('/api/settings',{style:x[3],style_preset:x[0]});await botLoad();const t=$('#bStyle');if(t)t.value=x[3];stFill();toast('เปลี่ยนสไตล์เป็น '+x[1]);}catch(err){toast(botErr(err));b.disabled=false;}});
 
