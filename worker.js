@@ -62,7 +62,7 @@ export default {
   },
   async scheduled(event, env, ctx) {
     await ensureSchema(env);
-    ctx.waitUntil(tick(env, false));
+    ctx.waitUntil(tick(env, false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
     ctx.waitUntil(autoHeal(env).catch(() => {}).then(() => vTick(env, false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
     ctx.waitUntil(castBatch(env, 0, false).catch(() => {}));
     ctx.waitUntil(libDaily(env, false).catch(() => {}));
