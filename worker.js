@@ -628,12 +628,21 @@ def ensure_audio():
         if M.get("audio"):
             return
         log("กำลังโหลดโมเดลเสียง (ACE-Step เพลง + Stable Audio Open เสียงประกอบ)")
-        fetch([
-            ("checkpoints", "Comfy-Org/ACE-Step_ComfyUI_repackaged", "all_in_one/ace_step_v1_3.5b.safetensors"),
-            ("checkpoints", "AEmotionStudio/stable-audio-open-models", "model.safetensors", "stable_audio_open_1.0.safetensors"),
-            ("text_encoders", "google-t5/t5-base", "model.safetensors", "t5_base.safetensors"),
-        ])
-        fix_t5()
+        fetch([("checkpoints", "Comfy-Org/ACE-Step_ComfyUI_repackaged", "all_in_one/ace_step_v1_3.5b.safetensors")])
+        try:  # ไฟล์ทางการที่ ComfyUI ทำไว้ให้ (รู้จักรุ่นโมเดลแน่นอน)
+            fetch([
+                ("checkpoints", "Comfy-Org/stable-audio-open-1.0_repackaged", "stable-audio-open-1.0.safetensors", "sao_official.safetensors"),
+                ("text_encoders", "Comfy-Org/t5-base", "t5-base.safetensors", "t5_official.safetensors"),
+            ])
+            M["sao"], M["t5"] = "sao_official.safetensors", "t5_official.safetensors"
+        except Exception as e:
+            log("โหลดไฟล์เสียงทางการไม่ได้ (%s) ใช้ไฟล์สำรอง" % str(e)[:200])
+            fetch([
+                ("checkpoints", "AEmotionStudio/stable-audio-open-models", "model.safetensors", "stable_audio_open_1.0.safetensors"),
+                ("text_encoders", "google-t5/t5-base", "model.safetensors", "t5_base.safetensors"),
+            ])
+            fix_t5()
+            M["sao"], M["t5"] = "stable_audio_open_1.0.safetensors", "t5_base.safetensors"
         M["audio"] = True
         log("โมเดลเสียงพร้อม")
 
@@ -884,8 +893,8 @@ def audio(j, port=8188):
         }
     else:
         wf = {
-            "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "stable_audio_open_1.0.safetensors"}},
-            "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "t5_base.safetensors", "type": "stable_audio"}},
+            "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": M.get("sao", "stable_audio_open_1.0.safetensors")}},
+            "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": M.get("t5", "t5_base.safetensors"), "type": "stable_audio"}},
             "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": pr}},
             "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": "music, speech, low quality, noise, distortion"}},
             "5": {"class_type": "ConditioningStableAudio", "inputs": {"positive": ["3", 0], "negative": ["4", 0], "seconds_start": 0.0, "seconds_total": float(sec)}},
