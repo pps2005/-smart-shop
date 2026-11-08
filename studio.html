@@ -1031,7 +1031,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
+  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['hand','🎯','ภารกิจ'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -1433,6 +1433,57 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-help
     if(a==='off'||a==='on'){await botApi('/api/vhelperset',{id:+id,on:a==='on'});await botLoad();toast(a==='on'?'เปิดสิทธิ์แล้ว':'ปิดสิทธิ์แล้ว งานที่ค้างอยู่จะคืนเข้าคิว');}
     if($('#helpCard'))$('#helpCard').innerHTML=helpersHtml();
   }catch(err){toast(botErr(err));}finally{b.disabled=false;}});
+
+
+/* ---------- งานมือ: พรอมต์ให้ GPT/Gemini สร้างภาพ แล้วอัปโหลดกลับ (ไม่มีกำหนดเวลา วันไหนไม่ว่างก็ข้าม) ---------- */
+let HAND=null,HANDERR='';
+const HKIND={char:['🧑‍🎤','ชีตตัวละคร',30],key:['🎬','ภาพคีย์ฉาก',20],cover:['🖼️','ภาพปก',25],other:['✨','อื่นๆ',10]};
+function handXp(a){return a.filter(t=>t.status==='done').reduce((x,t)=>x+((HKIND[t.kind]||HKIND.other)[2]),0);}
+function handN(){return Math.min(8,Math.max(2,+(localStorage.getItem('ss_handn')||4)));}
+async function handLoad(){try{const r=await botApi('/api/vcastmanual',{act:'list'});HAND=r.tasks||[];HANDERR='';}catch(e){HANDERR=botErr(e);if(!HAND)HAND=[];}
+  if(view==='lib'&&SV.lib==='hand'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
+function handItem(t,open){const k=HKIND[t.kind]||HKIND.other;
+  const body=t.status==='done'&&t.image_id?`<img src="${esc(botU('/img/'+t.image_id))}" alt="${esc(t.title)}" style="width:100%;border-radius:10px" loading="lazy" data-bot="view">`
+    :`<span class="muted small">เอาพรอมต์ไปวางใน GPT หรือ Gemini ได้เลย ถ้าเป็นภาพคีย์ฉาก ให้แนบชีตตัวละครไปด้วย หน้าจะได้เหมือนกัน</span><pre class="hcell" style="user-select:all">${esc(t.prompt)}</pre>`;
+  const btns=t.status==='done'?`<div class="row"><button class="btn sm" data-hand="redo|${t.id}">↩️ ทำใหม่</button><button class="btn sm" data-hand="del|${t.id}">🗑 ลบ</button></div>`
+   :`<div class="row"><button class="btn sm main" data-hand="copy|${t.id}">📋 คัดลอกพรอมต์</button><label class="btn sm" style="cursor:pointer">📤 ส่งภารกิจ<input type="file" accept="image/*" hidden data-handup="${t.id}"></label><button class="btn sm" data-hand="${t.status==='skip'?'redo':'skip'}|${t.id}">${t.status==='skip'?'↩️ ทำต่อ':'💤 พักไว้'}</button><button class="btn sm" data-hand="del|${t.id}">🗑</button></div>`;
+  return det('hd|'+t.id,`${k[0]} ${esc(t.title)}<small>${k[1]} · +${k[2]} XP${t.status==='skip'?' · พักไว้':''}</small>`,body+btns,open);}
+function handHtml(){
+  if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
+  if(!HAND){handLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดงานมือ…</p></div>';}
+  const todo=HAND.filter(t=>t.status==='todo'),skip=HAND.filter(t=>t.status==='skip'),done=HAND.filter(t=>t.status==='done'),n=handN();
+  const today=todo.slice(0,n),rest=todo.slice(n);
+  const xp=handXp(HAND),lv=Math.floor(xp/100)+1,pc=xp%100;
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>🎯 กระดานภารกิจ</h3><span class="muted small">เลเวล ${lv} · ${xp} XP</span></div>
+  <div style="height:10px;border-radius:6px;background:#e8e4f5;overflow:hidden;margin:6px 0"><div style="height:100%;width:${pc}%;background:linear-gradient(90deg,#8b5cf6,#ec4899)"></div></div>
+  <span class="muted small">เลือกภารกิจไหนทำก็ได้ <b>ทำตอนไหนก็ได้ ไม่มีเวลาจำกัด</b> เอาพรอมต์ไปให้ GPT/Gemini สร้างภาพ แล้วกดส่งภารกิจ ได้ XP ทุกภาพ ภารกิจที่ยังไม่มีใครทำ ระบบ Flux ทำให้เองตามปกติ ไม่ต้องรีบ ตัวละครต้องเป็นต้นฉบับและเป็นผู้ใหญ่ · เสร็จ ${done.length} · เหลือ ${todo.length}</span>
+  <label class="muted">⭐ ภารกิจเด่นที่แนะนำ <select id="handN" style="width:auto">${[2,3,4,5,6,7,8].map(x=>`<option${x===n?' selected':''}>${x}</option>`).join('')}</select> งาน</label>${HANDERR?`<div class="errl">⚠️ ${esc(HANDERR)}</div>`:''}</div>
+  ${today.length?`<div class="card"><h3>⭐ ภารกิจเด่น (${today.length})</h3>${today.map((t,i)=>handItem(t,i===0)).join('')}</div>`:`<div class="card"><p class="muted" style="margin:0">${HAND.length?'เคลียร์ภารกิจครบแล้ว 🎉 สร้างภารกิจใหม่ด้านล่างได้':'ยังไม่มีงาน เริ่มจากเพิ่มชีตตัวละครด้านล่าง'}</p></div>`}
+  ${rest.length?det('hrest',`📜 ภารกิจอื่นๆ ที่รับได้ <span class="dn">${rest.length}</span>`,rest.map(t=>handItem(t)).join('')):''}
+  ${skip.length?det('hskip',`💤 พักไว้ <span class="dn">${skip.length}</span>`,skip.map(t=>handItem(t)).join('')):''}
+  ${done.length?det('hdone',`🏆 สำเร็จแล้ว <span class="dn">${done.length}</span>`,done.map(t=>handItem(t)).join('')):''}
+  <div class="card"><h3>➕ สร้างภารกิจใหม่</h3>
+    <select id="hKind">${Object.entries(HKIND).map(([k,v])=>`<option value="${k}">${v[0]} ${v[1]}</option>`).join('')}</select>
+    <input type="text" id="hTitle" placeholder="ชื่อ เช่น โทวะ (ชีตตัวละคร) / ตอน 1 ฉากสู้บนดาดฟ้า" autocomplete="off">
+    <textarea id="hDesc" placeholder="อธิบายเป็นภาษาอังกฤษหรือไทยก็ได้ เช่น ชายวัย 25 ผมดำสั้น ตาสีเทา ใส่เสื้อโค้ทยาวสีเทา"></textarea>
+    <div class="row"><button class="btn sm main" data-hand="add|0">สร้างภารกิจ</button><button class="btn sm" data-hand="shots|0">🎬 ดึงช็อตสำคัญ ⭐ จากตอน</button></div></div>`;}
+function imgToJpegB64(file,max){return new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(file);im.onload=()=>{const r=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*r);c.height=Math.round(im.naturalHeight*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  let q=.88,d=c.toDataURL('image/jpeg',q);while(d.length>1500000&&q>.4){q-=.12;d=c.toDataURL('image/jpeg',q);}URL.revokeObjectURL(u);ok(d.split(',')[1]);};im.onerror=()=>no(new Error('เปิดไฟล์ภาพไม่ได้'));im.src=u;});}
+document.addEventListener('change',async e=>{const i=e.target.closest('[data-handup]');if(!i||!i.files[0])return;
+  try{toast('กำลังอัปโหลด…');const data=await imgToJpegB64(i.files[0],1600);await botApi('/api/vcastmanualup',{id:+i.dataset.handup,data});toast('บันทึกภาพเข้าคลังแล้ว ✅');await handLoad();botLoad();}catch(err){toast(botErr(err));}});
+document.addEventListener('change',e=>{if(e.target.id==='handN'){localStorage.setItem('ss_handn',e.target.value);renderLib(true);}});
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-hand]');if(!b)return;const [a,id]=b.dataset.hand.split('|'),t=(HAND||[]).find(x=>x.id===+id);
+  try{
+    if(a==='copy'&&t)return copy(t.prompt);
+    if(a==='add'){const title=($('#hTitle').value||'').trim(),desc=($('#hDesc').value||'').trim();if(!title||!desc)return toast('ใส่ชื่อและคำอธิบายก่อน');b.disabled=true;
+      const r=await botApi('/api/vcastmanual',{act:'add',kind:$('#hKind').value,title,desc});toast(r.dup?'มีงานชื่อนี้อยู่แล้ว':'เพิ่มงานแล้ว');await handLoad();return;}
+    if(a==='shots'){b.disabled=true;let n=0;
+      for(const e2 of eps){for(const sh of (e2.shots||[])){if(!sh.hq)continue;if((e2.media||{})[String(sh.n)+'_image']||((e2.media||{})[String(sh.n)]||{}).image)continue;
+        const r=await botApi('/api/vcastmanual',{act:'add',kind:'key',title:`${e2.title} ช็อต ${sh.n}`,desc:String(sh.image_prompt||sh.action||'').slice(0,600)||'key shot'});if(!r.dup)n++;}}
+      toast(n?`ดึงมา ${n} ช็อต`:'ไม่พบช็อตสำคัญ ⭐ ที่ยังไม่มีภาพ (กดดาว ⭐ ที่ช็อตก่อน)');await handLoad();return;}
+    if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ'))return;await botApi('/api/vcastmanual',{act:'del',id:+id});await handLoad();return;}
+    if(a==='skip'||a==='redo'){await botApi('/api/vcastmanual',{act:'set',id:+id,status:a==='skip'?'skip':'todo'});await handLoad();return;}
+  }catch(err){toast(botErr(err));}finally{if(b.isConnected)b.disabled=false;}});
 
 boot();
 })();

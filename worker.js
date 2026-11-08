@@ -282,6 +282,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT, helper INTEGER DEFAULT 0)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS manual_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, title TEXT, descr TEXT, prompt TEXT, pri INTEGER DEFAULT 50, status TEXT DEFAULT 'todo', image_id INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS helpers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, key TEXT UNIQUE, on_ INTEGER DEFAULT 1, created INTEGER, seen INTEGER DEFAULT 0, done INTEGER DEFAULT 0, cur TEXT DEFAULT '')"),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS videos (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, ep TEXT, shot TEXT, prompt TEXT, size INTEGER, sec INTEGER, w INTEGER, h INTEGER, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vchunks (vid INTEGER, idx INTEGER, data TEXT, PRIMARY KEY (vid, idx))'),
@@ -1181,6 +1182,13 @@ async function audioDaily(env, have) {
 }
 
 // ---------- คลังอัตโนมัติรายวัน: ทุกวันหลัง 07:00 สร้างของใหม่หมวดละ 1 ชิ้น (ยกเว้นตัวละคร) ครบรายการแล้ววนรอบใหม่ ----------
+function manualPrompt(kind, desc, chars) {
+  const base = 'modern TV anime style, clean lineart, cel shading, high quality, no text, no watermark. All characters are ORIGINAL adults, not based on any existing anime, manga or game character.';
+  if (kind === 'char') return `Create ONE character model sheet image of an original adult anime character. Show on a plain light background: full-body front view, side view and back view, plus four face close-ups (neutral, smiling, angry, surprised). Keep the design identical in every view. Character: ${desc}. ${base}`;
+  if (kind === 'cover') return `Create a vertical key-visual / cover illustration for an original anime series, dramatic composition, cinematic lighting, space left clear for a title (but draw NO text). Subject: ${desc}. ${base}`;
+  if (kind === 'key') return `Create ONE widescreen 16:9 anime key-frame illustration, cinematic composition and lighting. Scene: ${desc}.${chars ? ' Character design to follow: ' + String(chars).slice(0, 400) + '.' : ''} If I attach a character sheet, keep the faces and outfits exactly the same as the sheet. ${base}`;
+  return `Create ONE anime illustration. Subject: ${desc}. ${base}`;
+}
 const LIB_TAIL = 'modern TV anime style, clean lineart, cel shading, high quality';
 const LIBD = [
   ['ฉาก', () => SCENES, it => `${it.e}, no people, detailed anime background art, cinematic lighting, ${LIB_TAIL}`],
@@ -1256,6 +1264,33 @@ async function castBatch(env, n, force, only) {
 async function castApi(req, env, url, body) {
   const p = url.pathname;
   if (p === '/api/vcastlib') return json(await libDaily(env, true));
+  if (p === '/api/vcastmanual') { // งานมือ: รายการพรอมต์สำหรับ GPT/Gemini (ไม่มีกำหนดเวลา ไม่เข้าคิวอัตโนมัติ)
+    const b = body || {}, act = b.act || 'list';
+    if (act === 'add') {
+      const kind = ['char', 'key', 'cover', 'other'].includes(b.kind) ? b.kind : 'other', title = String(b.title || '').trim().slice(0, 80), desc = String(b.desc || '').trim().slice(0, 900);
+      if (!title || !desc) return json({ error: 'ใส่ชื่อและคำอธิบายก่อน' }, 400);
+      const dup = await env.DB.prepare("SELECT id FROM manual_tasks WHERE title=? AND status!='skip'").bind(title).first();
+      if (dup) return json({ ok: true, dup: true });
+      const s = await getSettings(env);
+      await env.DB.prepare('INSERT INTO manual_tasks (kind,title,descr,prompt,pri,status,created) VALUES (?,?,?,?,?,?,?)')
+        .bind(kind, title, desc, manualPrompt(kind, desc, s.character || ''), { char: 10, key: 20, cover: 30, other: 40 }[kind], 'todo', Date.now()).run();
+      return json({ ok: true });
+    }
+    if (act === 'set') { await env.DB.prepare('UPDATE manual_tasks SET status=? WHERE id=?').bind(['todo', 'skip', 'done'].includes(b.status) ? b.status : 'todo', +b.id).run(); return json({ ok: true }); }
+    if (act === 'del') { await env.DB.prepare('DELETE FROM manual_tasks WHERE id=?').bind(+b.id).run(); return json({ ok: true }); }
+    const r = await env.DB.prepare("SELECT id,kind,title,descr,prompt,pri,status,image_id,created FROM manual_tasks ORDER BY CASE status WHEN 'todo' THEN 0 WHEN 'skip' THEN 1 ELSE 2 END, pri, id LIMIT 300").all();
+    return json({ tasks: r.results });
+  }
+  if (p === '/api/vcastmanualup') { // อัปโหลดภาพที่ได้จาก GPT/Gemini เข้าคลัง (ย่อภาพมาแล้วจากเบราว์เซอร์)
+    const b = body || {}, t = await env.DB.prepare('SELECT id,title,prompt FROM manual_tasks WHERE id=?').bind(+b.id).first();
+    if (!t) return json({ error: 'ไม่พบงานนี้' }, 404);
+    const data = String(b.data || '').replace(/^data:[^,]*,/, '');
+    if (data.length < 2000) return json({ error: 'ไฟล์ภาพเล็กผิดปกติ' }, 400);
+    if (data.length > 1900000) return json({ error: 'ภาพใหญ่เกินไป ลองใหม่อีกครั้ง' }, 400);
+    const ins = await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (0,?,?,?,?,1,?)').bind('✋·' + t.title, 1, t.prompt.slice(0, 600), data, Date.now()).run();
+    await env.DB.prepare("UPDATE manual_tasks SET status='done', image_id=? WHERE id=?").bind(ins.meta.last_row_id, t.id).run();
+    return json({ ok: true, image_id: ins.meta.last_row_id });
+  }
   if (p === '/api/vcastlibone') { // สั่งสร้างภาพรายการเดียวจากคลังทันที
     const b = body || {};
     const row = LIBD.find(x => x[0] === b.cat); if (!row) return json({ error: 'ไม่รู้จักหมวด' }, 400);
