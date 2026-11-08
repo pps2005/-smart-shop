@@ -66,6 +66,7 @@ export default {
     ctx.waitUntil(autoHeal(env).catch(() => {}).then(() => vTick(env, false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
     ctx.waitUntil(castBatch(env, 0, false).catch(() => {}));
     ctx.waitUntil(libDaily(env, false).catch(() => {}));
+    ctx.waitUntil(audDaily(env).catch(() => {}));
   },
 };
 
@@ -142,6 +143,19 @@ function audIntro(name, tr) {
   for (const t of tr) if (L[t]) return L[t];
   return `ฉันชื่อ${name} ขอโอกาสสักครั้งนะ`;
 }
+// ออดิชันรายวัน: หลัง 07:00 น. เวลาไทย เรียกผู้สมัครใหม่รวม aud_daily คน (ค่าเริ่ม 6, 4–8) เฉพาะบทที่ยังไม่ได้เลือก
+async function audDaily(env) {
+  const s = await getSettings(env), b = new Date(Date.now() + 7 * 3600000), day = b.toISOString().slice(0, 10);
+  if (b.getUTCHours() < 7 || s.aud_day === day) return;
+  await setSetting(env, 'aud_day', day);
+  const first = await env.DB.prepare('SELECT COUNT(*) n FROM aud_cands').first();
+  if (!first || !+first.n) return; // วันแรกเรียกครบทุกบทตอนเปิดห้องออดิชันอยู่แล้ว
+  const chosen = new Set((await env.DB.prepare('SELECT role FROM aud_cands WHERE chosen=1').all()).results.map(x => x.role));
+  const open = AUD_ROLES.filter(R => !chosen.has(R.key)); if (!open.length) return;
+  const total = Math.min(8, Math.max(4, +s.aud_daily || 6)), per = {};
+  for (let k = 0; k < total; k++) { const R = open[k % open.length]; per[R.key] = (per[R.key] || 0) + 1; }
+  for (const [role, n] of Object.entries(per)) await audApi(env, { act: 'gen', role, n });
+}
 async function audApi(env, b) {
   const act = b.act || 'list';
   if (act === 'gen') {
@@ -165,6 +179,7 @@ async function audApi(env, b) {
     await env.DB.batch(st);
     return { ok: true, added: n };
   }
+  if (act === 'daily') { await setSetting(env, 'aud_daily', String(Math.min(8, Math.max(4, +b.n || 6)))); return { ok: true }; }
   if (act === 'pick') {
     const c = await env.DB.prepare('SELECT * FROM aud_cands WHERE id=?').bind(+b.id).first(); if (!c) return { error: 'ไม่พบผู้สมัคร' };
     const R = AUD_ROLES.find(x => x.key === c.role) || {};
@@ -183,7 +198,8 @@ async function audApi(env, b) {
   const cs = (await env.DB.prepare('SELECT * FROM aud_cands ORDER BY id').all()).results;
   const ims = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE instr(project,'ออดิชัน·')=1 ORDER BY id").all()).results;
   const jb = (await env.DB.prepare("SELECT project,status FROM jobs WHERE instr(project,'ออดิชัน·')=1").all()).results;
-  return { roles: AUD_ROLES.map(x => ({ key: x.key, role: x.role })), cands: cs.map(c => { const pre = `ออดิชัน·${c.role}·${c.id}·`; return { ...c, card: (ims.filter(i => i.project.startsWith(pre) && i.scene === 1).pop() || {}).id || 0, aud: (ims.filter(i => i.project.startsWith(pre) && i.scene === 2).pop() || {}).id || 0, pending: jb.filter(j => j.project.startsWith(pre)).length }; }) };
+  const s0 = await getSettings(env);
+  return { daily: Math.min(8, Math.max(4, +s0.aud_daily || 6)), roles: AUD_ROLES.map(x => ({ key: x.key, role: x.role })), cands: cs.map(c => { const pre = `ออดิชัน·${c.role}·${c.id}·`; return { ...c, card: (ims.filter(i => i.project.startsWith(pre) && i.scene === 1).pop() || {}).id || 0, aud: (ims.filter(i => i.project.startsWith(pre) && i.scene === 2).pop() || {}).id || 0, pending: jb.filter(j => j.project.startsWith(pre)).length }; }) };
 }
 
 async function fluxKeysApi(env, b) {

@@ -1714,7 +1714,7 @@ function audHtml(){
   if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
   if(!AUDS){audLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังเปิดห้องออดิชัน…</p></div>';}
   const img=(id,alt)=>id?`<img src="${esc(botU('/img/'+id))}" alt="${esc(alt)}" loading="lazy" data-bot="view" style="width:100%;aspect-ratio:1;object-fit:cover;object-position:top;border-radius:8px;background:#eee">`:`<div style="width:100%;aspect-ratio:1;border-radius:8px;background:#f1eef9;display:flex;align-items:center;justify-content:center"><span class="spin"></span></div>`;
-  return `<div class="card"><h3>🎭 ห้องออดิชัน</h3><span class="muted small">แต่ละบทมีผู้สมัครที่หน้าตาและบุคลิกต่างกัน ภาพซ้ายคือภาพโปรไฟล์ ภาพขวาคือภาพออดิชัน (ทุกคนในบทเดียวกันเล่นช็อตเดียวกัน) กด ⭐ เลือก แล้วภารกิจ "ชีตใหม่" ของบทนั้นจะเปลี่ยนพรอมต์ให้ตรงกับผู้สมัคร ให้แนบภาพของเขาไปใน GPT</span>${AUDS.err?`<div class="errl">⚠️ ${esc(AUDS.err)}</div>`:''}</div>`+
+  return `<div class="card"><h3>🎭 ห้องออดิชัน</h3><span class="muted small">แต่ละบทมีผู้สมัครที่หน้าตาและบุคลิกต่างกัน ภาพซ้ายคือภาพโปรไฟล์ ภาพขวาคือภาพออดิชัน (ทุกคนในบทเดียวกันเล่นช็อตเดียวกัน) กด ⭐ เลือก แล้วภารกิจ "ชีตใหม่" ของบทนั้นจะเปลี่ยนพรอมต์ให้ตรงกับผู้สมัคร ให้แนบภาพของเขาไปใน GPT</span><label class="muted">ผู้สมัครใหม่ทุกวันหลัง 07:00 รวม <select id="audDaily" style="width:auto">${[4,5,6,7,8].map(x=>`<option${x===(AUDS.daily||6)?' selected':''}>${x}</option>`).join('')}</select> คน (เฉพาะบทที่ยังไม่ได้เลือก)</label>${AUDS.err?`<div class="errl">⚠️ ${esc(AUDS.err)}</div>`:''}</div>`+
   (AUDS.roles||[]).map(R=>{const cs=(AUDS.cands||[]).filter(c=>c.role===R.key),ch=cs.find(c=>+c.chosen);
     const body=(cs.length?`<div style="display:grid;grid-template-columns:1fr;gap:12px">`+cs.map(c=>`<div style="border:2px solid ${+c.chosen?'#f5b301':'#e5e0f3'};border-radius:12px;padding:8px;background:${+c.chosen?'#fffbea':'#fff'}">
       <div class="row" style="justify-content:space-between"><b>${+c.chosen?'⭐ ':''}${esc(c.name)}</b><span class="muted small">อายุ ${c.age} · ${esc(String(c.traits).split(',').join(' · '))}</span></div>
@@ -1730,6 +1730,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-aud]
     if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ')){b.disabled=false;return;}await botApi('/api/vcastaud',{act:'del',id:+v});}
     await audLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
 
+document.addEventListener('change',async e=>{if(e.target.id!=='audDaily')return;try{await botApi('/api/vcastaud',{act:'daily',n:+e.target.value});toast('บันทึกแล้ว');}catch(err){toast(botErr(err));}});
 boot();
 })();
 </script>
