@@ -657,31 +657,26 @@ def ensure_audio():
             return
         log("กำลังโหลดโมเดลเสียง (ACE-Step เพลง + Stable Audio Open เสียงประกอบ)")
         fetch([("checkpoints", "Comfy-Org/ACE-Step_ComfyUI_repackaged", "all_in_one/ace_step_v1_3.5b.safetensors")])
-        ok = False
-        for sao_repo, t5_repo in [("Comfy-Org/stable-audio-open-1.0_repackaged", "Comfy-Org/t5-base"), ("Comfy-Org/stable-audio-open-1.0", "Comfy-Org/t5-base")]:
+        sao = None
+        for repo in ("Comfy-Org/stable-audio-open-1.0_repackaged", "Comfy-Org/stable-audio-open-1.0"):
             try:  # ไฟล์ทางการที่ ComfyUI ทำไว้ให้ (รู้จักรุ่นโมเดลแน่นอน)
-                fetch([
-                    ("checkpoints", sao_repo, "stable-audio-open-1.0.safetensors", "sao_official.safetensors"),
-                    ("text_encoders", t5_repo, "t5-base.safetensors", "t5_official.safetensors"),
-                ])
-                M["sao"], M["t5"] = "sao_official.safetensors", "t5_official.safetensors"
-                ok = True
+                fetch([("checkpoints", repo, "stable-audio-open-1.0.safetensors", "sao_official.safetensors")])
+                sao = "sao_official.safetensors"
+                log("โหลดไฟล์ Stable Audio ทางการจาก " + repo + " แล้ว")
                 break
             except Exception as e:
-                log("โหลดไฟล์เสียงจาก %s ไม่ได้: %s" % (sao_repo, str(e)[:250]))
-                for f in ("checkpoints/sao_official.safetensors", "text_encoders/t5_official.safetensors"):
-                    try:
-                        os.remove(os.path.join(COMFY, "models", f))
-                    except Exception:
-                        pass
-        if not ok:
-            log("ใช้ไฟล์เสียงสำรอง (อาจใช้ไม่ได้)")
-            fetch([
-                ("checkpoints", "AEmotionStudio/stable-audio-open-models", "model.safetensors", "stable_audio_open_1.0.safetensors"),
-                ("text_encoders", "google-t5/t5-base", "model.safetensors", "t5_base.safetensors"),
-            ])
-            fix_t5()
-            M["sao"], M["t5"] = "stable_audio_open_1.0.safetensors", "t5_base.safetensors"
+                log("โหลด Stable Audio จาก %s ไม่ได้: %s" % (repo, str(e)[:200]))
+                try:
+                    os.remove(os.path.join(COMFY, "models", "checkpoints", "sao_official.safetensors"))
+                except Exception:
+                    pass
+        if not sao:
+            log("ใช้ไฟล์ Stable Audio สำรอง (อาจใช้ไม่ได้)")
+            fetch([("checkpoints", "AEmotionStudio/stable-audio-open-models", "model.safetensors", "stable_audio_open_1.0.safetensors")])
+            sao = "stable_audio_open_1.0.safetensors"
+        fetch([("text_encoders", "google-t5/t5-base", "model.safetensors", "t5_base.safetensors")])
+        fix_t5()
+        M["sao"], M["t5"] = sao, "t5_base.safetensors"
         M["audio"] = True
         log("โมเดลเสียงพร้อม")
 
