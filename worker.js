@@ -106,6 +106,7 @@ async function tick(env, force) {
     const msg = String(e.message || e);
     if (/neuron|allocation|quota|exceed|limit|4006|3036/i.test(msg)) {
       await env.DB.prepare("UPDATE jobs SET status='queued' WHERE id=?").bind(job.id).run();
+      await setSetting(env, 'img_err', new Date().toISOString() + ' ' + msg.slice(0, 400));
       const d = new Date(); d.setUTCHours(24, 2, 0, 0);
       await setSetting(env, 'paused_until', String(d.getTime()));
       await notify(env, '⏸ โควตาสร้างภาพฟรีของวันนี้หมดแล้ว บอทจะกลับมาทำต่อเองประมาณ 07:00 น. (เวลาไทย)');
