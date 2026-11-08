@@ -1170,7 +1170,9 @@ async function audioDaily(env, have) {
     }
     return res;
   };
-  for (const [x, nm] of pickN('เสียงประกอบ', SFXLIB, Math.min(400, +s.aud_sfx_n || 200)))
+  // AI ทำเฉพาะเสียงที่ทำได้ดี (บรรยากาศ/ธรรมชาติ/เวทมนตร์/ไซไฟ/ธาตุ/ลึกลับ) เสียงเดี่ยวอย่างก้าวเท้า ประตู กระแทก ใช้เสียงจริงจากคลังเสียงจริงแทน
+  const SFXAI = new Set(['ธรรมชาติและป่า', 'น้ำและสภาพอากาศ', 'เวทมนตร์และพลังพิเศษ', 'ไซไฟและอวกาศ', 'น้ำแข็ง หิมะ และธาตุ', 'เสียงลึกลับและเหนือธรรมชาติ']);
+  for (const [x, nm] of pickN('เสียงประกอบ', SFXLIB.filter(q => SFXAI.has(q.c)), Math.min(400, +s.aud_sfx_n || 200)))
     for (let v = 0; v < V; v++) out.push({ project: `คลัง·เสียงประกอบ·${nm}`, prompt: x.e + ', clean high quality sound effect, no music', type: 'sfx', sec: 10 });
   const ms = pickN('เพลง', MUSICLIB, Math.min(100, +s.aud_music_n || 20));
   for (const [x, nm] of ms)
