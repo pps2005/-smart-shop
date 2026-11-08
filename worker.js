@@ -39,7 +39,7 @@ export default {
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/fluxkeys') return json(await fluxKeysApi(env, body));
       if (p === '/api/settings') {
-        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset'])
+        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill'])
           if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
         return json({ ok: true });
       }
@@ -247,6 +247,22 @@ async function genImage(env, s, prompt, steps, seed) {
 const DEF_STYLE = 'soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading';
 function curStyle(s) { return String((s && s.style) || '').trim() || DEF_STYLE; }
 function withStyle(p, s) { p = String(p || ''); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
+// เจนต่อเนื่อง: คิวว่างเมื่อไร เติมงานใหม่เอง สลับระหว่างผู้สมัครออดิชัน 1 คน กับของในคลัง 1 ชิ้น (ฉาก อาวุธ เวท โลก ฯลฯ)
+async function autoFill(env, s) {
+  const n = +s.fill_n || 0; await setSetting(env, 'fill_n', String(n + 1));
+  if (n % 2 === 0) {
+    const asg = new Set((await env.DB.prepare('SELECT cast_role FROM aud_cands WHERE cast_role IS NOT NULL').all()).results.map(x => x.cast_role));
+    const open = AUD_ROLES.filter(R => !asg.has(R.key)), L = open.length ? open : AUD_ROLES;
+    await audApi(env, { act: 'gen', role: L[Math.floor(n / 2) % L.length].key, n: 1 });
+  } else {
+    const rows = LIBD.filter(r => r[0] !== 'เอฟเฟกต์'), row = rows[Math.floor(n / 2) % rows.length], list = row[1]() || [];
+    if (!list.length) return;
+    const it = list[Math.floor(Math.random() * list.length)], base = `คลัง·${row[0]}·${libName(it)}`;
+    const have = await env.DB.prepare('SELECT COUNT(*) c FROM images WHERE project=? OR instr(project,?)=1').bind(base, base + ' · รอบ').first();
+    const proj = have && +have.c ? `${base} · รอบ ${+have.c + 1}` : base;
+    await env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,4)").bind(proj, row[2](it).slice(0, 2000), Date.now()).run();
+  }
+}
 async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
@@ -258,7 +274,7 @@ async function tick(env, force) {
     if (now - +s.last_run > 180000) await env.DB.prepare("UPDATE jobs SET status='queued' WHERE status='running'").run();
   }
   const job = await env.DB.prepare("SELECT * FROM jobs WHERE status='queued' ORDER BY id LIMIT 1").first();
-  if (!job) return { skipped: 'empty' };
+  if (!job) { if (s.auto_fill === '1' && !force) { await autoFill(env, s); return { skipped: 'empty', filled: true }; } return { skipped: 'empty' }; }
   await setSetting(env, 'last_run', String(now));
   await env.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(job.id).run();
   try {

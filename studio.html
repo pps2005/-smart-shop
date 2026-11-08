@@ -1714,19 +1714,32 @@ let AUDS=null,AUDT=0;
 async function audLoad(){try{AUDS=await botApi('/api/vcastaud',{act:'list'});}catch(e){AUDS=AUDS||{roles:[],cands:[],err:botErr(e)};}
   if(view==='lib'&&(SV.lib==='aud'||SV.lib==='keep')){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}
   clearTimeout(AUDT);if(AUDS&&(AUDS.cands||[]).some(c=>c.pending)&&view==='lib'&&SV.lib==='aud')AUDT=setTimeout(audLoad,20000);}
+let AUDF=localStorage.getItem('ss_audf')||'all';
 function audHtml(){
   if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
   if(!AUDS){audLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังเปิดห้องออดิชัน…</p></div>';}
-  const img=(id,alt)=>id?`<img src="${esc(botU('/img/'+id))}" alt="${esc(alt)}" loading="lazy" data-bot="view" style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;border-radius:8px;background:#eee">`:`<div style="width:100%;aspect-ratio:1;border-radius:8px;background:#f1eef9;display:flex;align-items:center;justify-content:center"><span class="spin"></span></div>`;
-  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>🎭 ห้องออดิชัน</h3><button class="btn sm" data-fkgo2="1">🎨 ${esc(stCur()[1])}</button></div><span class="muted small">แต่ละบทมีผู้สมัครที่หน้าตาและบุคลิกต่างกัน กด ⭐ เก็บเข้าคลัง คนที่ชอบ แล้วไปใส่บทในแท็บ 📚 คลังของเรา ทีหลัง ใส่บทแล้วภารกิจ "ชีตใหม่" จะได้พรอมต์ตรงกับนักแสดง ให้แนบรูปของเขาไปใน GPT</span><label class="muted">ผู้สมัครใหม่ทุกวันหลัง 07:00 รวม <select id="audDaily" style="width:auto">${[4,5,6,7,8].map(x=>`<option${x===(AUDS.daily||6)?' selected':''}>${x}</option>`).join('')}</select> คน (เฉพาะบทที่ยังไม่ได้เลือก)</label>${AUDS.err?`<div class="errl">⚠️ ${esc(AUDS.err)}</div>`:''}</div>`+
-  (AUDS.roles||[]).map(R=>{const cs=(AUDS.cands||[]).filter(c=>c.role===R.key),ch=cs.find(c=>+c.kept);
-    const body=(cs.length?`<div style="display:grid;grid-template-columns:1fr;gap:12px">`+cs.map(c=>`<div style="border:2px solid ${+c.kept?'#f5b301':'#e5e0f3'};border-radius:12px;padding:8px;background:${+c.kept?'#fffbea':'#fff'}">
-      <div class="row" style="justify-content:space-between"><b>${+c.kept?'⭐ ':''}${esc(c.name)}</b><span class="muted small">อายุ ${c.age} · ${esc(String(c.traits).split(',').join(' · '))}</span></div>
-      <div style="margin:6px 0;max-width:340px">${img(c.aud||c.card,c.name)}</div>
-      <div class="small" style="font-style:italic;margin:4px 0">“${esc(c.intro)}”</div>
-      ${c.cast_role?`<div class="small" style="margin:4px 0">🎬 รับบท <b>${esc(c.cast_role)}</b> ใน ${esc(c.cast_story||'')}</div>`:''}<div class="row"><button class="btn sm${+c.kept?'':' main'}" data-aud="keep|${c.id}"${c.pending?' disabled':''}>${+c.kept?'✅ อยู่ในคลังแล้ว':'⭐ เก็บเข้าคลัง'}</button><button class="btn sm" data-aud="del|${c.id}">🗑</button></div></div>`).join('')+`</div>`:'<p class="muted small" style="margin:6px 0">ยังไม่มีผู้สมัคร</p>')
-      +`<div class="row" style="margin-top:8px"><button class="btn sm main" data-aud="gen|${esc(R.key)}">🔄 เรียกผู้สมัครเพิ่ม 4 คน</button></div>`;
-    return det('aud|'+R.key,`🎬 ${esc(R.key)}<small>${esc(R.role)}${cs.length?` · ผู้สมัคร ${cs.length} คน`:''}${cs.filter(c=>+c.kept).length?` · เก็บแล้ว ${cs.filter(c=>+c.kept).length}`:''}</small>`,body,false);}).join('');}
+  const st=(BOT.s&&BOT.s.settings)||{},auto=st.auto_fill==='1';
+  const roles=AUDS.roles||[],all=(AUDS.cands||[]).slice().reverse();
+  const L=all.filter(c=>AUDF==='all'?true:AUDF==='kept'?+c.kept:c.role===AUDF);
+  const chip=(k,t,n)=>`<button class="btn sm${AUDF===k?' main':''}" data-audf="${esc(k)}">${t}${n!=null?` <span class="dn">${n}</span>`:''}</button>`;
+  const card=c=>{const id=c.aud||c.card;return `<div style="border:2px solid ${+c.kept?'#f5b301':'#ece7f8'};border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column">
+    ${id?`<img src="${esc(botU('/img/'+id))}" alt="${esc(c.name)}" loading="lazy" data-bot="view" style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;display:block">`:`<div style="width:100%;aspect-ratio:3/4;background:#f1eef9;display:flex;align-items:center;justify-content:center"><span class="spin"></span></div>`}
+    <div style="padding:6px 8px;display:flex;flex-direction:column;gap:3px;flex:1">
+      <div class="row" style="justify-content:space-between;gap:4px"><b style="font-size:14px">${+c.kept?'⭐ ':''}${esc(c.name)}</b><span class="muted small">${c.age} ปี</span></div>
+      <span class="small" style="color:#8C6BFF">${esc(c.role)}${c.cast_role?` · 🎬 ${esc(c.cast_role)}`:''}</span>
+      <span class="muted small" style="line-height:1.3">${esc(String(c.traits).split(',').join(' · '))}</span>
+      <div class="row" style="gap:4px;margin-top:auto"><button class="btn sm${+c.kept?'':' main'}" style="flex:1;padding:6px 4px" data-aud="keep|${c.id}"${c.pending?' disabled':''}>${+c.kept?'✅ เก็บแล้ว':'⭐ เก็บ'}</button><button class="btn sm" style="padding:6px 8px" data-aud="del|${c.id}">🗑</button></div></div></div>`;};
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>🎭 ห้องออดิชัน</h3><button class="btn sm" data-fkgo2="1">🎨 ${esc(stCur()[1])}</button></div>
+    <span class="muted small">กด ⭐ เก็บ คนที่ชอบ แล้วไปใส่บทในแท็บ 📚 คลังของเรา</span>
+    <label class="row" style="gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="autoFill"${auto?' checked':''} style="width:22px;height:22px"><span><b>♾️ เจนต่อเนื่อง</b> <span class="muted small">คิวว่างเมื่อไรเติมเอง สลับผู้สมัคร 1 คนกับของในคลัง 1 ชิ้น ทุก ${st.interval_min||2} นาที จนโควตาทุกบัญชีหมด</span></span></label>
+    ${auto?'':`<label class="muted">ผู้สมัครใหม่ทุกวันหลัง 07:00 รวม <select id="audDaily" style="width:auto">${[4,5,6,7,8].map(x=>`<option${x===(AUDS.daily||6)?' selected':''}>${x}</option>`).join('')}</select> คน</label>`}
+    ${AUDS.err?`<div class="errl">⚠️ ${esc(AUDS.err)}</div>`:''}</div>
+  <div class="card"><div class="row" style="flex-wrap:wrap;gap:6px">${chip('all','ทั้งหมด',all.length)}${chip('kept','⭐ เก็บแล้ว',all.filter(c=>+c.kept).length)}${roles.map(R=>chip(R.key,esc(R.key),all.filter(c=>c.role===R.key).length)).join('')}</div>
+    ${AUDF!=='all'&&AUDF!=='kept'?`<div class="row" style="margin-top:6px"><button class="btn sm main" data-aud="gen|${esc(AUDF)}">🔄 เรียกผู้สมัครบท ${esc(AUDF)} เพิ่ม 4 คน</button></div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px">${L.map(card).join('')||'<p class="muted small">ยังไม่มี</p>'}</div></div>`;}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-audf]');if(!b)return;AUDF=b.dataset.audf;localStorage.setItem('ss_audf',AUDF);const y=window.scrollY;renderLib(true);window.scrollTo(0,y);});
+document.addEventListener('change',async e=>{if(e.target.id!=='autoFill')return;const on=e.target.checked;
+  try{await botApi('/api/settings',on?{auto_fill:'1',pace:'0',interval_min:2}:{auto_fill:'0',pace:'1'});await botLoad();toast(on?'เปิดเจนต่อเนื่องแล้ว ♾️':'ปิดเจนต่อเนื่องแล้ว');renderLib(true);}catch(err){toast(botErr(err));}});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-aud]');if(!b)return;const [a,v]=b.dataset.aud.split('|');
   try{b.disabled=true;
     if(a==='gen'){const r=await botApi('/api/vcastaud',{act:'gen',role:v,n:4});if(r.error)throw new Error(r.error);toast('เรียกผู้สมัครแล้ว ⏳ ภาพจะทยอยขึ้น (ราว 2 นาทีต่อภาพ)');}
