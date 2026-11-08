@@ -282,6 +282,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT, helper INTEGER DEFAULT 0)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS char_profiles (name TEXT PRIMARY KEY, data TEXT, updated INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS sfx_real (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, mime TEXT, size INTEGER, data TEXT, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS manual_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, title TEXT, descr TEXT, prompt TEXT, pri INTEGER DEFAULT 50, status TEXT DEFAULT 'todo', image_id INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS helpers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, key TEXT UNIQUE, on_ INTEGER DEFAULT 1, created INTEGER, seen INTEGER DEFAULT 0, done INTEGER DEFAULT 0, cur TEXT DEFAULT '')"),
@@ -1286,6 +1287,18 @@ async function castApi(req, env, url, body) {
     if (act === 'del') { await env.DB.prepare('DELETE FROM manual_tasks WHERE id=?').bind(+b.id).run(); return json({ ok: true }); }
     const r = await env.DB.prepare("SELECT id,kind,title,descr,prompt,pri,status,image_id,created FROM manual_tasks ORDER BY CASE status WHEN 'todo' THEN 0 WHEN 'skip' THEN 1 ELSE 2 END, pri, id LIMIT 300").all();
     return json({ tasks: r.results });
+  }
+  if (p === '/api/vcastprofile') { // ข้อมูลตัวละครที่ผู้ใช้เลือกจากตัวเลือก (Claude อ่านไปเขียนเรื่อง/พรอมต์)
+    const b = body || {};
+    if (b.act === 'set') {
+      const name = String(b.name || '').trim().slice(0, 60); if (!name) return json({ error: 'ไม่มีชื่อ' }, 400);
+      const d = JSON.stringify(b.data || {}).slice(0, 3000);
+      await env.DB.prepare('INSERT INTO char_profiles (name,data,updated) VALUES (?,?,?) ON CONFLICT(name) DO UPDATE SET data=excluded.data, updated=excluded.updated').bind(name, d, Date.now()).run();
+      return json({ ok: true });
+    }
+    const r = await env.DB.prepare('SELECT name,data FROM char_profiles').all(), out = {};
+    for (const x of r.results) { try { out[x.name] = JSON.parse(x.data); } catch (e) { } }
+    return json({ profiles: out });
   }
   if (p === '/api/vcastsfx') { // คลังเสียงจริง (CC0 ที่ผู้ใช้โหลดมาอัปเอง)
     const b = body || {}, act = b.act || 'list';

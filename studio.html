@@ -1031,7 +1031,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['hand','🎯','ภารกิจ'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
+  const lv2=SV.lib;vwSet(segHtml('lib',[['cast','🧑‍🎤','แคสติ้ง'],['world','🌌','โลก'],['hand','🎯','ภารกิจ'],['prof','👥','ตัวละคร'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -1532,6 +1532,43 @@ let SFXAUD=null;
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-sfx]');if(!b)return;const [a,id]=b.dataset.sfx.split('|');
   try{if(a==='play'){const r=await botApi('/api/vcastsfx',{act:'get',id:+id});if(SFXAUD)SFXAUD.pause();SFXAUD=new Audio(`data:${r.mime};base64,${r.data}`);SFXAUD.play().catch(()=>toast('เล่นเสียงไม่ได้'));}
     if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ'))return;await botApi('/api/vcastsfx',{act:'del',id:+id});await sfxLoad();}}catch(er){toast(botErr(er));}});
+
+
+/* ---------- ข้อมูลตัวละคร: เลือกจากตัวเลือก แล้ว Claude เอาไปเขียนเรื่อง/พรอมต์ ---------- */
+let PROF=null;
+const PF=[
+ ['gender','เพศ',['หญิง','ชาย','ไม่ระบุเพศ'],0],
+ ['age','ช่วงวัย (ต้องเป็นผู้ใหญ่)',['18-22 (วัยมหาลัย)','23-29','30-39','40 ขึ้นไป'],0],
+ ['role','บทบาท',['ตัวเอกหลัก','เพื่อนสนิทตัวเอก','คนรัก','คู่แข่ง','ตัวร้าย','ผู้ใหญ่ที่คอยดูแล','คนลึกลับ','ตัวตลก'],0],
+ ['traits','นิสัย (เลือกได้หลายอัน)',['ร่าเริง','สงบนิ่ง','ขี้อาย','เย็นชา','ใจดี','ดื้อรั้น','จริงจัง','ขี้เล่น','ลึกลับ','กล้าหาญ','ขี้กลัว','ขี้เหงา'],1],
+ ['job','อาชีพ/สถานะ',['นักเรียนมหาลัย','พนักงานออฟฟิศ','ศิลปิน/นักดนตรี','นักสืบ/นักวิจัย','เจ้าของร้าน','นักผจญภัย','ไม่ระบุ'],0],
+ ['tone','น้ำเสียงเวลาพูด',['สุภาพ','เป็นกันเอง','ห้วน สั้น','อ่อนโยน','มั่นใจ','พูดน้อย'],0]
+];
+async function profLoad(){try{const r=await botApi('/api/vcastprofile',{});PROF=r.profiles||{};}catch(e){PROF=PROF||{};}
+  if(view==='lib'&&SV.lib==='prof'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
+function profNames(){const n=[];(HAND||[]).filter(t=>t.kind==='char').forEach(t=>{const nm=String(t.title||'').replace(/\s*\(.*\)\s*$/,'').trim();if(nm&&!n.includes(nm))n.push(nm);});return n;}
+function profHtml(){
+  if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
+  if(!HAND){handLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลด…</p></div>';}
+  if(!PROF){profLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดข้อมูลตัวละคร…</p></div>';}
+  const names=profNames(),filled=names.filter(n=>PROF[n]&&Object.keys(PROF[n]).length).length;
+  if(!names.length)return '<div class="card"><h3>👥 ข้อมูลตัวละคร</h3><p class="muted" style="margin:0">ยังไม่มีตัวละคร สร้างภารกิจ "ชีตตัวละคร" ในแท็บ 🎯 ภารกิจก่อน ชื่อจะมาแสดงที่นี่</p></div>';
+  const others=n=>names.filter(x=>x!==n);
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>👥 ข้อมูลตัวละคร</h3><span class="muted small">กรอกแล้ว ${filled}/${names.length}</span></div>
+  <span class="muted small">แตะเลือกตัวเลือกได้เลย บันทึกอัตโนมัติ Claude จะอ่านข้อมูลนี้ไปเขียนเรื่อง บทพูด และพรอมต์ภาพ ไม่ต้องบอกซ้ำ ตัวละครทุกตัวต้องเป็นผู้ใหญ่ (18+)</span></div>`
+  +names.map(n=>{const p=PROF[n]||{},chip=(f,v,multi)=>{const on=multi?(p[f]||[]).includes(v):p[f]===v;return `<button class="btn sm${on?' main':''}" data-prof="${esc(n)}|${f}|${esc(v)}|${multi?1:0}">${esc(v)}</button>`;};
+   const body=PF.map(([f,l,opts,m])=>`<div class="muted small" style="margin-top:8px"><b>${l}</b></div><div class="row" style="flex-wrap:wrap;gap:6px">${opts.map(o=>chip(f,o,m)).join('')}</div>`).join('')
+    +(others(n).length?`<div class="muted small" style="margin-top:8px"><b>ความสัมพันธ์กับตัวละครอื่น</b></div>`+others(n).map(o=>`<div class="row" style="flex-wrap:wrap;gap:6px;align-items:center"><span class="small">${esc(o)}:</span>${['เพื่อนสนิท','คนรัก','ครอบครัว','คู่แข่ง','เพื่อนร่วมงาน','ไม่รู้จักกัน'].map(v=>{const on=(p.rel||{})[o]===v;return `<button class="btn sm${on?' main':''}" data-prof="${esc(n)}|rel:${esc(o)}|${v}|0">${v}</button>`;}).join('')}</div>`).join(''):'')
+    +`<div class="muted small" style="margin-top:8px"><b>อื่นๆ ที่อยากเพิ่ม (ไม่บังคับ)</b></div><textarea data-profnote="${esc(n)}" placeholder="เช่น ชอบกินของหวาน กลัวความสูง มีแมวชื่อโมจิ">${esc(p.note||'')}</textarea>`;
+   const done=Object.keys(p).filter(k=>p[k]&&(!Array.isArray(p[k])||p[k].length)).length;
+   return det('pf|'+n,`👤 ${esc(n)}<small>${done?`กรอกแล้ว ${done} ข้อ`:'ยังไม่กรอก'}</small>`,body);}).join('');}
+async function profSave(n){try{await botApi('/api/vcastprofile',{act:'set',name:n,data:PROF[n]||{}});}catch(e){toast(botErr(e));}}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-prof]');if(!b||!PROF)return;const [n,f,v,m]=b.dataset.prof.split('|'),p=PROF[n]=PROF[n]||{};
+  if(f.startsWith('rel:')){const o=f.slice(4);p.rel=p.rel||{};p.rel[o]===v?delete p.rel[o]:p.rel[o]=v;}
+  else if(m==='1'){const a=p[f]=p[f]||[],i=a.indexOf(v);i>=0?a.splice(i,1):a.push(v);}
+  else p[f]===v?delete p[f]:p[f]=v;
+  const y=window.scrollY;renderLib(true);window.scrollTo(0,y);await profSave(n);});
+document.addEventListener('change',async e=>{const t=e.target.closest('[data-profnote]');if(!t||!PROF)return;const n=t.dataset.profnote;(PROF[n]=PROF[n]||{}).note=t.value.trim().slice(0,300);await profSave(n);toast('บันทึกแล้ว');});
 
 boot();
 })();
