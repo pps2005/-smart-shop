@@ -100,7 +100,7 @@ async function slotCheck(env, s, now) {
   const next = nxt === undefined ? day0 + 86400000 + hrs[0] * 3600000 : day0 + nxt * 3600000;
   if (String(start) !== s.slot_start) { await setSetting(env, 'slot_start', String(start)); await setSetting(env, 'slot_n', '0'); s.slot_n = '0'; }
   const nx = await env.DB.prepare("SELECT steps FROM jobs WHERE status='queued' ORDER BY id LIMIT 1").first();
-  const st = Math.min(8, Math.max(1, +(nx && nx.steps) || +s.steps || 4)), per = 19.2 + 9.6 * st;
+  const st = Math.min(8, Math.max(1, +(nx && nx.steps) || +s.steps || 4)), per = 19.2 + 38.4 * st; // วัดจริง: ภาพ 1024² ที่ 4 สเต็ป ใช้ราว 170–190 neurons
   const nk = (await env.DB.prepare('SELECT COUNT(*) n FROM fluxkeys WHERE on_=1').first().catch(() => ({ n: 0 }))) || { n: 0 };
   const budget = Math.max(1, Math.floor(8500 * (1 + (+nk.n || 0)) / hrs.length / per));
   const info = JSON.stringify({ start, next, n: +s.slot_n || 0, budget });
@@ -112,7 +112,7 @@ const isQuota = m => /neuron|allocation|quota|exceed|limit|4006|3036|429/i.test(
 function nextReset() { const early = new Date().getUTCHours() < 6, d = new Date(); d.setUTCHours(24, 2, 0, 0); return early ? Date.now() + 30 * 60000 : d.getTime(); }
 async function activeKeys(env, now) { return (await env.DB.prepare('SELECT * FROM fluxkeys WHERE on_=1 AND COALESCE(paused_until,0)<? ORDER BY id').bind(now).all()).results; }
 async function runHelper(k, prompt, steps, seed) {
-  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(k.acct)}/ai/run/${MODEL}`, { method: 'POST', headers: { authorization: 'Bearer ' + k.token, 'content-type': 'application/json' }, body: JSON.stringify(seed ? { prompt, steps, seed } : { prompt, steps }) });
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(k.acct)}/ai/run/${MODEL}`, { method: 'POST', headers: { authorization: 'Bearer ' + k.token, 'content-type': 'application/json' }, body: JSON.stringify({ prompt, steps }) }); // flux-schnell บน Workers AI ไม่รับ seed
   const j = await r.json().catch(() => ({}));
   if (r.ok && j.result && j.result.image) return j.result.image;
   throw new Error(`[${r.status}] ` + JSON.stringify(j.errors || j).slice(0, 300));
@@ -225,7 +225,7 @@ async function fluxKeysApi(env, b) {
 async function genImage(env, s, prompt, steps, seed) {
   const now = Date.now();
   if (now >= +s.paused_until) {
-    try { const out = await env.AI.run(MODEL, seed ? { prompt, steps, seed } : { prompt, steps }); if (out && out.image) return { image: out.image, by: '' }; throw new Error('AI ไม่ได้ส่งภาพกลับมา'); }
+    try { const out = await env.AI.run(MODEL, { prompt, steps }); if (out && out.image) return { image: out.image, by: '' }; throw new Error('AI ไม่ได้ส่งภาพกลับมา'); }
     catch (e) { const m = String(e.message || e); if (!isQuota(m)) throw e; await setSetting(env, 'img_err', new Date().toISOString() + ' ' + m.slice(0, 400)); await setSetting(env, 'paused_until', String(nextReset())); s.paused_until = String(nextReset()); }
   }
   const day = new Date(now + 7 * 3600000).toISOString().slice(0, 10);
