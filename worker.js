@@ -231,7 +231,9 @@ async function genImage(env, s, prompt, steps) {
       return { image: img, by: k.name };
     } catch (e) {
       const m = String(e.message || e);
-      await env.DB.prepare('UPDATE fluxkeys SET last_err=?, paused_until=? WHERE id=?').bind(m.slice(0, 200), isQuota(m) ? nextReset() : now + 60 * 60000, k.id).run();
+      // พรอมต์ถูกปฏิเสธ (เช่นตัวกรองเนื้อหาเข้าใจผิด) = ปัญหาของงานนี้ ไม่ใช่ของบัญชี → ให้งานนี้ล้มเหลว ไม่พักบัญชี
+      if (/NSFW|8007|3030|\[400\]/i.test(m) && !isQuota(m)) { await env.DB.prepare('UPDATE fluxkeys SET last_err=? WHERE id=?').bind(m.slice(0, 200), k.id).run(); throw new Error('พรอมต์ถูกตัวกรองปฏิเสธ ลองแก้คำ: ' + m.slice(0, 160)); }
+      await env.DB.prepare('UPDATE fluxkeys SET last_err=?, paused_until=? WHERE id=?').bind(m.slice(0, 200), isQuota(m) ? nextReset() : now + 30 * 60000, k.id).run();
     }
   }
   const qe = new Error('quota: โควตาเราและผู้ช่วยหมดทุกบัญชี'); qe.allQuota = true; throw qe;
