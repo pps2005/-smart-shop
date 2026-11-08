@@ -1551,7 +1551,8 @@ const PF=[
 ];
 async function profLoad(){try{const r=await botApi('/api/vcastprofile',{});PROF=r.profiles||{};}catch(e){PROF=PROF||{};}
   if(view==='lib'&&SV.lib==='prof'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
-function profNames(){const n=[];(HAND||[]).filter(t=>t.kind==='char').forEach(t=>{const nm=String(t.title||'').replace(/\s*\(.*\)\s*$/,'').trim();if(nm&&!n.includes(nm))n.push(nm);});return n;}
+function chName(t){return String(t||'').replace(/^ชีตใหม่\s*·\s*/,'').replace(/\s*\(.*\)\s*$/,'').trim();}
+function profNames(){const n=[];(HAND||[]).filter(t=>t.kind==='char').forEach(t=>{const nm=chName(t.title);if(nm&&!n.includes(nm))n.push(nm);});return n;}
 function profHtml(){
   if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
   if(!HAND){handLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลด…</p></div>';}
@@ -1571,7 +1572,7 @@ function profHtml(){
     +`<div class="muted small" style="margin-top:8px"><b>อื่นๆ ที่อยากเพิ่ม (ไม่บังคับ)</b></div><textarea data-profnote="${esc(n)}" placeholder="เช่น ชอบกินของหวาน กลัวความสูง มีแมวชื่อโมจิ">${esc(p.note||'')}</textarea>`+outfitHtml(n,p);
    const done=Object.keys(p).filter(k=>p[k]&&(!Array.isArray(p[k])||p[k].length)).length;
    return det('pf|'+n,`${im?`<img src="${esc(im)}" alt="" style="width:34px;height:34px;object-fit:cover;object-position:top;border-radius:50%;vertical-align:middle;margin-right:6px">`:'👤 '}${esc(n)}<small>${done?`กรอกแล้ว ${done} ข้อ`:'ยังไม่กรอก'}</small>`,body);}).join('');}
-function profImg(n){const t=(HAND||[]).find(t=>t.kind==='char'&&t.image_id&&String(t.title||'').replace(/\s*\(.*\)\s*$/,'').trim()===n);return t?botU('/img/'+t.image_id):'';}
+function profImg(n){const t=(HAND||[]).filter(t=>t.kind==='char'&&t.image_id&&chName(t.title)===n).sort((a,b)=>b.image_id-a.image_id)[0];return t?botU('/img/'+t.image_id):'';}
 async function profSave(n){try{await botApi('/api/vcastprofile',{act:'set',name:n,data:PROF[n]||{}});}catch(e){toast(botErr(e));}}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-prof]');if(!b||!PROF)return;const [n,f,v,m]=b.dataset.prof.split('|'),p=PROF[n]=PROF[n]||{};
   const mm=f.match(/^(rel2?|why):(.*)$/);if(mm){const k=mm[1],o=mm[2];p[k]=p[k]||{};p[k][o]===v?delete p[k][o]:p[k][o]=v;}
