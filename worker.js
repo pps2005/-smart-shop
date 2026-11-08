@@ -1267,14 +1267,17 @@ async function castApi(req, env, url, body) {
   if (p === '/api/vcastmanual') { // งานมือ: รายการพรอมต์สำหรับ GPT/Gemini (ไม่มีกำหนดเวลา ไม่เข้าคิวอัตโนมัติ)
     const b = body || {}, act = b.act || 'list';
     if (act === 'add') {
-      const kind = ['char', 'key', 'cover', 'other'].includes(b.kind) ? b.kind : 'other', title = String(b.title || '').trim().slice(0, 80), desc = String(b.desc || '').trim().slice(0, 900);
+      const kind = ['char', 'key', 'cover', 'other'].includes(b.kind) ? b.kind : 'other', title = String(b.title || '').trim().slice(0, 80), desc = String(b.desc || (b.quick ? b.title : '') || '').trim().slice(0, 900);
       if (!title || !desc) return json({ error: 'ใส่ชื่อและคำอธิบายก่อน' }, 400);
       const dup = await env.DB.prepare("SELECT id FROM manual_tasks WHERE title=? AND status!='skip'").bind(title).first();
-      if (dup) return json({ ok: true, dup: true });
+      if (dup && !b.quick) return json({ ok: true, dup: true });
+      if (dup) return json({ ok: true, id: dup.id });
       const s = await getSettings(env);
       await env.DB.prepare('INSERT INTO manual_tasks (kind,title,descr,prompt,pri,status,created) VALUES (?,?,?,?,?,?,?)')
-        .bind(kind, title, desc, manualPrompt(kind, desc, s.character || ''), { char: 10, key: 20, cover: 30, other: 40 }[kind], 'todo', Date.now()).run();
-      return json({ ok: true });
+        .bind(kind, title, desc, manualPrompt(kind, desc, s.character || ''), { char: 10, key: 20, cover: 30, other: 40 }[kind], 'todo', Date.now()).run()
+        .then(x => x);
+      const nid = await env.DB.prepare('SELECT id FROM manual_tasks WHERE title=? ORDER BY id DESC').bind(title).first();
+      return json({ ok: true, id: nid && nid.id });
     }
     if (act === 'set') { await env.DB.prepare('UPDATE manual_tasks SET status=? WHERE id=?').bind(['todo', 'skip', 'done'].includes(b.status) ? b.status : 'todo', +b.id).run(); return json({ ok: true }); }
     if (act === 'del') { await env.DB.prepare('DELETE FROM manual_tasks WHERE id=?').bind(+b.id).run(); return json({ ok: true }); }

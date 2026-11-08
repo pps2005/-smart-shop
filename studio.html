@@ -1466,11 +1466,17 @@ function handHtml(){
     <select id="hKind">${Object.entries(HKIND).map(([k,v])=>`<option value="${k}">${v[0]} ${v[1]}</option>`).join('')}</select>
     <input type="text" id="hTitle" placeholder="ชื่อ เช่น โทวะ (ชีตตัวละคร) / ตอน 1 ฉากสู้บนดาดฟ้า" autocomplete="off">
     <textarea id="hDesc" placeholder="อธิบายเป็นภาษาอังกฤษหรือไทยก็ได้ เช่น ชายวัย 25 ผมดำสั้น ตาสีเทา ใส่เสื้อโค้ทยาวสีเทา"></textarea>
+    <div class="row"><label class="btn sm main" style="cursor:pointer">📤 มีภาพแล้ว อัปโหลดเลย<input type="file" accept="image/*" hidden id="hQuick"></label></div>
+    <span class="muted small">ใส่แค่ชื่อกับเลือกประเภท แล้วกดอัปโหลดเลย ไม่ต้องสร้างภารกิจก่อน (คำอธิบายไม่ต้องใส่ก็ได้)</span>
     <div class="row"><button class="btn sm main" data-hand="add|0">สร้างภารกิจ</button><button class="btn sm" data-hand="shots|0">🎬 ดึงช็อตสำคัญ ⭐ จากตอน</button></div></div>`;}
 function imgToJpegB64(file,max){return new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(file);im.onload=()=>{const r=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*r);c.height=Math.round(im.naturalHeight*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
   let q=.88,d=c.toDataURL('image/jpeg',q);while(d.length>1500000&&q>.4){q-=.12;d=c.toDataURL('image/jpeg',q);}URL.revokeObjectURL(u);ok(d.split(',')[1]);};im.onerror=()=>no(new Error('เปิดไฟล์ภาพไม่ได้'));im.src=u;});}
 document.addEventListener('change',async e=>{const i=e.target.closest('[data-handup]');if(!i||!i.files[0])return;
   try{toast('กำลังอัปโหลด…');const data=await imgToJpegB64(i.files[0],1600);await botApi('/api/vcastmanualup',{id:+i.dataset.handup,data});toast('บันทึกภาพเข้าคลังแล้ว ✅');await handLoad();botLoad();}catch(err){toast(botErr(err));}});
+document.addEventListener('change',async e=>{const i=e.target;if(i.id!=='hQuick'||!i.files[0])return;const title=($('#hTitle').value||'').trim();
+  if(!title){i.value='';return toast('ใส่ชื่อภาพก่อน แล้วค่อยเลือกไฟล์');}
+  try{toast('กำลังอัปโหลด…');const data=await imgToJpegB64(i.files[0],1600),r=await botApi('/api/vcastmanual',{act:'add',quick:1,kind:$('#hKind').value,title,desc:($('#hDesc').value||'').trim()||title});
+    if(!r.id)throw new Error('สร้างภารกิจไม่สำเร็จ');await botApi('/api/vcastmanualup',{id:r.id,data});toast('บันทึกภาพเข้าคลังแล้ว ✅ ได้ XP');await handLoad();botLoad();}catch(err){toast(botErr(err));}});
 document.addEventListener('change',e=>{if(e.target.id==='handN'){localStorage.setItem('ss_handn',e.target.value);renderLib(true);}});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-hand]');if(!b)return;const [a,id]=b.dataset.hand.split('|'),t=(HAND||[]).find(x=>x.id===+id);
   try{
