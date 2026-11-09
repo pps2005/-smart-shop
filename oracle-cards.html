@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eef4fb">
+<title>คลังไพ่ออราเคิล 78 ใบ · SMART SHOP</title>
+<style>
+:root{--bg:#f1f6fc;--card:#fff;--text:#1e2a3d;--mute:#6b7a90;--line:#dde7f3;--pri:#5b7cfa;--pri2:#8b6cf0;--chip:#e6eefb;--ok:#22a06b;--bad:#d9534f}
+@media (prefers-color-scheme:dark){:root{--bg:#121826;--card:#1b2436;--text:#e8eef9;--mute:#9aa8c0;--line:#2a364d;--chip:#25314a}}
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px}
+.hr{display:flex;align-items:center;gap:10px}
+.back{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.22);color:#fff;font-size:1.2rem}
+h1{font-size:1.05rem;flex:1;line-height:1.2}
+h1 small{display:block;font-weight:400;opacity:.9;font-size:.72rem}
+.tabs{display:flex;gap:8px;margin-top:10px}
+.tabs button{flex:1;padding:8px;border-radius:12px;background:rgba(255,255,255,.2);color:#fff;font-size:.85rem}
+.tabs button.on{background:#fff;color:#4b5fd6;font-weight:700}
+main{max-width:1100px;margin:auto;padding:12px 14px calc(40px + env(safe-area-inset-bottom,0px))}
+#q{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 14px;font-size:16px;background:var(--card);color:var(--text);outline:0;margin-bottom:10px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;padding:8px 14px;border-radius:99px;background:var(--chip);font-size:.85rem;border:1px solid var(--line)}
+.chip.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.sec{margin:6px 0 18px}
+.sec h2{font-size:1rem;margin:4px 0 10px;display:flex;align-items:center;gap:8px}
+.sec h2 small{color:var(--mute);font-weight:400}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+.cd{display:block;width:100%;aspect-ratio:2/3.2;padding:0;border-radius:12px}
+.cd:active{transform:scale(.97)}
+.nm{font-size:.72rem;margin-top:4px;color:var(--mute);text-align:center;line-height:1.25}
+.face{position:relative;width:100%;height:100%;border-radius:12px;padding:5px;background:linear-gradient(160deg,var(--a,#8fb7d9),var(--b,#cfe3f5));box-shadow:0 1px 5px rgba(30,42,61,.18);overflow:hidden;text-align:center}
+.art{position:absolute;inset:5px 5px 36px;border-radius:8px;overflow:hidden;background:#fff}
+.art img{width:100%;height:100%;object-fit:cover;display:block}
+.face.bk .art{inset:5px}
+.ph{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#fff}
+.ph span{font-size:2rem}.ph small{font-size:.62rem;opacity:.9}
+.no{position:absolute;top:9px;left:9px;background:rgba(255,255,255,.88);color:#3a4b6b;font-size:.62rem;min-width:20px;padding:2px 6px;border-radius:99px}
+.lbl{position:absolute;left:5px;right:5px;bottom:5px;height:31px;background:rgba(255,255,255,.93);border-radius:7px;color:#2b3a56;display:flex;flex-direction:column;justify-content:center;padding:0 4px}
+.lbl i{font-style:normal;font-weight:700;font-size:.62rem;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbl em{font-size:.54rem;color:#6b7a90;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ds{display:none}
+.big .art{inset:6px 6px 84px}
+.big .lbl{height:78px;padding:4px 8px}
+.big .lbl i{font-size:.95rem}.big .lbl em{font-size:.7rem}
+.big .ds{display:block;font-size:.76rem;margin-top:3px;line-height:1.3;color:#2b3a56}
+.big .no{font-size:.75rem}
+.fl{perspective:900px;width:min(66%,260px);aspect-ratio:2/3.2;margin:6px auto 4px}
+.fi{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d;cursor:pointer}
+.fl.on .fi{transform:rotateY(180deg)}
+.ff,.fb{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.fb{transform:rotateY(180deg)}
+#sheet{position:fixed;inset:0;z-index:20;background:rgba(20,28,45,.5);display:none;align-items:flex-end;justify-content:center}
+#sheet.on{display:flex}
+.pn{background:var(--card);width:100%;max-width:580px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom,0px))}
+.pn h3{font-size:1.05rem;text-align:center}
+.pn .sub{text-align:center;color:var(--mute);font-size:.82rem;margin:2px 0 10px}
+.mean{text-align:center;font-size:.92rem;margin:8px 0 4px}
+.hint{text-align:center;color:var(--mute);font-size:.74rem}
+.lb{font-size:.8rem;color:var(--mute);margin:12px 0 6px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.opt{padding:9px 12px;border-radius:12px;border:1px solid var(--line);background:var(--chip);font-size:.82rem}
+.opt.on{border-color:var(--pri);background:var(--pri);color:#fff}
+.act{display:flex;gap:8px;margin-top:14px}
+.act button,.bt{flex:1;padding:12px;border-radius:12px;background:var(--pri);color:#fff;font-weight:600;font-size:.88rem}
+.act .g,.bt.g{background:var(--chip);color:var(--text)}
+.bt.s{flex:0 0 auto;padding:8px 12px;font-size:.78rem}
+.tx{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:16px;background:var(--bg);color:var(--text);margin:4px 0 6px}
+.bn{background:var(--chip);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;font-size:.85rem;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.er{color:var(--bad);font-size:.8rem;margin:6px 0}
+.dk{display:flex;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px}
+.dt{flex:0 0 64px;aspect-ratio:2/3.2}
+.di{flex:1;min-width:0}
+.di b{font-size:.98rem}.di u{text-decoration:none;font-size:.68rem;background:var(--ok);color:#fff;border-radius:99px;padding:2px 8px;margin-left:6px}
+.di small{display:block;color:var(--mute);font-size:.76rem;margin-top:2px}
+.pb{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0 2px}
+.pb i{display:block;height:100%;background:linear-gradient(90deg,var(--pri),var(--pri2))}
+.bk3{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.bk3 button{aspect-ratio:2/3.2;border-radius:12px;outline-offset:2px}
+.bk3 button.on{outline:3px solid var(--pri)}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#1e2a3d;color:#fff;padding:10px 16px;border-radius:12px;font-size:.84rem;z-index:40;display:none;max-width:88%}
+.em{padding:30px;text-align:center;color:var(--mute)}
+</style>
+</head>
+<body>
+<header>
+ <div class="hr"><button class="back" data-a="bk" aria-label="กลับ">←</button><h1>คลังไพ่ออราเคิล<small id="sub"></small></h1></div>
+ <div class="tabs"><button data-a="tab" data-v="lib" id="t-lib">คลังไพ่</button><button data-a="tab" data-v="decks" id="t-decks">สำรับของฉัน</button></div>
+</header>
+<main id="main"></main>
+<div id="sheet"><div class="pn" id="pn"></div></div>
+<div id="toast"></div>
+<script>
+(function(){
+'use strict';
+var MAJOR=[[0, "เดอะฟูล (ผู้เริ่มต้น)", "The Fool", "🃏", "เริ่มต้นใหม่ กล้าเสี่ยงอย่างบริสุทธิ์ใจ"], [1, "นักมายากล", "The Magician", "🪄", "มีทุกอย่างพร้อมในมือ ลงมือแล้วสำเร็จ ใช้ความสามารถให้เต็มที่"], [2, "สตรีนักบวช", "The High Priestess", "🌙", "ฟังเสียงภายใน ความลับยังไม่เปิดเผย อย่าเพิ่งรีบ"], [3, "จักรพรรดินี", "The Empress", "👑", "ความอุดมสมบูรณ์ ความรักอบอุ่น สิ่งที่ปลูกไว้งอกงาม"], [4, "จักรพรรดิ", "The Emperor", "🏛️", "ความมั่นคง ระเบียบ ผู้มีอำนาจช่วยหนุน"], [5, "สังฆราช", "The Hierophant", "📿", "ยึดแนวทางดั้งเดิม ขอคำปรึกษาจากผู้รู้"], [6, "คู่รัก", "The Lovers", "💞", "ความรักและการเลือกที่ตรงกับหัวใจ ความสัมพันธ์ลงตัว"], [7, "รถม้าศึก", "The Chariot", "🐎", "ชัยชนะจากความมุ่งมั่น คุมทิศทางได้"], [8, "พลัง", "Strength", "🦁", "ความใจเย็นเอาชนะแรงกล้า เข้มแข็งแต่อ่อนโยน"], [9, "ฤๅษี", "The Hermit", "🏮", "ถอยมาทบทวนตัวเอง หาปัญญาในความเงียบ"], [10, "กงล้อแห่งโชค", "Wheel of Fortune", "🎡", "โชคเปลี่ยนไปในทางดี จังหวะมาถึงแล้ว"], [11, "ความยุติธรรม", "Justice", "⚖️", "เหตุและผลตรงไปตรงมา ตัดสินอย่างเป็นธรรม"], [12, "ผู้ถูกแขวน", "The Hanged Man", "🙃", "หยุดและมองมุมใหม่ ยอมเสียสละเพื่อได้มากกว่า"], [13, "ความตาย (การเปลี่ยนผ่าน)", "Death", "💀", "สิ่งเก่าจบเพื่อสิ่งใหม่ เปลี่ยนผ่านครั้งใหญ่ (ไม่ได้แปลว่าตายจริง)"], [14, "ความพอดี", "Temperance", "🏺", "สมดุล ประนีประนอม ค่อยเป็นค่อยไป"], [15, "ปีศาจ", "The Devil", "😈", "ติดกับดักความอยากหรือสัญญาเก่า ทั้งที่โซ่นั้นปลดได้"], [16, "หอคอย", "The Tower", "⚡", "เหตุไม่คาดคิดที่พังของเดิม ก่อนสร้างใหม่ที่มั่นคงกว่า"], [17, "ดวงดาว", "The Star", "⭐", "ความหวัง การเยียวยา แสงสว่างปลายทาง"], [18, "พระจันทร์", "The Moon", "🌕", "ความไม่ชัดเจน ความกลัวในใจ อย่าตัดสินใจตามอารมณ์"], [19, "พระอาทิตย์", "The Sun", "☀️", "ความสำเร็จ ความสุข พลังบวกเต็มที่"], [20, "การพิพากษา", "Judgement", "📯", "การตื่นรู้ ถึงเวลาตัดสินใจสำคัญ รับสิ่งที่สมควรได้"], [21, "โลก", "The World", "🌍", "ความสมบูรณ์ ปิดรอบสำเร็จ"]];
+var SC22=[
+'the couple step hand in hand off a cliff of clouds into the sky, carefree and brave, a small white dog beside them, sunrise',
+'the man raises one glowing wand to the sky while the woman presents a cup, coin and sword laid on a table of clouds, magic in the air',
+'the woman sits veiled between a dark and a light pillar with a crescent moon at her feet, the man stands quietly behind her listening, mystery',
+'the woman wearing a flower crown rests in a golden wheat field, the man offers her flowers, abundance and warmth',
+'the man sits on a stone throne carved with ram heads holding a sceptre, the woman stands beside him, order and stability',
+'the couple kneel before a gentle elder monk in a temple holding two keys, receiving guidance and tradition',
+'the couple face each other beneath a bright sun with a winged guardian blessing them above, a blooming garden, love and choice',
+'the couple ride a chariot pulled by one white and one dark horse over the clouds, determined, victory',
+'the woman gently calms a large lion with her hands while the man watches at her side, flower garland, quiet strength',
+'the man holds a glowing lantern on a mountaintop while the woman walks behind him in its light, solitude and inner wisdom',
+'the couple stand before a giant glowing wheel of zodiac symbols turning in the sky, fate and cycles',
+'the couple stand between two pillars holding a pair of scales and an upright sword, fairness and truth',
+'the man hangs upside down from a tree by one foot, calm with a halo of light, the woman watches him gently, new perspective',
+'the couple walk through a misty field as white petals and butterflies rise at dawn, a black flag with a white rose in the distance, gentle transformation',
+'the woman with soft wings pours water between two cups, the man beside her, one foot on land one in water, a rainbow, harmony',
+'the couple loosely chained to a dark pedestal, the chains are loose and could be lifted off, a shadowy horned silhouette behind them, temptation',
+'the couple flee a tall tower struck by lightning, stones and crown falling, dramatic sky, sudden upheaval',
+'the woman kneels pouring water from two jars beneath a huge bright star, the man watches in the night pool, hope and healing',
+'the couple walk a path between two towers beneath a large full moon, a wolf and a dog howling, a crayfish in the pool, illusion and intuition',
+'the couple laugh and embrace in a sunflower field beneath a big smiling sun, a white horse nearby, joy and success',
+'the couple rise from the clouds with open arms as an angel blows a trumpet above, awakening and renewal',
+'the couple dance inside a large laurel wreath among the clouds, four elemental creatures in the corners, completion and wholeness'];
+var R=[
+{t:'เอซ',e:'Ace',m:'จุดเริ่มต้นใหม่',s:1,c:'the couple together hold up one glowing {P} between them as a new beginning, sunrise light'},
+{t:'สอง',e:'Two',m:'สมดุลและการเลือก',s:1,c:'the couple stand facing each other each holding a {P}, balanced, choosing together'},
+{t:'สาม',e:'Three',m:'การเติบโตร่วมกัน',s:0,c:'the couple celebrate together raising three {P}, joyful, growing together'},
+{t:'สี่',e:'Four',m:'ความมั่นคงและการพัก',s:0,c:'the couple rest peacefully under a tree with four {P} arranged around them, stability and rest'},
+{t:'ห้า',e:'Five',m:'ความขัดแย้งและบททดสอบ',s:0,c:'the couple stand apart with their backs turned, disagreeing, five scattered {P} around them, tension'},
+{t:'หก',e:'Six',m:'การช่วยเหลือและเดินหน้า',s:0,c:'the man rows a small boat carrying the woman and six {P} toward a calm shore, support and moving on'},
+{t:'เจ็ด',e:'Seven',m:'การยืนหยัดต่อสู้ปัญหา',s:0,c:'the couple stand firm on a hill defending seven {P}, determined, resilience'},
+{t:'แปด',e:'Eight',m:'ความพยายามและความเคลื่อนไหว',s:0,c:'the couple move swiftly while eight {P} fly in a line beside them, momentum and effort'},
+{t:'เก้า',e:'Nine',m:'ใกล้สำเร็จและความอดทน',s:0,c:'the woman stands resolute guarded by nine {P}, the man watches proudly from behind, nearly there'},
+{t:'สิบ',e:'Ten',m:'จุดสิ้นสุดของวัฏจักร',s:0,c:'the couple stand beneath ten {P} arching like a gateway at the end of a long journey, completion'},
+{t:'เพจ',e:'Page',m:'ข่าวสารและการเรียนรู้',s:1,c:'the couple dressed as young pages, curious, the woman studies a {P} while the man delivers a letter, news and learning'},
+{t:'อัศวิน',e:'Knight',m:'การลงมือและความมุ่งมั่น',s:1,c:'the man in knight armor rides a horse charging forward holding a {P}, the woman waves him on, action and drive'},
+{t:'ราชินี',e:'Queen',m:'ความเข้าใจและการดูแล',s:1,c:'the woman as a queen sits on a throne holding a {P} with warm wisdom, the man kneels beside her, care and understanding'},
+{t:'ราชา',e:'King',m:'ความเชี่ยวชาญและผู้นำ',s:1,c:'the man as a king sits on a throne holding a {P}, the woman stands beside him as his advisor, mastery and leadership'}];
+var SUITS=[
+{id:'wands',th:'ไม้เท้า',en:'Wands',ic:'🔥',a:'#ff8f7a',b:'#ffc2a8',d:'พลังและแรงบันดาลใจ',p1:'wooden wand sprouting green leaves',pn:'wooden wands sprouting green leaves',tone:'warm coral and orange accent colors'},
+{id:'cups',th:'ถ้วย',en:'Cups',ic:'💧',a:'#6bb7ff',b:'#b4dcff',d:'ความรู้สึกและความรัก',p1:'golden cup',pn:'golden cups',tone:'blue and teal accent colors'},
+{id:'swords',th:'ดาบ',en:'Swords',ic:'🌬️',a:'#8fa4ff',b:'#cfd7ff',d:'ความคิดและการตัดสินใจ',p1:'silver sword',pn:'silver swords',tone:'silver and periwinkle accent colors'},
+{id:'pents',th:'เหรียญ',en:'Pentacles',ic:'🌿',a:'#5fd0a5',b:'#b6ecd3',d:'การเงินและความมั่นคง',p1:'golden coin engraved with a star',pn:'golden coins engraved with a star',tone:'green and golden accent colors'}];
+var CATS=[{id:'major',th:'ไพ่หลัก (Major Arcana)',ic:'✨',a:'#a58bff',b:'#d9ccff',n:22}].concat(SUITS.map(function(s){return{id:s.id,th:s.th+' ('+s.en+')',ic:s.ic,a:s.a,b:s.b,n:14};}));
+var ROM='0 I II III IV V VI VII VIII IX X XI XII XIII XIV XV XVI XVII XVIII XIX XX XXI'.split(' ');
+var COUPLE='an original young adult anime couple, the woman has long dark brown hair tied in a low bun with a small earring and wears a lavender short-sleeved dress, the man has short dark hair and wears a light blue collared shirt';
+var STYLE='tarot card illustration, tall vertical portrait composition with the couple centered, anime style, clean fine line art, soft pastel flat colors with gentle shading, decorative symbolic details, no text, no letters, no border, no frame, no watermark';
+var THEMES=[
+{id:'sky',t:'ท้องฟ้าเมฆพาสเทล',ic:'☁️',p:'endless sea of pastel clouds, sky blue fading to soft pink, gentle sunlight'},
+{id:'sakura',t:'ซากุระญี่ปุ่น',ic:'🌸',p:'japanese shrine with a red bridge, falling cherry blossom petals, soft pink and white tones'},
+{id:'night',t:'ราตรีจันทร์เสี้ยว',ic:'🌙',p:'moonlit indigo night sky, large crescent moon, twinkling stars, fireflies'},
+{id:'garden',t:'สวนมนต์เสน่ห์',ic:'🌿',p:'lush enchanted garden, blooming flowers, butterflies, fresh green and mint tones'},
+{id:'lake',t:'ทะเลสาบและโคมไฟ',ic:'🏮',p:'calm teal lake at dusk, floating paper lanterns, gentle ripples, teal and warm light'}];
+var BACKS=[
+{id:'moon',t:'จันทร์ทรงมนต์',ic:'🌙',p:'teal and navy palette, moon phases in the center, ornate celtic knot corners, silver line details'},
+{id:'star',t:'กลุ่มดาวทอง',ic:'⭐',p:'deep navy starfield, golden constellations and sunburst mandala'},
+{id:'sakura',t:'มณฑลซากุระ',ic:'🌸',p:'pale pink and cream palette, cherry blossom mandala, delicate gold lines'},
+{id:'cloud',t:'เมฆและตะวัน',ic:'☁️',p:'pastel sky blue and lavender, symmetrical clouds, sun and crescent moon emblem'}];
+var CARDS=[];
+MAJOR.forEach(function(m,i){CARDS.push({cat:'major',no:ROM[i],th:m[1],en:m[2],ic:m[3],mean:m[4],sc:SC22[i]});});
+SUITS.forEach(function(s){R.forEach(function(r,i){CARDS.push({cat:s.id,no:i<10?String(i+1):['P','Kn','Q','K'][i-10],th:r.t+s.th,en:r.e+' of '+s.en,ic:s.ic,mean:r.m+' · '+s.d,sc:r.c.split('{P}').join(r.s?s.p1:s.pn)+', '+s.tone});});});
+function one(a,id){return a.filter(function(x){return x.id===id;})[0];}
+function K(id){return one(CATS,id);}
+function promptFor(i,th){return COUPLE+', '+CARDS[i].sc+', '+one(THEMES,th).p+', '+STYLE;}
+function backPrompt(bs){return 'tarot card back design, perfectly symmetrical ornate pattern centered, '+one(BACKS,bs).p+', tall vertical composition, flat illustration, no text, no letters, no characters, no border';}
+
+var ST={tab:'lib',cat:'all',q:'',decks:[],cur:'',S:null,err:'',draft:{th:'sky',bs:'moon'},sig:'',T:0,open:'',inf:{},idx:-1};
+try{ST.decks=JSON.parse(localStorage.getItem('oc_decks')||'[]');ST.cur=localStorage.getItem('oc_cur')||'';}catch(e){}
+function persist(){try{localStorage.setItem('oc_decks',JSON.stringify(ST.decks));localStorage.setItem('oc_cur',ST.cur);}catch(e){}}
+function $(s){return document.querySelector(s);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function toast(m){var t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(function(){t.style.display='none';},3200);}
+function cfg(){try{return JSON.parse(localStorage.getItem('ss_imgbot')||'{}')||{};}catch(e){return{};}}
+function U(p){var c=cfg();return String(c.url||'').replace(/\/+$/,'')+p+(p.indexOf('?')>=0?'&':'?')+'k='+encodeURIComponent(c.key||'');}
+async function api(p,b){
+ var r=await fetch(U(p),b?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)}:{});
+ if(r.status===401)throw new Error('รหัสผ่านบอทไม่ถูกต้อง');
+ var j=await r.json().catch(function(){return{error:'บอทตอบกลับไม่ถูกต้อง (ลิงก์ถูกไหม?)'};});
+ if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j;
+}
+function errMsg(e){var m=String(e&&e.message||e);return /failed to fetch|load failed|networkerror|network request/i.test(m)?'ติดต่อบอทไม่ได้ ตรวจลิงก์บอท หรือบอทยังไม่ได้ deploy':m;}
+function deck(id){return one(ST.decks,id);}
+function curDeck(){return deck(ST.cur)||ST.decks[0]||null;}
+function P(d,k){return 'oracle|'+d.id+'|'+k;}
+function info(d){
+ var f={},b=[],pend={},fail=0,n=0,S=ST.S;
+ if(S){
+  S.images.forEach(function(im){if(im.project===P(d,'front')){if(!f[im.scene]||im.id>f[im.scene])f[im.scene]=im.id;}else if(im.project===P(d,'back'))b.push(im.id);});
+  S.jobs.forEach(function(j){if(j.project===P(d,'front')||j.project===P(d,'back')){if(j.status==='failed')fail++;else{n++;if(j.project===P(d,'front'))pend[j.scene]=1;}}});
+ }
+ var done=0;for(var i=1;i<=78;i++)if(f[i])done++;
+ b.sort(function(x,y){return x-y;});
+ var bk=b.indexOf(d.back)>=0?d.back:(b.length?b[b.length-1]:0);
+ return{f:f,b:b,bk:bk,pend:pend,n:n,fail:fail,done:done};
+}
+function im(id){return '<img src="'+U('/img/'+id)+'" alt="" loading="lazy">';}
+function art(i,inf){
+ var c=CARDS[i],id=inf&&inf.f[i+1];
+ if(id)return im(id);
+ return '<div class="ph" style="background:linear-gradient(135deg,'+K(c.cat).a+','+K(c.cat).b+')"><span>'+c.ic+'</span><small>'+(inf&&inf.pend[i+1]?'กำลังสร้าง…':'ยังไม่มีภาพ')+'</small></div>';
+}
+function front(i,inf){
+ var c=CARDS[i],k=K(c.cat);
+ return '<div class="face" style="--a:'+k.a+';--b:'+k.b+'"><div class="art">'+art(i,inf)+'</div><b class="no">'+esc(c.no)+'</b><div class="lbl"><i>'+esc(c.th)+'</i><em>'+esc(c.en)+'</em><span class="ds">'+esc(c.mean)+'</span></div></div>';
+}
+function back(inf){
+ var id=inf&&inf.bk;
+ return '<div class="face bk"><div class="art">'+(id?im(id):'<div class="ph" style="background:repeating-linear-gradient(45deg,#8fb7d9,#8fb7d9 8px,#a9c9e6 8px,#a9c9e6 16px)"><span>🔮</span><small>ด้านหลังยังไม่มีภาพ</small></div>')+'</div></div>';
+}
+function vis(c){var q=ST.q.trim().toLowerCase();if(ST.cat!=='all'&&c.cat!==ST.cat)return false;return !q||(c.th+' '+c.en+' '+K(c.cat).th+' '+c.mean).toLowerCase().indexOf(q)>=0;}
+function sheet(h){$('#pn').innerHTML=h;$('#sheet').classList.add('on');}
+function close_(){$('#sheet').classList.remove('on');ST.open='';ST.idx=-1;}
+function anyPending(){return ST.decks.some(function(d){var i=ST.inf[d.id];return i&&i.n>0;});}
+
+function renderLib(){
+ var d=curDeck(),inf=d?ST.inf[d.id]:null,h='';
+ if(!d)h+='<div class="bn"><span>ยังไม่มีสำรับ สร้างสำรับเพื่อให้ Flux ออกแบบไพ่ครบ 78 ใบ</span><button class="bt s" data-a="newdeck">สร้างสำรับ</button></div>';
+ h+='<input id="q" placeholder="ค้นหาชื่อไพ่หรือความหมาย เช่น ราชา, Cups, ความรัก" autocomplete="off" value="'+esc(ST.q)+'">';
+ h+='<div class="chips"><button class="chip'+(ST.cat==='all'?' on':'')+'" data-a="cat" data-v="all">ทั้งหมด 78</button>'+CATS.map(function(c){return '<button class="chip'+(ST.cat===c.id?' on':'')+'" data-a="cat" data-v="'+c.id+'">'+c.ic+' '+c.th.split(' (')[0]+' '+c.n+'</button>';}).join('')+'</div>';
+ var tot=0,body='';
+ CATS.forEach(function(k){
+  var L=[];CARDS.forEach(function(c,i){if(c.cat===k.id&&vis(c))L.push(i);});if(!L.length)return;tot+=L.length;
+  body+='<section class="sec"><h2>'+k.ic+' '+k.th+' <small>'+L.length+' ใบ</small></h2><div class="grid">';
+  L.forEach(function(i){body+='<div><button class="cd" data-a="card" data-v="'+i+'" aria-label="'+esc(CARDS[i].th)+'">'+front(i,inf)+'</button><div class="nm">'+esc(CARDS[i].th)+'</div></div>';});
+  body+='</div></section>';
+ });
+ h+=body||'<div class="em">ไม่พบไพ่ที่ค้นหา</div>';
+ $('#main').innerHTML=h;
+ var q=$('#q');if(q)q.addEventListener('input',function(e){ST.q=e.target.value;var s=e.target.selectionStart;renderLib();var n=$('#q');n.focus();try{n.setSelectionRange(s,s);}catch(x){}});
+}
+function renderDecks(){
+ var c=cfg(),h='<div class="bn"><span>'+(c.url?'เชื่อมบอท Flux แล้ว':'ยังไม่ได้ตั้งค่าบอท Flux')+'</span><button class="bt s g" data-a="bot">ตั้งค่าบอท</button></div>';
+ if(ST.err)h+='<div class="er">'+esc(ST.err)+'</div>';
+ h+='<div class="act" style="margin:0 0 12px"><button data-a="newdeck">+ สร้างสำรับใหม่</button></div>';
+ if(!ST.decks.length)h+='<div class="em">ยังไม่มีสำรับ 1 สำรับ = 1 สไตล์ ด้านหลังใช้ภาพเดียวทั้งสำรับ ด้านหน้าต่างกันตามความหมายไพ่</div>';
+ ST.decks.forEach(function(d){
+  var inf=ST.inf[d.id]||info(d),cur=curDeck()&&curDeck().id===d.id;
+  h+='<div class="dk"><div class="dt">'+back(inf)+'</div><div class="di"><b>'+esc(d.name)+'</b>'+(cur?'<u>กำลังใช้</u>':'')
+  +'<small>ธีมด้านหน้า: '+esc(one(THEMES,d.theme).t)+' · ด้านหลัง: '+esc(one(BACKS,d.bs).t)+'</small>'
+  +'<div class="pb"><i style="width:'+Math.round(inf.done/78*100)+'%"></i></div>'
+  +'<small>ภาพด้านหน้า '+inf.done+'/78 · ด้านหลัง '+inf.b.length+' แบบ'+(inf.n?' · รอคิว '+inf.n:'')+(inf.fail?' · ล้มเหลว '+inf.fail:'')+'</small>'
+  +'<div class="row" style="margin-top:8px">'+(cur?'':'<button class="bt s" data-a="use" data-v="'+d.id+'">ใช้สำรับนี้</button>')
+  +'<button class="bt s g" data-a="bkm" data-v="'+d.id+'">ด้านหลัง</button>'
+  +(inf.done<78?'<button class="bt s g" data-a="fill" data-v="'+d.id+'">สร้างใบที่ขาด</button>':'')
+  +(inf.fail?'<button class="bt s g" data-a="resume">ลองงานที่ล้มเหลวใหม่</button>':'')
+  +'<button class="bt s g" data-a="del" data-v="'+d.id+'">ลบ</button></div></div></div>';
+ });
+ $('#main').innerHTML=h;
+}
+function render(){
+ ST.decks.forEach(function(d){ST.inf[d.id]=info(d);});
+ $('#t-lib').className=ST.tab==='lib'?'on':'';$('#t-decks').className=ST.tab==='decks'?'on':'';
+ var d=curDeck();$('#sub').textContent=d?d.name+' · '+ST.inf[d.id].done+'/78 ใบ':'ยังไม่มีสำรับ';
+ if(ST.tab==='lib')renderLib();else renderDecks();
+}
+async function load(){
+ if(!cfg().url){ST.S=null;render();return;}
+ try{ST.S=await api('/api/state');ST.err='';
+  ST.S.images.forEach(function(im){var m=/^oracle\|([a-z0-9]+)\|(front|back)$/.exec(im.project);if(m&&!deck(m[1])){ST.decks.push({id:m[1],name:'สำรับ '+m[1],theme:'sky',bs:'moon',back:0});persist();}});
+ }catch(e){ST.err=errMsg(e);}
+ var sig=JSON.stringify(ST.decks.map(function(d){var i=info(d);return[d.id,d.back,i.done,i.b,i.n,i.fail];}))+ST.cur+ST.err;
+ if(sig!==ST.sig){ST.sig=sig;render();}
+}
+function poll(){clearTimeout(ST.T);load().then(function(){if(anyPending())ST.T=setTimeout(poll,10000);});}
+
+function newDeckSheet(){
+ var nm=$('#dn')?$('#dn').value:'';
+ sheet('<h3>สร้างสำรับใหม่</h3><div class="sub">1 สำรับ = 1 สไตล์ · ด้านหลังใช้ภาพเดียวทั้งสำรับ</div>'
+ +'<input class="tx" id="dn" placeholder="ชื่อสำรับ" value="'+esc(nm)+'" maxlength="30">'
+ +'<div class="lb">ธีมด้านหน้า (ฉากหลังของไพ่ทั้ง 78 ใบ)</div><div class="row">'+THEMES.map(function(t){return '<button class="opt'+(ST.draft.th===t.id?' on':'')+'" data-a="th" data-v="'+t.id+'">'+t.ic+' '+t.t+'</button>';}).join('')+'</div>'
+ +'<div class="lb">ลายด้านหลัง (สร้าง 3 แบบให้เลือก 1)</div><div class="row">'+BACKS.map(function(t){return '<button class="opt'+(ST.draft.bs===t.id?' on':'')+'" data-a="bs" data-v="'+t.id+'">'+t.ic+' '+t.t+'</button>';}).join('')+'</div>'
+ +'<div class="hint" style="margin-top:12px">ใช้ภาพรวม 81 ภาพ บอทจะทยอยสร้างตามรอบและโควตาที่ตั้งไว้ในสตูดิโอ</div>'
+ +'<div class="act"><button data-a="mk">เริ่มสร้างสำรับ</button><button class="g" data-a="close">ยกเลิก</button></div>');
+}
+function botSheet(){
+ var c=cfg();
+ sheet('<h3>ตั้งค่าบอท Flux</h3><div class="sub">ใช้บอทเดียวกับแท็บ "เจนภาพ" ในสตูดิโอ AI</div>'
+ +'<input class="tx" id="bu" placeholder="ลิงก์บอท https://...workers.dev" value="'+esc(c.url||'')+'">'
+ +'<input class="tx" id="bkk" type="password" placeholder="รหัสผ่านบอท" value="'+esc(c.key||'')+'">'
+ +'<div class="act"><button data-a="botsave">บันทึก</button><button class="g" data-a="close">ปิด</button></div>');
+}
+function backSheet(id){
+ var d=deck(id);if(!d)return;ST.open=id;var inf=ST.inf[id]||info(d);
+ sheet('<h3>ด้านหลังของ '+esc(d.name)+'</h3><div class="sub">เลือก 1 ใบ ใช้กับไพ่ทั้งสำรับ</div>'
+ +(inf.b.length?'<div class="bk3">'+inf.b.map(function(b){return '<button data-a="bkpick" data-v="'+b+'" class="'+(b===inf.bk?'on':'')+'"><div class="face bk"><div class="art">'+im(b)+'</div></div></button>';}).join('')+'</div>':'<div class="em">ยังไม่มีภาพด้านหลัง รอบอทสร้าง</div>')
+ +'<div class="lb">สร้างด้านหลังเพิ่ม 3 แบบ</div><div class="row">'+BACKS.map(function(t){return '<button class="opt'+(d.bs===t.id?' on':'')+'" data-a="bkset" data-v="'+t.id+'">'+t.ic+' '+t.t+'</button>';}).join('')+'</div>'
+ +'<div class="act"><button data-a="bkgen">สร้างเพิ่ม</button><button class="g" data-a="close">ปิด</button></div>');
+}
+function cardSheet(i){
+ var d=curDeck(),inf=d?ST.inf[d.id]:null,c=CARDS[i];ST.idx=i;
+ sheet('<div class="fl big" id="fl"><div class="fi"><div class="ff">'+front(i,inf)+'</div><div class="fb">'+back(inf)+'</div></div></div>'
+ +'<div class="hint">แตะการ์ดเพื่อพลิกดูด้านหลัง</div><h3>'+esc(c.th)+'</h3><div class="sub">'+esc(c.en)+' · '+esc(K(c.cat).th)+'</div><div class="mean">'+esc(c.mean)+'</div>'
+ +'<div class="act">'+(d?'<button data-a="regen">สร้างภาพใบนี้ใหม่</button>':'')+'<button class="g" data-a="close">ปิด</button></div>');
+}
+async function enqueue(body,msg){
+ try{var r=await api('/api/enqueue',body);toast(msg||('ส่งเข้าคิวแล้ว '+r.added+' ภาพ'));return true;}catch(e){toast(errMsg(e));return false;}
+}
+function need(){if(!cfg().url){botSheet();toast('ตั้งค่าบอทก่อนครับ');return false;}return true;}
+var A={
+ bk:function(){history.length>1?history.back():(location.href='index.html');},
+ tab:function(v){ST.tab=v;render();},
+ cat:function(v){ST.cat=v;render();},
+ card:function(v){cardSheet(+v);},
+ close:close_,
+ newdeck:function(){newDeckSheet();},
+ th:function(v){ST.draft.th=v;newDeckSheet();},
+ bs:function(v){ST.draft.bs=v;newDeckSheet();},
+ mk:async function(){
+  if(!need())return;
+  var nm=($('#dn').value||'').trim()||('สำรับ '+(ST.decks.length+1));
+  var d={id:Math.random().toString(36).slice(2,8),name:nm,theme:ST.draft.th,bs:ST.draft.bs,back:0};
+  var ok=await enqueue({project:P(d,'back'),items:[{scene:1,prompt:backPrompt(d.bs)}],variants:3,raw:true},'');
+  if(ok)ok=await enqueue({project:P(d,'front'),items:CARDS.map(function(c,i){return{scene:i+1,prompt:promptFor(i,d.theme)};}),raw:true},'เริ่มสร้างสำรับแล้ว ภาพจะทยอยขึ้นมา');
+  if(!ok)return;
+  ST.decks.push(d);ST.cur=d.id;persist();close_();ST.tab='lib';ST.sig='';poll();
+ },
+ use:function(v){ST.cur=v;persist();render();},
+ fill:async function(v){
+  var d=deck(v);if(!d||!need())return;var inf=ST.inf[v],items=[];
+  CARDS.forEach(function(c,i){if(!inf.f[i+1]&&!inf.pend[i+1])items.push({scene:i+1,prompt:promptFor(i,d.theme)});});
+  if(!items.length){toast('ไม่มีใบที่ขาดหรือรอคิวอยู่แล้ว');return;}
+  if(await enqueue({project:P(d,'front'),items:items,raw:true}))poll();
+ },
+ resume:async function(){try{await api('/api/resume',{});toast('ส่งงานที่ล้มเหลวกลับเข้าคิวแล้ว');poll();}catch(e){toast(errMsg(e));}},
+ del:function(v){var d=deck(v);if(!d||!confirm('ลบสำรับ "'+d.name+'" ออกจากรายการนี้? (ภาพที่บอทสร้างแล้วยังอยู่ในบอท)'))return;ST.decks=ST.decks.filter(function(x){return x.id!==v;});if(ST.cur===v)ST.cur='';persist();ST.sig='';render();},
+ bot:function(){botSheet();},
+ botsave:function(){var c=cfg();c.url=($('#bu').value||'').trim();c.key=$('#bkk').value||'';try{localStorage.setItem('ss_imgbot',JSON.stringify(c));}catch(e){}close_();toast('บันทึกแล้ว');ST.sig='';poll();},
+ bkm:function(v){backSheet(v);},
+ bkpick:function(v){var d=deck(ST.open);if(!d)return;d.back=+v;persist();ST.sig='';render();backSheet(d.id);},
+ bkset:function(v){var d=deck(ST.open);if(!d)return;d.bs=v;persist();backSheet(d.id);},
+ bkgen:async function(){var d=deck(ST.open);if(!d||!need())return;if(await enqueue({project:P(d,'back'),items:[{scene:1,prompt:backPrompt(d.bs)}],variants:3,raw:true}))poll();},
+ regen:async function(){var d=curDeck();if(!d||ST.idx<0||!need())return;if(await enqueue({project:P(d,'front'),items:[{scene:ST.idx+1,prompt:promptFor(ST.idx,d.theme)}],raw:true},'ส่งใบนี้เข้าคิวแล้ว'))poll();}
+};
+document.addEventListener('click',function(e){
+ if(e.target.id==='sheet'){close_();return;}
+ var fl=e.target.closest('#fl');if(fl&&!e.target.closest('button')){fl.classList.toggle('on');return;}
+ var t=e.target.closest('button[data-a]');if(!t)return;
+ var f=A[t.dataset.a];if(f)f(t.dataset.v);
+});
+render();poll();
+})();
+</script>
+</body>
+</html>
