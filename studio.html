@@ -1027,7 +1027,7 @@ function renderLib(quiet){
     <div class="row" style="justify-content:space-between"><span class="muted small">${done}/${total} ภาพ · ${pct}%</span><span class="muted small">${myQ.length?`เหลือประมาณ ${eta} นาที${ahead>0?` (มีงานอื่นรอก่อน ${ahead})`:''}`:''}</span></div>
     <div class="ltip">${esc(tip)}</div>
     <div class="row"><button class="btn sm main" data-lib="starter">✨ สร้างคลังเริ่มต้น (สัตว์เลี้ยง · ฉาก · ของประกอบ)</button></div>
-    <div class="report">📦 ทุกวันหลัง 07:00 บอทสร้างของใหม่ให้เองหมวดละ 1 ชิ้น: ฉาก · สัตว์และอสูร · ของประกอบ · ชุด · องค์ประกอบฉาก · เอฟเฟกต์ (ยกเว้นตัวละคร) ครบแล้ววนรอบใหม่ · เสียงประกอบวันละ 200 + เพลงวันละ 20 ทำบน Kaggle
+    <div class="report">📦 ทุกวันหลัง 07:00 บอทสร้างของใหม่ให้เองหมวดละ 1 ชิ้น: ฉาก · สัตว์และอสูร · ของประกอบ · ชุด · องค์ประกอบฉาก (ยกเว้นตัวละคร) ครบแล้ววนรอบใหม่ · เพลงวันละ 20 ทำบน Kaggle
       <div class="row" style="margin-top:6px"><button class="btn sm" data-lib="dailynow">สร้างชุดวันนี้เพิ่มตอนนี้</button><button class="btn sm" data-lib="dailyset" data-on="${s.lib_on==='0'?1:0}">${s.lib_on==='0'?'▶️ เปิดสร้างอัตโนมัติ':'⏸ ปิดสร้างอัตโนมัติ'}</button></div></div></div>`;
   const LA=libAll(),cats=[...LA.filter(c=>!c.lock),...LA.filter(c=>c.lock)].map(c=>{const items=c.items.map(([n,pr])=>{const p=LP(c.n,n),x=st[p];
       const best=x.im.find(i=>i.starred)||x.im[0];
@@ -1220,7 +1220,7 @@ function planHtml(){const S=BOT.s,V=BOT.v;if(!S)return '';
     if(hp.length)rows.push(['🤝','ผู้ช่วย',`${hp.length} คน · เปิดสิทธิ์ ${on} · ออนไลน์ ${live}${on?'':' (ยังปิดสิทธิ์ทั้งหมด)'}`,'ok']);
     const nm=+st.aud_music_n||20,ns=+st.aud_sfx_n||200,nv=Math.min(3,Math.max(1,+st.aud_var||2));
     const nextDay=Math.max(endDay+7*3600000,0);
-    rows.push(['📅','พรุ่งนี้ 07:00',`ระบบเพิ่มของใหม่: ภาพคลัง 11 หมวด (22 ภาพ) · เสียงประกอบ ${ns} (${nv} แบบ) · เพลง ${nm}`,'ok']);}
+    rows.push(['📅','พรุ่งนี้ 07:00',`ระบบเพิ่มของใหม่: ภาพคลัง 10 หมวด (20 ภาพ) · เพลง ${nm} (${nv} แบบ)`,'ok']);}
   return `<div class="card plan"><div class="row" style="justify-content:space-between"><h3>🔮 แผนและคาดการณ์วันนี้</h3><span class="muted small">เวลาไทย ${pad(bk.getUTCHours())}:${pad(bk.getUTCMinutes())}</span></div>
   ${rows.map(([ic,t,d,k])=>`<div class="prow ${k}"><b>${ic} ${t}</b><span>${esc(d)}</span></div>`).join('')}
   <span class="muted small">เป็นการประมาณจากคิวและโควตาตอนนี้ อาจเปลี่ยนถ้าเครื่องหรือโควตามีปัญหา</span></div>`;}

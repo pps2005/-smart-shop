@@ -7,9 +7,7 @@
 
 import SCENES from './scenes.json';
 import IDEAS from './ideas.json';
-import SFXLIB from './sfx.json';
 import MUSICLIB from './music.json';
-import VFXLIB from './vfx.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -1444,17 +1442,13 @@ async function audioDaily(env, have) {
     }
     return res;
   };
-  // AI ทำเฉพาะเสียงที่ทำได้ดี (บรรยากาศ/ธรรมชาติ/เวทมนตร์/ไซไฟ/ธาตุ/ลึกลับ) เสียงเดี่ยวอย่างก้าวเท้า ประตู กระแทก ใช้เสียงจริงจากคลังเสียงจริงแทน
-  const SFXAI = new Set(['ธรรมชาติและป่า', 'น้ำและสภาพอากาศ', 'เวทมนตร์และพลังพิเศษ', 'ไซไฟและอวกาศ', 'น้ำแข็ง หิมะ และธาตุ', 'เสียงลึกลับและเหนือธรรมชาติ']);
-  for (const [x, nm] of pickN('เสียงประกอบ', SFXLIB.filter(q => SFXAI.has(q.c)), Math.min(400, +s.aud_sfx_n || 200)))
-    for (let v = 0; v < V; v++) out.push({ project: `คลัง·เสียงประกอบ·${nm}`, prompt: x.e + ', clean high quality sound effect, no music', type: 'sfx', sec: 10 });
   const ms = pickN('เพลง', MUSICLIB, Math.min(100, +s.aud_music_n || 20));
   for (const [x, nm] of ms)
     for (let v = 0; v < V; v++) out.push(x.t === 'sfx'
       ? { project: `คลัง·เพลง·${nm}`, prompt: x.e + ', cinematic music sound effect, high quality', type: 'sfx', sec: 8 }
       : { project: `คลัง·เพลง·${nm}`, prompt: x.e + (x.v ? ', anime soundtrack, wordless vocals, high quality' : ', anime soundtrack, instrumental, no vocals, high quality'), type: 'music', sec: 45, vocal: x.v ? 1 : 0 });
   for (let k = 0; k < out.length; k += 50) await audioEnqueue(env, out.slice(k, k + 50));
-  made.push(`เสียงประกอบ ${Math.min(400, +s.aud_sfx_n || 200)} รายการ`, `เพลง ${ms.length} รายการ (รายการละ ${V} แบบ)`);
+  made.push(`เพลง ${ms.length} รายการ (รายการละ ${V} แบบ)`);
   return made;
 }
 
@@ -1477,7 +1471,6 @@ const LIBD = [
   ['พลังอาคม', () => WORLD.power, it => `${it.e}, magic power visual effect, anime spell, dramatic lighting, dark background, no people, ${LIB_TAIL}`],
   ['ของวิเศษ', () => WORLD.artifact, it => `a ${it.e}, magical item design, single object, centered, plain soft background, ${LIB_TAIL}`],
   ['โลกและจักรวาล', () => WORLD.realm, it => `${it.e}, epic anime world landscape, no people, cinematic lighting, detailed background art, ${LIB_TAIL}`],
-  ['เอฟเฟกต์', () => VFXLIB, it => `${it.e}, visual effect artwork for anime and film, isolated effect on a dark background, no people, high quality`],
 ];
 // สเต็ปภาพคลัง: ฉาก/เอฟเฟกต์/พลังงาน 4 สเต็ป (พอแล้วสำหรับโมเดลนี้) ส่วนงานออกแบบที่ต้องละเอียดกว่า (สัตว์ ชุด อาวุธ ของ) 6 สเต็ป
 const LIB_STEP4 = new Set(['ฉาก', 'องค์ประกอบฉาก', 'พลังอาคม', 'โลกและจักรวาล', 'เอฟเฟกต์']);
