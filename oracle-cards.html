@@ -274,7 +274,7 @@ function render(){
 async function load(){
  if(!cfg().url){ST.S=null;render();return;}
  try{ST.S=await api('/api/state');ST.err='';
-  ST.S.images.forEach(function(im){var m=/^oracle\|([a-z0-9]+)\|(front|back)$/.exec(im.project);if(m&&!deck(m[1])){ST.decks.push({id:m[1],name:'สำรับ '+m[1],theme:'sky',bs:'moon',back:0});persist();}});
+  ST.S.images.concat(ST.S.jobs||[]).forEach(function(im){var m=/^oracle\|([a-z0-9]+)\|(front|back)$/.exec(im.project);if(m&&!deck(m[1])){ST.decks.push({id:m[1],name:'สำรับ '+m[1],theme:'sky',bs:'moon',back:0});persist();}});
  }catch(e){ST.err=errMsg(e);}
  var sig=JSON.stringify(ST.decks.map(function(d){var i=info(d);return[d.id,d.back,i.done,i.b,i.n,i.fail];}))+ST.cur+ST.err;
  if(sig!==ST.sig){ST.sig=sig;var ae=document.activeElement;if(!(ST.tab==='design'&&ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)))render();if(ST.vd&&$('#sheet').classList.contains('on'))viewSheet(ST.vi,1);}
