@@ -98,7 +98,7 @@ textarea.tx{min-height:92px;resize:vertical;font-family:inherit;line-height:1.4}
 <body>
 <header>
  <div class="hr"><button class="back" data-a="bk" aria-label="กลับ">←</button><h1>คลังไพ่ออราเคิล<small id="sub"></small></h1></div>
- <div class="tabs"><button data-a="tab" data-v="lib" id="t-lib">คลังไพ่</button><button data-a="tab" data-v="decks" id="t-decks">สำรับของฉัน</button><button data-a="tab" data-v="design" id="t-design">ออกแบบสำรับ</button></div>
+ <div class="tabs"><button data-a="tab" data-v="lib" id="t-lib">คลังไพ่</button><button data-a="tab" data-v="decks" id="t-decks">สำรับของฉัน</button><button data-a="tab" data-v="design" id="t-design">ออกแบบสำรับ</button><button data-a="cmp">ประกอบไพ่</button></div>
 </header>
 <main id="main"></main>
 <div id="sheet"><div class="pn" id="pn"></div></div>
@@ -257,7 +257,7 @@ function renderDecks(){
   +'<small>'+deckLabel(d)+'</small>'
   +'<div class="pb"><i style="width:'+Math.round(inf.done/78*100)+'%"></i></div>'
   +'<small>ภาพด้านหน้า '+inf.done+'/78 · ด้านหลัง '+inf.b.length+' แบบ'+(inf.n?' · รอคิว '+inf.n:'')+(inf.fail?' · ล้มเหลว '+inf.fail:'')+'</small>'
-  +'<div class="row" style="margin-top:8px">'+'<button class="bt s" data-a="view" data-v="'+d.id+'">ดูไพ่ทีละใบ</button>'+(cur?'':'<button class="bt s" data-a="use" data-v="'+d.id+'">ใช้สำรับนี้</button>')
+  +'<div class="row" style="margin-top:8px">'+'<button class="bt s" data-a="view" data-v="'+d.id+'">ดูไพ่ทีละใบ</button>'+(d.custom?'<button class="bt s g" data-a="eddk" data-v="'+d.id+'">แก้ prompt</button>':'')+(cur?'':'<button class="bt s" data-a="use" data-v="'+d.id+'">ใช้สำรับนี้</button>')
   +'<button class="bt s g" data-a="bkm" data-v="'+d.id+'">ด้านหลัง</button>'
   +(inf.done<78?'<button class="bt s g" data-a="fill" data-v="'+d.id+'">สร้างใบที่ขาด</button>':'')
   +(inf.fail?'<button class="bt s g" data-a="resume">ลองงานที่ล้มเหลวใหม่</button>':'')
@@ -296,8 +296,8 @@ function renderDesign(){
  if(f.sid&&!s){f.sid='';}
  var h='<div class="bn"><span>'+(c.url?'เชื่อมบอท Flux แล้ว':'ยังไม่ได้ตั้งค่าบอท Flux')+'</span><button class="bt s g" data-a="bot">ตั้งค่าบอท</button></div>';
  if(ST.err)h+='<div class="er">'+esc(ST.err)+'</div>';
- h+='<div class="fm"><h2>สั่งออกแบบสำรับด้วย prompt ของคุณ</h2><div class="hint">เขียนเองได้อิสระ ระบบจะจำ prompt ไว้ใช้ซ้ำ แต่แสดงแค่ชื่อธีมกับชื่อสไตล์ · ใช้ภาพรวม 81 ภาพ</div>'
- +'<input class="tx" data-f="name" placeholder="ชื่อสำรับ (เว้นว่าง = ใช้ชื่อธีม)" maxlength="30" value="'+esc(f.name||'')+'">';
+ h+='<div class="fm"><h2>'+(f.eid?'แก้ไข prompt ของสไตล์':'สั่งออกแบบสำรับด้วย prompt ของคุณ')+'</h2><div class="hint">เขียนเองได้อิสระ ระบบจะจำ prompt ไว้ใช้ซ้ำ แต่แสดงแค่ชื่อธีมกับชื่อสไตล์ · ใช้ภาพรวม 81 ภาพ</div>'
+ +(f.eid?'':'<input class="tx" data-f="name" placeholder="ชื่อสำรับ (เว้นว่าง = ใช้ชื่อธีม)" maxlength="30" value="'+esc(f.name||'')+'">');
  if(s){
   h+='<div class="sel"><span>ใช้ธีม <b>'+esc(s.tn)+'</b> · สไตล์ <b>'+esc(s.sn)+'</b></span><button class="bt s g" data-a="clrst">เขียนใหม่</button></div>';
  }else{
@@ -309,11 +309,11 @@ function renderDesign(){
  var cp=s?s.couple:(f.couple!==false);
  if(!s)h+='<label class="ck"><input type="checkbox" data-f="couple"'+(cp?' checked':'')+'> ใช้คู่ตัวละครเดิมในไพ่ทุกใบ</label>';
  else h+='<div class="hint">'+(s.couple?'ใช้คู่ตัวละครเดิม':'ไม่ใช้คู่ตัวละคร')+'</div>';
- h+='<div class="act"><button data-a="mkc">เริ่มสร้างสำรับ</button></div></div>';
+ h+=f.eid?'<div class="hint">แก้แล้วสำรับที่ใช้สไตล์นี้จะใช้ prompt ใหม่กับใบที่สร้างต่อจากนี้ (ภาพเดิมไม่เปลี่ยน)</div><div class="act"><button data-a="savest">บันทึกการแก้ไข</button><button class="g" data-a="cancst">ยกเลิก</button></div></div>':'<div class="act"><button data-a="mkc">เริ่มสร้างสำรับ</button></div></div>';
  h+='<h2 style="font-size:1rem;margin:4px 0 8px">สไตล์ที่บันทึกไว้ <small style="color:var(--mute);font-weight:400">'+ST.st.length+'</small></h2>';
  if(!ST.st.length)h+='<div class="em">ยังไม่มีสไตล์ที่บันทึก สร้างสำรับด้วย prompt แล้วระบบจะจำให้อัตโนมัติ</div>';
  ST.st.forEach(function(x){
-  h+='<div class="dk"><div class="di"><b>'+esc(x.tn)+'</b><small>สไตล์: '+esc(x.sn)+'</small><div class="row" style="margin-top:8px"><button class="bt s'+(f.sid===x.id?' g':'')+'" data-a="usest" data-v="'+x.id+'">'+(f.sid===x.id?'กำลังเลือก':'ใช้สไตล์นี้')+'</button><button class="bt s g" data-a="delst" data-v="'+x.id+'">ลบ</button></div></div></div>';
+  h+='<div class="dk"><div class="di"><b>'+esc(x.tn)+'</b><small>สไตล์: '+esc(x.sn)+'</small><div class="row" style="margin-top:8px"><button class="bt s'+(f.sid===x.id?' g':'')+'" data-a="usest" data-v="'+x.id+'">'+(f.sid===x.id?'กำลังเลือก':'ใช้สไตล์นี้')+'</button><button class="bt s g" data-a="edst" data-v="'+x.id+'">แก้ไข</button><button class="bt s g" data-a="delst" data-v="'+x.id+'">ลบ</button></div></div></div>';
  });
  $('#main').innerHTML=h;
 }
@@ -390,6 +390,18 @@ var A={
  view:function(v){var d=deck(v);if(!d)return;ST.vd=v;var inf=ST.inf[v]||info(d),f=0;for(var i=0;i<CARDS.length;i++){if(inf.f[i+1]){f=i;break;}}viewSheet(f);},
  vprev:function(){viewSheet((ST.vi+CARDS.length-1)%CARDS.length);},
  vnext:function(){viewSheet((ST.vi+1)%CARDS.length);},
+ cmp:function(){location.href='oracle-compose.html';},
+ edst:function(v){var x=one(ST.st,v);if(!x)return;ST.form={eid:v,tn:x.tn,tp:x.tp,sn:x.sn,sp:x.sp,couple:!!x.couple};ST.tab='design';render();window.scrollTo(0,0);},
+ eddk:function(v){var d=deck(v);if(!d)return;var id=d.sid||d.id;if(!one(ST.st,id)){ST.st.push({id:id,tn:d.tn,sn:d.sn,tp:d.tp,sp:d.sp,couple:!!d.couple});persistSt();}d.sid=id;persist();A.edst(id);},
+ cancst:function(){ST.form={};render();},
+ savest:function(){
+  var f=ST.form,x=one(ST.st,f.eid),t=function(v){return String(v||'').trim();};
+  if(!x)return;var tn=t(f.tn),sn=t(f.sn),tp=t(f.tp),sp=t(f.sp);
+  if(!tn||!sn||!tp||!sp){toast('กรอกชื่อธีม ชื่อสไตล์ และ prompt ให้ครบ');return;}
+  x.tn=tn;x.sn=sn;x.tp=tp;x.sp=sp;x.couple=f.couple!==false;
+  ST.decks.forEach(function(d){if(d.sid===x.id){d.tn=tn;d.sn=sn;d.tp=tp;d.sp=sp;d.couple=x.couple;}});
+  persistSt();persist();ST.form={};ST.sig='';render();toast('บันทึกแล้ว ใบที่สร้างต่อจากนี้จะใช้ prompt ใหม่');
+ },
  usest:function(v){ST.form.sid=v;render();},
  clrst:function(){ST.form.sid='';render();},
  delst:function(v){ST.st=ST.st.filter(function(x){return x.id!==v;});if(ST.form.sid===v)ST.form.sid='';persistSt();render();toast('ลบสไตล์แล้ว (สำรับที่สร้างไปแล้วยังใช้ได้)');},
@@ -402,7 +414,7 @@ var A={
   var ok=await enqueue({project:P(d,'back'),items:[{scene:1,prompt:backPrompt(d)}],variants:3,raw:true},'');
   if(ok)ok=await enqueue({project:P(d,'front'),items:CARDS.map(function(c,i){return{scene:i+1,prompt:promptFor(i,d)};}),raw:true},'เริ่มสร้างสำรับแล้ว ภาพจะทยอยขึ้นมา');
   if(!ok)return;
-  if(!s){ST.st.push({id:d.id,tn:tn,sn:sn,tp:tp,sp:sp,couple:cp});persistSt();}
+  d.sid=s?s.id:d.id;if(!s){ST.st.push({id:d.id,tn:tn,sn:sn,tp:tp,sp:sp,couple:cp});persistSt();}
   ST.decks.push(d);ST.cur=d.id;persist();ST.form={};ST.tab='decks';ST.sig='';poll();render();
  },
 };

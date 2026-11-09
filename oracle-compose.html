@@ -1,0 +1,121 @@
+<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ประกอบไพ่ · SMART SHOP</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&family=Mali:wght@400;700&family=Noto+Serif+Thai:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f1f6fc;--card:#fff;--text:#1e2a3d;--mute:#6b7a90;--line:#dde7f3;--pri:#5b7cfa;--chip:#e6eefb}
+@media(prefers-color-scheme:dark){:root{--bg:#121826;--card:#1b2436;--text:#e8eef9;--mute:#9aa8c0;--line:#2a364d;--chip:#25314a}}
+*{box-sizing:border-box;margin:0}body{font-family:system-ui,"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--text)}
+button,select,input,textarea{font:inherit;color:inherit}button{border:0;cursor:pointer}
+header{display:flex;gap:8px;align-items:center;padding:10px 14px;background:linear-gradient(135deg,#5b7cfa,#8b6cf0);color:#fff;position:sticky;top:0;z-index:5}
+header h1{font-size:1.05rem;flex:1}header button,header select{border-radius:10px;padding:8px 12px;background:rgba(255,255,255,.25);color:#fff}
+header select option{color:#000}#ok{background:#fff;color:#4b5fd6;font-weight:700}
+main{display:grid;grid-template-columns:330px 1fr;gap:12px;padding:12px;max-width:1100px;margin:auto}
+#side{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;max-height:calc(100vh - 80px);overflow:auto}
+.tb{display:flex;gap:6px;margin-bottom:8px}.tb button,.bt{flex:1;padding:8px;border-radius:10px;background:var(--chip)}.tb .on,.bt.p{background:var(--pri);color:#fff}
+.gr{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.gr img{width:100%;aspect-ratio:.7;object-fit:cover;border-radius:8px;cursor:grab}
+.tx{display:flex;gap:6px;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;cursor:grab}
+.tx small{display:block;color:var(--mute)}.tx button{background:none;font-size:1.1rem}
+input,textarea,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg);margin:3px 0}
+#stage{text-align:center}#cv{width:min(100%,400px);touch-action:none;border-radius:10px;box-shadow:0 2px 14px rgba(0,0,0,.25);background:#fff}
+#ed{max-width:400px;margin:10px auto;text-align:left}#ed .r{display:flex;gap:6px}small{color:var(--mute)}
+@media(max-width:800px){main{grid-template-columns:1fr}#stage{order:-1}#side{max-height:none}}
+</style></head><body>
+<header><button onclick="history.length>1?history.back():location.href='oracle-cards.html'">←</button><h1>ประกอบไพ่</h1>
+<select id="sz"><option value="o">ออราเคิล 89×127</option><option value="t">ทาโรต์ 70×120</option><option value="p">โป๊กเกอร์ 63×88</option></select><button id="ok">ยืนยัน ✓</button></header>
+<main><aside id="side"></aside><section id="stage"><canvas id="cv"></canvas><div id="ed"></div></section></main>
+<script>
+(function(){
+var $=function(s){return document.querySelector(s)},SZ={o:[89,127],t:[70,120],p:[63,88]},FONTS=['Prompt','Mali','Noto Serif Thai'];
+var LW=700,LH=1000,cv=$('#cv'),cx=cv.getContext('2d'),L=[],sel=null,drag=null,lib=[],fin=[],T='i';
+var texts=[];try{texts=JSON.parse(localStorage.oc_texts||'[]')}catch(e){}
+function cfg(){try{return JSON.parse(localStorage.ss_imgbot||'{}')}catch(e){return{}}}
+function U(p){var c=cfg();return String(c.url||'').replace(/\/+$/,'')+p+(p.indexOf('?')>=0?'&':'?')+'k='+encodeURIComponent(c.key||'')}
+function imgFrom(u){return new Promise(function(ok,no){var i=new Image();i.onload=function(){ok(i)};i.onerror=no;i.src=u})}
+function toast(m){alert(m)}
+/* IndexedDB: ไพ่ที่ยืนยันแล้ว */
+var DB=new Promise(function(r){var q=indexedDB.open('occ',1);q.onupgradeneeded=function(){q.result.createObjectStore('f',{keyPath:'id',autoIncrement:true})};q.onsuccess=function(){r(q.result)}});
+function tx(m,f){return DB.then(function(d){return new Promise(function(r){var q=f(d.transaction('f',m).objectStore('f'));q.onsuccess=function(){r(q.result)}})})}
+function loadFin(){return tx('readonly',function(s){return s.getAll()}).then(function(a){fin=a.reverse();side()})}
+/* วาด */
+function wrap(c,t,mw){var out=[];String(t).split('\n').forEach(function(p){var seg=(window.Intl&&Intl.Segmenter)?Array.from(new Intl.Segmenter('th',{granularity:'word'}).segment(p)).map(function(x){return x.segment}):Array.from(p),ln='';seg.forEach(function(w){if(ln&&c.measureText(ln+w).width>mw){out.push(ln.trim());ln=w}else ln+=w});out.push(ln.trim())});return out}
+function txt(c,l){
+ var sz=l.sz*LW,mw=LW*.86,rows=[],bw=0,h=0;
+ [[l.t,1,700],[l.e,.55,400],[l.kw,.5,400]].forEach(function(p){if(!p[0])return;c.font=p[2]+' '+(sz*p[1])+'px '+l.f+',sans-serif';wrap(c,p[0],mw).forEach(function(r){var w=c.measureText(r).width;bw=Math.max(bw,w);h+=sz*p[1]*1.35;rows.push([r,sz*p[1],p[2],w])})});
+ var top=l.y*LH-h/2,mx=l.x*LW;
+ if(l.pl==='g'){var g=c.createLinearGradient(0,top-sz,0,LH);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(.35,'rgba(0,0,0,.75)');g.addColorStop(1,'rgba(0,0,0,.88)');c.fillStyle=g;c.fillRect(0,top-sz,LW,LH-top+sz)}
+ if(l.pl==='b'){c.fillStyle='rgba(0,0,0,.55)';c.beginPath();if(c.roundRect)c.roundRect(mx-bw/2-16,top-10,bw+32,h+20,14);else c.rect(mx-bw/2-16,top-10,bw+32,h+20);c.fill()}
+ c.textAlign='center';c.textBaseline='middle';c.fillStyle=l.c;
+ if(l.pl==='n'){c.shadowColor='rgba(0,0,0,.85)';c.shadowBlur=10}
+ var y=top;rows.forEach(function(r){c.font=r[2]+' '+r[1]+'px '+l.f+',sans-serif';c.fillText(r[0],mx,y+r[1]*.675);y+=r[1]*1.35});
+ c.shadowBlur=0;l.b=[mx-bw/2-8,top-6,bw+16,h+12];
+}
+function paint(c,S,ui){
+ c.save();c.scale(S,S);c.fillStyle='#fff';c.fillRect(0,0,LW,LH);
+ L.forEach(function(l){if(l.ty==='i'){var iw=l.im.naturalWidth||l.im.width,ih=l.im.naturalHeight||l.im.height,s=Math.max(LW/iw,LH/ih)*l.s,w=iw*s,h=ih*s;c.drawImage(l.im,l.x*LW-w/2,l.y*LH-h/2,w,h);l.b=[l.x*LW-w/2,l.y*LH-h/2,w,h]}else txt(c,l)});
+ if(ui&&sel&&sel.b){c.strokeStyle='#5b7cfa';c.lineWidth=3;c.setLineDash([9,6]);c.strokeRect(sel.b[0],sel.b[1],sel.b[2],sel.b[3])}
+ c.restore();
+}
+function draw(){paint(cx,1,1)}
+function setSz(){var s=SZ[$('#sz').value];LH=Math.round(LW*s[1]/s[0]);cv.width=LW;cv.height=LH;draw()}
+/* เพิ่มชิ้นงาน */
+function addImg(it,x,y){it.load().then(function(im){L.push({ty:'i',im:im,s:1,x:x==null?.5:x,y:y==null?.5:y});sel=L[L.length-1];ed();draw()}).catch(function(){toast('โหลดรูปไม่ได้ (เช็กการเชื่อมบอท)')})}
+function addTxt(t,x,y){L.push({ty:'t',t:t.t,e:t.e||'',kw:t.kw||'',x:x==null?.5:x,y:y==null?.86:y,sz:.075,c:'#ffffff',f:'Prompt',pl:'g'});sel=L[L.length-1];ed();draw()}
+/* แผงซ้าย */
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function side(){
+ var h='<div class="tb">'+[['i','รูป'],['t','ข้อความ'],['f','เสร็จแล้ว']].map(function(a){return '<button data-a="tab" data-v="'+a[0]+'" class="'+(T===a[0]?'on':'')+'">'+a[1]+'</button>'}).join('')+'</div>';
+ if(T==='i')h+='<label class="bt" style="display:block;text-align:center;margin-bottom:8px">+ อัปโหลดรูป<input type="file" id="up" accept="image/*" multiple hidden></label><div class="gr">'+lib.map(function(x,i){return '<img draggable="true" data-d="i'+i+'" data-a="addi" data-v="'+i+'" src="'+x.u+'" loading="lazy">'}).join('')+'</div>'+(lib.length?'':'<small>ยังไม่มีรูป อัปโหลด หรือเชื่อมบอทที่หน้าคลังไพ่</small>');
+ if(T==='t')h+='<textarea id="nt" rows="3" placeholder="ชื่อ | English | คำคีย์เวิร์ด&#10;(1 บรรทัด = 1 ข้อความ)"></textarea><button class="bt p" data-a="nt" style="width:100%;margin-bottom:8px">เพิ่มเข้าคลังข้อความ</button>'+texts.map(function(x,i){return '<div class="tx" draggable="true" data-d="t'+i+'" data-a="addt" data-v="'+i+'"><span><b>'+esc(x.t)+'</b><small>'+esc(x.e||'')+(x.kw?' · '+esc(x.kw):'')+'</small></span><button data-a="dt" data-v="'+i+'">×</button></div>'}).join('');
+ if(T==='f')h+='<div class="gr">'+fin.map(function(x,i){return '<div><img data-a="usef" data-v="'+i+'" src="'+(x.u=x.u||URL.createObjectURL(x.b))+'"><a href="'+x.u+'" download="card-'+x.id+'.png" style="font-size:.75rem">ดาวน์โหลด</a> <button data-a="df" data-v="'+i+'" style="background:none">🗑</button></div>'}).join('')+'</div>'+(fin.length?'':'<small>ยังไม่มีไพ่ที่ยืนยัน</small>');
+ $('#side').innerHTML=h;
+}
+function ed(){
+ var l=sel,h='';
+ if(!l){$('#ed').innerHTML='<small>แตะชิ้นงานบนไพ่เพื่อแก้ไข · ลากเพื่อย้ายตำแหน่ง · ลากรูป/ข้อความจากซ้ายมาวาง (มือถือใช้แตะ)</small>';return}
+ if(l.ty==='t'){h+='<input data-f="t" value="'+esc(l.t)+'" placeholder="ชื่อ"><input data-f="e" value="'+esc(l.e)+'" placeholder="English"><input data-f="kw" value="'+esc(l.kw)+'" placeholder="คำคีย์เวิร์ด">'
+  +'<div class="r"><input type="range" data-f="sz" min=".03" max=".15" step=".005" value="'+l.sz+'"><input type="color" data-f="c" value="'+l.c+'" style="width:56px"></div>'
+  +'<div class="r"><select data-f="f">'+FONTS.map(function(f){return '<option'+(l.f===f?' selected':'')+'>'+f+'</option>'}).join('')+'</select><select data-f="pl"><option value="g"'+(l.pl==='g'?' selected':'')+'>ไล่เฉดดำ</option><option value="b"'+(l.pl==='b'?' selected':'')+'>กล่อง</option><option value="n"'+(l.pl==='n'?' selected':'')+'>เงา</option></select></div>'}
+ else h+='<small>ซูมรูป</small><input type="range" data-f="s" min=".5" max="3" step=".01" value="'+l.s+'">';
+ h+='<div class="r"><button class="bt" data-a="up">↑ ขึ้น</button><button class="bt" data-a="dn">↓ ลง</button><button class="bt" data-a="rm">ลบ</button></div>';
+ $('#ed').innerHTML=h;
+}
+/* events */
+$('#ed').addEventListener('input',function(e){var k=e.target.dataset.f;if(!k||!sel)return;sel[k]=e.target.type==='range'?+e.target.value:e.target.value;draw()});
+function pt(e){var r=cv.getBoundingClientRect();return[(e.clientX-r.left)*LW/r.width,(e.clientY-r.top)*LH/r.height]}
+cv.onpointerdown=function(e){var p=pt(e);sel=L.slice().reverse().filter(function(l){return l.b&&p[0]>=l.b[0]&&p[0]<=l.b[0]+l.b[2]&&p[1]>=l.b[1]&&p[1]<=l.b[1]+l.b[3]})[0]||null;drag=sel&&{p:p,x:sel.x,y:sel.y};cv.setPointerCapture(e.pointerId);ed();draw()};
+cv.onpointermove=function(e){if(!drag)return;var p=pt(e);sel.x=drag.x+(p[0]-drag.p[0])/LW;sel.y=drag.y+(p[1]-drag.p[1])/LH;draw()};
+cv.onpointerup=function(){drag=null};
+cv.ondragover=function(e){e.preventDefault()};
+cv.ondrop=function(e){e.preventDefault();var d=e.dataTransfer.getData('text/plain'),p=pt(e),x=p[0]/LW,y=p[1]/LH,i=+d.slice(1);if(d[0]==='i'&&lib[i])addImg(lib[i],x,y);if(d[0]==='t'&&texts[i])addTxt(texts[i],x,y)};
+document.addEventListener('dragstart',function(e){var d=e.target.dataset&&e.target.dataset.d;if(d)e.dataTransfer.setData('text/plain',d)});
+document.addEventListener('change',function(e){if(e.target.id!=='up')return;Array.prototype.forEach.call(e.target.files,function(f){var u=URL.createObjectURL(f);lib.unshift({u:u,load:function(){return imgFrom(u)}})});side()});
+function save(){localStorage.oc_texts=JSON.stringify(texts)}
+var A={
+ tab:function(v){T=v;side()},
+ addi:function(v){addImg(lib[+v])},addt:function(v){addTxt(texts[+v])},
+ nt:function(){$('#nt').value.split('\n').forEach(function(r){var p=r.split('|').map(function(s){return s.trim()});if(p[0])texts.push({t:p[0],e:p[1]||'',kw:p[2]||''})});save();side()},
+ dt:function(v){texts.splice(+v,1);save();side()},
+ up:function(){var i=L.indexOf(sel);if(i>=0&&i<L.length-1){L.splice(i+1,0,L.splice(i,1)[0]);draw()}},
+ dn:function(){var i=L.indexOf(sel);if(i>0){L.splice(i-1,0,L.splice(i,1)[0]);draw()}},
+ rm:function(){L=L.filter(function(l){return l!==sel});sel=null;ed();draw()},
+ usef:function(v){var x=fin[+v];addImg({load:function(){return imgFrom(x.u)}})},
+ df:function(v){var x=fin[+v];tx('readwrite',function(s){return s.delete(x.id)}).then(loadFin)}
+};
+document.addEventListener('click',function(e){var t=e.target.closest('[data-a]');if(t&&A[t.dataset.a]){e.stopPropagation();A[t.dataset.a](t.dataset.v)}});
+/* ยืนยัน: รวมเป็นรูปใหม่ 300dpi */
+$('#ok').onclick=function(){
+ if(!L.length){toast('ยังไม่มีอะไรบนไพ่');return}
+ sel=null;
+ Promise.all(FONTS.map(function(f){return document.fonts.load('700 20px '+f)})).then(function(){
+  var S=Math.round(SZ[$('#sz').value][0]/25.4*300)/LW,c=document.createElement('canvas');c.width=Math.round(LW*S);c.height=Math.round(LH*S);paint(c.getContext('2d'),S,0);
+  return new Promise(function(r){c.toBlob(r,'image/png')})
+ }).then(function(b){return tx('readwrite',function(s){return s.add({b:b,t:Date.now()})}).then(function(){var u=URL.createObjectURL(b);return imgFrom(u).then(function(im){L=[{ty:'i',im:im,s:1,x:.5,y:.5}];sel=null;ed();draw();return loadFin()})})}).then(function(){T='f';side();toast('บันทึกเป็นรูปใหม่แล้ว (แท็บ "เสร็จแล้ว" โหลดได้)')}).catch(function(){toast('สร้างรูปไม่สำเร็จ (รูปจากบอทอาจติด CORS)')});
+};
+$('#sz').onchange=setSz;
+/* รูปจากบอท */
+if(cfg().url)fetch(U('/api/state')).then(function(r){return r.json()}).then(function(S){
+ (S.images||[]).filter(function(i){return /^oracle\|/.test(i.project)}).sort(function(a,b){return b.id-a.id}).slice(0,150).forEach(function(i){var u=U('/img/'+i.id);lib.push({u:u,load:function(){return fetch(u).then(function(r){return r.blob()}).then(function(b){return imgFrom(URL.createObjectURL(b))})}})});side()
+}).catch(function(){});
+setSz();side();ed();loadFin();
+})();
+</script></body></html>
