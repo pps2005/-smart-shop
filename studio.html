@@ -880,11 +880,13 @@ async function ideasSave(){
 /* คลิปที่ Kaggle ทำเสร็จ โชว์ในคลังไอเดียด้วย (ไฟล์อยู่ที่บอท) */
 function ideaBotVids(){const V=BOT.v;if(!V||!V.videos)return [];
   return V.videos.map(v=>({id:'v'+v.id,bot:v.id,title:`${v.project||'วิดีโอ'} · ช็อต ${v.shot}`,at:+v.created,type:'video',dur:v.w?5:0,src:botU('/vid/'+v.id)}));}
-function ideaCard(x){if(x.bot)return `<button class="icard" data-idea="${esc(x.id)}"><div class="icov"><video src="${esc(x.src)}#t=1" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block"></video><span class="ty">🎞️ บอท</span><span class="badge">0:05</span></div><b>${esc(x.title)}</b><small>${new Date(x.at).toLocaleDateString('th-TH',{day:'numeric',month:'short'})} · ทำโดย Kaggle</small></button>`;
+function ideaCardRaw(x){if(x.bot)return `<button class="icard" data-idea="${esc(x.id)}"><div class="icov"><video src="${esc(x.src)}#t=1" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block"></video><span class="ty">🎞️ บอท</span><span class="badge">0:05</span></div><b>${esc(x.title)}</b><small>${new Date(x.at).toLocaleDateString('th-TH',{day:'numeric',month:'short'})} · ทำโดย Kaggle</small></button>`;
   const cu=x.cover&&urls[x.cover],col=ICOL[(+String(x.id).slice(-3)||0)%ICOL.length];
   const d=new Date(x.at).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
   const inner=cu?`<img loading="lazy" src="${esc(cu)}" alt="">`:`<div class="ph" style="background:${col}"><i>${IICON[x.type]||'📎'}</i>${x.text?`<p>${esc(x.text)}</p>`:`<p>${esc(x.title)}</p>`}</div>`;
   return `<button class="icard" data-idea="${esc(x.id)}"><div class="icov">${inner}${cu?`<span class="ty">${IICON[x.type]||''}</span>`:''}${x.dur?`<span class="badge">${fmtDur(x.dur)}</span>`:''}</div><b>${esc(x.title)}</b><small>${d}</small></button>`;}
+function ideaCard(x){const d=x.bot?`data-ivdel="${x.bot}"`:`data-idel="${esc(x.id)}"`;
+  return `<div class="iwrap" style="position:relative">${ideaCardRaw(x)}<button class="btn sm" ${d} aria-label="ลบ" style="position:absolute;top:6px;right:6px;z-index:2;padding:4px 8px;background:rgba(0,0,0,.65);border-radius:10px">🗑</button></div>`;}
 const fmtDur=s=>{s=Math.round(+s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
 async function renderIdeas(){
   if(!IDEA.list){$('#vw').innerHTML='<div class="card"><p class="muted" style="margin:0">กำลังโหลดคลังไอเดีย…</p></div>';await ideasLoad();if(view!=='ideas')return;}
@@ -1028,7 +1030,7 @@ function renderLib(quiet){
     <div class="row" style="justify-content:space-between"><span class="muted small">${done}/${total} ภาพ · ${pct}%</span><span class="muted small">${myQ.length?`เหลือประมาณ ${eta} นาที${ahead>0?` (มีงานอื่นรอก่อน ${ahead})`:''}`:''}</span></div>
     <div class="ltip">${esc(tip)}</div>
     <div class="row"><button class="btn sm main" data-lib="starter">✨ สร้างคลังเริ่มต้น (สัตว์เลี้ยง · ฉาก · ของประกอบ)</button></div>
-    <div class="report">📦 ทุกวันหลัง 07:00 บอทสร้างของใหม่ให้เองหมวดละ 1 ชิ้น: ฉาก · สัตว์และอสูร · ของประกอบ · ชุด · องค์ประกอบฉาก (ยกเว้นตัวละคร) ครบแล้ววนรอบใหม่ · เพลงวันละ 20 ทำบน Kaggle
+    <div class="report">📦 ทุกวันหลัง 07:00 บอทสร้างของใหม่ให้เองหมวดละ 1 ชิ้น: ฉาก · สัตว์และอสูร · ของประกอบ · ชุด · องค์ประกอบฉาก (ยกเว้นตัวละคร) ครบแล้ววนรอบใหม่
       <div class="row" style="margin-top:6px"><button class="btn sm" data-lib="dailynow">สร้างชุดวันนี้เพิ่มตอนนี้</button><button class="btn sm" data-lib="dailyset" data-on="${s.lib_on==='0'?1:0}">${s.lib_on==='0'?'▶️ เปิดสร้างอัตโนมัติ':'⏸ ปิดสร้างอัตโนมัติ'}</button></div></div></div>`;
   const LA=libAll(),cats=[...LA.filter(c=>!c.lock),...LA.filter(c=>c.lock)].map(c=>{const items=c.items.map(([n,pr])=>{const p=LP(c.n,n),x=st[p];
       const best=x.im.find(i=>i.starred)||x.im[0];
@@ -1219,9 +1221,8 @@ function planHtml(){const S=BOT.s,V=BOT.v;if(!S)return '';
     rows.push(['🎞️','วิดีโอ',vq?`รอ/กำลังทำ ${vq} ช็อต${vf?` · พัง ${vf}`:''}`:'ไม่มีช็อตค้าง','ok']);
     const hp=(V.helpers||[]),on=hp.filter(h=>h.on_).length,live=hp.filter(h=>h.on_&&now-(h.seen||0)<20*60000).length;
     if(hp.length)rows.push(['🤝','ผู้ช่วย',`${hp.length} คน · เปิดสิทธิ์ ${on} · ออนไลน์ ${live}${on?'':' (ยังปิดสิทธิ์ทั้งหมด)'}`,'ok']);
-    const nm=+st.aud_music_n||20,ns=+st.aud_sfx_n||200,nv=Math.min(3,Math.max(1,+st.aud_var||2));
     const nextDay=Math.max(endDay+7*3600000,0);
-    rows.push(['📅','พรุ่งนี้ 07:00',`ระบบเพิ่มของใหม่: ภาพคลัง 10 หมวด (20 ภาพ) · เพลง ${nm} (${nv} แบบ)`,'ok']);}
+    rows.push(['📅','พรุ่งนี้ 07:00',`ระบบเพิ่มของใหม่: ภาพคลัง 10 หมวด (20 ภาพ)`,'ok']);}
   return `<div class="card plan"><div class="row" style="justify-content:space-between"><h3>🔮 แผนและคาดการณ์วันนี้</h3><span class="muted small">เวลาไทย ${pad(bk.getUTCHours())}:${pad(bk.getUTCMinutes())}</span></div>
   ${rows.map(([ic,t,d,k])=>`<div class="prow ${k}"><b>${ic} ${t}</b><span>${esc(d)}</span></div>`).join('')}
   <span class="muted small">เป็นการประมาณจากคิวและโควตาตอนนี้ อาจเปลี่ยนถ้าเครื่องหรือโควตามีปัญหา</span></div>`;}

@@ -7,7 +7,6 @@
 
 import SCENES from './scenes.json';
 import IDEAS from './ideas.json';
-import MUSICLIB from './music.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -1423,30 +1422,6 @@ async function audioEnqueue(env, items) {
     .bind(it.project, '', '1', it.prompt.slice(0, 1500), Date.now(), JSON.stringify({ type: it.type, sec: it.sec, vocal: it.vocal ? 1 : 0 })));
   if (st.length) await env.DB.batch(st);
 }
-async function audioDaily(env, have) {
-  // ต่อวัน: เสียงประกอบ aud_sfx_n รายการ + เพลง aud_music_n รายการ รายการละ aud_var แบบ (ตั้งค่าได้)
-  const s = await getSettings(env), r = rng(Date.now() ^ 0x5bd1e995), out = [], made = [];
-  const V = Math.min(3, Math.max(1, +s.aud_var || 2));
-  const pickN = (cat, L, n) => {
-    const key = x => `${String(x.i).padStart(4, '0')} ${x.n}`;
-    let free = L.filter(x => ![...have].some(p => p === `คลัง·${cat}·${key(x)}` || p.startsWith(`คลัง·${cat}·${key(x)} · รอบ`)));
-    const res = [];
-    for (let k = 0; k < n; k++) {
-      if (free.length) { const t = Math.floor(r() * free.length); res.push([free[t], key(free[t])]); free.splice(t, 1); }
-      else { const x = L[Math.floor(r() * L.length)], b = key(x); res.push([x, `${b} · รอบ ${[...have].filter(p => p.startsWith(`คลัง·${cat}·${b}`)).length + 1 + k}`]); }
-    }
-    return res;
-  };
-  const ms = pickN('เพลง', MUSICLIB, Math.min(100, +s.aud_music_n || 20));
-  for (const [x, nm] of ms)
-    for (let v = 0; v < V; v++) out.push(x.t === 'sfx'
-      ? { project: `คลัง·เพลง·${nm}`, prompt: x.e + ', cinematic music sound effect, high quality', type: 'sfx', sec: 8 }
-      : { project: `คลัง·เพลง·${nm}`, prompt: x.e + (x.v ? ', anime soundtrack, wordless vocals, high quality' : ', anime soundtrack, instrumental, no vocals, high quality'), type: 'music', sec: 45, vocal: x.v ? 1 : 0 });
-  for (let k = 0; k < out.length; k += 50) await audioEnqueue(env, out.slice(k, k + 50));
-  made.push(`เพลง ${ms.length} รายการ (รายการละ ${V} แบบ)`);
-  return made;
-}
-
 // ---------- คลังอัตโนมัติรายวัน: ทุกวันหลัง 07:00 สร้างของใหม่หมวดละ 1 ชิ้น (ยกเว้นตัวละคร) ครบรายการแล้ววนรอบใหม่ ----------
 function manualPrompt(kind, desc, chars) {
   const base = 'Art style: [[STYLE]], high quality, no text, no watermark. All characters are ORIGINAL adults, not based on any existing anime, manga or game character.';
@@ -1496,7 +1471,7 @@ async function libDaily(env, force) {
   }
   if (st.length) await env.DB.batch(st);
   const vh = new Set((await env.DB.prepare("SELECT DISTINCT project FROM vjobs WHERE project LIKE 'คลัง·%' UNION SELECT DISTINCT project FROM videos WHERE project LIKE 'คลัง·%'").all()).results.map(x => x.project));
-  try { made.push(...await audioDaily(env, vh)); await vTick(env, true); } catch (e) { made.push('เสียง: ' + String(e.message || e).slice(0, 80)); }
+  try { await vTick(env, true); } catch (e) { made.push('คิว: ' + String(e.message || e).slice(0, 80)); }
   await notify(env, `📦 คลังวันนี้: ${made.join(' · ')}`);
   return { ok: true, made };
 }
