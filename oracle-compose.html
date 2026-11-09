@@ -19,10 +19,14 @@ input,textarea,select{width:100%;border:1px solid var(--line);border-radius:10px
 #stage{text-align:center}#cv{width:min(100%,400px);touch-action:none;border-radius:10px;box-shadow:0 2px 14px rgba(0,0,0,.25);background:#fff}
 #ed{max-width:400px;margin:10px auto;text-align:left}#ed .r{display:flex;gap:6px}small{color:var(--mute)}
 @media(max-width:800px){main{grid-template-columns:1fr}#stage{order:-1}#side{max-height:none}}
+main{grid-template-rows:auto 1fr;align-items:start}
+#side{grid-column:1;grid-row:1/3}#stage{grid-column:2;grid-row:1}#ed{grid-column:2;grid-row:2;width:100%}
+header{gap:6px;padding:8px 10px}header h1{white-space:nowrap;font-size:.95rem}#ok{white-space:nowrap}header select{max-width:150px;font-size:.85rem}
+@media(max-width:800px){main{display:block;padding:0 10px 24px}#stage{position:sticky;top:var(--hh,56px);z-index:4;background:var(--bg);padding:8px 0}#cv{width:auto;height:40vh;max-width:100%}#ed{margin:8px auto;max-width:none}#side{margin-top:8px}}
 </style></head><body>
 <header><button onclick="history.length>1?history.back():location.href='oracle-cards.html'">←</button><h1>ประกอบไพ่</h1>
 <select id="sz"><option value="o">ออราเคิล 89×127</option><option value="t">ทาโรต์ 70×120</option><option value="p">โป๊กเกอร์ 63×88</option></select><button id="ok">ยืนยัน ✓</button></header>
-<main><aside id="side"></aside><section id="stage"><canvas id="cv"></canvas><div id="ed"></div></section></main>
+<main><section id="stage"><canvas id="cv"></canvas></section><div id="ed"></div><aside id="side"></aside></main>
 <script>
 (function(){
 var $=function(s){return document.querySelector(s)},SZ={o:[89,127],t:[70,120],p:[63,88]},FONTS=['Prompt','Mali','Noto Serif Thai'];
@@ -71,7 +75,7 @@ function side(){
 }
 function ed(){
  var l=sel,h='';
- if(!l){$('#ed').innerHTML='<small>แตะชิ้นงานบนไพ่เพื่อแก้ไข · ลากเพื่อย้ายตำแหน่ง · ลากรูป/ข้อความจากซ้ายมาวาง (มือถือใช้แตะ)</small>';return}
+ if(!l){$('#ed').innerHTML='<small>แตะรูป/ข้อความในคลังเพื่อวางบนไพ่ (คอมลากมาวางได้) · แตะชิ้นงานบนไพ่เพื่อแก้ไข · ลากเพื่อย้าย</small>';return}
  if(l.ty==='t'){h+='<input data-f="t" value="'+esc(l.t)+'" placeholder="ชื่อ"><input data-f="e" value="'+esc(l.e)+'" placeholder="English"><input data-f="kw" value="'+esc(l.kw)+'" placeholder="คำคีย์เวิร์ด">'
   +'<div class="r"><input type="range" data-f="sz" min=".03" max=".15" step=".005" value="'+l.sz+'"><input type="color" data-f="c" value="'+l.c+'" style="width:56px"></div>'
   +'<div class="r"><select data-f="f">'+FONTS.map(function(f){return '<option'+(l.f===f?' selected':'')+'>'+f+'</option>'}).join('')+'</select><select data-f="pl"><option value="g"'+(l.pl==='g'?' selected':'')+'>ไล่เฉดดำ</option><option value="b"'+(l.pl==='b'?' selected':'')+'>กล่อง</option><option value="n"'+(l.pl==='n'?' selected':'')+'>เงา</option></select></div>'}
@@ -116,6 +120,7 @@ $('#sz').onchange=setSz;
 if(cfg().url)fetch(U('/api/state')).then(function(r){return r.json()}).then(function(S){
  (S.images||[]).filter(function(i){return /^oracle\|/.test(i.project)}).sort(function(a,b){return b.id-a.id}).slice(0,150).forEach(function(i){var u=U('/img/'+i.id);lib.push({u:u,load:function(){return fetch(u).then(function(r){return r.blob()}).then(function(b){return imgFrom(URL.createObjectURL(b))})}})});side()
 }).catch(function(){});
+function hh(){document.documentElement.style.setProperty('--hh',document.querySelector('header').offsetHeight+'px')}hh();addEventListener('resize',hh);
 setSz();side();ed();loadFin();
 })();
 </script></body></html>
