@@ -19,6 +19,11 @@ export default {
     if (p === '/') return new Response(HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
     if (p.startsWith('/k/')) return (await vRoutes(req, env, url, ctx).catch(e => json({ error: String(e.message || e) }, 500)));
     if (p.startsWith('/h/')) return (await helperScript(env, url).catch(e => new Response('# error: ' + String(e.message || e), { status: 500 })));
+    if (p.startsWith('/vv/')) { // ลิงก์คลิปแบบมีลายเซ็น ให้เครื่อง Kaggle ดึงไปรวมคลิป (ไม่เปิดรหัสผ่านเจ้าของ)
+      const vid = +p.split('/')[2];
+      if (!vid || url.searchParams.get('s') !== await vvSig(env, vid)) return new Response('forbidden', { status: 403 });
+      return getVideo(req, env, vid);
+    }
     if (!authOK(req, url, env)) return json({ error: 'รหัสผ่านไม่ถูกต้อง' }, 401);
     await ensureSchema(env);
     if (selfUrl !== url.origin) { selfUrl = url.origin; ctx.waitUntil(setSetting(env, 'self_url', url.origin)); }
@@ -686,7 +691,12 @@ async function vApi(req, env, url, ctx, body) {
     return json({ ok: true, added: st.length });
   }
   if (p === '/api/vconcat') {
-    const urls = (Array.isArray(body.urls) ? body.urls : []).filter(u => /^https:\/\//.test(u)).slice(0, 400);
+    let urls = (Array.isArray(body.urls) ? body.urls : []).filter(u => /^https:\/\//.test(u)).slice(0, 400);
+    if (Array.isArray(body.vids) && body.vids.length) { // รวมจากคลิปในบอทโดยตรง (ไม่ต้องอัปโหลดขึ้น Supabase)
+      const og = (await getSettings(env)).self_url || url.origin;
+      urls = [];
+      for (const v of body.vids.slice(0, 400)) { const id = +v; if (id) urls.push(og + '/vv/' + id + '?s=' + await vvSig(env, id)); }
+    }
     if (urls.length < 1) return json({ error: 'ไม่มีคลิปให้รวม' });
     await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind) VALUES (?,?,?,?,'','',0,'queued',0,?,'concat')")
       .bind(String(body.project || '').slice(0, 60), String(body.ep || ''), String(body.key || 'final').slice(0, 20), JSON.stringify(urls), Date.now()).run();
@@ -782,6 +792,14 @@ async function vTick(env, force) {
   }
   await setSetting(env, 'k_status', 'starting');
   return { pushed: true };
+}
+
+async function vvSig(env, id) {
+  const s = await getSettings(env);
+  let kt = s.ktoken;
+  if (!kt) { kt = crypto.randomUUID().replace(/-/g, ''); await setSetting(env, 'ktoken', kt); }
+  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(kt + ':vv:' + id));
+  return [...new Uint8Array(h)].slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // ---- สคริปต์สำหรับผู้ช่วย (เปิดใน Kaggle ของตัวเอง) ----
@@ -1349,7 +1367,7 @@ def concat(j):
     parts = "".join("[%d:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1,format=yuv420p[v%d];" % (i, W, H, W, H, i) for i in range(len(files)))
     chain = "".join("[v%d]" % i for i in range(len(files)))
     out = os.path.join(ROOT, "job%s.mp4" % j["id"])
-    sh('"%s" -y -loglevel error %s -filter_complex "%s%sconcat=n=%d:v=1:a=0[o]" -map "[o]" -c:v libx264 -preset veryfast -crf 18 -movflags +faststart "%s"' % (ff, ins, parts, chain, len(files), out))
+    sh('"%s" -y -loglevel error %s -filter_complex "%s%sconcat=n=%d:v=1:a=0[o]" -map "[o]" -c:v libx264 -preset veryfast -crf 23 -movflags +faststart "%s"' % (ff, ins, parts, chain, len(files), out))
     shutil.rmtree(d, ignore_errors=True)
     return out, 0, W, H
 

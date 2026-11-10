@@ -1045,7 +1045,7 @@ function renderLib(quiet){
     const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
     return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
       ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  const lv2=SV.lib;vwSet(segHtml('lib',[['keep','📚','คลังของเรา'],['aud','🎭','ออดิชัน'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='keep'?keepHtml():lv2==='aud'?audHtml():lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
+  const lv2=SV.lib;vwSet(segHtml('lib',[['keep','📚','คลังของเรา'],['lock','🔒','ล็อกหน้า'],['aud','🎭','ออดิชัน'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='keep'?keepHtml():lv2==='lock'?lockHtml():lv2==='aud'?audHtml():lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 async function libEnqueue(list,label){let n=0;
   for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
@@ -1130,9 +1130,9 @@ function sceneHead(sc){const sh=epScenes()[sc]||[],k='sc'+sc,ready=sh.filter(s=>
   const sec=sh.reduce((a,s)=>a+(+s.sec||5),0),title=(ep.scenes&&ep.scenes[sc-1]&&ep.scenes[sc-1].title)||(sh[0]&&sh[0].shot)||'';
   return `<div class="card" style="border-color:rgba(143,211,255,.35)"><div class="row" style="justify-content:space-between"><h3>🎬 ฉาก ${sc}${title?' · '+esc(title):''}</h3><span class="muted small">${sh.length} ช็อต · ${fmtS(sec)} · คลิปพร้อม ${ready}/${sh.length}</span></div>
     <div class="row">${ready===sh.length&&ready?botBtn('vscene',sc,has?'🔁 รวมฉากนี้ใหม่':'🎬 รวมช็อตเป็นฉาก',!has):`<span class="muted small">ใส่คลิปให้ครบทุกช็อตก่อน แล้วปุ่มรวมฉากจะขึ้น</span>`}</div>
-    <div class="media">${slot(k,'video','คลิปฉาก')}</div><div class="vidthumbs" data-k="${k}"></div></div>`;}
+    <div class="media">${slot(k,'video','คลิปฉาก')}</div><div class="vidthumbs" data-k="${k}"></div>${scOptHtml(sc,sh,sec)}</div>`;}
 function epAsmHtml(){const M=epScenes(),keys=Object.keys(M).map(Number).sort((a,b)=>a-b),ok=keys.filter(sc=>hasM('sc'+sc,'video')).length;
-  return `<div class="row"><span class="st todo">${keys.length} ฉาก · ฉากที่รวมแล้ว ${ok}/${keys.length}</span>${ok===keys.length&&ok?botBtn('vepisode','','🎞️ รวมทุกฉากเป็นตอน',true):''}</div><div class="media">${slot('final','video','คลิปทั้งตอน')}</div><div class="vidthumbs" data-k="final"></div>`;}
+  return `<div class="row"><span class="st todo">${keys.length} ฉาก · ฉากที่รวมแล้ว ${ok}/${keys.length}</span>${ok===keys.length&&ok?botBtn('vepisode','','🎞️ รวมทุกฉากเป็นตอน',true):''}</div><div class="media">${slot('final','video','คลิปทั้งตอน')}</div><div class="vidthumbs" data-k="final"></div>${epOptHtml()}`;}
 async function longUrls(paths){const {data}=await sb.storage.from(BUCKET).createSignedUrls(paths,86400);return (data||[]).map(d=>d.signedUrl).filter(Boolean);}
 async function vConcat(key,paths,label){if(!paths.length)return toast('ยังไม่มีคลิปให้รวม');
   const urls=await longUrls(paths);if(urls.length!==paths.length)return toast('สร้างลิงก์คลิปไม่ครบ ลองใหม่');
@@ -1143,6 +1143,61 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot=
     else{const keys=Object.keys(epScenes()).map(Number).sort((a,b)=>a-b);await vConcat('final',keys.map(sc=>ep.media['sc'+sc].video),'ทั้งตอน');}
     await botLoad();}catch(err){toast(botErr(err));}finally{b.disabled=false;}},true);
 
+
+/* ---------- ฉากให้เลือก (แบบ A/B) · ตอนให้เลือก · เป้าหมาย ฉากละ 5 นาที ตอนละ 15 นาที ---------- */
+const SC_TARGET=300,EP_TARGET=900;
+function bvids(key){const V=BOT.v;return ((V&&V.videos)||[]).filter(v=>v.ep===ep.id&&String(v.shot)===String(key)).sort((a,b)=>a.id-b.id);}
+function bjobs(key){const V=BOT.v;return ((V&&V.jobs)||[]).filter(j=>j.ep===ep.id&&String(j.shot)===String(key)&&(j.status==='queued'||j.status==='running'));}
+function lastV(key){const a=bvids(key);return a.length?a[a.length-1]:null;}
+function pkGet(sc){const x=ep.scenes&&ep.scenes[sc-1];return x&&x.pick?+x.pick:0;}
+function fpGet(){const x=ep.scenes&&ep.scenes[0];return x&&x.finalPick?+x.finalPick:0;}
+async function pkSet(sc,id){const a=Array.isArray(ep.scenes)?ep.scenes.map(x=>({...x})):[];while(a.length<sc)a.push({});a[sc-1]={...a[sc-1],pick:id};await saveEp({scenes:a},`เลือกฉาก ${sc} แล้ว ✓`);}
+async function fpSet(id){const a=Array.isArray(ep.scenes)&&ep.scenes.length?ep.scenes.map(x=>({...x})):[{}];a[0]={...a[0],finalPick:id};await saveEp({scenes:a},'เลือกตอนนี้แล้ว ✓');}
+function durTxt(sec,target){const d=sec-target,ok=Math.abs(d)<=target*0.2;return `<span class="${ok?'':'muted '}small" style="${ok?'color:#2f9b5a':''}">⏱ ${fmtS(sec)} / เป้า ${fmtS(target)}${ok?' ✓':d<0?` · ขาดอีก ${fmtS(-d)}`:` · เกิน ${fmtS(d)}`}</span>`;}
+function vcard(v,label,btn){return `<div class="vcard"><div class="muted small" style="margin:2px 0"><b>${label}</b></div><video src="${esc(botU('/vid/'+v.id))}" muted loop playsinline controls preload="metadata"></video><div class="bb">${btn}<a class="btn sm" href="${esc(botU('/vid/'+v.id))}" download>⬇️</a></div></div>`;}
+function scOptHtml(sc,sh,sec){
+  const shots=sh.length,withImg=sh.filter(s=>mUrl(String(s.n),'image')).length,haveAll=sh.every(s=>bvids(s.n).length>0),
+    pend=sh.reduce((a,s)=>a+bjobs(s.n).length,0),stars=sh.filter(s=>s.hq).length,
+    a=lastV('sc'+sc+'a'),b=lastV('sc'+sc+'b'),pk=pkGet(sc),bp=bjobs('sc'+sc+'a').length+bjobs('sc'+sc+'b').length;
+  const pickBtn=(v,k)=>`<button class="btn sm${pk===v.id?' main':''}" data-scopt="pick|${sc}|${v.id}">${pk===v.id?'✅ เลือกแล้ว':'เลือกแบบนี้'}</button>`;
+  return `<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #d9cff5"><div class="row" style="justify-content:space-between"><b class="small">🎲 ฉากให้เลือก (แบบ A / B)</b>${durTxt(sec,SC_TARGET)}</div>
+  <span class="muted small">ระบบทำคลิปทุกช็อต ส่วนช็อตสำคัญ ⭐ ทำ 2 แบบ แล้วประกอบเป็นฉาก A และฉาก B ให้เลือก (ไม่มี ⭐ ระบบตั้งให้อัตโนมัติ 20% ของช็อต)</span>
+  <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><button class="btn sm main" data-scopt="make|${sc}"${withImg<shots||!shots?' disabled':''}>🎬 ทำคลิปให้เลือก</button><button class="btn sm" data-scopt="build|${sc}"${haveAll&&shots?'':' disabled'}>📦 ประกอบฉาก A/B</button><button class="btn sm" data-scopt="refresh|${sc}">🔄 อัปเดต</button></div>
+  <span class="muted small">${withImg<shots?`ยังมี ${shots-withImg} ช็อตที่ไม่มีภาพคีย์ ใส่ภาพคีย์ให้ครบก่อน`:`ช็อต ${shots} · ⭐ ${stars} · คลิปพร้อม ${sh.filter(s=>bvids(s.n).length).length}/${shots}${pend?` · กำลังทำ/รอคิว ${pend}`:''}${bp?' · กำลังประกอบฉาก':''}`}</span>
+  ${(a||b)?`<div class="vgrid" style="margin-top:6px">${a?vcard(a,'ฉาก A',pickBtn(a)):''}${b?vcard(b,'ฉาก B',pickBtn(b)):''}</div>`:''}</div>`;}
+function epOptHtml(){
+  const keys=Object.keys(epScenes()).map(Number).sort((a,b)=>a-b),total=(ep.shots||[]).reduce((x,s)=>x+(+s.sec||5),0),
+    ready=keys.filter(sc=>lastV('sc'+sc+'a')).length,picked=keys.filter(sc=>pkGet(sc)).length,fp=fpGet(),
+    fa=lastV('finA'),fb=lastV('finB'),fm=lastV('finM'),pend=bjobs('finA').length+bjobs('finB').length+bjobs('finM').length;
+  const pb=v=>`<button class="btn sm${fp===v.id?' main':''}" data-scopt="fpick|${v.id}">${fp===v.id?'✅ เลือกแล้ว':'เลือกตอนนี้'}</button>`;
+  return `<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #d9cff5"><div class="row" style="justify-content:space-between"><b class="small">🎞️ ตอนให้เลือก</b>${durTxt(total,EP_TARGET)}</div>
+  <span class="muted small">รวมทุกฉากเป็นตอนให้เลือก: แบบ A (ทุกฉากแบบ A) · แบบ B (ทุกฉากแบบ B) · แบบผสม (ฉากที่คุณเลือกไว้) แล้วแตะเลือกตอนที่ชอบที่สุด</span>
+  <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><button class="btn sm main" data-scopt="epmake|0"${ready===keys.length&&keys.length?'':' disabled'}>🎞️ ทำตอนให้เลือก</button><button class="btn sm" data-scopt="refresh|0">🔄 อัปเดต</button></div>
+  <span class="muted small">ฉากที่ประกอบแล้ว ${ready}/${keys.length} · ฉากที่เลือกแล้ว ${picked}/${keys.length}${pend?` · กำลังประกอบตอน ${pend}`:''}</span>
+  ${(fa||fb||fm)?`<div class="vgrid" style="margin-top:6px">${fa?vcard(fa,'ตอน แบบ A',pb(fa)):''}${fb?vcard(fb,'ตอน แบบ B',pb(fb)):''}${fm?vcard(fm,'ตอน แบบผสม',pb(fm)):''}</div><span class="muted small">ไฟล์ตอนอยู่ในบอท กด ⬇️ เพื่อดาวน์โหลด</span>`:''}</div>`;}
+async function scOptMake(sc){const sh=epScenes()[sc]||[];await signMedia();
+  const miss=sh.filter(s=>!mUrl(String(s.n),'image')).length;if(miss)return toast(`ยังมี ${miss} ช็อตที่ไม่มีภาพคีย์`);
+  if(!sh.some(s=>s.hq)){[...sh].sort((a,b)=>shotSec(b)-shotSec(a)).slice(0,Math.max(1,Math.ceil(sh.length*0.2))).forEach(s=>{s.hq=true;});await saveEp({shots:ep.shots},'ตั้งช็อตสำคัญ ⭐ ให้อัตโนมัติแล้ว (ช็อตยาวที่สุด 20%)');}
+  const need=[];for(const s of sh){const have=bvids(s.n).length+bjobs(s.n).length,want=s.hq?2:1;for(let i=have;i<want;i++)need.push(s);}
+  if(!need.length)return toast('ทุกช็อตมีคลิปหรืออยู่ในคิวครบแล้ว');
+  for(let i=0;i<need.length;i+=40)await vEnqueue(need.slice(i,i+40),`ฉาก ${sc}`);}
+async function scOptBuild(sc){const sh=epScenes()[sc]||[];await botLoad();const A=[],B=[];let diff=0;
+  for(const s of sh){const v=bvids(s.n);if(!v.length)return toast(`ช็อต ${s.n} ยังไม่มีคลิป รอให้ครบก่อน`);A.push(v[0].id);B.push((v[1]||v[0]).id);if(v[1])diff++;}
+  await botApi('/api/vconcat',{project:epBotProject(),ep:ep.id,key:'sc'+sc+'a',vids:A});
+  if(diff)await botApi('/api/vconcat',{project:epBotProject(),ep:ep.id,key:'sc'+sc+'b',vids:B});
+  toast(diff?`ส่งประกอบฉาก ${sc} แบบ A และ B แล้ว รอสักครู่`:`ส่งประกอบฉาก ${sc} แบบ A แล้ว (ไม่มีช็อตที่มี 2 แบบ จึงมีแบบเดียว)`);}
+async function epOptMake(){const keys=Object.keys(epScenes()).map(Number).sort((a,b)=>a-b);await botLoad();
+  const A=[],B=[],M=[];let hasB=false,allPick=true;
+  for(const sc of keys){const a=lastV('sc'+sc+'a'),b=lastV('sc'+sc+'b'),pk=pkGet(sc);if(!a)return toast(`ฉาก ${sc} ยังไม่ได้ประกอบ`);A.push(a.id);B.push((b||a).id);if(b)hasB=true;if(pk)M.push(pk);else allPick=false;}
+  const job=(key,vids)=>botApi('/api/vconcat',{project:epBotProject(),ep:ep.id,key,vids});
+  await job('finA',A);if(hasB)await job('finB',B);if(allPick)await job('finM',M);
+  toast(`ส่งประกอบตอนแล้ว (${1+(hasB?1:0)+(allPick?1:0)} แบบ) รอสักครู่`);}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-scopt]');if(!b||!ep)return;const [a,x,y]=b.dataset.scopt.split('|');
+  try{b.disabled=true;
+    if(a==='make')await scOptMake(+x);else if(a==='build')await scOptBuild(+x);else if(a==='pick')await pkSet(+x,+y);
+    else if(a==='epmake')await epOptMake();else if(a==='fpick')await fpSet(+x);
+    await botLoad();const sy=window.scrollY;renderEp();window.scrollTo(0,sy);}
+  catch(err){toast(botErr(err));}finally{b.disabled=false;}});
 
 /* ---------- ความยาวช็อต · ช็อตสำคัญ · ลุคอนิเมะ ---------- */
 function shotSec(s){return Math.min(15,Math.max(1,Math.round(+s.sec||5)));}
@@ -1238,7 +1293,8 @@ const SCRIPT_PROMPT=`เขียนบทอนิเมะตอนนี้�
 ตัวอย่าง:
 1 | 1 | 4 | ภาพกว้าง กล้องนิ่ง | ตู้กดน้ำหลังโกดังตอนกลางคืน โทวะเดินเข้ามา | - | เสียงจั๊กจั่น | เงียบ เหงา
 1 | 2 | 3 | โคลสอัพ | หน้าโทวะตกใจเห็นคนยืนในเงา | โทวะ (คิดในใจ): มีคนอยู่ตรงนี้ด้วยเหรอ | ตึ๊ง! | ตกใจ ตลก
-ช็อตละ 1–10 วินาที ห้ามใช้ชื่อหรือบทจากอนิเมะที่มีอยู่จริง ตัวละครทุกตัวเป็นผู้ใหญ่`;
+ช็อตละ 1–10 วินาที ห้ามใช้ชื่อหรือบทจากอนิเมะที่มีอยู่จริง ตัวละครทุกตัวเป็นผู้ใหญ่
+ความยาว: 1 ตอนมี 3 ฉาก แต่ละฉากยาวประมาณ 300 วินาที (5 นาที ราว 45–70 ช็อต) รวมทั้งตอนประมาณ 900 วินาที (15 นาที) ให้รวมวินาทีของทุกช็อตในฉากให้ใกล้ 300`;
 function parseScript(txt){const out=[];let n=0;
   for(const raw of String(txt).split(/\r?\n/)){const l=raw.trim().replace(/^\|/,'').replace(/\|$/,'');if(!l.includes('|'))continue;
     const c=l.split('|').map(x=>x.trim());if(c.length<5||!/^\d+$/.test(c[0])||!/^\d+$/.test(c[1]))continue;
@@ -1594,6 +1650,41 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-prof
   else p[f]===v?delete p[f]:p[f]=v;
   const y=window.scrollY;renderLib(true);window.scrollTo(0,y);await profSave(n);});
 document.addEventListener('change',async e=>{const t=e.target.closest('[data-profnote]');if(!t||!PROF)return;const n=t.dataset.profnote;(PROF[n]=PROF[n]||{}).note=t.value.trim().slice(0,300);await profSave(n);toast('บันทึกแล้ว');});
+
+
+/* ---------- 🔒 ล็อกหน้าตัวละคร: แตะเลือกภาพหน้าหลัก (+ภาพเสริมสูงสุด 3) เก็บใน PROF[ชื่อ].lock = {main, extra[]} ---------- */
+function lockCands(n){const out=[],seen={};
+  (HAND||[]).filter(t=>t.kind==='char'&&t.image_id&&chName(t.title)===n).sort((a,b)=>b.image_id-a.image_id).forEach(t=>{if(!seen[t.image_id]){seen[t.image_id]=1;out.push({id:+t.image_id,lb:'ชีตตัวละคร'});}});
+  ((BOT.s&&BOT.s.images)||[]).filter(i=>String(i.project||'').startsWith('แฟ้ม·'+n+'·')).forEach(i=>{if(!seen[i.id]){seen[i.id]=1;out.push({id:+i.id,lb:String(i.project).split('·')[2]||'ชุด'});}});
+  return out;}
+let LOCKLOAD=0;
+async function lockLoad(){if(LOCKLOAD)return;LOCKLOAD=1;try{await Promise.all([handLoad(),profLoad()]);}catch(e){}LOCKLOAD=0;if(view==='lib'&&SV.lib==='lock'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
+function lockHtml(){
+  if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
+  if(!HAND||!PROF){lockLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดตัวละคร…</p></div>';}
+  const names=profNames();
+  if(!names.length)return '<div class="card"><h3>🔒 ล็อกหน้าตัวละคร</h3><p class="muted" style="margin:0">ยังไม่มีตัวละคร สร้างภารกิจ "ชีตตัวละคร" ในแท็บ 🎯 ภารกิจก่อน ชื่อกับภาพจะมาแสดงที่นี่</p></div>';
+  const done=names.filter(n=>PROF[n]&&PROF[n].lock&&PROF[n].lock.main).length;
+  const head=`<div class="card"><div class="row" style="justify-content:space-between"><h3>🔒 ล็อกหน้าตัวละคร</h3><span class="muted small">ล็อกแล้ว ${done}/${names.length}</span></div>
+  <span class="muted small">แตะ "🔒 ใช้เป็นหน้าหลัก" ใต้ภาพที่หน้าตรงตามต้องการที่สุด (หน้าตรง พื้นเรียบ เห็นหน้าชัด ดีที่สุด) และเพิ่ม "＋ เสริม" ได้สูงสุด 3 ภาพ เช่น หน้าข้าง ยิ้ม ตกใจ ระบบจะใช้ภาพเหล่านี้เป็นต้นแบบให้ตัวละครหน้าเดิมทุกช็อต บันทึกอัตโนมัติ</span></div>`;
+  return head+names.map(n=>{const L=(PROF[n]&&PROF[n].lock)||{},ex=L.extra||[],cs=lockCands(n);
+    const st=L.main?`🔒 ล็อกแล้ว${ex.length?' · เสริม '+ex.length:''}`:'ยังไม่ได้ล็อก';
+    const prev=L.main?`<img src="${esc(botU('/img/'+L.main))}" alt="${esc(n)}" style="width:100%;max-height:420px;object-fit:contain;border-radius:10px;background:#f4f1fb" loading="lazy">`:'';
+    const grid=cs.length?`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">${cs.map(c=>{const m=L.main===c.id,x=ex.includes(c.id);
+      return `<div style="border:2px solid ${m?'#8b5cf6':x?'#f0b429':'#e5e0f3'};border-radius:10px;padding:4px">
+      <img src="${esc(botU('/img/'+c.id))}" alt="" style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;border-radius:8px;background:#f4f1fb" loading="lazy" data-bot="view" data-src="${esc(botU('/img/'+c.id))}">
+      <div class="muted small" style="margin:2px 0">${esc(c.lb)}${m?' · 🔒 หน้าหลัก':x?' · ⭐ เสริม':''}</div>
+      <div class="row" style="flex-wrap:wrap;gap:4px"><button class="btn sm${m?' main':''}" data-lock="${esc(n)}|main|${c.id}">${m?'🔒 ล็อกอยู่':'🔒 ใช้เป็นหน้าหลัก'}</button><button class="btn sm${x?' main':''}" data-lock="${esc(n)}|extra|${c.id}"${m?' disabled':''}>＋ เสริม</button></div></div>`;}).join('')}</div>`
+      :'<p class="muted small" style="margin:6px 0 0">ยังไม่มีภาพของตัวละครนี้ อัปโหลดชีตในแท็บ 🎯 ภารกิจ หรือสร้างภาพชุดใน 👥 ข้อมูลตัวละครก่อน</p>';
+    return det('lk|'+n,`${L.main?`<img src="${esc(botU('/img/'+L.main))}" alt="" style="width:34px;height:34px;object-fit:cover;object-position:top;border-radius:50%;vertical-align:middle;margin-right:6px">`:'👤 '}${esc(n)}<small>${st}</small>`,
+      prev+grid+(L.main?`<div class="row" style="margin-top:8px"><button class="btn sm" data-lock="${esc(n)}|clear|0">ปลดล็อก</button></div>`:''),!L.main);}).join('');}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-lock]');if(!b||!PROF)return;const [n,act,id]=b.dataset.lock.split('|'),v=+id,p=PROF[n]=PROF[n]||{};
+  if(act==='clear'){delete p.lock;}
+  else{const L=p.lock=p.lock||{main:0,extra:[]};L.extra=L.extra||[];
+    if(act==='main'){L.main=L.main===v?0:v;L.extra=L.extra.filter(x=>x!==v);}
+    else if(act==='extra'){if(L.main===v)return toast('ภาพนี้เป็นหน้าหลักอยู่แล้ว');const i=L.extra.indexOf(v);if(i>=0)L.extra.splice(i,1);else{if(L.extra.length>=3)return toast('เสริมได้สูงสุด 3 ภาพ');L.extra.push(v);}}
+    if(!L.main&&!L.extra.length)delete p.lock;}
+  const y=window.scrollY;renderLib(true);window.scrollTo(0,y);await profSave(n);});
 
 
 /* ---------- แฟ้มชุดตัวละคร: พรอมต์พร้อมใช้หลายชุด เพิ่มชุดเองได้ ระบบทำร่างให้ได้ (มีสถานะหมุน) ---------- */
