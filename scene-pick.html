@@ -91,7 +91,7 @@ function renderLock(){
   const nl=NAMES.filter(n=>!LOCKS[n]).length;
   $('#lockCard').innerHTML=`<div class="row" style="justify-content:space-between"><b>🔒 ล็อกหน้าตัวละคร</b><span class="muted small">${NAMES.filter(n=>LOCKS[n]).length}/${NAMES.length} ล็อกแล้ว</span></div>
    <div class="row" style="margin-top:8px">${chips||'<span class="muted small">ยังไม่มีตัวละคร</span>'}</div>
-   <div class="muted small" style="margin-top:8px">${BOTOK?(nl?'ตัวที่ยังไม่ล็อก ไปเลือกหน้าหลักได้ที่ สตูดิโอ › คลัง › 🔒 ล็อกหน้า':'ล็อกครบแล้ว ทุกช็อตที่ใส่ตัวละครเหล่านี้จะอ้างอิงหน้าเดิม'):'ยังเชื่อมบอทไม่ได้ (ตั้งลิงก์บอทที่ สตูดิโอ › เจนภาพ) ยังเลือกฉากและส่งออกแผนตอนได้ตามปกติ'}</div>
+   <div class="muted small" style="margin-top:8px">${BOTOK?(nl?'ตัวที่ยังไม่ล็อก ไปเลือกหน้าหลักได้ที่ สตูดิโอ › คลัง › 🔒 ล็อกหน้า (หรือหน้า ตัวละคร · สถานที่ · ซีน)':'ล็อกครบแล้ว ทุกช็อตที่ใส่ตัวละครเหล่านี้จะอ้างอิงหน้าเดิม'):'ยังเชื่อมบอทไม่ได้ (ตั้งลิงก์บอทที่ สตูดิโอ › เจนภาพ) ยังเลือกฉากและส่งออกแผนตอนได้ตามปกติ'}</div>
    <div class="row" style="margin-top:8px"><input type="text" id="newch" placeholder="เพิ่มชื่อตัวละคร" style="flex:1;min-width:140px"><button class="btn sm" id="addch">＋ เพิ่ม</button></div>`;
 }
 

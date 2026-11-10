@@ -1622,13 +1622,12 @@ const PF=[
 async function profLoad(){try{const r=await botApi('/api/vcastprofile',{});PROF=r.profiles||{};}catch(e){PROF=PROF||{};}
   if(view==='lib'&&SV.lib==='prof'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
 function chName(t){return String(t||'').replace(/^ชีตใหม่\s*·\s*/,'').replace(/\s*\(.*\)\s*$/,'').trim();}
-function profNames(){const n=[];(HAND||[]).filter(t=>t.kind==='char').forEach(t=>{const nm=chName(t.title);if(nm&&!n.includes(nm))n.push(nm);});return n;}
+function profNames(){return Object.keys(PROF||{}).filter(k=>!k.startsWith('@')&&PROF[k]&&!PROF[k].deleted);}
 function profHtml(){
   if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
-  if(!HAND){handLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลด…</p></div>';}
   if(!PROF){profLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดข้อมูลตัวละคร…</p></div>';}
   const names=profNames(),filled=names.filter(n=>PROF[n]&&Object.keys(PROF[n]).length).length;
-  if(!names.length)return '<div class="card"><h3>👥 ข้อมูลตัวละคร</h3><p class="muted" style="margin:0">ยังไม่มีตัวละคร สร้างภารกิจ "ชีตตัวละคร" ในแท็บ 🎯 ภารกิจก่อน ชื่อจะมาแสดงที่นี่</p></div>';
+  if(!names.length)return '<div class="card"><h3>👥 ข้อมูลตัวละคร</h3><p class="muted" style="margin:0">ยังไม่มีตัวละคร เพิ่มชื่อตัวละครที่แท็บ 🔒 ล็อกหน้า ก่อน</p></div>';
   const others=n=>names.filter(x=>x!==n);
   return `<div class="card"><div class="row" style="justify-content:space-between"><h3>👥 ข้อมูลตัวละคร</h3><span class="muted small">กรอกแล้ว ${filled}/${names.length}</span></div>
   <span class="muted small">แตะเลือกตัวเลือกได้เลย บันทึกอัตโนมัติ Claude จะอ่านข้อมูลนี้ไปเขียนเรื่อง บทพูด และพรอมต์ภาพ ไม่ต้องบอกซ้ำ ตัวละครทุกตัวต้องเป็นผู้ใหญ่ (18+)</span></div>`
@@ -1642,7 +1641,7 @@ function profHtml(){
     +`<div class="muted small" style="margin-top:8px"><b>อื่นๆ ที่อยากเพิ่ม (ไม่บังคับ)</b></div><textarea data-profnote="${esc(n)}" placeholder="เช่น ชอบกินของหวาน กลัวความสูง มีแมวชื่อโมจิ">${esc(p.note||'')}</textarea>`+outfitHtml(n,p);
    const done=Object.keys(p).filter(k=>p[k]&&(!Array.isArray(p[k])||p[k].length)).length;
    return det('pf|'+n,`${im?`<img src="${esc(im)}" alt="" style="width:34px;height:34px;object-fit:cover;object-position:top;border-radius:50%;vertical-align:middle;margin-right:6px">`:'👤 '}${esc(n)}<small>${done?`กรอกแล้ว ${done} ข้อ`:'ยังไม่กรอก'}</small>`,body);}).join('');}
-function profImg(n){const t=(HAND||[]).filter(t=>t.kind==='char'&&t.image_id&&chName(t.title)===n).sort((a,b)=>b.image_id-a.image_id)[0];return t?botU('/img/'+t.image_id):'';}
+function profImg(n){const l=PROF&&PROF[n]&&PROF[n].lock;return l&&l.main?botU('/img/'+l.main):'';}
 async function profSave(n){try{await botApi('/api/vcastprofile',{act:'set',name:n,data:PROF[n]||{}});}catch(e){toast(botErr(e));}}
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-prof]');if(!b||!PROF)return;const [n,f,v,m]=b.dataset.prof.split('|'),p=PROF[n]=PROF[n]||{};
   const mm=f.match(/^(rel2?|why):(.*)$/);if(mm){const k=mm[1],o=mm[2];p[k]=p[k]||{};p[k][o]===v?delete p[k][o]:p[k][o]=v;}
@@ -1654,20 +1653,22 @@ document.addEventListener('change',async e=>{const t=e.target.closest('[data-pro
 
 /* ---------- 🔒 ล็อกหน้าตัวละคร: แตะเลือกภาพหน้าหลัก (+ภาพเสริมสูงสุด 3) เก็บใน PROF[ชื่อ].lock = {main, extra[]} ---------- */
 function lockCands(n){const out=[],seen={};
-  (HAND||[]).filter(t=>t.kind==='char'&&t.image_id&&chName(t.title)===n).sort((a,b)=>b.image_id-a.image_id).forEach(t=>{if(!seen[t.image_id]){seen[t.image_id]=1;out.push({id:+t.image_id,lb:'ชีตตัวละคร'});}});
-  ((BOT.s&&BOT.s.images)||[]).filter(i=>String(i.project||'').startsWith('แฟ้ม·'+n+'·')).forEach(i=>{if(!seen[i.id]){seen[i.id]=1;out.push({id:+i.id,lb:String(i.project).split('·')[2]||'ชุด'});}});
+  const IM=((BOT.s&&BOT.s.images)||[]);
+  IM.filter(i=>String(i.project||'').startsWith('หน้า·'+n+'·')||String(i.project||'').startsWith('แฟ้ม·'+n+'·')).sort((a,b)=>b.id-a.id).forEach(i=>{if(!seen[i.id]){seen[i.id]=1;out.push({id:+i.id,lb:String(i.project).split('·')[2]||'ชุด'});}});
+  IM.slice().sort((a,b)=>b.id-a.id).filter(i=>{const p=String(i.project||'');return !p.startsWith('ที่·')&&!p.startsWith('@');}).slice(0,30).forEach(i=>{if(!seen[i.id]){seen[i.id]=1;out.push({id:+i.id,lb:'คลังภาพ'});}});
   return out;}
 let LOCKLOAD=0;
-async function lockLoad(){if(LOCKLOAD)return;LOCKLOAD=1;try{await Promise.all([handLoad(),profLoad()]);}catch(e){}LOCKLOAD=0;if(view==='lib'&&SV.lib==='lock'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
+async function lockLoad(){if(LOCKLOAD)return;LOCKLOAD=1;try{await profLoad();}catch(e){}LOCKLOAD=0;if(view==='lib'&&SV.lib==='lock'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
 function lockHtml(){
   if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
-  if(!HAND||!PROF){lockLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดตัวละคร…</p></div>';}
+  if(!PROF){lockLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดตัวละคร…</p></div>';}
   const names=profNames();
-  if(!names.length)return '<div class="card"><h3>🔒 ล็อกหน้าตัวละคร</h3><p class="muted" style="margin:0">ยังไม่มีตัวละคร สร้างภารกิจ "ชีตตัวละคร" ในแท็บ 🎯 ภารกิจก่อน ชื่อกับภาพจะมาแสดงที่นี่</p></div>';
+  const addRow='<div class="card"><div class="row"><input id="lkNew" placeholder="เพิ่มตัวละครใหม่ (ชื่อ)" style="flex:1;min-width:120px"><button class="btn sm" data-addchar="1">＋ เพิ่ม</button></div></div>';
+  if(!names.length)return '<div class="card"><h3>🔒 ล็อกหน้าตัวละคร</h3><p class="muted" style="margin:0">ยังไม่มีตัวละคร พิมพ์ชื่อด้านล่างเพื่อเพิ่ม แล้วเลือกภาพหน้าจากคลังภาพ</p></div>'+addRow;
   const done=names.filter(n=>PROF[n]&&PROF[n].lock&&PROF[n].lock.main).length;
   const head=`<div class="card"><div class="row" style="justify-content:space-between"><h3>🔒 ล็อกหน้าตัวละคร</h3><span class="muted small">ล็อกแล้ว ${done}/${names.length}</span></div>
   <span class="muted small">แตะ "🔒 ใช้เป็นหน้าหลัก" ใต้ภาพที่หน้าตรงตามต้องการที่สุด (หน้าตรง พื้นเรียบ เห็นหน้าชัด ดีที่สุด) และเพิ่ม "＋ เสริม" ได้สูงสุด 3 ภาพ เช่น หน้าข้าง ยิ้ม ตกใจ ระบบจะใช้ภาพเหล่านี้เป็นต้นแบบให้ตัวละครหน้าเดิมทุกช็อต บันทึกอัตโนมัติ</span></div>`;
-  return head+names.map(n=>{const L=(PROF[n]&&PROF[n].lock)||{},ex=L.extra||[],cs=lockCands(n);
+  return head+addRow+names.map(n=>{const L=(PROF[n]&&PROF[n].lock)||{},ex=L.extra||[],cs=lockCands(n);
     const st=L.main?`🔒 ล็อกแล้ว${ex.length?' · เสริม '+ex.length:''}`:'ยังไม่ได้ล็อก';
     const prev=L.main?`<img src="${esc(botU('/img/'+L.main))}" alt="${esc(n)}" style="width:100%;max-height:420px;object-fit:contain;border-radius:10px;background:#f4f1fb" loading="lazy">`:'';
     const grid=cs.length?`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">${cs.map(c=>{const m=L.main===c.id,x=ex.includes(c.id);
@@ -1675,9 +1676,10 @@ function lockHtml(){
       <img src="${esc(botU('/img/'+c.id))}" alt="" style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;border-radius:8px;background:#f4f1fb" loading="lazy" data-bot="view" data-src="${esc(botU('/img/'+c.id))}">
       <div class="muted small" style="margin:2px 0">${esc(c.lb)}${m?' · 🔒 หน้าหลัก':x?' · ⭐ เสริม':''}</div>
       <div class="row" style="flex-wrap:wrap;gap:4px"><button class="btn sm${m?' main':''}" data-lock="${esc(n)}|main|${c.id}">${m?'🔒 ล็อกอยู่':'🔒 ใช้เป็นหน้าหลัก'}</button><button class="btn sm${x?' main':''}" data-lock="${esc(n)}|extra|${c.id}"${m?' disabled':''}>＋ เสริม</button></div></div>`;}).join('')}</div>`
-      :'<p class="muted small" style="margin:6px 0 0">ยังไม่มีภาพของตัวละครนี้ อัปโหลดชีตในแท็บ 🎯 ภารกิจ หรือสร้างภาพชุดใน 👥 ข้อมูลตัวละครก่อน</p>';
+      :'<p class="muted small" style="margin:6px 0 0">ยังไม่มีภาพในคลัง เจนภาพที่แท็บเจนภาพก่อน แล้วกลับมาเลือกหน้าหลักที่นี่</p>';
     return det('lk|'+n,`${L.main?`<img src="${esc(botU('/img/'+L.main))}" alt="" style="width:34px;height:34px;object-fit:cover;object-position:top;border-radius:50%;vertical-align:middle;margin-right:6px">`:'👤 '}${esc(n)}<small>${st}</small>`,
       prev+grid+(L.main?`<div class="row" style="margin-top:8px"><button class="btn sm" data-lock="${esc(n)}|clear|0">ปลดล็อก</button></div>`:''),!L.main);}).join('');}
+document.addEventListener('click',async e=>{const ab=e.target.closest('[data-addchar]');if(!ab||!PROF)return;const el=document.getElementById('lkNew'),v=((el&&el.value)||'').trim().slice(0,40);if(!v)return toast('ใส่ชื่อตัวละครก่อน');if(v.startsWith('@'))return toast('ชื่อห้ามขึ้นต้นด้วย @');if(PROF[v]&&!PROF[v].deleted)return toast('มีตัวละครนี้แล้ว');PROF[v]={};const y=window.scrollY;renderLib(true);window.scrollTo(0,y);await profSave(v);});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-lock]');if(!b||!PROF)return;const [n,act,id]=b.dataset.lock.split('|'),v=+id,p=PROF[n]=PROF[n]||{};
   if(act==='clear'){delete p.lock;}
   else{const L=p.lock=p.lock||{main:0,extra:[]};L.extra=L.extra||[];

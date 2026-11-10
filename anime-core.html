@@ -51,7 +51,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const STYLE='soft anime style, clean detailed illustration, cinematic lighting, vertical 9:16';
 const LOCP='@ที่·', K='ss_core';
-let PROF={}, IMGS=[], HAND=[], SCN=[], OK=false, EP=null, OPEN={};
+let PROF={}, IMGS=[], SCN=[], OK=false, EP=null, OPEN={};
 let ST=Object.assign({tab:'chars',cur:'',loc:'',sc:'',q:''},JSON.parse(localStorage.getItem(K)||'{}'));
 let SC=JSON.parse(localStorage.getItem('ss_core_scenes')||'[]');
 const sv=()=>{localStorage.setItem(K,JSON.stringify(ST));localStorage.setItem('ss_core_scenes',JSON.stringify(SC));};
@@ -66,12 +66,11 @@ async function load(){
   if(!cfg().url){OK=false;render();return;}
   try{PROF=(await api('/api/vcastprofile',{})).profiles||{};Object.keys(PROF).forEach(k=>{if(PROF[k]&&PROF[k].deleted)delete PROF[k];});OK=true;}catch(e){toast(String(e.message||e));}
   try{const s=await api('/api/state');IMGS=s.images||[];}catch(e){}
-  try{HAND=(await api('/api/vcastmanual',{act:'list'})).tasks||[];}catch(e){}
   render();
 }
 async function psave(n){try{await api('/api/vcastprofile',{act:'set',name:n,data:PROF[n]||{}});}catch(e){toast(String(e.message||e));}}
 const chName=t=>String(t||'').replace(/^ชีตใหม่\s*·\s*/,'').replace(/\s*\(.*\)\s*$/,'').trim();
-function charNames(){const s=new Set();Object.keys(PROF).filter(k=>!k.startsWith('@')).forEach(k=>s.add(k));HAND.filter(t=>t.kind==='char').forEach(t=>{const n=chName(t.title);if(n)s.add(n);});return [...s];}
+function charNames(){const s=new Set();Object.keys(PROF).filter(k=>!k.startsWith('@')).forEach(k=>s.add(k));return [...s];}
 function locNames(){return Object.keys(PROF).filter(k=>k.startsWith(LOCP)&&PROF[k]&&!PROF[k].deleted).map(k=>k.slice(LOCP.length));}
 const P=n=>(PROF[n]=PROF[n]||{});
 const lockOf=n=>(PROF[n]&&PROF[n].lock&&PROF[n].lock.main)?PROF[n].lock:null;
@@ -79,8 +78,8 @@ const av=n=>lockOf(n)?`<img class="av" src="${esc(img(lockOf(n).main))}" alt="">
 
 /* ---------- ตัวละคร: ล็อกหน้าที่เดียว ---------- */
 function faceCands(n){const out=[],seen={};
-  HAND.filter(t=>t.kind==='char'&&t.image_id&&chName(t.title)===n).forEach(t=>{if(!seen[t.image_id]){seen[t.image_id]=1;out.push({id:+t.image_id,lb:'ชีตตัวละคร'});}});
   IMGS.filter(i=>String(i.project||'').startsWith('หน้า·'+n+'·')||String(i.project||'').startsWith('แฟ้ม·'+n+'·')).sort((a,b)=>b.id-a.id).forEach(i=>{if(!seen[i.id]){seen[i.id]=1;out.push({id:+i.id,lb:String(i.project).split('·')[2]||'หน้า'});}});
+  IMGS.slice().sort((a,b)=>b.id-a.id).filter(i=>{const p=String(i.project||'');return !p.startsWith('ที่·')&&!p.startsWith('@');}).slice(0,30).forEach(i=>{if(!seen[i.id]){seen[i.id]=1;out.push({id:+i.id,lb:'คลังภาพ'});}});
   return out;}
 function viewChars(){
   if(!cfg().url)return '<div class="card">เชื่อมบอทที่ สตูดิโอ › เจนภาพ ก่อน</div>';
