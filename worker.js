@@ -357,7 +357,8 @@ async function animeSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS scripts (id INTEGER PRIMARY KEY AUTOINCREMENT, series_id INTEGER, body TEXT, ver INTEGER DEFAULT 1, picked INTEGER DEFAULT 0, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS loras (id INTEGER PRIMARY KEY AUTOINCREMENT, char_id INTEGER, vjob INTEGER, status TEXT DEFAULT 'queued', error TEXT, size INTEGER DEFAULT 0, use INTEGER DEFAULT 0, created INTEGER)"),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS lchunks (lid INTEGER, idx INTEGER, data TEXT)'),
-    env.DB.prepare('CREATE TABLE IF NOT EXISTS shots (id INTEGER PRIMARY KEY AUTOINCREMENT, script_id INTEGER, idx INTEGER, beat INTEGER, th TEXT, en TEXT, chars TEXT, loras TEXT, kproj TEXT, created INTEGER)')]);
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS shots (id INTEGER PRIMARY KEY AUTOINCREMENT, script_id INTEGER, idx INTEGER, beat INTEGER, th TEXT, en TEXT, chars TEXT, loras TEXT, kproj TEXT, created INTEGER)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS eps (id INTEGER PRIMARY KEY AUTOINCREMENT, series_id INTEGER, no INTEGER, title TEXT, logline TEXT, script_id INTEGER DEFAULT 0, sb INTEGER DEFAULT 0, auto INTEGER DEFAULT 0, fin INTEGER DEFAULT 0, created INTEGER)')]);
   animeReady = true;
 }
 // เทรน LoRA ตัวละครอัตโนมัติ: ภาพอ้างอิงครบและไม่มีงานค้าง → เข้าคิวเทรนบน Kaggle (ใช้ภาพที่ติดดาว ถ้าเลือกไว้ ≥8 ภาพ ไม่งั้นใช้ทุกภาพ) · ปิดได้ที่ settings.auto_lora = 0
@@ -387,6 +388,41 @@ async function charRefs(env, cid, n) {
   for (let i = 0; i < n; i++) st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,4)").bind(pj, have + i + 1, `${c.desc}, ${CHAR_VARS[(have + i) % CHAR_VARS.length]}, plain light background, same character design in every image, [[STYLE]]`.slice(0, 1800), now));
   await env.DB.batch(st);
   return { queued: n };
+}
+
+// ซีรีส์ 50 ตอน: เขียนบทตอน (ตอนละ ~5 นาที) จากโครงเรื่อง
+async function epWrite(env, s, e) {
+  const sr = await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(e.series_id).first();
+  const cs = (await env.DB.prepare('SELECT name,desc FROM chars WHERE series_id=?').bind(e.series_id).all()).results;
+  const pv = await env.DB.prepare('SELECT logline FROM eps WHERE series_id=? AND no=?').bind(e.series_id, e.no - 1).first();
+  const nx = await env.DB.prepare('SELECT logline FROM eps WHERE series_id=? AND no=?').bind(e.series_id, e.no + 1).first();
+  const o0 = await llmJson(env, s, `ซีรีส์: ${sr ? sr.brief : ''}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nตอนที่ ${e.no}/50: ${e.title} — ${e.logline}\nตอนก่อนหน้า: ${pv ? pv.logline : '-'}\nตอนถัดไป: ${nx ? nx.logline : '-'}\nเขียนบทตอนนี้ (ยาวราว 5 นาที เรื่องจบในตอนและเชื่อมกับตอนอื่น) ตอบเป็น JSON object {"title":"ชื่อตอน","logline":"สรุป","beats":["เหตุการณ์ตามลำดับเวลา 6-10 ข้อ"]}`);
+  const o = Array.isArray(o0) ? o0[0] : o0;
+  if (!o || !Array.isArray(o.beats) || !o.beats.length) throw new Error('เขียนบทไม่สำเร็จ ลองใหม่');
+  o.title = o.title || e.title;
+  const r = await env.DB.prepare('INSERT INTO scripts (series_id,body,picked,created) VALUES (?,?,1,?)').bind(e.series_id, JSON.stringify(o).slice(0, 8000), Date.now()).run();
+  await env.DB.prepare('UPDATE eps SET script_id=?, sb=0 WHERE id=?').bind(r.meta.last_row_id, e.id).run();
+  return r.meta.last_row_id;
+}
+// ทำงานต่อเองทีละขั้นต่อรอบ cron: บท → ช็อต → ภาพคีย์ → วิดีโอ → รวมตอน (ทีละตอน เรียงตามลำดับ เพราะ GPU ฟรีมีจำกัด)
+async function animeAdvance(env, s) {
+  if (s.auto_anime === '0') return;
+  await animeSchema(env);
+  const e = await env.DB.prepare('SELECT * FROM eps WHERE auto=1 AND fin=0 ORDER BY series_id,no LIMIT 1').first(); if (!e) return;
+  if (!e.script_id) { await epWrite(env, s, e); return; }
+  const sid = e.script_id;
+  if (e.sb >= 0) { const r = await animeApi(env, { act: 'sb_beat', script_id: sid, beat: e.sb, minutes: 5 }); await env.DB.prepare('UPDATE eps SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
+  const rows = (await env.DB.prepare('SELECT id,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
+  const hasImg = (await env.DB.prepare('SELECT COUNT(DISTINCT project) n FROM images WHERE project LIKE ?').bind(`ฉาก${sid}·%`).first()).n;
+  if (hasImg < rows.length) { await animeApi(env, { act: 'kf', script_id: sid }); return; }
+  await animeApi(env, { act: 'vid', script_id: sid });
+  const ep = 'a' + sid, ids = [];
+  for (const sh of rows) { const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind(ep, String(sh.id)).first(); if (!v || !v.id) return; ids.push(v.id); }
+  if ((await env.DB.prepare("SELECT id FROM videos WHERE ep=? AND shot='final' LIMIT 1").bind(ep).first())) { await env.DB.prepare('UPDATE eps SET fin=1 WHERE id=?').bind(e.id).run(); return; }
+  if ((await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE ep=? AND shot='final' AND status IN ('queued','running','failed')").bind(ep).first()).n) return;
+  if (!s.self_url) return;
+  const urls = []; for (const id of ids) urls.push(s.self_url + '/vv/' + id + '?s=' + await vvSig(env, id));
+  await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind) VALUES (?,?,'final',?,'','',0,'queued',0,?,'concat')").bind(`อนิเมะ·${sid}`, ep, JSON.stringify(urls), Date.now()).run();
 }
 async function animeApi(env, b) {
   await animeSchema(env);
@@ -472,7 +508,10 @@ async function animeApi(env, b) {
     const im = {}, pd = {};
     for (const x of (await env.DB.prepare('SELECT project, MAX(id) id FROM images WHERE project LIKE ? GROUP BY project').bind(like).all()).results) im[x.project] = x.id;
     for (const x of (await env.DB.prepare("SELECT project, COUNT(*) n FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle') GROUP BY project").bind(like).all()).results) pd[x.project] = x.n;
-    return { shots: rows.map(r => ({ ...r, img: im[`ฉาก${+b.script_id}·${r.idx}`] || 0, pending: pd[`ฉาก${+b.script_id}·${r.idx}`] || 0 })) };
+    const vv = {}, vj = {};
+    for (const x of (await env.DB.prepare('SELECT shot, MAX(id) id FROM videos WHERE ep=? GROUP BY shot').bind('a' + (+b.script_id)).all()).results) vv[x.shot] = x.id;
+    for (const x of (await env.DB.prepare("SELECT shot, COUNT(*) n FROM vjobs WHERE ep=? AND status IN ('queued','running') GROUP BY shot").bind('a' + (+b.script_id)).all()).results) vj[x.shot] = x.n;
+    return { shots: rows.map(r => ({ ...r, img: im[`ฉาก${+b.script_id}·${r.idx}`] || 0, pending: pd[`ฉาก${+b.script_id}·${r.idx}`] || 0, vid: vv[String(r.id)] || 0, vpend: vj[String(r.id)] || 0 })) };
   }
   if (act === 'lora_use') { await env.DB.prepare('UPDATE loras SET use=? WHERE id=?').bind(b.on ? 1 : 0, +b.id).run(); return { ok: true }; }
   if (act === 'lora_retrain') { await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(+b.char_id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=(SELECT 'ซีรีส์'||series_id||'·'||name FROM chars WHERE id=?)").bind(+b.char_id)]); return { ok: true }; }
@@ -486,6 +525,45 @@ async function animeApi(env, b) {
       if (l) { if (l.status === 'queued' && l.vs === 'running') l.status = 'training'; c.lora = l; }
     }
     return { chars: cs };
+  }
+  if (act === 'ep_plan') { // วางโครง 50 ตอน ทีละ 10 ตอน (หน้าเว็บเรียกวนจนครบ)
+    const sr = await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(+b.series_id).first(); if (!sr) throw new Error('ไม่พบซีรีส์');
+    const from = Math.max(1, +b.from || 1), N = Math.min(10, 51 - from); if (N < 1) return { next: -1 };
+    const prev = (await env.DB.prepare('SELECT no,title,logline FROM eps WHERE series_id=? ORDER BY no').bind(sr.id).all()).results;
+    const cs = (await env.DB.prepare('SELECT name,desc FROM chars WHERE series_id=?').bind(sr.id).all()).results;
+    const arr = await llmJson(env, s, `ซีรีส์: ${sr.brief}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nวางโครงเรื่องทั้งหมด 50 ตอน (ตอนละ 5 นาที แต่ละตอนมีเรื่องจบในตัวและมีเส้นเรื่องหลักเดินไปถึงตอนที่ 50)\nตอนที่วางไว้แล้ว: ${prev.map(x => x.no + '.' + x.title + ' ' + x.logline).join(' | ') || '-'}\nเขียนตอนที่ ${from}-${from + N - 1} ตอบเป็น JSON array ของ {"title":"ชื่อตอน","logline":"สรุป 1-2 ประโยค"} จำนวน ${N} รายการ`);
+    const list = (Array.isArray(arr) ? arr : [arr]).slice(0, N); if (!list.length) throw new Error('วางโครงไม่สำเร็จ ลองใหม่');
+    await env.DB.batch(list.map((x, i) => env.DB.prepare('INSERT INTO eps (series_id,no,title,logline,created) VALUES (?,?,?,?,?)').bind(sr.id, from + i, String(x.title || '').slice(0, 80), String(x.logline || '').slice(0, 400), Date.now())));
+    return { next: from + list.length <= 50 ? from + list.length : -1 };
+  }
+  if (act === 'eps') {
+    const rows = (await env.DB.prepare('SELECT * FROM eps WHERE series_id=? ORDER BY no').bind(+b.series_id).all()).results;
+    for (const e of rows) {
+      if (!e.script_id) continue; const ep = 'a' + e.script_id;
+      e.tot = (await env.DB.prepare('SELECT COUNT(*) n FROM shots WHERE script_id=?').bind(e.script_id).first()).n;
+      e.img = (await env.DB.prepare('SELECT COUNT(DISTINCT project) n FROM images WHERE project LIKE ?').bind(`ฉาก${e.script_id}·%`).first()).n;
+      e.vid = (await env.DB.prepare("SELECT COUNT(DISTINCT shot) n FROM videos WHERE ep=? AND shot<>'final'").bind(ep).first()).n;
+      e.final = ((await env.DB.prepare("SELECT MAX(id) id FROM videos WHERE ep=? AND shot='final'").bind(ep).first()) || {}).id || 0;
+    }
+    return { eps: rows };
+  }
+  if (act === 'ep_auto') { // เปิด/ปิดให้ทำเอง: ส่ง id = ตอนเดียว ไม่ส่ง = ทุกตอนที่ยังไม่เสร็จของซีรีส์
+    if (+b.id) await env.DB.prepare('UPDATE eps SET auto=? WHERE id=?').bind(b.on ? 1 : 0, +b.id).run();
+    else await env.DB.prepare('UPDATE eps SET auto=? WHERE series_id=? AND fin=0').bind(b.on ? 1 : 0, +b.series_id).run();
+    return { ok: true };
+  }
+  if (act === 'vid') { // ภาพคีย์ → วิดีโอช็อตละ ~5 วิ (ลุคอนิเมะ 12fps) ครั้งละไม่เกิน 6 ช็อต ที่เหลือทำรอบถัดไป
+    const sid = +b.script_id, ep = 'a' + sid;
+    const rows = (await env.DB.prepare('SELECT id,en,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
+    const have = new Set([...(await env.DB.prepare("SELECT DISTINCT shot FROM videos WHERE ep=?").bind(ep).all()).results, ...(await env.DB.prepare("SELECT shot FROM vjobs WHERE ep=? AND status IN ('queued','running')").bind(ep).all()).results].map(x => String(x.shot)));
+    let n = 0;
+    for (const sh of rows) {
+      if (n >= 6) break; if (have.has(String(sh.id))) continue;
+      const im = await env.DB.prepare('SELECT data FROM images WHERE project=? ORDER BY id DESC LIMIT 1').bind(sh.kproj).first(); if (!im || !im.data) continue;
+      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(5), Date.now(), JSON.stringify({ hq: 0, fps: 12 })).run();
+      n++;
+    }
+    return { queued: n };
   }
   const sers = (await env.DB.prepare('SELECT id,title,brief FROM series ORDER BY id DESC LIMIT 20').all()).results;
   const sid = +b.series_id || (sers[0] && sers[0].id) || 0;
@@ -531,6 +609,7 @@ async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
   await animeAuto(env, s).catch(() => {});
+  await animeAdvance(env, s).catch(() => {});
   const useK = await kImgOn(env, s, now);
   if (useK) {
     if (!force && s.auto_fill === '1') await kTopUp(env, s);
