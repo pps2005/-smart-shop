@@ -203,42 +203,57 @@ async function audDaily(env) {
   for (let k = 0; k < total; k++) { const R = open[k % open.length]; per[R.key] = (per[R.key] || 0) + 1; }
   for (const [role, n] of Object.entries(per)) await audApi(env, { act: 'gen', role, n });
 }
-// ---------- ฝึก LoRA จากภาพที่กด "🧬 ทำ LoRA" ในห้องออดิชัน ----------
-const audImgOf = (ims, c) => { const pre = `ออดิชัน·${c.role}·${c.id}·`, m = ims.filter(i => i.project.startsWith(pre)); return ((m.filter(i => i.scene === 2).pop()) || (m.filter(i => i.scene === 1).pop()) || {}).id || 0; };
-async function audLoraList(env) {
+// ---------- ตัวละคร LoRA: เลือกผู้สมัคร → สร้างชุดภาพ 12 ภาพ → ⭐ เลือกภาพ → ฝึก LoRA (ตัวละครที่ series_id=0 ใช้ได้ทุกเรื่อง จับคู่ด้วยชื่อ) ----------
+async function charList(env) {
   await animeSchema(env);
-  const ims = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE instr(project,'ออดิชัน·')=1 ORDER BY id").all()).results;
-  const marked = (await env.DB.prepare('SELECT id,role,name,age FROM aud_cands WHERE COALESCE(lora,0)=1 ORDER BY id DESC').all()).results.map(c => ({ ...c, img: audImgOf(ims, c) })).filter(c => c.img);
   const cs = (await env.DB.prepare('SELECT * FROM chars WHERE series_id=0 ORDER BY id DESC').all()).results;
   for (const c of cs) {
+    const pj = charProj(c);
+    c.images = (await env.DB.prepare('SELECT id,starred FROM images WHERE project=? ORDER BY id').bind(pj).all()).results;
+    c.pending = (await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n;
     const l = await env.DB.prepare("SELECT l.id,l.status,l.error,l.size,l.use,v.status vs, v.opt FROM loras l LEFT JOIN vjobs v ON v.id=l.vjob WHERE l.char_id=? AND l.status<>'old' ORDER BY l.id DESC LIMIT 1").bind(c.id).first();
     if (l) { if (l.status === 'queued' && l.vs === 'running') l.status = 'training'; try { l.n = (JSON.parse(l.opt || '{}').images || []).length; } catch { l.n = 0; } delete l.opt; delete l.vs; c.lora = l; }
     c.trigger = 'chr' + c.id + 'x';
   }
-  return { marked, loras: cs };
+  return { chars: cs };
 }
-async function audLoraTrain(env, b) {
+async function charBusy(env, id) { return (await env.DB.prepare("SELECT COUNT(*) n FROM loras WHERE char_id=? AND status='queued'").bind(id).first()).n > 0; }
+async function charMake(env, b) {
   await animeSchema(env);
-  const name = String(b.name || '').trim().slice(0, 40); if (!name) return { error: 'ตั้งชื่อ LoRA ก่อน' };
-  const ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(Number).filter(Boolean))];
-  if (ids.length < 8) return { error: 'ต้องเลือกอย่างน้อย 8 ภาพ (ตอนนี้ ' + ids.length + ')' };
-  if (ids.length > 24) return { error: 'เลือกได้ไม่เกิน 24 ภาพ' };
-  const cs = (await env.DB.prepare(`SELECT * FROM aud_cands WHERE COALESCE(lora,0)=1 AND id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all()).results;
-  const ims = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE instr(project,'ออดิชัน·')=1 ORDER BY id").all()).results;
-  const rows = cs.map(c => ({ c, img: audImgOf(ims, c) })).filter(x => x.img);
-  if (rows.length < 8) return { error: 'มีภาพที่ใช้ได้แค่ ' + rows.length + ' ภาพ (ต้องกด 🧬 ทำ LoRA ในห้องออดิชัน และภาพต้องวาดเสร็จแล้ว)' };
-  let ch = await env.DB.prepare('SELECT * FROM chars WHERE series_id=0 AND name=?').bind(name).first();
-  if (ch) {
-    if ((await env.DB.prepare("SELECT COUNT(*) n FROM loras WHERE char_id=? AND status='queued'").bind(ch.id).first()).n) return { error: 'LoRA ชื่อนี้กำลังรอ/เทรนอยู่ รอให้เสร็จก่อน' };
-    await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(charProj(ch))]);
-  } else {
-    const r = await env.DB.prepare('INSERT INTO chars (series_id,name,desc,created) VALUES (0,?,?,?)').bind(name, 'LoRA จากภาพห้องออดิชัน', Date.now()).run();
-    ch = { id: r.meta.last_row_id, series_id: 0, name };
-  }
-  const trig = 'chr' + ch.id + 'x', imgs = rows.map(x => ({ id: x.img, cap: `${trig}, ${String(x.c.look || '').slice(0, 300)}` }));
-  const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(charProj(ch), Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs })).run();
+  const c = await env.DB.prepare('SELECT * FROM aud_cands WHERE id=?').bind(+b.id).first(); if (!c) return { error: 'ไม่พบผู้สมัคร' };
+  if (+c.char_id) return { error: 'สร้างตัวละครนี้ไปแล้ว' };
+  const R = AUD_ROLES.find(x => x.key === c.role) || { outfit: '' };
+  let name = String(c.name || 'ตัวละคร').replace(/·/g, '-').slice(0, 40);
+  if (await env.DB.prepare('SELECT id FROM chars WHERE series_id=0 AND name=?').bind(name).first()) name = `${name} ${c.id}`;
+  const desc = `${c.look || ''}${R.outfit ? ', wearing ' + R.outfit : ''}`.slice(0, 600);
+  const r = await env.DB.prepare('INSERT INTO chars (series_id,name,desc,created) VALUES (0,?,?,?)').bind(name, desc, Date.now()).run();
+  const id = r.meta.last_row_id;
+  await env.DB.prepare('UPDATE aud_cands SET char_id=? WHERE id=?').bind(id, c.id).run();
+  await charRefs(env, id, 12);
+  return { ok: true, char_id: id };
+}
+async function charTrain(env, b) {
+  await animeSchema(env);
+  const ch = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!ch) return { error: 'ไม่พบตัวละคร' };
+  if (await charBusy(env, ch.id)) return { error: 'กำลังรอ/เทรนอยู่ รอให้เสร็จก่อน' };
+  const pj = charProj(ch);
+  const all = (await env.DB.prepare('SELECT id,scene,starred FROM images WHERE project=? ORDER BY id').bind(pj).all()).results;
+  const st = all.filter(x => x.starred), use = (st.length ? st : all).slice(0, 24);
+  if (use.length < 8) return { error: st.length ? `ติด ⭐ แค่ ${st.length} ภาพ ต้องอย่างน้อย 8 (หรือไม่ติดเลย = ใช้ทุกภาพ)` : `มีภาพแค่ ${all.length} ภาพ ต้องอย่างน้อย 8 ภาพ` };
+  const trig = 'chr' + ch.id + 'x', imgs = use.map(x => ({ id: x.id, cap: `${trig}, ${CHAR_VARS[((+x.scene || 1) - 1) % CHAR_VARS.length]}` }));
+  await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
+  const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs })).run();
   await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(ch.id, r.meta.last_row_id, Date.now()).run();
-  return { ok: true, char_id: ch.id, trigger: trig, images: imgs.length };
+  return { ok: true, images: imgs.length };
+}
+async function charRename(env, b) {
+  await animeSchema(env);
+  const ch = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!ch) return { error: 'ไม่พบตัวละคร' };
+  const name = String(b.name || '').trim().replace(/·/g, '-').slice(0, 40); if (!name) return { error: 'ใส่ชื่อก่อน' };
+  if (await env.DB.prepare('SELECT id FROM chars WHERE series_id=0 AND name=? AND id<>?').bind(name, ch.id).first()) return { error: 'มีตัวละครชื่อนี้แล้ว' };
+  const o = charProj(ch), n = charProj({ series_id: 0, name });
+  await env.DB.batch([env.DB.prepare('UPDATE chars SET name=? WHERE id=?').bind(name, ch.id), env.DB.prepare('UPDATE images SET project=? WHERE project=?').bind(n, o), env.DB.prepare('UPDATE jobs SET project=? WHERE project=?').bind(n, o), env.DB.prepare("UPDATE vjobs SET project=? WHERE project=? AND kind='lora'").bind(n, o)]);
+  return { ok: true };
 }
 async function audApi(env, b) {
   const act = b.act || 'list';
@@ -268,16 +283,18 @@ async function audApi(env, b) {
     await env.DB.batch(st);
     return { ok: true, added: n };
   }
-  if (act === 'lora_mark') { await env.DB.prepare('UPDATE aud_cands SET lora=CASE WHEN COALESCE(lora,0)=1 THEN 0 ELSE 1 END WHERE id=?').bind(+b.id).run(); return { ok: true }; }
-  if (act === 'lora_list') return await audLoraList(env);
+  if (act === 'char_list') return await charList(env);
+  if (act === 'char_make') return await charMake(env, b);
+  if (act === 'char_train') return await charTrain(env, b);
+  if (act === 'char_rename') return await charRename(env, b);
+  if (act === 'char_more') { const ch = await env.DB.prepare('SELECT id FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!ch) return { error: 'ไม่พบตัวละคร' }; return await charRefs(env, ch.id, Math.min(8, Math.max(1, +b.n || 8))); }
   if (act === 'lora_use') { await env.DB.prepare('UPDATE loras SET use=? WHERE id=?').bind(b.on ? 1 : 0, +b.id).run(); return { ok: true }; }
-  if (act === 'lora_train') return await audLoraTrain(env, b);
-  if (act === 'lora_del') {
+  if (act === 'char_del') {
     await animeSchema(env);
-    const c = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!c) return { error: 'ไม่พบ LoRA' };
-    if ((await env.DB.prepare("SELECT COUNT(*) n FROM loras WHERE char_id=? AND status='queued'").bind(c.id).first()).n) return { error: 'LoRA นี้กำลังรอ/เทรนอยู่ รอให้เสร็จก่อนค่อยลบ' };
-    const ls = (await env.DB.prepare('SELECT id FROM loras WHERE char_id=?').bind(c.id).all()).results;
-    await env.DB.batch([...ls.map(l => env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id)), env.DB.prepare('DELETE FROM loras WHERE char_id=?').bind(c.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND project=?").bind(charProj(c)), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(c.id)]);
+    const c = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!c) return { error: 'ไม่พบตัวละคร' };
+    if (await charBusy(env, c.id)) return { error: 'กำลังรอ/เทรนอยู่ รอให้เสร็จก่อนค่อยลบ' };
+    const ls = (await env.DB.prepare('SELECT id FROM loras WHERE char_id=?').bind(c.id).all()).results, pj = charProj(c);
+    await env.DB.batch([...ls.map(l => env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id)), env.DB.prepare('DELETE FROM loras WHERE char_id=?').bind(c.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND project=?").bind(pj), env.DB.prepare("DELETE FROM jobs WHERE project=? AND status='queued'").bind(pj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare('UPDATE aud_cands SET char_id=0 WHERE char_id=?').bind(c.id), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(c.id)]);
     return { ok: true };
   }
   if (act === 'daily') { await setSetting(env, 'aud_daily', String(Math.min(8, Math.max(4, +b.n || 6)))); return { ok: true }; }
@@ -405,7 +422,7 @@ async function animeSchema(env) {
 async function animeAuto(env, s) {
   if (s.auto_lora === '0') return;
   await animeSchema(env);
-  const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
+  const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE c.series_id<>0 AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
   for (const c of cs) {
     const pj = charProj(c);
     if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n) continue;
@@ -857,7 +874,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vlog (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS casting (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, cat TEXT DEFAULT 'char', name TEXT, descr TEXT, prompt TEXT, status TEXT DEFAULT 'pending', created INTEGER)"),
   ]);
-  for (const q of ['ALTER TABLE jobs ADD COLUMN seed INTEGER', 'ALTER TABLE jobs ADD COLUMN eng TEXT', 'ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT', 'ALTER TABLE aud_cands ADD COLUMN lora INTEGER DEFAULT 0']) await env.DB.prepare(q).run().catch(() => {});
+  for (const q of ['ALTER TABLE jobs ADD COLUMN seed INTEGER', 'ALTER TABLE jobs ADD COLUMN eng TEXT', 'ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT', 'ALTER TABLE aud_cands ADD COLUMN char_id INTEGER DEFAULT 0']) await env.DB.prepare(q).run().catch(() => {});
   schemaReady = true;
 }
 

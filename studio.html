@@ -978,54 +978,42 @@ function renderLib(quiet){
   if(quiet&&document.activeElement&&(document.activeElement.id==='audTxt'||document.activeElement.id==='loraName'))return;
   if(!botCfg().url){$('#vw').innerHTML=`<div class="card"><h2>คลัง</h2><p class="muted" style="margin:0">เชื่อมบอทเจนภาพก่อน (แท็บเจนภาพ)</p></div>`;return;}
   if(!BOT.s){$('#vw').innerHTML=`<div class="card"><p class="muted" style="margin:0">กำลังโหลด…</p></div>`;botLoad();return;}
-  const lv2=SV.lib;vwSet(segHtml('lib',[['keep','📚','คลังของเรา'],['lock','🔒','ล็อกหน้า'],['aud','🎭','ออดิชัน'],['lora','🧬','ฝึก LoRA'],['snd','🔊','เสียง']])+(lv2==='keep'?keepHtml():lv2==='lock'?lockHtml():lv2==='aud'?audHtml():lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():loraHtml()),quiet);
+  const lv2=SV.lib;vwSet(segHtml('lib',[['keep','📚','คลังของเรา'],['lock','🔒','ล็อกหน้า'],['lora','🧬','ตัวละคร LoRA'],['snd','🔊','เสียง']])+(lv2==='keep'?keepHtml():lv2==='lock'?lockHtml():lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():loraHtml()),quiet);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
 
-/* ---------- 🧬 ฝึก LoRA: ใช้ภาพที่กด "🧬 ทำ LoRA" ในห้องออดิชัน ---------- */
-let LORA=null,LORAT=0,LORASEL=new Set(),LORAN='';
-async function loraLoad(){try{LORA=await botApi('/api/vcastaud',{act:'lora_list'});}catch(e){LORA=LORA||{marked:[],loras:[],err:botErr(e)};}
-  if(LORA.marked){const ok=new Set(LORA.marked.map(x=>+x.id));LORASEL=new Set([...LORASEL].filter(x=>ok.has(x)));}
+/* ---------- 🧬 ตัวละคร LoRA: เลือกผู้สมัคร → สร้างชุดภาพ 12 ภาพ → ⭐ เลือกภาพที่หน้าเหมือนกัน → ฝึก LoRA → ติ๊กใช้ในเรื่อง ---------- */
+let CHS=null,CHT=0;
+async function chLoad(){try{CHS=await botApi('/api/vcastaud',{act:'char_list'});}catch(e){CHS=CHS||{chars:[],err:botErr(e)};}
   if(view==='lib'&&SV.lib==='lora'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}
-  clearTimeout(LORAT);if(LORA&&(LORA.loras||[]).some(l=>l.lora&&(l.lora.status==='queued'||l.lora.status==='training'))&&view==='lib'&&SV.lib==='lora')LORAT=setTimeout(loraLoad,20000);}
-function loraHtml(){
-  if(!LORA){loraLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังเปิดหน้าฝึก LoRA…</p></div>';}
-  const M=LORA.marked||[],Ls=LORA.loras||[],n=LORASEL.size,ST={queued:'⏳ รอเทรน (เริ่มเองเมื่อ Kaggle ว่าง)',training:'🔧 กำลังเทรน',ready:'✅ พร้อมใช้',failed:'⚠️ เทรนพัง'};
-  const th=c=>`<div style="position:relative;border:3px solid ${LORASEL.has(+c.id)?'#8b5cf6':'transparent'};border-radius:12px;overflow:hidden;background:#fff">
-    <img src="${esc(botU('/img/'+c.img))}" alt="${esc(c.name)}" loading="lazy" data-lsel="${c.id}" style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;display:block;cursor:pointer">
-    ${LORASEL.has(+c.id)?'<span style="position:absolute;top:4px;left:4px;background:#8b5cf6;color:#fff;border-radius:999px;padding:0 7px;font-size:13px">✓</span>':''}
-    <button class="btn sm" data-lrm="${c.id}" aria-label="เอาออกจากชุด" style="position:absolute;top:4px;right:4px;padding:2px 7px">✖</button>
-    <div class="small" style="padding:3px 6px">${esc(c.name)} <span class="muted">· ${esc(c.role)}</span></div></div>`;
-  const mine=Ls.map(l=>{const L=l.lora;return `<div class="arow"><div class="row" style="justify-content:space-between"><b>🧬 ${esc(l.name)}</b><span class="small">${L?(ST[L.status]||esc(L.status)):'—'}${L&&L.size?' · '+Math.round(L.size/1048576)+' MB':''}${L&&L.n?' · '+L.n+' ภาพ':''}</span></div>
-    <span class="muted small">คำเรียก (trigger): <code>${esc(l.trigger)}</code> · ตั้งชื่อตัวละครในบทให้ตรงกับ "${esc(l.name)}" ระบบจะใช้ LoRA นี้เองตอนสร้างภาพคีย์</span>
+  clearTimeout(CHT);if(CHS&&(CHS.chars||[]).some(c=>c.pending||(c.lora&&(c.lora.status==='queued'||c.lora.status==='training')))&&view==='lib'&&SV.lib==='lora')CHT=setTimeout(chLoad,20000);}
+function loraHtml(){return charsHtml()+audHtml();}
+function charsHtml(){
+  if(!CHS){chLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดตัวละคร…</p></div>';}
+  const Cs=CHS.chars||[],ST={queued:'⏳ รอเทรน (เริ่มเองเมื่อ Kaggle ว่าง)',training:'🔧 กำลังเทรน',ready:'✅ LoRA พร้อมใช้',failed:'⚠️ เทรนพัง'};
+  const one=c=>{const L=c.lora,im=c.images||[],st=im.filter(i=>+i.starred).length,use=st||im.length,busy=L&&(L.status==='queued'||L.status==='training');
+    return `<div class="arow"><div class="row" style="justify-content:space-between;gap:6px"><b>🧬 ${esc(c.name)}</b><span class="small">${L?(ST[L.status]||esc(L.status))+(L.size?' · '+Math.round(L.size/1048576)+' MB':''):'ยังไม่ได้ฝึก'}</span></div>
+    <span class="muted small">${im.length} ภาพ · ⭐ ${st}${c.pending?` · กำลังวาดอีก ${c.pending}`:''} · แตะภาพที่หน้าเหมือนกันที่สุดให้ติด ⭐ (ไม่ติดเลย = ใช้ทุกภาพ) ต้องอย่างน้อย 8 ภาพ · คำเรียก <code>chr${c.id}x</code></span>
+    ${im.length?`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:6px 0">${im.map(i=>`<img src="${esc(botU('/img/'+i.id))}" alt="" loading="lazy" data-chstar="${i.id}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:3px solid ${+i.starred?'#8b5cf6':'transparent'};cursor:pointer">`).join('')}</div>`:'<div class="row" style="margin:6px 0"><span class="spin"></span><span class="muted small">กำลังวาดชุดภาพ… (ราว 2 นาทีต่อภาพ)</span></div>'}
     ${L&&L.error?`<div class="errl">⚠️ ${esc(L.error)}</div>`:''}
-    <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:4px">
-      ${L&&L.status==='ready'?`<label class="row" style="gap:6px;align-items:center"><input type="checkbox" data-luse="${L.id}"${+L.use?' checked':''} style="width:20px;height:20px">ใช้ในเรื่อง</label>`:''}
-      ${L&&(L.status==='ready'||L.status==='failed')?`<button class="btn sm" data-lre="${esc(l.name)}">🔁 ฝึกใหม่ (ใช้ภาพที่เลือกตอนนี้)</button>`:''}
-      ${L&&L.status==='queued'||L&&L.status==='training'?'':`<button class="btn sm" data-ldel="${l.id}">🗑 ลบ</button>`}</div></div>`;}).join('');
-  return `<div class="card"><h3>🧬 ฝึก LoRA</h3><span class="muted small">กด "🧬 ทำ LoRA" ใต้ภาพในห้อง 🎭 ออดิชัน ภาพจะมาอยู่ที่นี่ แตะภาพเพื่อเลือกเข้าชุดเทรน (ต้อง 8–24 ภาพ) · ฝึกบน Kaggle ใช้เวลาราว 20–40 นาที</span>
-    ${LORA.err?`<div class="errl">⚠️ ${esc(LORA.err)}</div>`:''}
-    <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sm" data-lall="1">เลือกทั้งหมด</button><button class="btn sm" data-lall="0">ล้างที่เลือก</button><span class="muted small">เลือกแล้ว <b>${n}</b>/24</span></div>
-    ${M.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:8px">${M.map(th).join('')}</div>`:'<p class="muted small" style="margin:10px 0 0">ยังไม่มีภาพ ไปที่ห้อง 🎭 ออดิชัน แล้วกด 🧬 ทำ LoRA ที่ภาพที่ต้องการ</p>'}
-    <div class="row" style="gap:6px;margin-top:10px"><input id="loraName" placeholder="ชื่อ LoRA (เช่น อายะ)" value="${esc(LORAN)}" maxlength="40" style="flex:1"><button class="btn main" data-ltrain="1"${n<8?' disabled':''}>🧬 เริ่มฝึก</button></div>
-    ${n<8?`<span class="muted small">ต้องเลือกอีก ${8-n} ภาพ</span>`:''}</div>
-  ${Ls.length?`<div class="card"><h3>🧬 LoRA ของเรา</h3>${mine}</div>`:''}`;}
-document.addEventListener('input',e=>{if(e.target.id==='loraName')LORAN=e.target.value;});
-document.addEventListener('click',async e=>{const b=e.target.closest('[data-lsel],[data-lrm],[data-lall],[data-ltrain],[data-lre],[data-ldel]');if(!b)return;
-  const re=()=>{const y=window.scrollY;renderLib(true);window.scrollTo(0,y);};
+    <div class="row" style="gap:6px;flex-wrap:wrap">
+      <button class="btn sm main" data-chtrain="${c.id}"${busy||use<8||(st&&st<8)?' disabled':''}>${L&&L.status==='ready'?'🔁 ฝึกใหม่':'🧬 ฝึก LoRA'} (${Math.min(24,use)} ภาพ)</button>
+      <button class="btn sm" data-chmore="${c.id}">➕ ขอภาพเพิ่ม 8</button><button class="btn sm" data-chname="${c.id}|${esc(c.name)}">✏️ ตั้งชื่อ</button>
+      ${busy?'':`<button class="btn sm" data-chdel="${c.id}">🗑 ลบ</button>`}</div>
+    ${L&&L.status==='ready'?`<label class="row" style="gap:8px;align-items:center;margin-top:6px"><input type="checkbox" data-luse="${L.id}"${+L.use?' checked':''} style="width:22px;height:22px"><span><b>ใช้ในอนิเมะ</b> <span class="muted small">ตั้งชื่อให้ตรงกับชื่อตัวละครในบท ระบบจะใส่ LoRA นี้เองตอนสร้างภาพคีย์</span></span></label>`:''}</div>`;};
+  return `<div class="card"><h3>🧬 ตัวละครของเรา (LoRA)</h3><span class="muted small">ภาพเดียวเทรน LoRA ไม่ได้ จึงให้ระบบวาดชุดภาพหลายมุม/อารมณ์ของผู้สมัครที่เลือก (เลือกจากด้านล่างด้วย 🧬 สร้างตัวละครนี้) แล้วเลือกภาพที่หน้าเหมือนกัน ฝึก LoRA และติ๊กใช้ในอนิเมะ</span>
+    ${CHS.err?`<div class="errl">⚠️ ${esc(CHS.err)}</div>`:''}</div>${Cs.length?`<div class="card">${Cs.map(one).join('')}</div>`:'<div class="card"><p class="muted small" style="margin:0">ยังไม่มีตัวละคร เลือกผู้สมัครด้านล่างแล้วกด 🧬 สร้างตัวละครนี้</p></div>'}`;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-chstar],[data-chtrain],[data-chmore],[data-chname],[data-chdel]');if(!b)return;
   try{
-    if(b.dataset.lsel){const id=+b.dataset.lsel;if(LORASEL.has(id))LORASEL.delete(id);else{if(LORASEL.size>=24)return toast('เลือกได้ไม่เกิน 24 ภาพ');LORASEL.add(id);}return re();}
-    if(b.dataset.lall!==undefined){LORASEL=b.dataset.lall==='1'?new Set(((LORA&&LORA.marked)||[]).slice(0,24).map(x=>+x.id)):new Set();return re();}
-    if(b.dataset.lrm){b.disabled=true;LORASEL.delete(+b.dataset.lrm);await botApi('/api/vcastaud',{act:'lora_mark',id:+b.dataset.lrm});await loraLoad();AUDS=null;return;}
-    if(b.dataset.ltrain||b.dataset.lre){
-      const nm=(b.dataset.lre||LORAN||'').trim();if(!nm)return toast('ตั้งชื่อ LoRA ก่อน');
-      if(LORASEL.size<8)return toast('เลือกภาพอย่างน้อย 8 ภาพ');
-      if(b.dataset.lre&&!sure(b,'กดอีกครั้งเพื่อฝึกใหม่ (LoRA เดิมจะถูกแทนที่)'))return;
-      b.disabled=true;const r=await botApi('/api/vcastaud',{act:'lora_train',name:nm,ids:[...LORASEL]});if(r.error)throw new Error(r.error);
-      toast('ส่งเข้าคิวเทรนแล้ว ⏳ เครื่อง Kaggle จะเริ่มเองเมื่อว่าง');LORAN='';await loraLoad();return;}
-    if(b.dataset.ldel){if(!sure(b,'กดอีกครั้งเพื่อลบ LoRA'))return;b.disabled=true;const r=await botApi('/api/vcastaud',{act:'lora_del',char_id:+b.dataset.ldel});if(r.error)throw new Error(r.error);toast('ลบแล้ว');await loraLoad();return;}
+    if(b.dataset.chstar){const id=+b.dataset.chstar;await botApi('/api/star',{id});for(const c of CHS.chars)for(const i of c.images)if(+i.id===id)i.starred=+i.starred?0:1;const y=window.scrollY;renderLib(true);window.scrollTo(0,y);return;}
+    b.disabled=true;
+    if(b.dataset.chtrain){const r=await botApi('/api/vcastaud',{act:'char_train',char_id:+b.dataset.chtrain});if(r.error)throw new Error(r.error);toast('ส่งเข้าคิวเทรนแล้ว ⏳ เครื่อง Kaggle เริ่มเองเมื่อว่าง (ราว 20–40 นาที)');}
+    if(b.dataset.chmore){await botApi('/api/vcastaud',{act:'char_more',char_id:+b.dataset.chmore,n:8});toast('ขอภาพเพิ่ม 8 ภาพแล้ว ⏳');}
+    if(b.dataset.chname){const [id,old]=b.dataset.chname.split('|');const n=prompt('ชื่อตัวละคร (ให้ตรงกับชื่อในบท)',old);if(!n){b.disabled=false;return;}const r=await botApi('/api/vcastaud',{act:'char_rename',char_id:+id,name:n});if(r.error)throw new Error(r.error);}
+    if(b.dataset.chdel){if(!sure(b,'กดอีกครั้งเพื่อลบตัวละครและภาพทั้งหมด')){b.disabled=false;return;}const r=await botApi('/api/vcastaud',{act:'char_del',char_id:+b.dataset.chdel});if(r.error)throw new Error(r.error);toast('ลบแล้ว');AUDS=null;}
+    await botLoad();await chLoad();
   }catch(err){toast(botErr(err));b.disabled=false;}});
 document.addEventListener('change',async e=>{const c=e.target.closest('[data-luse]');if(!c)return;
-  try{await botApi('/api/vcastaud',{act:'lora_use',id:+c.dataset.luse,on:c.checked});toast(c.checked?'ใช้ LoRA นี้ในเรื่องแล้ว':'เลิกใช้แล้ว');}catch(err){toast(botErr(err));c.checked=!c.checked;}});
+  try{await botApi('/api/vcastaud',{act:'lora_use',id:+c.dataset.luse,on:c.checked});toast(c.checked?'ใช้ LoRA นี้ในอนิเมะแล้ว':'เลิกใช้แล้ว');}catch(err){toast(botErr(err));c.checked=!c.checked;}});
 
 /* ---------- แคสติ้ง (คัดนักแสดง) ---------- */
 let CCAT='char';
@@ -1401,9 +1389,8 @@ function vwSet(h,quiet){const vw=$('#vw');if(!vw)return;
   const y=window.scrollY;vw.innerHTML=h;VWH=h;vw.dataset.vwk=view;
   if(quiet){window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y));}}
 /* ---------- แถบย่อยแบบกด (ลดการเลื่อนหน้า) ---------- */
-const SV=(()=>{try{return Object.assign({studio:'city',lib:'aud',gen:'stat'},JSON.parse(localStorage.getItem('ss_sv')||'{}'));}catch(e){return {studio:'city',lib:'aud',gen:'stat'};}})();
-if(SV.lib==='cast')SV.lib='aud';
-if(SV.lib==='img')SV.lib='lora';
+const SV=(()=>{try{return Object.assign({studio:'city',lib:'lora',gen:'stat'},JSON.parse(localStorage.getItem('ss_sv')||'{}'));}catch(e){return {studio:'city',lib:'lora',gen:'stat'};}})();
+if(['cast','aud','img'].includes(SV.lib))SV.lib='lora';
 if(['world','hand','prof','mg'].includes(SV.lib))SV.lib='keep';
 if(SV.gen==='gal')SV.gen='stat';
 function segHtml(pg,items){return `<nav class="seg">${items.map(([k,ic,n])=>`<button class="${SV[pg]===k?'on':''}" data-seg="${pg}|${k}"><i>${ic}</i>${n}</button>`).join('')}</nav>`;}
@@ -1629,11 +1616,11 @@ function lockHtml(){
   if(!names.length)return '<div class="card"><h3>🔒 ล็อกหน้าตัวละคร</h3><p class="muted" style="margin:0">ยังไม่มีตัวละคร พิมพ์ชื่อด้านล่างเพื่อเพิ่ม แล้วเลือกภาพหน้าจากคลังภาพ</p></div>'+addRow;
   const done=names.filter(n=>PROF[n]&&PROF[n].lock&&PROF[n].lock.main).length;
   const head=`<div class="card"><div class="row" style="justify-content:space-between"><h3>🔒 ล็อกหน้าตัวละคร</h3><span class="muted small">ล็อกแล้ว ${done}/${names.length}</span></div>
-  <span class="muted small">แตะ "🔒 ใช้เป็นหน้าหลัก" ใต้ภาพที่หน้าตรงตามต้องการที่สุด (หน้าตรง พื้นเรียบ เห็นหน้าชัด ดีที่สุด) และเพิ่ม "＋ เสริม" ได้สูงสุด 3 ภาพ เช่น หน้าข้าง ยิ้ม ตกใจ ระบบจะใช้ภาพเหล่านี้เป็นต้นแบบให้ตัวละครหน้าเดิมทุกช็อต บันทึกอัตโนมัติ<br>⭐ ล็อกได้เฉพาะตัวละครที่กด ⭐ เก็บไว้ในห้องออดิชันแล้วเท่านั้น</span></div>`;
+  <span class="muted small">แตะ "🔒 ใช้เป็นหน้าหลัก" ใต้ภาพที่หน้าตรงตามต้องการที่สุด (หน้าตรง พื้นเรียบ เห็นหน้าชัด ดีที่สุด) และเพิ่ม "＋ เสริม" ได้สูงสุด 3 ภาพ เช่น หน้าข้าง ยิ้ม ตกใจ ระบบจะใช้ภาพเหล่านี้เป็นต้นแบบให้ตัวละครหน้าเดิมทุกช็อต บันทึกอัตโนมัติ<br>⭐ ล็อกได้เฉพาะตัวละครที่กด ⭐ เก็บไว้ในแท็บ 🧬 ตัวละคร LoRAแล้วเท่านั้น</span></div>`;
   return head+addRow+names.map(n=>{const L=(PROF[n]&&PROF[n].lock)||{},ex=L.extra||[],cs=lockCands(n);
     const ok=lockOk(n),st=L.main?`🔒 ล็อกแล้ว${ex.length?' · เสริม '+ex.length:''}`:(ok?'ยังไม่ได้ล็อก':'⭐ ต้องกดเก็บในออดิชันก่อน');
     const prev=L.main?`<img src="${esc(botU('/img/'+L.main))}" alt="${esc(n)}" style="width:100%;max-height:420px;object-fit:contain;border-radius:10px;background:#f4f1fb" loading="lazy">`:'';
-    const grid=!ok?'<p class="muted small" style="margin:6px 0 0">ตัวละครนี้ยังไม่ได้กด ⭐ เก็บในห้องออดิชัน ไปกด ⭐ เก็บ ก่อน แล้วกลับมาล็อกหน้าที่นี่</p>':cs.length?`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">${cs.map(c=>{const m=L.main===c.id,x=ex.includes(c.id);
+    const grid=!ok?'<p class="muted small" style="margin:6px 0 0">ตัวละครนี้ยังไม่ได้กด ⭐ เก็บในแท็บ 🧬 ตัวละคร LoRA ไปกด ⭐ เก็บ ก่อน แล้วกลับมาล็อกหน้าที่นี่</p>':cs.length?`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">${cs.map(c=>{const m=L.main===c.id,x=ex.includes(c.id);
       return `<div style="border:2px solid ${m?'#8b5cf6':x?'#f0b429':'#e5e0f3'};border-radius:10px;padding:4px">
       <img src="${esc(botU('/img/'+c.id))}" alt="" style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;border-radius:8px;background:#f4f1fb" loading="lazy" data-bot="view" data-src="${esc(botU('/img/'+c.id))}">
       <div class="muted small" style="margin:2px 0">${esc(c.lb)}${m?' · 🔒 หน้าหลัก':x?' · ⭐ เสริม':''}</div>
@@ -1777,26 +1764,26 @@ document.addEventListener('click',e=>{if(!e.target.closest('[data-fkgo]'))return
 /* ---------- ออดิชันตัวละคร ---------- */
 let AUDS=null,AUDT=0;
 async function audLoad(){try{AUDS=await botApi('/api/vcastaud',{act:'list'});}catch(e){AUDS=AUDS||{roles:[],cands:[],err:botErr(e)};}
-  if(view==='lib'&&(SV.lib==='aud'||SV.lib==='keep'||SV.lib==='lock')){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}
-  clearTimeout(AUDT);if(AUDS&&(AUDS.cands||[]).some(c=>c.pending)&&view==='lib'&&SV.lib==='aud')AUDT=setTimeout(audLoad,20000);}
+  if(view==='lib'&&(SV.lib==='lora'||SV.lib==='keep'||SV.lib==='lock')){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}
+  clearTimeout(AUDT);if(AUDS&&(AUDS.cands||[]).some(c=>c.pending)&&view==='lib'&&SV.lib==='lora')AUDT=setTimeout(audLoad,20000);}
 let AUDF=localStorage.getItem('ss_audf')||'all';
 function audHtml(){
   if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
-  if(!AUDS){audLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังเปิดห้องออดิชัน…</p></div>';}
+  if(!AUDS){audLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังโหลดผู้สมัคร…</p></div>';}
   const st=(BOT.s&&BOT.s.settings)||{},auto=st.auto_fill==='1';
   const roles=AUDS.roles||[],all=(AUDS.cands||[]).slice().reverse();
   const L=all.filter(c=>AUDF==='all'?true:AUDF==='kept'?+c.kept:c.role===AUDF);
   const chip=(k,t,n)=>`<button class="btn sm${AUDF===k?' main':''}" data-audf="${esc(k)}">${t}${n!=null?` <span class="dn">${n}</span>`:''}</button>`;
-  const card=c=>{const id=c.aud||c.card;return `<div style="border:2px solid ${+c.lora?'#8b5cf6':+c.kept?'#f5b301':'#ece7f8'};border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column">
+  const card=c=>{const id=c.aud||c.card;return `<div style="border:2px solid ${+c.char_id?'#8b5cf6':+c.kept?'#f5b301':'#ece7f8'};border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column">
     ${id?`<img src="${esc(botU('/img/'+id))}" alt="${esc(c.name)}" loading="lazy" data-bot="view" style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;display:block">`:`<div style="width:100%;aspect-ratio:3/4;background:#f1eef9;display:flex;align-items:center;justify-content:center"><span class="spin"></span></div>`}
     <div style="padding:6px 8px;display:flex;flex-direction:column;gap:3px;flex:1">
       <div class="row" style="justify-content:space-between;gap:4px"><b style="font-size:14px">${+c.kept?'⭐ ':''}${esc(c.name)}</b><span class="muted small">${c.age} ปี</span></div>
       <span class="small" style="color:#8C6BFF">${esc(c.role)}${c.cast_role?` · 🎬 ${esc(c.cast_role)}`:''}</span>
       <span class="muted small" style="line-height:1.3">${esc(String(c.traits).split(',').join(' · '))}</span>
       <div class="row" style="gap:4px;margin-top:auto"><button class="btn sm${+c.kept?'':' main'}" style="flex:1;padding:6px 4px" data-aud="keep|${c.id}"${c.pending?' disabled':''}>${+c.kept?'✅ เก็บแล้ว':'⭐ เก็บ'}</button><button class="btn sm" style="padding:6px 8px" data-aud="del|${c.id}">🗑</button></div>
-      <button class="btn sm${+c.lora?' main':''}" style="padding:6px 4px" data-aud="lora|${c.id}"${c.pending||!id?' disabled':''}>${+c.lora?'🧬 อยู่ในชุด LoRA ✓':'🧬 ทำ LoRA'}</button></div></div>`;};
-  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>🎭 ห้องออดิชัน</h3><button class="btn sm" data-fkgo2="1">🎨 ${esc(stCur()[1])}</button></div>
-    <span class="muted small">กด ⭐ เก็บ คนที่ชอบ แล้วไปใส่บทในแท็บ 📚 คลังของเรา · กด 🧬 ทำ LoRA ที่ภาพที่อยากใช้ฝึก แล้วไปเลือกในแท็บ 🧬 ฝึก LoRA</span>
+      <button class="btn sm${+c.char_id?'':' main'}" style="padding:6px 4px" data-aud="mk|${c.id}"${c.pending||!id||+c.char_id?' disabled':''}>${+c.char_id?'🧬 สร้างตัวละครแล้ว ✓':'🧬 สร้างตัวละครนี้'}</button></div></div>`;};
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>🎲 ผู้สมัครตัวละคร</h3><button class="btn sm" data-fkgo2="1">🎨 ${esc(stCur()[1])}</button></div>
+    <span class="muted small">กด ⭐ เก็บ คนที่ชอบ แล้วไปใส่บทในแท็บ 📚 คลังของเรา · กด 🧬 สร้างตัวละครนี้ เพื่อวาดชุดภาพแล้วฝึก LoRA (ด้านบน)</span>
     <label class="row" style="gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="autoFill"${auto?' checked':''} style="width:22px;height:22px"><span><b>♾️ เจนต่อเนื่อง</b> <span class="muted small">คิวว่างเมื่อไรเติมผู้สมัครใหม่เอง ทุก ${st.interval_min||2} นาที จนโควตาทุกบัญชีหมด</span></span></label>
     ${auto?'':`<label class="muted">ผู้สมัครใหม่ทุกวันหลัง 07:00 รวม <select id="audDaily" style="width:auto">${[4,5,6,7,8].map(x=>`<option${x===(AUDS.daily||6)?' selected':''}>${x}</option>`).join('')}</select> คน</label>`}
     ${AUDS.err?`<div class="errl">⚠️ ${esc(AUDS.err)}</div>`:''}</div>
@@ -1810,7 +1797,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-aud]
   try{b.disabled=true;
     if(a==='gen'){const r=await botApi('/api/vcastaud',{act:'gen',role:v,n:4});if(r.error)throw new Error(r.error);toast('เรียกผู้สมัครแล้ว ⏳ ภาพจะทยอยขึ้น (ราว 2 นาทีต่อภาพ)');}
     if(a==='keep'){await botApi('/api/vcastaud',{act:'keep',id:+v});}
-    if(a==='lora'){await botApi('/api/vcastaud',{act:'lora_mark',id:+v});LORA=null;}
+    if(a==='mk'){const r=await botApi('/api/vcastaud',{act:'char_make',id:+v});if(r.error)throw new Error(r.error);toast('กำลังวาดชุดภาพ 12 ภาพของตัวละครนี้ ⏳');await botLoad();await chLoad();}
     if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ')){b.disabled=false;return;}await botApi('/api/vcastaud',{act:'del',id:+v});}
     await audLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
 
@@ -1866,13 +1853,13 @@ function keepHtml(){
   if(!AUDS)audLoad();
   const S=BOT.s||{images:[]},st=STCUR,A=(STY.assets||[]).filter(a=>a.story===st),used=new Set(A.map(a=>+a.image_id));
   const roles=(AUDS&&AUDS.roles)||[],kept=((AUDS&&AUDS.cands)||[]).filter(c=>+c.kept),thumb=(id,h)=>id?`<img src="${esc(botU('/img/'+id))}" alt="" loading="lazy" data-bot="view" style="width:100%;height:${h||150}px;object-fit:cover;object-position:top;border-radius:8px">`:'<div style="height:120px;border-radius:8px;background:#f1eef9"></div>';
-  const head=`<div class="card"><h3>📚 คลังของเรา</h3><span class="muted small">เก็บของที่ชอบไว้ก่อน (เก็บนักแสดงในห้องออดิชัน หรือกด ⭐ ที่ภาพ) แล้วค่อยหยิบมาใส่แต่ละเรื่อง ของชิ้นเดียวใช้ได้หลายเรื่อง</span>
+  const head=`<div class="card"><h3>📚 คลังของเรา</h3><span class="muted small">เก็บของที่ชอบไว้ก่อน (เก็บนักแสดงในแท็บ 🧬 ตัวละคร LoRA หรือกด ⭐ ที่ภาพ) แล้วค่อยหยิบมาใส่แต่ละเรื่อง ของชิ้นเดียวใช้ได้หลายเรื่อง</span>
    <div class="row" style="margin-top:6px"><label class="muted">เรื่อง <select id="stSel" style="width:auto">${STY.stories.map(x=>`<option${x===st?' selected':''}>${esc(x)}</option>`).join('')}</select></label><button class="btn sm" data-keep="newstory|0">➕ เรื่องใหม่</button></div>${STY.err?`<div class="errl">⚠️ ${esc(STY.err)}</div>`:''}</div>`;
   // นักแสดงในเรื่องนี้
   const castRows=roles.map(R=>{const c=kept.find(x=>x.cast_role===R.key&&x.cast_story===st);
     return `<div class="arow"><div class="row" style="justify-content:space-between"><b>${esc(R.key)}</b><span class="muted small">${esc(R.role)}</span></div>${c?`<div class="row" style="gap:8px;align-items:center"><div style="width:70px">${thumb(c.aud||c.card,90)}</div><span>🎭 ${esc(c.name)}</span><button class="btn sm" data-keep="unassign|${c.id}">เอาออก</button></div>`:`<span class="muted small">ยังไม่มีนักแสดง</span>`}
       ${kept.length?`<div class="row"><select class="kRole" data-role="${esc(R.key)}" style="width:auto;max-width:60%"><option value="">เลือกนักแสดงจากคลัง…</option>${kept.map(k=>`<option value="${k.id}">${esc(k.name)}${k.cast_role?` (บท ${esc(k.cast_role)})`:''}</option>`).join('')}</select><button class="btn sm main" data-keep="assign|${esc(R.key)}">ใส่บท</button></div>`:''}</div>`;}).join('');
-  const castSec=det('kp|cast',`🎬 นักแสดงในเรื่องนี้ <span class="dn">${kept.filter(c=>c.cast_story===st).length}/${roles.length}</span>`,castRows+(kept.length?'':'<p class="muted small">ยังไม่มีนักแสดงในคลัง ไปกด ⭐ เก็บเข้าคลัง ในห้องออดิชันก่อน</p>'),true);
+  const castSec=det('kp|cast',`🎬 นักแสดงในเรื่องนี้ <span class="dn">${kept.filter(c=>c.cast_story===st).length}/${roles.length}</span>`,castRows+(kept.length?'':'<p class="muted small">ยังไม่มีนักแสดงในคลัง ไปกด ⭐ เก็บเข้าคลัง ในแท็บ 🧬 ตัวละคร LoRAก่อน</p>'),true);
   const actorSec=det('kp|actors',`🎭 นักแสดงในคลัง <span class="dn">${kept.length}</span>`,kept.length?`<div class="wgrid">${kept.map(c=>`<div class="witem">${thumb(c.aud||c.card)}<b>${esc(c.name)}</b><span class="muted small">อายุ ${c.age}${c.cast_role?` · บท ${esc(c.cast_role)}`:''}</span><button class="btn sm" data-aud="keep|${c.id}">เอาออกจากคลัง</button></div>`).join('')}</div>`:'<p class="muted small">ยังไม่มี</p>');
   // ของที่ติดดาว แยกหมวด
   const starred=(S.images||[]).filter(i=>+i.starred&&imgCat(i.project)),cats={};
