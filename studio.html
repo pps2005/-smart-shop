@@ -971,106 +971,61 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-idea
       ideaClose();renderIdeas();return toast('ลบแล้ว');}
   }catch(err){toast(String(err.message||err));}});
 
-/* ================= คลัง (หน้าโหลดแบบเกม) =================
-   ของในคลัง = โปรเจกต์ในบอทที่ชื่อขึ้นต้นด้วย "คลัง·<หมวด>·<ชื่อ>" → ไม่ต้องมีตารางใหม่
-   หมวดที่ต้องล็อกหน้า (ตัวละคร/ตู้เสื้อผ้า) แสดงเป็นช่องล็อกไว้ก่อน จนกว่าระบบล็อกหน้าบน Kaggle จะพร้อม */
-const LSTYLE='soft anime style, clean detailed background art, cinematic lighting, vertical 9:16';
-const LIB=[
- {k:'char',n:'ตัวละคร',ic:'🧑‍🎤',lock:'รอระบบล็อกหน้า',items:[['นางเอก (ลุคหลัก)'],['นางเอก · หน้าใกล้ หลายมุม']]},
- {k:'look',n:'ตู้เสื้อผ้า',ic:'👗',lock:'รอระบบล็อกหน้า',items:[['ผมบ็อบเดิม'],['ผมหางม้า'],['ผมมัดครึ่งหัว'],['ผมเปียข้าง'],['ผมดังโงะ'],['ผมยาว (ย้อนอดีต)'],['ชุดอยู่บ้าน'],['ชุดนอน'],['ชุดทำงาน'],['เดรสไปเที่ยว'],['ชุดกีฬา'],['ชุดกันหนาว'],['ยูกาตะ'],['แว่นกรอบกลม'],['สร้อยคอจี้'],['ต่างหูมุก'],['กิ๊บติดผม'],['หมวกไหมพรม']]},
- {k:'pet',n:'สัตว์เลี้ยง',ic:'🐾',items:[
-  ['แมวส้มขนฟู','a chubby fluffy orange tabby cat with big round eyes, sitting and looking at the camera, full body, plain soft background, cute anime character design, '+LSTYLE],
-  ['แมวขาวตาสองสี','an elegant white cat with one blue eye and one gold eye, full body, plain soft background, cute anime character design, '+LSTYLE],
-  ['หมาชิบะ','a smiling shiba inu dog with a red collar, full body, plain soft background, cute anime character design, '+LSTYLE],
-  ['กระต่ายหูตก','a small cream lop-eared rabbit, full body, plain soft background, cute anime character design, '+LSTYLE],
-  ['แฮมสเตอร์','a round golden hamster holding a sunflower seed, full body, plain soft background, cute anime character design, '+LSTYLE],
-  ['นกแก้วเขียว','a small green parakeet with a yellow face perched on a branch, full body, plain soft background, cute anime character design, '+LSTYLE]]},
- {k:'place',n:'ฉาก',ic:'🏙️',items:[
-  ['ห้องนอนนางเอก · กลางวัน','a cozy small apartment bedroom with a bed by the window, bookshelf, plants and warm wooden furniture, morning sunlight, no people, '+LSTYLE],
-  ['ห้องนอนนางเอก · กลางคืน','a cozy small apartment bedroom with a bed by the window, bookshelf, plants and warm wooden furniture, night with a warm desk lamp and city lights outside, no people, '+LSTYLE],
-  ['ห้องนั่งเล่น','a cozy apartment living room with a gray sofa, coffee table, rug and big window, afternoon light, no people, '+LSTYLE],
-  ['ครัว','a small bright apartment kitchen with hanging pans, a kettle and plants on the windowsill, morning light, no people, '+LSTYLE],
-  ['ร้านกาแฟ','a warm indie coffee shop interior with wooden tables, hanging lights and a counter with pastries, no people, '+LSTYLE],
-  ['ออฟฟิศ','a modern open office with desks, monitors and large windows over the city, daytime, no people, '+LSTYLE],
-  ['สวนสาธารณะ','a city park with a walking path, benches, big trees and a pond, sunny day, no people, '+LSTYLE],
-  ['ถนนยามค่ำ','a narrow city street at night with neon signs, small shops and wet asphalt reflections, no people, '+LSTYLE],
-  ['ชายหาด','a quiet tropical beach with gentle waves and palm trees at golden sunset, no people, '+LSTYLE],
-  ['มหาวิทยาลัย','a university campus courtyard with brick buildings, trees and students benches, daytime, no people, '+LSTYLE],
-  ['รถไฟฟ้า','the interior of a modern skytrain carriage with blue seats and windows showing the city, daytime, no people, '+LSTYLE]]},
- {k:'prop',n:'ของประกอบ',ic:'🎒',items:[
-  ['แก้วกาแฟนางเอก','a cute white ceramic mug with a small cat doodle, steaming coffee, on a wooden table, '+LSTYLE],
-  ['จักรยานแม่บ้าน','a pastel mint city bicycle with a front basket, parked by a wall, '+LSTYLE],
-  ['ร่มใส','a clear umbrella with raindrops, leaning against a wall, '+LSTYLE]]}];
-const LP=(c,n)=>`คลัง·${c}·${n}`;
-/* ของที่บอทสร้างให้เองทุกวัน (หมวดละ 1 ชิ้น ยกเว้นตัวละคร) โผล่ในคลังอัตโนมัติจากชื่อโปรเจกต์ */
-const LDYN={'อาวุธ':'⚔️','พลังอาคม':'🔮','ของวิเศษ':'🗝️','โลกและจักรวาล':'🌌','ฉาก':'🏙️','สัตว์และอสูร':'🐉','ของประกอบ':'🎒','ชุด':'👘','องค์ประกอบฉาก':'🏮','เอฟเฟกต์':'✨'};
-function libAll(){const S=BOT.s||{images:[],jobs:[]},L=LIB.map(c=>({...c,items:[...c.items]}));
-  const ps=new Set([...S.images,...S.jobs].map(x=>String(x.project)).filter(p=>p.startsWith('คลัง·')));
-  ps.forEach(p=>{const [,cat,...rest]=p.split('·'),nm=rest.join('·');if(!cat||!nm)return;
-    let c=L.find(x=>x.n===cat);if(!c){c={k:'d'+cat,n:cat,ic:LDYN[cat]||'📦',items:[]};L.push(c);}
-    if(!c.items.some(i=>i[0]===nm))c.items.unshift([nm]);});
-  return L;}
-function libPrompt(p){const S=BOT.s||{images:[],jobs:[]};const x=[...S.images,...S.jobs].find(i=>i.project===p&&i.prompt);return x?x.prompt:'';}
-const TIPS=['ทิป: ภาพต้นแบบหน้าตรงพื้นเรียบ ช่วยให้ AI จำตัวละครได้แม่นที่สุด','ทิป: 1 ตอนใช้ทรงผมเดียว หน้านางเอกจะนิ่งทุกช็อต','ทิป: ฉากเดียวกันใช้ภาพเดียวกันทุกตอน คนดูจะรู้สึกว่าเป็นโลกเดียวกัน','ทิป: ตัวละครไม่เกิน 2–3 คนต่อช็อต ภาพจะไม่ตีกัน','ทิป: กด ⭐ ที่ภาพที่ชอบ ภาพนั้นจะเป็นภาพทางการของรายการ','ทิป: สัตว์เลี้ยงที่ใช้ซ้ำหลายตอน ตั้งเป็นตัวละครได้'];
+/* ================= คลัง: แท็บคลังของเรา · ล็อกหน้า · ออดิชัน · ฝึก LoRA · เสียง ================= */
 let LIBT=0;
-function libStat(){const S=BOT.s||{images:[],jobs:[]},out={};
-  libAll().forEach(c=>c.items.forEach(([n])=>{const p=LP(c.n,n);const im=S.images.filter(i=>i.project===p),j=S.jobs.filter(x=>x.project===p);
-    out[p]={im,q:j.filter(x=>x.status==='queued').length,run:j.some(x=>x.status==='running'),fail:j.filter(x=>x.status==='failed').length};}));return out;}
 function renderLib(quiet){
   if(quiet&&[...document.querySelectorAll('#vw audio')].some(a=>!a.paused)){clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);return;}
-  if(quiet&&document.activeElement&&document.activeElement.id==='audTxt')return;
+  if(quiet&&document.activeElement&&(document.activeElement.id==='audTxt'||document.activeElement.id==='loraName'))return;
   if(!botCfg().url){$('#vw').innerHTML=`<div class="card"><h2>คลัง</h2><p class="muted" style="margin:0">เชื่อมบอทเจนภาพก่อน (แท็บเจนภาพ)</p></div>`;return;}
-  if(!BOT.s){$('#vw').innerHTML=`<div class="card lload"><div class="lbig">กำลังโหลดคลัง…</div><div class="lbar"><i style="width:30%"></i></div></div>`;botLoad();return;}
-  const st=libStat(),S=BOT.s,s=S.settings||{};
-  const libJobs=S.jobs.filter(j=>String(j.project).startsWith('คลัง·'));
-  const allQ=S.jobs.filter(j=>j.status!=='failed'),myQ=libJobs.filter(j=>j.status!=='failed');
-  const run=libJobs.find(j=>j.status==='running')||myQ[0];
-  const total=Object.values(st).reduce((a,x)=>a+x.im.length,0)+myQ.length,done=Object.values(st).reduce((a,x)=>a+x.im.length,0);
-  const pct=total?Math.round(done/total*100):100;
-  const ahead=run?allQ.findIndex(j=>j.id===run.id):0,eta=Math.round((myQ.length+Math.max(0,ahead))*(+s.interval_min||2));
-  const paused=S.now<+s.paused_until;
-  const cur=run?String(run.project).split('·'):null;
-  const last=[...S.images].filter(i=>String(i.project).startsWith('คลัง·')).sort((a,b)=>b.created-a.created)[0];
-  const tip=TIPS[Math.floor(Date.now()/8000)%TIPS.length];
-  const hero=`<div class="card lload">${last?`<div class="lprev"><img src="${esc(botU('/img/'+last.id))}" alt=""><span>ล่าสุด: ${esc(String(last.project).split('·').slice(1).join(' · '))}</span></div>`:''}
-    <div class="lbig">${paused?'⏸ พักเครื่อง (โควตาวันนี้หมด) ทำต่อ '+tTH(s.paused_until):cur?`✨ กำลังสร้าง: ${esc(cur[1])} · ${esc(cur[2])}`:total?'✅ สร้างครบแล้ว':'คลังยังว่าง'}</div>
-    <div class="lbar"><i style="width:${pct}%"></i></div>
-    <div class="row" style="justify-content:space-between"><span class="muted small">${done}/${total} ภาพ · ${pct}%</span><span class="muted small">${myQ.length?`เหลือประมาณ ${eta} นาที${ahead>0?` (มีงานอื่นรอก่อน ${ahead})`:''}`:''}</span></div>
-    <div class="ltip">${esc(tip)}</div>
-    <div class="row"><button class="btn sm main" data-lib="starter">✨ สร้างคลังเริ่มต้น (สัตว์เลี้ยง · ฉาก · ของประกอบ)</button></div>
-    <div class="report">📦 ทุกวันหลัง 07:00 บอทสร้างของใหม่ให้เองหมวดละ 1 ชิ้น: ฉาก · สัตว์และอสูร · ของประกอบ · ชุด · องค์ประกอบฉาก (ยกเว้นตัวละคร) ครบแล้ววนรอบใหม่
-      <div class="row" style="margin-top:6px"><button class="btn sm" data-lib="dailynow">สร้างชุดวันนี้เพิ่มตอนนี้</button><button class="btn sm" data-lib="dailyset" data-on="${s.lib_on==='0'?1:0}">${s.lib_on==='0'?'▶️ เปิดสร้างอัตโนมัติ':'⏸ ปิดสร้างอัตโนมัติ'}</button></div></div></div>`;
-  const LA=libAll(),cats=[...LA.filter(c=>!c.lock),...LA.filter(c=>c.lock)].map(c=>{const items=c.items.map(([n,pr])=>{const p=LP(c.n,n),x=st[p];
-      const best=x.im.find(i=>i.starred)||x.im[0];
-      const state=c.lock?'lock':best?'done':x.run?'run':x.q?'q':'none';
-      const badge={lock:'🔒 '+c.lock,done:`✓ ${x.im.length} ภาพ${x.im.some(i=>i.starred)?' · ⭐':''}`,run:'✨ กำลังสร้าง',q:'⏳ รอคิว',none:'แตะเพื่อสร้าง'}[state];
-      return `<button class="lcard ${state}" data-libitem="${esc(c.k)}|${esc(n)}"><div class="lthumb">${best?`<img loading="lazy" src="${esc(botU('/img/'+best.id))}" alt="">`:`<i>${c.ic}</i>`}${state==='run'||state==='q'?'<b class="shim"></b>':''}</div><span class="lname">${esc(n)}</span><span class="lbadge">${badge}</span></button>`;}).join('');
-    const n=c.items.length,d=c.items.filter(([nm])=>st[LP(c.n,nm)].im.length).length;
-    return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${c.ic} ${c.n}</h3><span class="muted small">${c.lock?'🔒 '+c.lock:`${d}/${n}`}</span></div>
-      ${c.lock?'':`<div class="lbar thin"><i style="width:${n?Math.round(d/n*100):0}%"></i></div>`}<div class="lgrid${c.lock?' small':''}">${items}</div></div>`;}).join('');
-  const lv2=SV.lib;vwSet(segHtml('lib',[['keep','📚','คลังของเรา'],['lock','🔒','ล็อกหน้า'],['aud','🎭','ออดิชัน'],['img','🖼️','ภาพ'],['snd','🔊','เสียง']])+(lv2==='keep'?keepHtml():lv2==='lock'?lockHtml():lv2==='aud'?audHtml():lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():hero+cats),quiet);
+  if(!BOT.s){$('#vw').innerHTML=`<div class="card"><p class="muted" style="margin:0">กำลังโหลด…</p></div>`;botLoad();return;}
+  const lv2=SV.lib;vwSet(segHtml('lib',[['keep','📚','คลังของเรา'],['lock','🔒','ล็อกหน้า'],['aud','🎭','ออดิชัน'],['lora','🧬','ฝึก LoRA'],['snd','🔊','เสียง']])+(lv2==='keep'?keepHtml():lv2==='lock'?lockHtml():lv2==='aud'?audHtml():lv2==='mg'?mangaHtml():lv2==='prof'?profHtml():lv2==='hand'?handHtml():lv2==='world'?worldHtml():lv2==='cast'?(castHtml()||'<div class="card"><p class="muted" style="margin:0">กำลังโหลดแคสติ้ง…</p></div>'):lv2==='snd'?audioHtml():loraHtml()),quiet);
   clearTimeout(LIBT);LIBT=setTimeout(()=>{if(view==='lib')renderLib(true);},8000);}
-async function libEnqueue(list,label){let n=0;
-  for(const [c,name,pr] of list){await botApi('/api/enqueue',{project:LP(c,name),items:[{scene:1,prompt:pr}],variants:2,raw:true});n+=2;}
-  toast(`ส่ง${label}เข้าคิวแล้ว ${n} ภาพ`);await botLoad();renderLib();}
-function libOpen(ck,name){const c=libAll().find(x=>x.k===ck);if(!c)return;const p=LP(c.n,name),it=c.items.find(i=>i[0]===name);
-  if(c.lock)return toast('หมวดนี้ต้องรอระบบล็อกหน้าให้เสร็จก่อน จะได้หน้าเหมือนนางเอกทุกลุค');
-  const x=libStat()[p];
-  if(!x.im.length&&!x.q&&!x.run&&(it[1]||libPrompt(p)))return libEnqueue([[c.n,name,it[1]||libPrompt(p)]],name+' ');
-  let v=$('#iview');if(!v){v=document.createElement('div');v.id='iview';document.body.appendChild(v);}
-  v.innerHTML=`<div class="iv" style="align-content:start;place-items:stretch"><div class="sec"><h3>${c.ic} ${esc(name)}</h3><span class="muted small">กด ⭐ ที่ภาพที่ชอบ = ภาพทางการ · 🔁 เจนเพิ่ม</span>${x.im.length?`<div class="bgrid">${x.im.map(i=>botCard(i)).join('')}</div>`:'<p class="muted">กำลังสร้าง… รอสักครู่</p>'}</div></div>
-    <div class="ib2"><div class="row"><button class="btn sm" data-libmore="${esc(ck)}|${esc(name)}">เจนเพิ่ม 2 แบบ</button><span class="grow"></span><button class="btn sm main" data-iclose>ปิด</button></div></div>`;v.hidden=false;}
-document.addEventListener('click',async e=>{const b=e.target.closest('[data-lib],[data-libitem],[data-libmore]');if(!b)return;
-  try{
-    if(b.dataset.lib==='starter'){if(!sure(b,'กดอีกครั้งเพื่อเริ่มสร้าง (ประมาณ 40 ภาพ)'))return;b.disabled=true;
-      const L=[];LIB.filter(c=>!c.lock).forEach(c=>c.items.forEach(([n,pr])=>{const x=libStat()[LP(c.n,n)];if(!x.im.length&&!x.q&&!x.run)L.push([c.n,n,pr]);}));
-      if(!L.length)return toast('สร้างครบทุกรายการแล้ว');return await libEnqueue(L,'คลังเริ่มต้น');}
-    if(b.dataset.libitem){const [ck,n]=b.dataset.libitem.split('|');return libOpen(ck,n);}
-    if(b.dataset.lib==='dailynow'){if(!sure(b,'กดอีกครั้งเพื่อสร้างชุดใหม่ (6 ชิ้น · 12 ภาพ)'))return;b.disabled=true;const r=await botApi('/api/vcastlib',{});toast(r.made?'ส่งเข้าคิวแล้ว: '+r.made.join(' · '):'ยังสร้างไม่ได้');await botLoad();return renderLib();}
-    if(b.dataset.lib==='dailyset'){await botApi('/api/vcastlibset',{on:b.dataset.on==='1'});toast(b.dataset.on==='1'?'เปิดสร้างอัตโนมัติแล้ว':'ปิดสร้างอัตโนมัติแล้ว');await botLoad();return renderLib();}
-    if(b.dataset.libmore){const [ck,n]=b.dataset.libmore.split('|');const c=libAll().find(x=>x.k===ck),it=c.items.find(i=>i[0]===n),pr=it[1]||libPrompt(LP(c.n,n));if(!pr)return toast('หาคำสั่งภาพเดิมไม่เจอ');await libEnqueue([[c.n,n,pr]],n+' ');const v=$('#iview');if(v){v.innerHTML='';v.hidden=true;}}
-  }catch(err){toast(botErr(err));}});
 
+/* ---------- 🧬 ฝึก LoRA: ใช้ภาพที่กด "🧬 ทำ LoRA" ในห้องออดิชัน ---------- */
+let LORA=null,LORAT=0,LORASEL=new Set(),LORAN='';
+async function loraLoad(){try{LORA=await botApi('/api/vcastaud',{act:'lora_list'});}catch(e){LORA=LORA||{marked:[],loras:[],err:botErr(e)};}
+  if(LORA.marked){const ok=new Set(LORA.marked.map(x=>+x.id));LORASEL=new Set([...LORASEL].filter(x=>ok.has(x)));}
+  if(view==='lib'&&SV.lib==='lora'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}
+  clearTimeout(LORAT);if(LORA&&(LORA.loras||[]).some(l=>l.lora&&(l.lora.status==='queued'||l.lora.status==='training'))&&view==='lib'&&SV.lib==='lora')LORAT=setTimeout(loraLoad,20000);}
+function loraHtml(){
+  if(!LORA){loraLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังเปิดหน้าฝึก LoRA…</p></div>';}
+  const M=LORA.marked||[],Ls=LORA.loras||[],n=LORASEL.size,ST={queued:'⏳ รอเทรน (เริ่มเองเมื่อ Kaggle ว่าง)',training:'🔧 กำลังเทรน',ready:'✅ พร้อมใช้',failed:'⚠️ เทรนพัง'};
+  const th=c=>`<div style="position:relative;border:3px solid ${LORASEL.has(+c.id)?'#8b5cf6':'transparent'};border-radius:12px;overflow:hidden;background:#fff">
+    <img src="${esc(botU('/img/'+c.img))}" alt="${esc(c.name)}" loading="lazy" data-lsel="${c.id}" style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;display:block;cursor:pointer">
+    ${LORASEL.has(+c.id)?'<span style="position:absolute;top:4px;left:4px;background:#8b5cf6;color:#fff;border-radius:999px;padding:0 7px;font-size:13px">✓</span>':''}
+    <button class="btn sm" data-lrm="${c.id}" aria-label="เอาออกจากชุด" style="position:absolute;top:4px;right:4px;padding:2px 7px">✖</button>
+    <div class="small" style="padding:3px 6px">${esc(c.name)} <span class="muted">· ${esc(c.role)}</span></div></div>`;
+  const mine=Ls.map(l=>{const L=l.lora;return `<div class="arow"><div class="row" style="justify-content:space-between"><b>🧬 ${esc(l.name)}</b><span class="small">${L?(ST[L.status]||esc(L.status)):'—'}${L&&L.size?' · '+Math.round(L.size/1048576)+' MB':''}${L&&L.n?' · '+L.n+' ภาพ':''}</span></div>
+    <span class="muted small">คำเรียก (trigger): <code>${esc(l.trigger)}</code> · ตั้งชื่อตัวละครในบทให้ตรงกับ "${esc(l.name)}" ระบบจะใช้ LoRA นี้เองตอนสร้างภาพคีย์</span>
+    ${L&&L.error?`<div class="errl">⚠️ ${esc(L.error)}</div>`:''}
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:4px">
+      ${L&&L.status==='ready'?`<label class="row" style="gap:6px;align-items:center"><input type="checkbox" data-luse="${L.id}"${+L.use?' checked':''} style="width:20px;height:20px">ใช้ในเรื่อง</label>`:''}
+      ${L&&(L.status==='ready'||L.status==='failed')?`<button class="btn sm" data-lre="${esc(l.name)}">🔁 ฝึกใหม่ (ใช้ภาพที่เลือกตอนนี้)</button>`:''}
+      ${L&&L.status==='queued'||L&&L.status==='training'?'':`<button class="btn sm" data-ldel="${l.id}">🗑 ลบ</button>`}</div></div>`;}).join('');
+  return `<div class="card"><h3>🧬 ฝึก LoRA</h3><span class="muted small">กด "🧬 ทำ LoRA" ใต้ภาพในห้อง 🎭 ออดิชัน ภาพจะมาอยู่ที่นี่ แตะภาพเพื่อเลือกเข้าชุดเทรน (ต้อง 8–24 ภาพ) · ฝึกบน Kaggle ใช้เวลาราว 20–40 นาที</span>
+    ${LORA.err?`<div class="errl">⚠️ ${esc(LORA.err)}</div>`:''}
+    <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sm" data-lall="1">เลือกทั้งหมด</button><button class="btn sm" data-lall="0">ล้างที่เลือก</button><span class="muted small">เลือกแล้ว <b>${n}</b>/24</span></div>
+    ${M.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:8px">${M.map(th).join('')}</div>`:'<p class="muted small" style="margin:10px 0 0">ยังไม่มีภาพ ไปที่ห้อง 🎭 ออดิชัน แล้วกด 🧬 ทำ LoRA ที่ภาพที่ต้องการ</p>'}
+    <div class="row" style="gap:6px;margin-top:10px"><input id="loraName" placeholder="ชื่อ LoRA (เช่น อายะ)" value="${esc(LORAN)}" maxlength="40" style="flex:1"><button class="btn main" data-ltrain="1"${n<8?' disabled':''}>🧬 เริ่มฝึก</button></div>
+    ${n<8?`<span class="muted small">ต้องเลือกอีก ${8-n} ภาพ</span>`:''}</div>
+  ${Ls.length?`<div class="card"><h3>🧬 LoRA ของเรา</h3>${mine}</div>`:''}`;}
+document.addEventListener('input',e=>{if(e.target.id==='loraName')LORAN=e.target.value;});
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-lsel],[data-lrm],[data-lall],[data-ltrain],[data-lre],[data-ldel]');if(!b)return;
+  const re=()=>{const y=window.scrollY;renderLib(true);window.scrollTo(0,y);};
+  try{
+    if(b.dataset.lsel){const id=+b.dataset.lsel;if(LORASEL.has(id))LORASEL.delete(id);else{if(LORASEL.size>=24)return toast('เลือกได้ไม่เกิน 24 ภาพ');LORASEL.add(id);}return re();}
+    if(b.dataset.lall!==undefined){LORASEL=b.dataset.lall==='1'?new Set(((LORA&&LORA.marked)||[]).slice(0,24).map(x=>+x.id)):new Set();return re();}
+    if(b.dataset.lrm){b.disabled=true;LORASEL.delete(+b.dataset.lrm);await botApi('/api/vcastaud',{act:'lora_mark',id:+b.dataset.lrm});await loraLoad();AUDS=null;return;}
+    if(b.dataset.ltrain||b.dataset.lre){
+      const nm=(b.dataset.lre||LORAN||'').trim();if(!nm)return toast('ตั้งชื่อ LoRA ก่อน');
+      if(LORASEL.size<8)return toast('เลือกภาพอย่างน้อย 8 ภาพ');
+      if(b.dataset.lre&&!sure(b,'กดอีกครั้งเพื่อฝึกใหม่ (LoRA เดิมจะถูกแทนที่)'))return;
+      b.disabled=true;const r=await botApi('/api/vcastaud',{act:'lora_train',name:nm,ids:[...LORASEL]});if(r.error)throw new Error(r.error);
+      toast('ส่งเข้าคิวเทรนแล้ว ⏳ เครื่อง Kaggle จะเริ่มเองเมื่อว่าง');LORAN='';await loraLoad();return;}
+    if(b.dataset.ldel){if(!sure(b,'กดอีกครั้งเพื่อลบ LoRA'))return;b.disabled=true;const r=await botApi('/api/vcastaud',{act:'lora_del',char_id:+b.dataset.ldel});if(r.error)throw new Error(r.error);toast('ลบแล้ว');await loraLoad();return;}
+  }catch(err){toast(botErr(err));b.disabled=false;}});
+document.addEventListener('change',async e=>{const c=e.target.closest('[data-luse]');if(!c)return;
+  try{await botApi('/api/vcastaud',{act:'lora_use',id:+c.dataset.luse,on:c.checked});toast(c.checked?'ใช้ LoRA นี้ในเรื่องแล้ว':'เลิกใช้แล้ว');}catch(err){toast(botErr(err));c.checked=!c.checked;}});
 
 /* ---------- แคสติ้ง (คัดนักแสดง) ---------- */
 let CCAT='char';
@@ -1448,6 +1403,7 @@ function vwSet(h,quiet){const vw=$('#vw');if(!vw)return;
 /* ---------- แถบย่อยแบบกด (ลดการเลื่อนหน้า) ---------- */
 const SV=(()=>{try{return Object.assign({studio:'city',lib:'aud',gen:'stat'},JSON.parse(localStorage.getItem('ss_sv')||'{}'));}catch(e){return {studio:'city',lib:'aud',gen:'stat'};}})();
 if(SV.lib==='cast')SV.lib='aud';
+if(SV.lib==='img')SV.lib='lora';
 if(['world','hand','prof','mg'].includes(SV.lib))SV.lib='keep';
 if(SV.gen==='gal')SV.gen='stat';
 function segHtml(pg,items){return `<nav class="seg">${items.map(([k,ic,n])=>`<button class="${SV[pg]===k?'on':''}" data-seg="${pg}|${k}"><i>${ic}</i>${n}</button>`).join('')}</nav>`;}
@@ -1831,16 +1787,17 @@ function audHtml(){
   const roles=AUDS.roles||[],all=(AUDS.cands||[]).slice().reverse();
   const L=all.filter(c=>AUDF==='all'?true:AUDF==='kept'?+c.kept:c.role===AUDF);
   const chip=(k,t,n)=>`<button class="btn sm${AUDF===k?' main':''}" data-audf="${esc(k)}">${t}${n!=null?` <span class="dn">${n}</span>`:''}</button>`;
-  const card=c=>{const id=c.aud||c.card;return `<div style="border:2px solid ${+c.kept?'#f5b301':'#ece7f8'};border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column">
+  const card=c=>{const id=c.aud||c.card;return `<div style="border:2px solid ${+c.lora?'#8b5cf6':+c.kept?'#f5b301':'#ece7f8'};border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column">
     ${id?`<img src="${esc(botU('/img/'+id))}" alt="${esc(c.name)}" loading="lazy" data-bot="view" style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;display:block">`:`<div style="width:100%;aspect-ratio:3/4;background:#f1eef9;display:flex;align-items:center;justify-content:center"><span class="spin"></span></div>`}
     <div style="padding:6px 8px;display:flex;flex-direction:column;gap:3px;flex:1">
       <div class="row" style="justify-content:space-between;gap:4px"><b style="font-size:14px">${+c.kept?'⭐ ':''}${esc(c.name)}</b><span class="muted small">${c.age} ปี</span></div>
       <span class="small" style="color:#8C6BFF">${esc(c.role)}${c.cast_role?` · 🎬 ${esc(c.cast_role)}`:''}</span>
       <span class="muted small" style="line-height:1.3">${esc(String(c.traits).split(',').join(' · '))}</span>
-      <div class="row" style="gap:4px;margin-top:auto"><button class="btn sm${+c.kept?'':' main'}" style="flex:1;padding:6px 4px" data-aud="keep|${c.id}"${c.pending?' disabled':''}>${+c.kept?'✅ เก็บแล้ว':'⭐ เก็บ'}</button><button class="btn sm" style="padding:6px 8px" data-aud="del|${c.id}">🗑</button></div></div></div>`;};
+      <div class="row" style="gap:4px;margin-top:auto"><button class="btn sm${+c.kept?'':' main'}" style="flex:1;padding:6px 4px" data-aud="keep|${c.id}"${c.pending?' disabled':''}>${+c.kept?'✅ เก็บแล้ว':'⭐ เก็บ'}</button><button class="btn sm" style="padding:6px 8px" data-aud="del|${c.id}">🗑</button></div>
+      <button class="btn sm${+c.lora?' main':''}" style="padding:6px 4px" data-aud="lora|${c.id}"${c.pending||!id?' disabled':''}>${+c.lora?'🧬 อยู่ในชุด LoRA ✓':'🧬 ทำ LoRA'}</button></div></div>`;};
   return `<div class="card"><div class="row" style="justify-content:space-between"><h3>🎭 ห้องออดิชัน</h3><button class="btn sm" data-fkgo2="1">🎨 ${esc(stCur()[1])}</button></div>
-    <span class="muted small">กด ⭐ เก็บ คนที่ชอบ แล้วไปใส่บทในแท็บ 📚 คลังของเรา</span>
-    <label class="row" style="gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="autoFill"${auto?' checked':''} style="width:22px;height:22px"><span><b>♾️ เจนต่อเนื่อง</b> <span class="muted small">คิวว่างเมื่อไรเติมเอง สลับผู้สมัคร 1 คนกับของในคลัง 1 ชิ้น ทุก ${st.interval_min||2} นาที จนโควตาทุกบัญชีหมด</span></span></label>
+    <span class="muted small">กด ⭐ เก็บ คนที่ชอบ แล้วไปใส่บทในแท็บ 📚 คลังของเรา · กด 🧬 ทำ LoRA ที่ภาพที่อยากใช้ฝึก แล้วไปเลือกในแท็บ 🧬 ฝึก LoRA</span>
+    <label class="row" style="gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="autoFill"${auto?' checked':''} style="width:22px;height:22px"><span><b>♾️ เจนต่อเนื่อง</b> <span class="muted small">คิวว่างเมื่อไรเติมผู้สมัครใหม่เอง ทุก ${st.interval_min||2} นาที จนโควตาทุกบัญชีหมด</span></span></label>
     ${auto?'':`<label class="muted">ผู้สมัครใหม่ทุกวันหลัง 07:00 รวม <select id="audDaily" style="width:auto">${[4,5,6,7,8].map(x=>`<option${x===(AUDS.daily||6)?' selected':''}>${x}</option>`).join('')}</select> คน</label>`}
     ${AUDS.err?`<div class="errl">⚠️ ${esc(AUDS.err)}</div>`:''}</div>
   <div class="card"><div class="row" style="flex-wrap:wrap;gap:6px">${chip('all','ทั้งหมด',all.length)}${chip('kept','⭐ เก็บแล้ว',all.filter(c=>+c.kept).length)}${roles.map(R=>chip(R.key,esc(R.key),all.filter(c=>c.role===R.key).length)).join('')}</div>
@@ -1853,6 +1810,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-aud]
   try{b.disabled=true;
     if(a==='gen'){const r=await botApi('/api/vcastaud',{act:'gen',role:v,n:4});if(r.error)throw new Error(r.error);toast('เรียกผู้สมัครแล้ว ⏳ ภาพจะทยอยขึ้น (ราว 2 นาทีต่อภาพ)');}
     if(a==='keep'){await botApi('/api/vcastaud',{act:'keep',id:+v});}
+    if(a==='lora'){await botApi('/api/vcastaud',{act:'lora_mark',id:+v});LORA=null;}
     if(a==='del'){if(!sure(b,'กดอีกครั้งเพื่อลบ')){b.disabled=false;return;}await botApi('/api/vcastaud',{act:'del',id:+v});}
     await audLoad();}catch(err){toast(botErr(err));b.disabled=false;}});
 

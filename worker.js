@@ -69,7 +69,6 @@ export default {
     ctx.waitUntil(tick(env, false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
     ctx.waitUntil(autoHeal(env).catch(() => {}).then(() => vTick(env, false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
     ctx.waitUntil(castBatch(env, 0, false).catch(() => {}));
-    ctx.waitUntil(libDaily(env, false).catch(() => {}));
     ctx.waitUntil(audDaily(env).catch(() => {}));
   },
 };
@@ -204,6 +203,43 @@ async function audDaily(env) {
   for (let k = 0; k < total; k++) { const R = open[k % open.length]; per[R.key] = (per[R.key] || 0) + 1; }
   for (const [role, n] of Object.entries(per)) await audApi(env, { act: 'gen', role, n });
 }
+// ---------- ฝึก LoRA จากภาพที่กด "🧬 ทำ LoRA" ในห้องออดิชัน ----------
+const audImgOf = (ims, c) => { const pre = `ออดิชัน·${c.role}·${c.id}·`, m = ims.filter(i => i.project.startsWith(pre)); return ((m.filter(i => i.scene === 2).pop()) || (m.filter(i => i.scene === 1).pop()) || {}).id || 0; };
+async function audLoraList(env) {
+  await animeSchema(env);
+  const ims = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE instr(project,'ออดิชัน·')=1 ORDER BY id").all()).results;
+  const marked = (await env.DB.prepare('SELECT id,role,name,age FROM aud_cands WHERE COALESCE(lora,0)=1 ORDER BY id DESC').all()).results.map(c => ({ ...c, img: audImgOf(ims, c) })).filter(c => c.img);
+  const cs = (await env.DB.prepare('SELECT * FROM chars WHERE series_id=0 ORDER BY id DESC').all()).results;
+  for (const c of cs) {
+    const l = await env.DB.prepare("SELECT l.id,l.status,l.error,l.size,l.use,v.status vs, v.opt FROM loras l LEFT JOIN vjobs v ON v.id=l.vjob WHERE l.char_id=? AND l.status<>'old' ORDER BY l.id DESC LIMIT 1").bind(c.id).first();
+    if (l) { if (l.status === 'queued' && l.vs === 'running') l.status = 'training'; try { l.n = (JSON.parse(l.opt || '{}').images || []).length; } catch { l.n = 0; } delete l.opt; delete l.vs; c.lora = l; }
+    c.trigger = 'chr' + c.id + 'x';
+  }
+  return { marked, loras: cs };
+}
+async function audLoraTrain(env, b) {
+  await animeSchema(env);
+  const name = String(b.name || '').trim().slice(0, 40); if (!name) return { error: 'ตั้งชื่อ LoRA ก่อน' };
+  const ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map(Number).filter(Boolean))];
+  if (ids.length < 8) return { error: 'ต้องเลือกอย่างน้อย 8 ภาพ (ตอนนี้ ' + ids.length + ')' };
+  if (ids.length > 24) return { error: 'เลือกได้ไม่เกิน 24 ภาพ' };
+  const cs = (await env.DB.prepare(`SELECT * FROM aud_cands WHERE COALESCE(lora,0)=1 AND id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all()).results;
+  const ims = (await env.DB.prepare("SELECT id,project,scene FROM images WHERE instr(project,'ออดิชัน·')=1 ORDER BY id").all()).results;
+  const rows = cs.map(c => ({ c, img: audImgOf(ims, c) })).filter(x => x.img);
+  if (rows.length < 8) return { error: 'มีภาพที่ใช้ได้แค่ ' + rows.length + ' ภาพ (ต้องกด 🧬 ทำ LoRA ในห้องออดิชัน และภาพต้องวาดเสร็จแล้ว)' };
+  let ch = await env.DB.prepare('SELECT * FROM chars WHERE series_id=0 AND name=?').bind(name).first();
+  if (ch) {
+    if ((await env.DB.prepare("SELECT COUNT(*) n FROM loras WHERE char_id=? AND status='queued'").bind(ch.id).first()).n) return { error: 'LoRA ชื่อนี้กำลังรอ/เทรนอยู่ รอให้เสร็จก่อน' };
+    await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(charProj(ch))]);
+  } else {
+    const r = await env.DB.prepare('INSERT INTO chars (series_id,name,desc,created) VALUES (0,?,?,?)').bind(name, 'LoRA จากภาพห้องออดิชัน', Date.now()).run();
+    ch = { id: r.meta.last_row_id, series_id: 0, name };
+  }
+  const trig = 'chr' + ch.id + 'x', imgs = rows.map(x => ({ id: x.img, cap: `${trig}, ${String(x.c.look || '').slice(0, 300)}` }));
+  const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(charProj(ch), Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs })).run();
+  await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(ch.id, r.meta.last_row_id, Date.now()).run();
+  return { ok: true, char_id: ch.id, trigger: trig, images: imgs.length };
+}
 async function audApi(env, b) {
   const act = b.act || 'list';
   if (act === 'gen') {
@@ -231,6 +267,18 @@ async function audApi(env, b) {
     }
     await env.DB.batch(st);
     return { ok: true, added: n };
+  }
+  if (act === 'lora_mark') { await env.DB.prepare('UPDATE aud_cands SET lora=CASE WHEN COALESCE(lora,0)=1 THEN 0 ELSE 1 END WHERE id=?').bind(+b.id).run(); return { ok: true }; }
+  if (act === 'lora_list') return await audLoraList(env);
+  if (act === 'lora_use') { await env.DB.prepare('UPDATE loras SET use=? WHERE id=?').bind(b.on ? 1 : 0, +b.id).run(); return { ok: true }; }
+  if (act === 'lora_train') return await audLoraTrain(env, b);
+  if (act === 'lora_del') {
+    await animeSchema(env);
+    const c = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!c) return { error: 'ไม่พบ LoRA' };
+    if ((await env.DB.prepare("SELECT COUNT(*) n FROM loras WHERE char_id=? AND status='queued'").bind(c.id).first()).n) return { error: 'LoRA นี้กำลังรอ/เทรนอยู่ รอให้เสร็จก่อนค่อยลบ' };
+    const ls = (await env.DB.prepare('SELECT id FROM loras WHERE char_id=?').bind(c.id).all()).results;
+    await env.DB.batch([...ls.map(l => env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id)), env.DB.prepare('DELETE FROM loras WHERE char_id=?').bind(c.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND project=?").bind(charProj(c)), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(c.id)]);
+    return { ok: true };
   }
   if (act === 'daily') { await setSetting(env, 'aud_daily', String(Math.min(8, Math.max(4, +b.n || 6)))); return { ok: true }; }
   if (act === 'keep') { await env.DB.prepare('UPDATE aud_cands SET kept=CASE WHEN COALESCE(kept,0)=1 THEN 0 ELSE 1 END WHERE id=?').bind(+b.id).run(); return { ok: true }; }
@@ -312,21 +360,12 @@ function legacyFix(p) {
   return p;
 }
 function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
-// เจนต่อเนื่อง: คิวว่างเมื่อไร เติมงานใหม่เอง สลับระหว่างผู้สมัครออดิชัน 1 คน กับของในคลัง 1 ชิ้น (ฉาก อาวุธ เวท โลก ฯลฯ)
+// เจนต่อเนื่อง: คิวว่างเมื่อไร เติมผู้สมัครออดิชันใหม่เอง (สลับบท) — เอาไว้ให้ได้ภาพมากพอเลือกทำ LoRA
 async function autoFill(env, s) {
   const n = +s.fill_n || 0; await setSetting(env, 'fill_n', String(n + 1));
-  if (n % 2 === 0) {
-    const asg = new Set((await env.DB.prepare('SELECT cast_role FROM aud_cands WHERE cast_role IS NOT NULL').all()).results.map(x => x.cast_role));
-    const open = AUD_ROLES.filter(R => !asg.has(R.key)), L = open.length ? open : AUD_ROLES;
-    await audApi(env, { act: 'gen', role: L[Math.floor(n / 2) % L.length].key, n: 1 });
-  } else {
-    const rows = LIBD.filter(r => r[0] !== 'เอฟเฟกต์'), row = rows[Math.floor(n / 2) % rows.length], list = row[1]() || [];
-    if (!list.length) return;
-    const it = list[Math.floor(Math.random() * list.length)], base = `คลัง·${row[0]}·${libName(it)}`;
-    const have = await env.DB.prepare('SELECT COUNT(*) c FROM images WHERE project=? OR instr(project,?)=1').bind(base, base + ' · รอบ').first();
-    const proj = have && +have.c ? `${base} · รอบ ${+have.c + 1}` : base;
-    await env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,4)").bind(proj, row[2](it).slice(0, 2000), Date.now()).run();
-  }
+  const asg = new Set((await env.DB.prepare('SELECT cast_role FROM aud_cands WHERE cast_role IS NOT NULL').all()).results.map(x => x.cast_role));
+  const open = AUD_ROLES.filter(R => !asg.has(R.key)), L = open.length ? open : AUD_ROLES;
+  await audApi(env, { act: 'gen', role: L[n % L.length].key, n: 1 });
 }
 // ---- ภาพอนิเมะด้วย SDXL / FLUX.1-dev บน Kaggle (ฟรี ไม่กินโควตา Cloudflare) · Flux เป็นตัวสำรองเมื่อ Kaggle ใช้ไม่ได้ ----
 // เลือกเอนจินภาพต่องาน: img_engine = auto | sdxl | dev | flux(Cloudflare schnell) · ค่าเก่า 'kaggle' = auto
@@ -485,7 +524,7 @@ async function animeApi(env, b) {
     const sc = await env.DB.prepare('SELECT series_id FROM scripts WHERE id=?').bind(+b.script_id).first(); if (!sc) throw new Error('ไม่พบบท');
     const rows = (await env.DB.prepare('SELECT * FROM shots WHERE script_id=? ORDER BY idx').bind(+b.script_id).all()).results;
     const only = Array.isArray(b.ids) ? new Set(b.ids.map(Number)) : null;
-    const lc = (await env.DB.prepare("SELECT c.id cid,c.name,l.id lid FROM chars c JOIN loras l ON l.char_id=c.id AND l.status='ready' AND l.use=1 WHERE c.series_id=?").bind(sc.series_id).all()).results;
+    const lc = (await env.DB.prepare("SELECT c.id cid,c.name,l.id lid FROM chars c JOIN loras l ON l.char_id=c.id AND l.status='ready' AND l.use=1 WHERE c.series_id=? OR c.series_id=0").bind(sc.series_id).all()).results;
     const hv = new Set((await env.DB.prepare('SELECT DISTINCT project FROM images WHERE project LIKE ?').bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
     const pd = new Set((await env.DB.prepare("SELECT DISTINCT project FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle')").bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
     const st = []; let n = 0;
@@ -818,7 +857,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vlog (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS casting (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, cat TEXT DEFAULT 'char', name TEXT, descr TEXT, prompt TEXT, status TEXT DEFAULT 'pending', created INTEGER)"),
   ]);
-  for (const q of ['ALTER TABLE jobs ADD COLUMN seed INTEGER', 'ALTER TABLE jobs ADD COLUMN eng TEXT', 'ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT']) await env.DB.prepare(q).run().catch(() => {});
+  for (const q of ['ALTER TABLE jobs ADD COLUMN seed INTEGER', 'ALTER TABLE jobs ADD COLUMN eng TEXT', 'ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT', 'ALTER TABLE aud_cands ADD COLUMN lora INTEGER DEFAULT 0']) await env.DB.prepare(q).run().catch(() => {});
   schemaReady = true;
 }
 
@@ -2077,35 +2116,6 @@ const LIBD = [
 const LIB_STEP4 = new Set(['ฉาก', 'องค์ประกอบฉาก', 'พลังอาคม', 'โลกและจักรวาล', 'เอฟเฟกต์']);
 function libSteps(cat) { return 4; } // ผู้ใช้เลือก: คุณภาพ 4 พอสำหรับทุกหมวด
 function libName(it) { return (typeof it.i === 'number' ? String(it.i).padStart(4, '0') + ' ' : '') + String(it.n).replace(' — ', ' · ').replace(/·/g, '-').replace(' - ', ' · '); }
-async function libDaily(env, force) {
-  const s = await getSettings(env), day = bkkDay(), hr = new Date(Date.now() + 7 * 3600000).getUTCHours();
-  if (!force && (s.lib_on === '0' || hr < 7 || s.lib_day === day)) return { skipped: true };
-  await setSetting(env, 'lib_day', day);
-  const have = new Set([...(await env.DB.prepare("SELECT DISTINCT project FROM jobs WHERE project LIKE 'คลัง·%'").all()).results,
-    ...(await env.DB.prepare("SELECT DISTINCT project FROM images WHERE project LIKE 'คลัง·%'").all()).results].map(x => x.project));
-  const r = rng(Date.now() ^ Math.floor(Math.random() * 1e9)), st = [], made = [];
-  for (const [cat, list, mk] of LIBD) {
-    const L = list() || [];
-    if (!L.length) continue;
-    const name = libName;
-    let free = L.filter(it => ![...have].some(p => p === `คลัง·${cat}·${name(it)}` || p.startsWith(`คลัง·${cat}·${name(it)} · รอบ`)));
-    let it, nm;
-    if (free.length) { it = free[Math.floor(r() * free.length)]; nm = name(it); }
-    else { // ครบทุกรายการแล้ว → วนรอบใหม่ เป็นเวอร์ชันใหม่ของของเดิม
-      it = L[Math.floor(r() * L.length)]; const base = name(it);
-      const n = [...have].filter(p => p === `คลัง·${cat}·${base}` || p.startsWith(`คลัง·${cat}·${base} · รอบ`)).length;
-      nm = `${base} · รอบ ${n + 1}`;
-    }
-    const proj = `คลัง·${cat}·${nm}`, pr = mk(it).slice(0, 2000);
-    for (let v = 0; v < 2; v++) st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,?)").bind(proj, 1, pr, Date.now(), libSteps(cat)));
-    made.push(`${cat}: ${nm}`);
-  }
-  if (st.length) await env.DB.batch(st);
-  const vh = new Set((await env.DB.prepare("SELECT DISTINCT project FROM vjobs WHERE project LIKE 'คลัง·%' UNION SELECT DISTINCT project FROM videos WHERE project LIKE 'คลัง·%'").all()).results.map(x => x.project));
-  try { await vTick(env, true); } catch (e) { made.push('คิว: ' + String(e.message || e).slice(0, 80)); }
-  await notify(env, `📦 คลังวันนี้: ${made.join(' · ')}`);
-  return { ok: true, made };
-}
 function bkkDay(ts) { return new Date((ts || Date.now()) + 7 * 3600000).toISOString().slice(0, 10); }
 async function castBatch(env, n, force, only) {
   const s = await getSettings(env), day = bkkDay(), hr = new Date(Date.now() + 7 * 3600000).getUTCHours();
@@ -2141,7 +2151,6 @@ async function castBatch(env, n, force, only) {
 }
 async function castApi(req, env, url, body) {
   const p = url.pathname;
-  if (p === '/api/vcastlib') return json(await libDaily(env, true));
   if (p === '/api/vcastmanual') { // งานมือ: รายการพรอมต์สำหรับ GPT/Gemini (ไม่มีกำหนดเวลา ไม่เข้าคิวอัตโนมัติ)
     const b = body || {}, act = b.act || 'list';
     if (act === 'add') {
