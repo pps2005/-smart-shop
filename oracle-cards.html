@@ -87,6 +87,7 @@ main{max-width:1100px;margin:auto;padding:12px 14px calc(40px + env(safe-area-in
 .fm h2{font-size:1rem;margin-bottom:2px}
 .fm .hint{text-align:left;margin-bottom:6px}
 textarea.tx.big{min-height:150px}
+.act{flex-wrap:wrap}
 textarea.tx{min-height:92px;resize:vertical;font-family:inherit;line-height:1.4}
 .ck{display:flex;align-items:center;gap:8px;font-size:.84rem;margin:8px 0}
 .ck input{width:18px;height:18px}
@@ -199,6 +200,8 @@ var LS0=[
 try{ST.ls=JSON.parse(localStorage.getItem('oc_ls')||'[]');}catch(e){}
 try{ST.gone=JSON.parse(localStorage.getItem('oc_gone')||'[]');}catch(e){ST.gone=[];}
 function persistGone(){try{localStorage.setItem('oc_gone',JSON.stringify(ST.gone));}catch(e){}}
+try{ST.rep=JSON.parse(localStorage.getItem('oc_rep')||'{}');}catch(e){ST.rep={};}
+function persistRep(){try{localStorage.setItem('oc_rep',JSON.stringify(ST.rep));}catch(e){}}
 function persistLs(){try{localStorage.setItem('oc_ls',JSON.stringify(ST.ls));}catch(e){}}
 function allLS(){return LS0.concat(ST.ls);}
 function lsOf(id){return one(allLS(),id);}
@@ -289,10 +292,19 @@ function render(){
  var d=curDeck();$('#sub').textContent=d?d.name+' · '+ST.inf[d.id].done+'/78 ใบ':'ยังไม่มีสำรับ';
  if(ST.tab==='lib')renderLib();else if(ST.tab==='design')renderDesign();else renderDecks();
 }
+async function sweepRep(){
+ var S=ST.S,ks=Object.keys(ST.rep);if(!S||!ks.length)return;
+ for(var i=0;i<ks.length;i++){var k=ks[i],a=k.split(':'),d=deck(a[0]);if(!d){delete ST.rep[k];continue;}
+  var sc=+a[1],mx=0,oid=ST.rep[k];S.images.forEach(function(im){if(im.project===P(d,'front')&&+im.scene===sc&&im.id>mx)mx=im.id;});
+  if(mx>oid){try{await api('/api/delete',{id:oid});}catch(e){continue;}
+   S.images=S.images.filter(function(im){return im.id!==oid;});delete ST.rep[k];}}
+ persistRep();
+}
 async function load(){
  if(!cfg().url){ST.S=null;render();return;}
  try{ST.S=await api('/api/state');ST.err='';
   ST.S.images.concat(ST.S.jobs||[]).forEach(function(im){var m=/^oracle\|([a-z0-9]+)\|(front|back)$/.exec(im.project);if(m&&!deck(m[1])&&ST.gone.indexOf(m[1])<0){ST.decks.push({id:m[1],name:'สำรับ '+m[1],theme:'sky',bs:'moon',back:0});persist();}});
+  await sweepRep();
  }catch(e){ST.err=errMsg(e);}
  var sig=JSON.stringify(ST.decks.map(function(d){var i=info(d);return[d.id,d.back,i.done,i.b,i.n,i.fail];}))+ST.cur+ST.err;
  if(sig!==ST.sig){ST.sig=sig;var ae=document.activeElement;if(!(ST.tab==='design'&&ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)))render();if(ST.vd&&$('#sheet').classList.contains('on'))viewSheet(ST.vi,1);}
@@ -352,7 +364,7 @@ function viewSheet(i,keep){
  +'<button class="nv" data-a="vnext" aria-label="ใบถัดไป">›</button></div>'
  +'<div class="hint">'+(i+1)+' / '+CARDS.length+' · แตะการ์ดเพื่อพลิก · ปัดซ้ายขวาเพื่อเปลี่ยนใบ</div>'
  +'<h3>'+esc(c.th)+'</h3><div class="sub">'+esc(c.en)+' · '+esc(K(c.cat).th)+'</div><div class="mean">'+esc(c.mean)+'</div>'
- +'<div class="act"><button data-a="regen">สร้างภาพใบนี้ใหม่</button><button class="g" data-a="close">ปิด</button></div>');
+ +'<div class="act"><button data-a="regenrep">สร้างใหม่ทับภาพเดิม</button><button class="g" data-a="regen">สร้างใหม่ (เก็บภาพเดิมไว้)</button><button class="g" data-a="close">ปิด</button></div>');
 }
 function botSheet(){
  var c=cfg();
@@ -372,7 +384,7 @@ function cardSheet(i){
  var d=curDeck(),inf=d?ST.inf[d.id]:null,c=CARDS[i];ST.idx=i;ST.vd='';
  sheet('<div class="fl big" id="fl"><div class="fi"><div class="ff">'+front(i,inf)+'</div><div class="fb">'+back(inf)+'</div></div></div>'
  +'<div class="hint">แตะการ์ดเพื่อพลิกดูด้านหลัง</div><h3>'+esc(c.th)+'</h3><div class="sub">'+esc(c.en)+' · '+esc(K(c.cat).th)+'</div><div class="mean">'+esc(c.mean)+'</div>'
- +'<div class="act">'+(d?'<button data-a="regen">สร้างภาพใบนี้ใหม่</button>':'')+'<button class="g" data-a="close">ปิด</button></div>');
+ +'<div class="act">'+(d?'<button data-a="regenrep">สร้างใหม่ทับภาพเดิม</button><button class="g" data-a="regen">สร้างใหม่ (เก็บภาพเดิมไว้)</button>':'')+'<button class="g" data-a="close">ปิด</button></div>');
 }
 async function enqueue(body,msg){
  try{var r=await api('/api/enqueue',body);toast(msg||('ส่งเข้าคิวแล้ว '+r.added+' ภาพ'));return true;}catch(e){toast(errMsg(e));return false;}
@@ -428,6 +440,7 @@ var A={
  bkpick:function(v){var d=deck(ST.open);if(!d)return;d.back=+v;persist();ST.sig='';render();backSheet(d.id);},
  bkset:function(v){var d=deck(ST.open);if(!d)return;d.bs=v;persist();backSheet(d.id);},
  bkgen:async function(){var d=deck(ST.open);if(!d||!need())return;if(await enqueue({project:P(d,'back'),items:[{scene:1,prompt:backPrompt(d)}],variants:3,raw:true}))poll();},
+ regenrep:async function(){var d=ST.vd?deck(ST.vd):curDeck();if(!d||ST.idx<0||!need())return;var o=(ST.inf[d.id]||info(d)).f[ST.idx+1];if(o){ST.rep[d.id+':'+(ST.idx+1)]=o;persistRep();}if(await enqueue({project:P(d,'front'),items:[{scene:ST.idx+1,prompt:promptFor(ST.idx,d)}],raw:true},'ส่งเข้าคิวแล้ว ภาพใหม่เสร็จแล้วระบบจะลบภาพเดิมให้'))poll();},
  regen:async function(){var d=ST.vd?deck(ST.vd):curDeck();if(!d||ST.idx<0||!need())return;if(await enqueue({project:P(d,'front'),items:[{scene:ST.idx+1,prompt:promptFor(ST.idx,d)}],raw:true},'ส่งใบนี้เข้าคิวแล้ว'))poll();},
  view:function(v){var d=deck(v);if(!d)return;ST.vd=v;var inf=ST.inf[v]||info(d),f=0;for(var i=0;i<CARDS.length;i++){if(inf.f[i+1]){f=i;break;}}viewSheet(f);},
  vprev:function(){viewSheet((ST.vi+CARDS.length-1)%CARDS.length);},
