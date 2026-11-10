@@ -1658,7 +1658,7 @@ function lockCands(n){const out=[],seen={};
   IM.slice().sort((a,b)=>b.id-a.id).filter(i=>{const p=String(i.project||'');return !p.startsWith('ที่·')&&!p.startsWith('@');}).slice(0,30).forEach(i=>{if(!seen[i.id]){seen[i.id]=1;out.push({id:+i.id,lb:'คลังภาพ'});}});
   return out;}
 let LOCKLOAD=0;
-function audKeptSet(){return new Set(((AUDS&&AUDS.cands)||[]).filter(c=>+c.kept).map(c=>String(c.name||'').trim()));}
+function audKeptSet(){const k=new Set();((AUDS&&AUDS.cands)||[]).filter(c=>+c.kept).forEach(c=>{[c.role,c.cast_role].forEach(v=>{if(v)k.add(String(v).trim());});});return k;}
 function lockOk(n){const L=(PROF&&PROF[n]&&PROF[n].lock)||{};if(L.main)return true;const k=audKeptSet();return k.has(String(n).trim())||k.has(chName(n));}
 async function lockLoad(){if(LOCKLOAD)return;LOCKLOAD=1;try{await profLoad();}catch(e){}LOCKLOAD=0;if(view==='lib'&&SV.lib==='lock'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
 function lockHtml(){
