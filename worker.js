@@ -1,4 +1,4 @@
-// ===== Anime Image Bot — Cloudflare Worker (Flux schnell + D1 + Cron) =====
+// ===== Anime Image Bot — Cloudflare Worker (ภาพ: SDXL อนิเมะบน Kaggle เป็นหลัก · Flux schnell สำรอง + D1 + Cron) =====
 // Bindings ที่ต้องตั้งใน Cloudflare:  AI (Workers AI),  DB (D1: anime-bot-db)
 // Variables (Secret):  PASSWORD   | ไม่บังคับ: TG_TOKEN, TG_CHAT (แจ้งเตือน Telegram)
 // วิดีโอ (ไม่บังคับ): KAGGLE_USERNAME, KAGGLE_KEY → ทำวิดีโอด้วย GPU ฟรีของ Kaggle อัตโนมัติ
@@ -36,7 +36,7 @@ export default {
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/fluxkeys') return json(await fluxKeysApi(env, body));
       if (p === '/api/settings') {
-        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill'])
+        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill', 'img_engine', 'img_model', 'img_w', 'img_h', 'img_cap'])
           if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
         return json({ ok: true });
       }
@@ -50,7 +50,7 @@ export default {
       if (p === '/api/runnow') return json(await tick(env, true));
       if (p === '/api/push') return json(await ghPush(env, body.path, body.b64, body.message));
       if (p === '/api/resume') { await setSetting(env, 'paused_until', '0'); await env.DB.prepare("UPDATE jobs SET status='queued' WHERE status IN ('running','failed')").run(); return json({ ok: true }); }
-      if (p === '/api/clearqueue') { await env.DB.prepare("DELETE FROM jobs WHERE status IN ('queued','failed')").run(); return json({ ok: true }); }
+      if (p === '/api/clearqueue') { await env.DB.prepare("DELETE FROM jobs WHERE status IN ('queued','failed','kaggle')").run(); await env.DB.prepare("DELETE FROM vjobs WHERE kind='img' AND status='queued'").run(); return json({ ok: true }); }
       if (p === '/api/clearjobs') { const pre = String(body.prefix || ''); if (!pre) return json({ error: 'no prefix' }, 400); const r = await env.DB.prepare("DELETE FROM jobs WHERE instr(project,?)=1 AND status!='running'").bind(pre).run(); return json({ ok: true, n: (r.meta && r.meta.changes) || 0 }); }
       if (p === '/api/clearnotices') { await env.DB.prepare('DELETE FROM notices').run(); return json({ ok: true }); }
       return json({ error: 'not found' }, 404);
@@ -311,9 +311,51 @@ async function autoFill(env, s) {
     await env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,4)").bind(proj, row[2](it).slice(0, 2000), Date.now()).run();
   }
 }
+// ---- ภาพอนิเมะด้วย SDXL บน Kaggle (ฟรี ไม่กินโควตา Cloudflare) · Flux เป็นตัวสำรองเมื่อ Kaggle ใช้ไม่ได้ ----
+async function kImgOn(env, s, now) {
+  if ((s.img_engine || 'kaggle') === 'flux') return false;
+  kEnv(env, s);
+  if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return false;
+  if (now < (+s.k_pause || 0)) return false; // โควตา GPU Kaggle สัปดาห์นี้หมด → ให้ Flux ทำไปก่อน
+  return true;
+}
+async function bridgeImg(env, s) {
+  const rows = (await env.DB.prepare("SELECT id,project,scene,prompt,steps,seed FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux' ORDER BY id LIMIT 40").all()).results;
+  if (!rows.length) return 0;
+  const st = [], now = Date.now();
+  for (const j of rows) {
+    const opt = { jobId: j.id, scene: j.scene, steps: (+j.steps || 4) >= 8 ? 34 : 26, seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '' };
+    st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
+      .bind(j.project, '', String(j.scene), withStyle(j.prompt, s).slice(0, 1800), now, JSON.stringify(opt)));
+    st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
+  }
+  await env.DB.batch(st);
+  return rows.length;
+}
+// เติมคิวภาพเองให้ GPU ทำงานเต็มโควตา แต่หยุดเมื่อภาพในคลังถึงเพดาน (D1 ฟรีเก็บได้จำกัด) — ติ๊กดาว/ลบภาพที่ไม่ใช้เพื่อให้ทำต่อ
+async function kTopUp(env, s) {
+  const c = await env.DB.prepare('SELECT COUNT(*) n FROM images').first();
+  if (+c.n >= (+s.img_cap || 600)) {
+    const day = new Date().toISOString().slice(0, 10);
+    if (s.cap_note !== day) { await setSetting(env, 'cap_note', day); await notify(env, '🖼️ ภาพในคลังถึงเพดานแล้ว บอทหยุดเติมคิวอัตโนมัติ ลบภาพที่ไม่ใช้หรือเพิ่มค่า img_cap เพื่อทำต่อ'); }
+    return;
+  }
+  const a = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux') + (SELECT COUNT(*) FROM vjobs WHERE kind='img' AND status IN ('queued','running')) n").first();
+  let n = +(a && a.n) || 0;
+  for (let i = 0; i < 8 && n < 16; i++, n++) await autoFill(env, await getSettings(env));
+}
 async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
+  const useK = await kImgOn(env, s, now);
+  if (useK) {
+    if (!force && s.auto_fill === '1') await kTopUp(env, s);
+    await bridgeImg(env, s);
+  } else {
+    // Kaggle ใช้ไม่ได้ → ดึงงานที่ยังไม่ได้เริ่มกลับมาให้ Flux ทำ
+    await env.DB.prepare("UPDATE jobs SET status='queued', eng='flux' WHERE status='kaggle' AND id IN (SELECT CAST(json_extract(opt,'$.jobId') AS INTEGER) FROM vjobs WHERE kind='img' AND status='queued')").run().catch(() => {});
+    await env.DB.prepare("DELETE FROM vjobs WHERE kind='img' AND status='queued'").run().catch(() => {});
+  }
   if (!force) {
     if (now < +s.paused_until && !(await activeKeys(env, now)).length) return { skipped: 'paused' };
     if (now - +s.last_run < (+s.interval_min || 1) * 60000 - 15000) return { skipped: 'wait' };
@@ -321,8 +363,8 @@ async function tick(env, force) {
     if (sl.full) return { skipped: 'slot full' };
     if (now - +s.last_run > 180000) await env.DB.prepare("UPDATE jobs SET status='queued' WHERE status='running'").run();
   }
-  const job = await env.DB.prepare("SELECT * FROM jobs WHERE status='queued' ORDER BY id LIMIT 1").first();
-  if (!job) { if (s.auto_fill === '1' && !force) { await autoFill(env, s); return { skipped: 'empty', filled: true }; } return { skipped: 'empty' }; }
+  const job = await env.DB.prepare("SELECT * FROM jobs WHERE status='queued' AND (?=0 OR eng='flux') ORDER BY id LIMIT 1").bind(useK ? 1 : 0).first();
+  if (!job) { if (s.auto_fill === '1' && !force && !useK) { await autoFill(env, s); return { skipped: 'empty', filled: true }; } return { skipped: 'empty' }; }
   await setSetting(env, 'last_run', String(now));
   await env.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(job.id).run();
   try {
@@ -501,7 +543,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS vlog (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS casting (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, cat TEXT DEFAULT 'char', name TEXT, descr TEXT, prompt TEXT, status TEXT DEFAULT 'pending', created INTEGER)"),
   ]);
-  for (const q of ['ALTER TABLE jobs ADD COLUMN seed INTEGER', 'ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT']) await env.DB.prepare(q).run().catch(() => {});
+  for (const q of ['ALTER TABLE jobs ADD COLUMN seed INTEGER', 'ALTER TABLE jobs ADD COLUMN eng TEXT', 'ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT']) await env.DB.prepare(q).run().catch(() => {});
   schemaReady = true;
 }
 
@@ -542,7 +584,7 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p === '/k/claim') {
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' ORDER BY id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' ORDER BY (kind='img'), id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -559,6 +601,17 @@ async function vRoutes(req, env, url, ctx) {
       if (!j) return json({ error: 'no job' }, 404);
       const buf = new Uint8Array(await req.arrayBuffer());
       if (buf.length < 1000) return json({ error: 'ไฟล์เล็กผิดปกติ' }, 400);
+      if (j.kind === 'img') { // ภาพ SDXL จาก Kaggle → เข้าคลังภาพเหมือนภาพ Flux
+        let o = {}; try { o = JSON.parse(j.opt || '{}'); } catch { o = {}; }
+        const jb = o.jobId ? await env.DB.prepare('SELECT prompt FROM jobs WHERE id=?').bind(o.jobId).first() : null;
+        await env.DB.batch([
+          env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (?,?,?,?,?,0,?)').bind(+o.jobId || 0, j.project, +o.scene || 0, jb ? jb.prompt : j.prompt, bytesToB64(buf), Date.now()),
+          env.DB.prepare('DELETE FROM jobs WHERE id=?').bind(+o.jobId || 0),
+          env.DB.prepare('DELETE FROM vjobs WHERE id=?').bind(id),
+        ]);
+        if (hid) await env.DB.prepare('UPDATE helpers SET done=done+1, seen=?, cur=? WHERE id=?').bind(Date.now(), '', hid).run();
+        return json({ ok: true, img: true });
+      }
       const v = await env.DB.prepare('INSERT INTO videos (job_id,project,ep,shot,prompt,size,sec,w,h,created) VALUES (?,?,?,?,?,?,?,?,?,?)')
         .bind(id, j.project, j.ep, j.shot, j.prompt, buf.length, +url.searchParams.get('sec') || 0, +url.searchParams.get('w') || 0, +url.searchParams.get('h') || 0, Date.now()).run();
       const vid = v.meta.last_row_id, st = [];
@@ -573,10 +626,16 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p.startsWith('/k/fail/')) {
       const b = await req.json().catch(() => ({}));
-      const j = await env.DB.prepare('SELECT tries,shot,project FROM vjobs WHERE id=?').bind(id).first();
+      const j = await env.DB.prepare('SELECT tries,shot,project,kind,opt FROM vjobs WHERE id=?').bind(id).first();
       if (!j) return json({ ok: true });
       const again = b.requeue || j.tries < 2;
       await env.DB.prepare('UPDATE vjobs SET status=?, error=? WHERE id=?').bind(again ? 'queued' : 'failed', String(b.error || '').slice(0, 500), id).run();
+      if (j.kind === 'img' && !again) { // ภาพ Kaggle พังซ้ำ → ส่งให้ Flux ทำแทน และกันไม่ให้ซ่อมอัตโนมัติซ้ำจนได้ภาพซ้อน
+        let o = {}; try { o = JSON.parse(j.opt || '{}'); } catch { o = {}; }
+        if (o.jobId) await env.DB.prepare("UPDATE jobs SET status='queued', eng='flux' WHERE id=?").bind(+o.jobId).run();
+        await env.DB.prepare('UPDATE vjobs SET tries=99 WHERE id=?').bind(id).run();
+        return json({ ok: true });
+      }
       if (!again && j.tries >= 6) await notify(env, `⚠️ ทำช็อต ${j.shot} (${j.project}) ไม่สำเร็จหลังซ่อมเองหลายรอบ: ${String(b.error || '').slice(0, 140)}`);
       return json({ ok: true });
     }
@@ -595,17 +654,19 @@ async function vRoutes(req, env, url, ctx) {
 
 // ---- ฝั่งสตูดิโอ (ผ่าน PASSWORD แล้ว) ----
 // ความยาวคลิป 2–5 วินาที (ค่าเริ่ม 3) → จำนวนเฟรมแบบ 4k+1 ที่ 16 fps
-function vFrames(sec) { const s = Math.min(5, Math.max(2, +sec || 3)); return Math.round(s * 16 / 4) * 4 + 1; }
+function vFrames(sec, max = 5) { const s = Math.min(max, Math.max(2, +sec || 3)); return Math.round(s * 16 / 4) * 4 + 1; }
 async function vApi(req, env, url, ctx, body) {
   const p = url.pathname;
   kEnv(env, await getSettings(env));
   if (p === '/api/vstate') {
     const s = await getSettings(env);
-    const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started,kind FROM vjobs WHERE status NOT IN ('done','hold') ORDER BY id LIMIT 300").all()).results;
+    const jobs = (await env.DB.prepare("SELECT id,project,ep,shot,status,error,tries,created,started,kind FROM vjobs WHERE status NOT IN ('done','hold') AND COALESCE(kind,'')<>'img' ORDER BY id LIMIT 300").all()).results;
     const videos = (await env.DB.prepare('SELECT id,job_id,project,ep,shot,prompt,size,sec,w,h,created FROM videos ORDER BY id DESC LIMIT 500').all()).results;
     const logs = (await env.DB.prepare('SELECT msg,created FROM vlog ORDER BY id DESC LIMIT 12').all()).results;
+    const ic = (await env.DB.prepare("SELECT status, COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') GROUP BY status").all()).results;
+    const imgs = { q: +((ic.find(x => x.status === 'queued') || {}).n) || 0, r: +((ic.find(x => x.status === 'running') || {}).n) || 0 };
     const helpers = (await env.DB.prepare('SELECT id,name,key,on_,created,seen,done,cur FROM helpers ORDER BY id').all()).results;
-    return json({ jobs, videos, logs, helpers, now: Date.now(), kaggle: { configured: !!(env.KAGGLE_USERNAME && env.KAGGLE_KEY), user: env.KAGGLE_USERNAME || '', hasKey: !!env.KAGGLE_KEY, status: s.k_status || '', checked: +s.k_checked || 0, pushed: +s.k_pushed || 0, seen: +s.k_seen || 0, error: s.k_error || '' } });
+    return json({ jobs, videos, logs, helpers, imgs, now: Date.now(), kaggle: { configured: !!(env.KAGGLE_USERNAME && env.KAGGLE_KEY), user: env.KAGGLE_USERNAME || '', hasKey: !!env.KAGGLE_KEY, status: s.k_status || '', checked: +s.k_checked || 0, pushed: +s.k_pushed || 0, seen: +s.k_seen || 0, error: s.k_error || '' } });
   }
   if (p.startsWith('/vid/')) return getVideo(req, env, +p.split('/')[2]);
   if (req.method !== 'POST') return null;
@@ -617,7 +678,7 @@ async function vApi(req, env, url, ctx, body) {
       if (!img || img.length > 1800000) continue;
       const opt = JSON.stringify({ hq: it.hq ? 1 : 0, fps: +it.fps === 12 ? 12 : 0 });
       st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)")
-        .bind(String(body.project || 'โปรเจกต์').slice(0, 60), String(body.ep || ''), String(it.shot ?? ''), String(it.prompt || '').slice(0, 2000), String(it.neg || VNEG).slice(0, 800), img, vFrames(it.frames ? (+it.frames - 1) / 16 : 3), Date.now(), opt));
+        .bind(String(body.project || 'โปรเจกต์').slice(0, 60), String(body.ep || ''), String(it.shot ?? ''), String(it.prompt || '').slice(0, 2000), String(it.neg || VNEG).slice(0, 800), img, vFrames(it.frames ? (+it.frames - 1) / 16 : 3, 15), Date.now(), opt)); // ช็อตยาวสูงสุด 15 วิ (kernel เจนต่อกันทีละ 5 วิ)
     }
     if (!st.length) return json({ error: 'ไม่มีช็อตที่มีภาพคีย์' });
     await env.DB.batch(st);
@@ -1047,10 +1108,11 @@ def gen(j, port=8188):
     for f in glob.glob(os.path.join(out, "job%s_*.png" % jid)):
         os.remove(f)
     mp4 = os.path.join(ROOT, "job%s.mp4" % jid)
+    crf = 18 if passes == 1 else 22  # ช็อตยาวบีบไฟล์มากขึ้น (คลิปเก็บใน D1 ที่พื้นที่ฟรีจำกัด)
     vf = "scale='if(gt(iw,ih),-2,1080)':'if(gt(iw,ih),1080,-2)':flags=lanczos,unsharp=5:5:0.6:5:5:0.0"
     if opt.get("fps") == 12:
         vf = "fps=12," + vf  # ลุคอนิเมะ: 12 ภาพ/วิ แบบวาดมือ
-    sh('"%s" -y -loglevel error -framerate %d -i "%s/%%05d.png" -vf "%s" -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -movflags +faststart "%s"' % (ffmpeg_bin(), fps, tmp, vf, mp4))
+    sh('"%s" -y -loglevel error -framerate %d -i "%s/%%05d.png" -vf "%s" -c:v libx264 -preset veryfast -crf %d -pix_fmt yuv420p -movflags +faststart "%s"' % (ffmpeg_bin(), fps, tmp, vf, crf, mp4))
     shutil.rmtree(tmp, ignore_errors=True)
     return mp4, time.time() - t0, W, H
 
@@ -1177,6 +1239,94 @@ def audio(j, port=8188):
     return m4a, time.time() - t0, 0, 0
 
 
+# ---------- ภาพอนิเมะ: SDXL (Animagine XL 4.0) ----------
+IMG_MODELS = [
+    ("cagliostrolab/animagine-xl-4.0", "animagine-xl-4.0-opt.safetensors"),
+    ("cagliostrolab/animagine-xl-4.0", "animagine-xl-4.0.safetensors"),
+]
+IMG_POS = "masterpiece, high score, great score, absurdres, "
+IMG_NEG = "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry"
+
+
+def ensure_image(model_spec=""):
+    with LOCK:
+        if M.get("sdxl"):
+            return
+        log("กำลังโหลดโมเดลภาพอนิเมะ SDXL (ครั้งแรกประมาณ 3–6 นาที)")
+        cands = list(IMG_MODELS)
+        if model_spec and "::" in model_spec:  # ตั้งเองได้ที่ settings.img_model = repo::ไฟล์.safetensors
+            r, f = model_spec.split("::", 1)
+            cands.insert(0, (r.strip(), f.strip()))
+        got = None
+        for repo, f in cands:
+            try:
+                fetch([("checkpoints", repo, f)])
+                got = os.path.basename(f)
+                break
+            except Exception as e:
+                log("โหลด %s ไม่ได้: %s" % (f, str(e)[:200]))
+        if not got:
+            raise RuntimeError("โหลดโมเดลภาพ SDXL ไม่สำเร็จ")
+        try:  # VAE แก้ปัญหาภาพดำ/เพี้ยนของ SDXL บน GPU รุ่น T4 (fp16)
+            fetch([("vae", "madebyollin/sdxl-vae-fp16-fix", "sdxl_vae.safetensors", "sdxl_vae_fp16fix.safetensors")])
+            M["sdxlvae"] = "sdxl_vae_fp16fix.safetensors"
+        except Exception as e:
+            log("โหลด VAE แก้ภาพดำไม่ได้ ใช้ VAE ในโมเดลแทน: " + str(e)[:160])
+            M["sdxlvae"] = ""
+        M["sdxl"] = got
+        log("โมเดลภาพพร้อม: " + got)
+
+
+def gen_image(j, port=8188):
+    opt = j.get("opt") or {}
+    ensure_image(opt.get("model") or "")
+    W = max(512, min(1536, int(opt.get("w") or 1024))) // 8 * 8
+    H = max(512, min(1536, int(opt.get("h") or 1024))) // 8 * 8
+    steps = max(10, min(50, int(opt.get("steps") or 26)))
+    seed = int(opt.get("seed") or 0) or random.randint(1, 2 ** 31)
+    jid = "i%s" % j["id"]
+    wf = {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": M["sdxl"]}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_POS + (j.get("prompt") or "")}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_NEG}},
+        "4": {"class_type": "EmptyLatentImage", "inputs": {"width": W, "height": H, "batch_size": 1}},
+        "5": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed, "steps": steps, "cfg": 6.0, "sampler_name": "euler_ancestral", "scheduler": "normal", "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0], "denoise": 1.0}},
+        "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+        "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "img%s" % jid}},
+    }
+    if M.get("sdxlvae"):
+        wf["8"] = {"class_type": "VAELoader", "inputs": {"vae_name": M["sdxlvae"]}}
+        wf["6"]["inputs"]["vae"] = ["8", 0]
+    t0 = time.time()
+    pid = comfy("/prompt", {"prompt": wf, "client_id": "bot"}, port=port)["prompt_id"]
+    while True:
+        time.sleep(2)
+        h = comfy("/history/" + pid, port=port)
+        if pid in h:
+            st = h[pid].get("status", {})
+            if st.get("status_str") == "error":
+                msgs = [m for m in st.get("messages", []) if m[0] == "execution_error"]
+                raise RuntimeError("เจนภาพไม่สำเร็จ: " + json.dumps(msgs)[:500])
+            break
+        if time.time() - t0 > 900:
+            raise RuntimeError("เจนภาพนานเกิน 15 นาที")
+    outs = sorted(glob.glob(os.path.join(COMFY, "output", "**", "img%s_*" % jid), recursive=True))
+    if not outs:
+        raise RuntimeError("ไม่มีไฟล์ภาพออกมา")
+    from PIL import Image
+    im = Image.open(outs[-1]).convert("RGB")
+    if max(e[1] for e in im.getextrema()) < 10:
+        raise RuntimeError("ภาพที่ได้เป็นสีดำ (VAE ผิดพลาด)")
+    jpg = os.path.join(ROOT, "%s.jpg" % jid)
+    im.save(jpg, "JPEG", quality=90, optimize=True)
+    for f in outs:
+        try:
+            os.remove(f)
+        except Exception:
+            pass
+    return jpg, int(time.time() - t0), W, H
+
+
 # ---------- งานหลัก ----------
 def concat(j):
     urls = json.loads(j.get("prompt") or "[]")
@@ -1208,6 +1358,8 @@ def work(job, port):
     if job.get("kind") == "concat":
         log("กำลังรวมคลิป %s → %s" % (job.get("project"), job.get("shot")))
         return concat(job)
+    if job.get("kind") == "img":
+        return gen_image(job, port)
     if job.get("kind") == "audio":
         log("เริ่มทำเสียง %s (การ์ด %d)" % (job.get("project"), port - 8187))
         return audio(job, port)
@@ -1256,7 +1408,10 @@ def worker(port, first, stat):
             call("/k/done/%s?sec=%d&w=%d&h=%d" % (job["id"], sec, W, H), raw=data, timeout=600)
             os.remove(mp4)
             stat["done"] += 1
-            log("เสร็จช็อต %s ใน %d นาที (%d KB)" % (job.get("shot"), sec / 60, len(data) / 1024))
+            if job.get("kind") != "img":
+                log("เสร็จช็อต %s ใน %d นาที (%d KB)" % (job.get("shot"), sec / 60, len(data) / 1024))
+            elif stat["done"] % 20 == 0:
+                log("เจนภาพ SDXL แล้ว %d ภาพในรอบนี้ (ล่าสุด %d วินาที)" % (stat["done"], sec))
         except Exception as e:
             log("ช็อต %s พัง: %s" % (job.get("shot"), str(e)[:400]))
             if port and healed != job["id"]:  # ซ่อมแล้วลองใหม่ในเครื่องก่อน 1 ครั้ง

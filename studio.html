@@ -561,7 +561,7 @@ function renderEp(){const S=ep.shots||[],P=prog(ep);
   if(epTab==='shots')body=`<div class="card"><div class="row"><span class="muted">ภาพคีย์ ${P.img}/${P.N} · คลิป ${P.vid}/${P.N} · ${fmtS(P.doneSec)} / ${fmtS(P.total)}</span></div>
       ${epAsmHtml()}${lookHtml()}<div class="row">${botBtn('epall','','🎨 ให้บอทเจนภาพทุกช็อต (ช็อตละ 3 แบบ)',true)}${botBtn('vall','','🎞️ ทำวิดีโอทุกช็อตที่มีภาพคีย์แล้ว',true)}<button class="btn sm" data-copy="${esc(S.map(s=>'#'+s.n+'\n'+(s.image_prompt||'')).join('\n\n'))}">คัดลอก image prompt ทั้งหมด</button></div></div>
     ${S.map((s,i)=>{const k=String(s.n),hi=!!mUrl(k,'image'),hv=!!mUrl(k,'video');const sc=+s.scene||1,first=i===0||(+S[i-1].scene||1)!==sc;return `${first?sceneHead(sc):''}<div class="shot${i===P.nowIdx?' now':''}"><div class="no"><b>${esc(s.n)}</b><span class="muted small">${esc(s.sec)} วิ</span><span title="ภาพคีย์">${hi?'🖼️':'·'}</span><span title="คลิป">${hv?'🎞️':'·'}</span></div><div class="bd">
-      <div class="row"><span class="st todo">⏱ ${shotSec(s)} วิ${shotSec(s)>5?' (เจน 2 รอบต่อกัน)':''}</span><button class="st ${s.hq?'doing':'todo'}" data-shq="${i}" style="border:0;cursor:pointer">${s.hq?'⭐ ช็อตสำคัญ (คุณภาพสูง)':'☆ ช็อตทั่วไป'}</button>${s.shot?`<span class="st todo">${esc(s.shot)}</span>`:''}${i===P.nowIdx?'<span class="st doing">กำลังทำช็อตนี้</span>':''}${hv?'<span class="st done">มีคลิปแล้ว</span>':''}</div>
+      <div class="row"><span class="st todo">⏱ ${shotSec(s)} วิ${shotSec(s)>5?' (เจน '+Math.ceil(shotSec(s)*16/80)+' รอบต่อกัน)':''}</span><button class="st ${s.hq?'doing':'todo'}" data-shq="${i}" style="border:0;cursor:pointer">${s.hq?'⭐ ช็อตสำคัญ (คุณภาพสูง)':'☆ ช็อตทั่วไป'}</button>${s.shot?`<span class="st todo">${esc(s.shot)}</span>`:''}${i===P.nowIdx?'<span class="st doing">กำลังทำช็อตนี้</span>':''}${hv?'<span class="st done">มีคลิปแล้ว</span>':''}</div>
       <div>${esc(s.action)}</div>${s.narration?`<div class="muted small">🎙 ${esc(s.narration)}</div>`:''}${s.text?`<div class="small"><b>ตัวอักษรบนจอ:</b> ${esc(s.text)}</div>`:''}
       <div class="media">${slot(k,'image','ภาพคีย์')}${slot(k,'video','คลิปช็อต')}</div>
       <div class="row">${s.image_prompt?botBtn('epone',s.n,'🎨 ให้บอทเจนภาพช็อตนี้'):''}${botBtn('vone',s.n,hi?'🎞️ ทำวิดีโอช็อตนี้':'🎞️ ทำวิดีโอ (ต้องมีภาพคีย์ก่อน)')}</div><div class="botthumbs" data-k="${esc(s.n)}"></div><div class="vidthumbs" data-k="${esc(s.n)}"></div>
@@ -714,14 +714,18 @@ function botParts0(st){const S=BOT.s;
   if(BOT.err&&!S){st.innerHTML=`<h3>เชื่อมบอทไม่ได้</h3><p class="muted" style="margin:0">${esc(BOT.err)}</p><div class="row"><button class="btn sm" data-bot="reload">ลองใหม่</button><button class="btn sm" data-bot="disconnect">แก้ลิงก์/รหัส</button></div>`;return;}
   if(!S){st.innerHTML='<p class="muted" style="margin:0">กำลังเชื่อมบอท…</p>';return;}
   const s=S.settings,qd=S.jobs.filter(j=>j.status!=='failed').length,fail=S.jobs.length-qd,paused=S.now<+s.paused_until;
+  const eng=s.img_engine==='flux'?'flux':'kaggle',kcfg=!!(BOT.v&&BOT.v.kaggle&&BOT.v.kaggle.configured),kp=+s.k_pause>S.now,useK=eng==='kaggle'&&kcfg&&!kp;
+  const engNote=eng==='flux'?'ใช้โควตา Cloudflare ราว 170 ภาพ/วัน':!kcfg?'⚠️ ยังไม่ได้ตั้ง Kaggle (ตั้งในการ์ดวิดีโอด้านล่าง) ตอนนี้ใช้ Flux ไปก่อน':kp?'⏸ โควตา GPU Kaggle สัปดาห์นี้หมด ใช้ Flux สำรองไปก่อน':'ฟรี ไม่กินโควตา Cloudflare · ถ้าพังหรือโควตาหมดจะใช้ Flux สำรองเอง';
   const si_=(()=>{try{return JSON.parse(s.slot_info||'null');}catch(e){return null;}})(),slotFull=s.pace!=='0'&&si_&&si_.n>=si_.budget;
-  const line=slotFull&&qd&&!paused?`🕒 ช่วงนี้ทำครบ ${si_.budget} ภาพแล้ว · ช่วงถัดไป ${tTH(si_.next)} (เหลือรอ ${qd} ภาพ)`:paused&&(S.helpers||[]).some(h=>h.ready)?`▶️ โควตาเราวันนี้หมด กำลังใช้โควตาผู้ช่วย ${esc((S.helpers||[]).filter(h=>h.ready).map(h=>h.name).join(', '))} · เหลือ ${qd} ภาพ`:paused?`⏸ พักอยู่ (โควตาฟรีวันนี้หมด) · ทำต่อเองประมาณ ${tTH(s.paused_until)}`:qd?`▶️ กำลังทำงาน · เหลือ ${qd} ภาพ · ภาพถัดไปประมาณ ${tTH(Math.max(S.now,+s.last_run+s.interval_min*60000))}`:'✅ คิวว่าง';
+  const line=useK&&qd?`🌸 เจนด้วย SDXL อนิเมะบน Kaggle · เหลือ ${qd} ภาพ`:slotFull&&qd&&!paused?`🕒 ช่วงนี้ทำครบ ${si_.budget} ภาพแล้ว · ช่วงถัดไป ${tTH(si_.next)} (เหลือรอ ${qd} ภาพ)`:paused&&(S.helpers||[]).some(h=>h.ready)?`▶️ โควตาเราวันนี้หมด กำลังใช้โควตาผู้ช่วย ${esc((S.helpers||[]).filter(h=>h.ready).map(h=>h.name).join(', '))} · เหลือ ${qd} ภาพ`:paused?`⏸ พักอยู่ (โควตาฟรีวันนี้หมด) · ทำต่อเองประมาณ ${tTH(s.paused_until)}`:qd?`▶️ กำลังทำงาน · เหลือ ${qd} ภาพ · ภาพถัดไปประมาณ ${tTH(Math.max(S.now,+s.last_run+s.interval_min*60000))}`:'✅ คิวว่าง';
   st.innerHTML=`<div class="row"><h3 style="margin-right:auto">🎨 บอทเจนภาพ</h3><span class="chip"><span class="dot"></span>${S.images.length} ภาพในคลัง</span></div>
     <div>${line}${fail?` · <span style="color:var(--red)">พัง ${fail}</span>`:''}${S.hasPassword?'':' · <span style="color:var(--you)">⚠️ บอทยังไม่ได้ตั้งรหัสผ่าน</span>'}</div>
     ${kLine()}
+    <div class="row" style="flex-wrap:wrap;gap:6px"><span class="muted small">ตัวเจนภาพ</span><button class="btn sm${eng==='kaggle'?' main':''}" data-bot="eng" data-v="kaggle">🌸 SDXL อนิเมะ (Kaggle)</button><button class="btn sm${eng==='flux'?' main':''}" data-bot="eng" data-v="flux">⚡ Flux (Cloudflare)</button></div>
+    <span class="muted small">${engNote} · คลัง ${S.images.length}/${+s.img_cap||600} ภาพ</span>
     <div class="row"><button class="btn sm" data-bot="runnow">สร้างภาพถัดไปเดี๋ยวนี้</button><button class="btn sm" data-bot="resume">ทำต่อ / ลองใหม่ที่พัง</button><button class="btn sm" data-bot="clearq">ล้างคิว</button></div>
     ${S.notices.length?det('noti',`🔔 แจ้งเตือน <span class="dn">${S.notices.length}</span><small>${esc(shortMsg(S.notices[0].msg).slice(0,60))}…</small>`,S.notices.slice(0,8).map(n=>`<div class="report">${esc(shortMsg(n.msg))} <span class="muted">${tTH(n.created)}</span></div>`).join('')+'<div><button class="btn sm" data-bot="clearn">ล้างแจ้งเตือน</button></div>'):''}`;
-  const ST={queued:'รอคิว',running:'กำลังสร้าง',failed:'พัง'};
+  const ST={queued:'รอคิว',running:'กำลังสร้าง',failed:'พัง',kaggle:'อยู่ที่ Kaggle'};
   const qg={};S.jobs.forEach(j=>(qg[j.project]=qg[j.project]||[]).push(j));
   $('#botQ').innerHTML=S.jobs.length?Object.entries(qg).map(([pj,a])=>{const f=a.filter(j=>j.status==='failed').length,r=a.filter(j=>j.status==='running').length;
     return det('q|'+pj,`${esc(pj)} <span class="dn">${a.length}</span>${r?'<small style="color:var(--you)">✨ กำลังสร้าง</small>':''}${f?`<small style="color:var(--red)">พัง ${f}</small>`:''}`,
@@ -749,13 +753,13 @@ function vidThumbsFill(){const V=BOT.v;document.querySelectorAll('.vidthumbs').f
   const run=js.filter(j=>j.status==='running').length,q=js.filter(j=>j.status==='queued').length,f=js.filter(j=>j.status==='failed');
   el.innerHTML=(vs.length||js.length)?`<span class="lab">วิดีโอจากบอท ${vs.length}${run?' · กำลังทำ':''}${q?` · รอคิว ${q}`:''}${f.length?` · <span style="color:var(--red)">พัง ${f.length}</span>`:''}</span>${f.length&&f[0].error?`<span class="muted small">${esc(String(f[0].error).slice(0,160))}</span>`:''}
     ${vs.length?`<div class="vgrid">${vs.map(v=>`<div class="vcard"><video src="${esc(botU('/vid/'+v.id))}" muted loop playsinline controls preload="metadata"></video><div class="bb">${/^\d+$/.test(k)?`<button data-bot="vone" data-n="${esc(k)}" aria-label="ทำใหม่">🔁</button>`:''}<button data-bot="vdel" data-id="${v.id}" aria-label="ลบ">🗑</button><button class="use" data-vuse="${esc(k)}|${v.id}">ใช้คลิปนี้</button></div></div>`).join('')}</div>`:''}`:'';});}
-function kLine(){const V=BOT.v;if(!V)return '';const K=V.kaggle||{},q=V.jobs.filter(j=>j.status==='queued').length,r=V.jobs.filter(j=>j.status==='running').length,f=V.jobs.filter(j=>j.status==='failed').length;
+function kLine(){const V=BOT.v;if(!V)return '';const iq=(V.imgs&&+V.imgs.q)||0,ir=(V.imgs&&+V.imgs.r)||0,K=V.kaggle||{},q=V.jobs.filter(j=>j.status==='queued').length,r=V.jobs.filter(j=>j.status==='running').length,f=V.jobs.filter(j=>j.status==='failed').length;
   if(!K.configured)return `<div class="report">🎞️ ตั้งค่าเครื่องเจนวิดีโอ (Kaggle)${q?` · มีงานรอ ${q} ช็อต`:''}</div>
     <span class="muted small">ชื่อผู้ใช้ Kaggle (คำหลัง kaggle.com/ ในลิงก์โปรไฟล์ — ไม่ใช่ลิงก์บอท)</span><input type="text" id="kUser" name="kaggle-user-x" placeholder="เช่น somchai123" value="${esc(K.user||'')}" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true">
     ${K.user?`<span class="muted small">✓ บันทึกชื่อผู้ใช้แล้ว: ${esc(K.user)}</span>`:''}${K.hasKey?'<span class="muted small">✓ มี API token แล้ว</span>':'<span class="muted small">API token ของ Kaggle (ขึ้นต้นด้วย KGAT_) — อย่าให้ iPad เติมรหัสผ่านให้เอง</span><input type="text" id="kKey" name="kaggle-token-x" placeholder="KGAT_..." autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" style="-webkit-text-security:disc">'}
     <div><button class="btn sm main" data-bot="ksave">บันทึกและเริ่มเครื่อง</button></div>`;
-  const alive=V.now-(K.seen||0)<20*60000,st=r?'▶️ กำลังทำวิดีโอ':q?(alive||/start|queued|running/.test(K.status)?'⏳ กำลังเปิดเครื่อง (5–20 นาที)':'💤 รอปลุก'):'✅ ว่าง';
-  return `<div class="report">🎞️ วิดีโอ: ${st} · รอคิว ${q}${r?' · กำลังทำ '+r:''}${f?` · <span style="color:var(--red)">พัง ${f}</span>`:''} · คลิปในคลัง ${V.videos.length}${K.error?`<br><span class="muted small">${esc(K.error)}</span>`:''}${V.logs&&V.logs[0]?`<br><span class="muted small">ล่าสุด: ${esc(V.logs[0].msg)} · ${tTH(V.logs[0].created)}</span>`:''}</div>
+  const alive=V.now-(K.seen||0)<20*60000,st=r?'▶️ กำลังทำวิดีโอ':ir?'▶️ กำลังเจนภาพ SDXL':(q||iq)?(alive||/start|queued|running/.test(K.status)?'⏳ กำลังเปิดเครื่อง (5–20 นาที)':'💤 รอปลุก'):'✅ ว่าง';
+  return `<div class="report">🎞️ วิดีโอ: ${st} · รอคิว ${q}${r?' · กำลังทำ '+r:''}${f?` · <span style="color:var(--red)">พัง ${f}</span>`:''} · คลิปในคลัง ${V.videos.length}${iq||ir?` · 🌸 ภาพ SDXL รอ ${iq}${ir?' · กำลังทำ '+ir:''}`:''}${K.error?`<br><span class="muted small">${esc(K.error)}</span>`:''}${V.logs&&V.logs[0]?`<br><span class="muted small">ล่าสุด: ${esc(V.logs[0].msg)} · ${tTH(V.logs[0].created)}</span>`:''}</div>
   <div class="row">${q?'<button class="btn sm" data-bot="vkick">ปลุกเครื่องเจนวิดีโอ</button>':''}${f?'<button class="btn sm" data-bot="vretry">ลองวิดีโอที่พังใหม่</button>':''}${q||f?'<button class="btn sm" data-bot="vclear">ล้างคิววิดีโอ</button>':''}</div>`;}
 function jpgB64(url,max){return new Promise(async(ok,no)=>{try{const bl=await (await fetch(url)).blob();const im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*r);c.height=Math.round(im.naturalHeight*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.9).split(',')[1]);URL.revokeObjectURL(im.src);};im.onerror=()=>no(new Error('เปิดภาพคีย์ไม่ได้'));im.src=URL.createObjectURL(bl);}catch(e){no(e);}});}
 async function vEnqueue(shots,label){await signMedia();const items=[];
@@ -854,6 +858,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot]
         await botApi('/api/vkaggle',{user:u,...(k?{key:k}:{})});toast('บันทึกแล้ว กำลังสั่งเปิดเครื่อง…');break;}
       case 'vretry':await botApi('/api/vretry',{});toast('ส่งวิดีโอที่พังกลับเข้าคิวแล้ว');break;
       case 'vclear':if(!sure(b,'กดอีกครั้งเพื่อล้าง'))return;await botApi('/api/vclear',{});toast('ล้างคิววิดีโอแล้ว');break;
+      case 'eng':{const v=b.dataset.v==='flux'?'flux':'kaggle';await botApi('/api/settings',{img_engine:v});toast(v==='flux'?'ใช้ Flux (โควตา Cloudflare) แล้ว ⚡':'ใช้ SDXL อนิเมะบน Kaggle แล้ว 🌸');break;}
       case 'epchar':await botEnqueueEp([{scene:0,prompt:ep.character_sheet_prompt}],'ภาพต้นแบบ');break;
       default:return;}
     await botLoad();
@@ -1140,7 +1145,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bot=
 
 
 /* ---------- ความยาวช็อต · ช็อตสำคัญ · ลุคอนิเมะ ---------- */
-function shotSec(s){return Math.min(10,Math.max(1,Math.round(+s.sec||5)));}
+function shotSec(s){return Math.min(15,Math.max(1,Math.round(+s.sec||5)));}
 function lookHtml(){const S=ep.shots||[],a=S.length&&S.every(s=>s.fps===12);
   return `<div class="row"><button class="btn sm${a?' main':''}" data-look="${a?0:12}">${a?'✓ ลุคอนิเมะ 12 ภาพ/วิ (แบบวาดมือ)':'ลุคลื่น 48 ภาพ/วิ · แตะเพื่อเปลี่ยนเป็นลุคอนิเมะ'}</button><span class="muted small">⭐ ช็อตสำคัญ = ละเอียดขึ้น ใช้เวลา ~2.5 เท่า</span></div>`;}
 document.addEventListener('click',async e=>{const h=e.target.closest('[data-shq],[data-look]');if(!h||!ep)return;e.stopImmediatePropagation();
@@ -1238,7 +1243,7 @@ function parseScript(txt){const out=[];let n=0;
   for(const raw of String(txt).split(/\r?\n/)){const l=raw.trim().replace(/^\|/,'').replace(/\|$/,'');if(!l.includes('|'))continue;
     const c=l.split('|').map(x=>x.trim());if(c.length<5||!/^\d+$/.test(c[0])||!/^\d+$/.test(c[1]))continue;
     const say=(c[5]||'').replace(/^-$/,'');n++;
-    out.push({n,scene:+c[0],sec:Math.min(10,Math.max(1,Math.round(+c[2]||4))),shot:c[3]||'',action:c[4]||'',narration:say,sfx:(c[6]||'').replace(/^-$/,''),mood:(c[7]||'').replace(/^-$/,''),image_prompt:'',video_prompt:''});}
+    out.push({n,scene:+c[0],sec:Math.min(15,Math.max(1,Math.round(+c[2]||4))),shot:c[3]||'',action:c[4]||'',narration:say,sfx:(c[6]||'').replace(/^-$/,''),mood:(c[7]||'').replace(/^-$/,''),image_prompt:'',video_prompt:''});}
   return out;}
 function scriptModal(){let m=$('#scriptM');if(!m){m=document.createElement('div');m.id='scriptM';m.className='modal';document.body.appendChild(m);}
   m.innerHTML=`<div class="box"><div class="hero"><span class="ic">📥</span><div><h3>วางบท สร้างตอนใหม่</h3><p class="muted small">บทจากใครหรือ AI ตัวไหนก็ได้ ขอแค่ใช้รูปแบบเดียวกัน</p></div></div>
