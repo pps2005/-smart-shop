@@ -1,4 +1,4 @@
-// ===== Anime Image Bot — Cloudflare Worker (ภาพ: SDXL อนิเมะบน Kaggle เป็นหลัก · Flux schnell สำรอง + D1 + Cron) =====
+// ===== Anime Image Bot — Cloudflare Worker (ภาพ: SDXL อนิเมะ / FLUX.1-dev บน Kaggle (เลือกเอง/อัตโนมัติ) · Flux schnell สำรอง + D1 + Cron) =====
 // Bindings ที่ต้องตั้งใน Cloudflare:  AI (Workers AI),  DB (D1: anime-bot-db)
 // Variables (Secret):  PASSWORD   | ไม่บังคับ: TG_TOKEN, TG_CHAT (แจ้งเตือน Telegram)
 // วิดีโอ (ไม่บังคับ): KAGGLE_USERNAME, KAGGLE_KEY → ทำวิดีโอด้วย GPU ฟรีของ Kaggle อัตโนมัติ
@@ -41,7 +41,7 @@ export default {
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/fluxkeys') return json(await fluxKeysApi(env, body));
       if (p === '/api/settings') {
-        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill', 'img_engine', 'img_model', 'img_w', 'img_h', 'img_cap'])
+        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill', 'img_engine', 'auto_char_engine', 'auto_obj_engine', 'img_model', 'img_quant', 'img_w', 'img_h', 'img_cap'])
           if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
         return json({ ok: true });
       }
@@ -327,9 +327,19 @@ async function autoFill(env, s) {
     await env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,4)").bind(proj, row[2](it).slice(0, 2000), Date.now()).run();
   }
 }
-// ---- ภาพอนิเมะด้วย SDXL บน Kaggle (ฟรี ไม่กินโควตา Cloudflare) · Flux เป็นตัวสำรองเมื่อ Kaggle ใช้ไม่ได้ ----
+// ---- ภาพอนิเมะด้วย SDXL / FLUX.1-dev บน Kaggle (ฟรี ไม่กินโควตา Cloudflare) · Flux เป็นตัวสำรองเมื่อ Kaggle ใช้ไม่ได้ ----
+// เลือกเอนจินภาพต่องาน: img_engine = auto | sdxl | dev | flux(Cloudflare schnell) · ค่าเก่า 'kaggle' = auto
+// auto: งานของ/ชุด/สัตว์/อาวุธ/ฉากในคลัง → FLUX.1-dev (auto_obj_engine) · งานตัวละคร/ฉากอนิเมะ → SDXL (auto_char_engine) · ตั้งสลับได้
+function imgEngineFor(j, s) {
+  const e = String((s && s.img_engine) || 'auto');
+  if (e === 'sdxl' || e === 'dev') return e;
+  const p = String((j && j.prompt) || ''), pr = String((j && j.project) || '');
+  const obj = pr.startsWith('คลัง·') || p.includes('[[STYLE_OBJ]]') || p.includes('[[STYLE_ENV]]') ||
+    /plain soft background|single object|creature design|dress form|faceless mannequin|environment element design|product design sheet/.test(p);
+  return obj ? (s.auto_obj_engine === 'sdxl' ? 'sdxl' : 'dev') : (s.auto_char_engine === 'dev' ? 'dev' : 'sdxl');
+}
 async function kImgOn(env, s, now) {
-  if ((s.img_engine || 'kaggle') === 'flux') return false;
+  if ((s.img_engine || 'auto') === 'flux') return false;
   kEnv(env, s);
   if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return false;
   if (now < (+s.k_pause || 0)) return false; // โควตา GPU Kaggle สัปดาห์นี้หมด → ให้ Flux ทำไปก่อน
@@ -340,7 +350,8 @@ async function bridgeImg(env, s) {
   if (!rows.length) return 0;
   const st = [], now = Date.now();
   for (const j of rows) {
-    const opt = { jobId: j.id, scene: j.scene, steps: (+j.steps || 4) >= 8 ? 34 : 26, seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '' };
+    const eg = imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
+    const opt = { jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '', quant: s.img_quant || '' };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), withStyle(j.prompt, s).slice(0, 1800), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -600,7 +611,7 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p === '/k/claim') {
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' ORDER BY (kind='img'), id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' ORDER BY (kind='img'), CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -617,7 +628,7 @@ async function vRoutes(req, env, url, ctx) {
       if (!j) return json({ error: 'no job' }, 404);
       const buf = new Uint8Array(await req.arrayBuffer());
       if (buf.length < 1000) return json({ error: 'ไฟล์เล็กผิดปกติ' }, 400);
-      if (j.kind === 'img') { // ภาพ SDXL จาก Kaggle → เข้าคลังภาพเหมือนภาพ Flux
+      if (j.kind === 'img') { // ภาพ FLUX.1-dev จาก Kaggle → เข้าคลังภาพเหมือนภาพ Flux
         let o = {}; try { o = JSON.parse(j.opt || '{}'); } catch { o = {}; }
         const jb = o.jobId ? await env.DB.prepare('SELECT prompt FROM jobs WHERE id=?').bind(o.jobId).first() : null;
         await env.DB.batch([
@@ -1268,64 +1279,133 @@ def audio(j, port=8188):
     return m4a, time.time() - t0, 0, 0
 
 
-# ---------- ภาพอนิเมะ: SDXL (Animagine XL 4.0) ----------
+# ---------- ภาพอนิเมะ: 2 เอนจิน สลับได้ต่องาน (opt.engine) ----------
+#   sdxl = SDXL อนิเมะ (Animagine XL 4.0) · dev = FLUX.1-dev (GGUF)
+# ตั้งเองได้ที่ settings.img_model = repo::ไฟล์ (.safetensors → SDXL · .gguf → FLUX) · settings.img_quant = quant ของ FLUX (ค่าเริ่มต้น Q5_K_S)
 IMG_MODELS = [
     ("cagliostrolab/animagine-xl-4.0", "animagine-xl-4.0-opt.safetensors"),
     ("cagliostrolab/animagine-xl-4.0", "animagine-xl-4.0.safetensors"),
 ]
 IMG_POS = "masterpiece, high score, great score, absurdres, "
 IMG_NEG = "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry"
+IMG_QUANTS = ["Q5_K_S", "Q4_K_S", "Q4_0", "Q8_0"]
+FLUX_REPO = "city96/FLUX.1-dev-gguf"
+FLUX_TE = "comfyanonymous/flux_text_encoders"
+FLUX_VAES = [("black-forest-labs/FLUX.1-schnell", "ae.safetensors"), ("Comfy-Org/Lumina_Image_2.0_Repackaged", "split_files/vae/ae.safetensors"), ("black-forest-labs/FLUX.1-dev", "ae.safetensors")]
+FLUX_GUIDANCE = 3.5
 
 
-def ensure_image(model_spec=""):
-    with LOCK:
-        if M.get("sdxl"):
-            return
-        log("กำลังโหลดโมเดลภาพอนิเมะ SDXL (ครั้งแรกประมาณ 3–6 นาที)")
-        cands = list(IMG_MODELS)
-        if model_spec and "::" in model_spec:  # ตั้งเองได้ที่ settings.img_model = repo::ไฟล์.safetensors
-            r, f = model_spec.split("::", 1)
-            cands.insert(0, (r.strip(), f.strip()))
-        got = None
-        for repo, f in cands:
-            try:
-                fetch([("checkpoints", repo, f)])
-                got = os.path.basename(f)
-                break
-            except Exception as e:
-                log("โหลด %s ไม่ได้: %s" % (f, str(e)[:200]))
-        if not got:
-            raise RuntimeError("โหลดโมเดลภาพ SDXL ไม่สำเร็จ")
-        try:  # VAE แก้ปัญหาภาพดำ/เพี้ยนของ SDXL บน GPU รุ่น T4 (fp16)
-            fetch([("vae", "madebyollin/sdxl-vae-fp16-fix", "sdxl_vae.safetensors", "sdxl_vae_fp16fix.safetensors")])
-            M["sdxlvae"] = "sdxl_vae_fp16fix.safetensors"
+def ensure_sdxl(model_spec=""):
+    if M.get("sdxl"):
+        return
+    log("กำลังโหลดโมเดลภาพอนิเมะ SDXL (ครั้งแรกประมาณ 3–6 นาที)")
+    cands = list(IMG_MODELS)
+    if model_spec and "::" in model_spec and not model_spec.strip().lower().endswith(".gguf"):
+        r, f = model_spec.split("::", 1)
+        cands.insert(0, (r.strip(), f.strip()))
+    got = None
+    for repo, f in cands:
+        try:
+            fetch([("checkpoints", repo, f)])
+            got = os.path.basename(f)
+            break
         except Exception as e:
-            log("โหลด VAE แก้ภาพดำไม่ได้ ใช้ VAE ในโมเดลแทน: " + str(e)[:160])
-            M["sdxlvae"] = ""
-        M["sdxl"] = got
-        log("โมเดลภาพพร้อม: " + got)
+            log("โหลด %s ไม่ได้: %s" % (f, str(e)[:200]))
+    if not got:
+        raise RuntimeError("โหลดโมเดลภาพ SDXL ไม่สำเร็จ")
+    try:  # VAE แก้ปัญหาภาพดำ/เพี้ยนของ SDXL บน GPU รุ่น T4 (fp16)
+        fetch([("vae", "madebyollin/sdxl-vae-fp16-fix", "sdxl_vae.safetensors", "sdxl_vae_fp16fix.safetensors")])
+        M["sdxlvae"] = "sdxl_vae_fp16fix.safetensors"
+    except Exception as e:
+        log("โหลด VAE แก้ภาพดำไม่ได้ ใช้ VAE ในโมเดลแทน: " + str(e)[:160])
+        M["sdxlvae"] = ""
+    M["sdxl"] = got
+    log("โมเดลภาพ SDXL พร้อม: " + got)
+
+
+def ensure_flux(model_spec="", quant=""):
+    if M.get("flux"):
+        return
+    log("กำลังโหลดโมเดลภาพ FLUX.1-dev (ครั้งแรกประมาณ 5–10 นาที)")
+    cands = []
+    if model_spec and "::" in model_spec and model_spec.strip().lower().endswith(".gguf"):
+        r, f = model_spec.split("::", 1)
+        cands.append((r.strip(), f.strip()))
+    qs = ([quant] if quant else []) + [x for x in IMG_QUANTS if x != quant]
+    cands += [(FLUX_REPO, "flux1-dev-%s.gguf" % x) for x in qs]
+    got = None
+    for repo, f in cands:
+        try:
+            fetch([("unet", repo, f)])
+            got = os.path.basename(f)
+            break
+        except Exception as e:
+            log("โหลด %s ไม่ได้: %s" % (f, str(e)[:200]))
+    if not got:
+        raise RuntimeError("โหลดโมเดล FLUX.1-dev ไม่สำเร็จ (ถ้าขึ้น 401/403 ให้ตั้ง HF_TOKEN ของบัญชี Hugging Face ที่กดยอมรับสัญญา FLUX.1-dev แล้ว)")
+    fetch([("clip", FLUX_TE, "clip_l.safetensors"), ("clip", FLUX_TE, "t5xxl_fp8_e4m3fn.safetensors")])
+    vae = None
+    for repo, f in FLUX_VAES:
+        try:
+            fetch([("vae", repo, f, "flux_ae.safetensors")])
+            vae = "flux_ae.safetensors"
+            break
+        except Exception as e:
+            log("โหลด VAE %s ไม่ได้: %s" % (repo, str(e)[:160]))
+    if not vae:
+        raise RuntimeError("โหลด VAE ของ FLUX ไม่สำเร็จ")
+    M["fluxvae"] = vae
+    M["flux"] = got
+    log("โมเดลภาพ FLUX.1-dev พร้อม: " + got)
+
+
+def ensure_image(engine="dev", model_spec="", quant=""):
+    with LOCK:
+        if engine == "sdxl":
+            ensure_sdxl(model_spec)
+        else:
+            ensure_flux(model_spec, quant)
 
 
 def gen_image(j, port=8188):
     opt = j.get("opt") or {}
-    ensure_image(opt.get("model") or "")
-    W = max(512, min(1536, int(opt.get("w") or 1024))) // 8 * 8
-    H = max(512, min(1536, int(opt.get("h") or 1024))) // 8 * 8
-    steps = max(10, min(50, int(opt.get("steps") or 26)))
+    engine = "sdxl" if opt.get("engine") == "sdxl" else "dev"
+    ensure_image(engine, opt.get("model") or "", opt.get("quant") or "")
+    q = 8 if engine == "sdxl" else 16
+    W = max(512, min(1536, int(opt.get("w") or 1024))) // q * q
+    H = max(512, min(1536, int(opt.get("h") or 1024))) // q * q
+    if engine == "sdxl":
+        steps = max(10, min(50, int(opt.get("steps") or 26)))
+    else:
+        steps = max(16, min(30, int(opt.get("steps") or 24)))
     seed = int(opt.get("seed") or 0) or random.randint(1, 2 ** 31)
     jid = "i%s" % j["id"]
-    wf = {
-        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": M["sdxl"]}},
-        "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_POS + (j.get("prompt") or "")}},
-        "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_NEG}},
-        "4": {"class_type": "EmptyLatentImage", "inputs": {"width": W, "height": H, "batch_size": 1}},
-        "5": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed, "steps": steps, "cfg": 6.0, "sampler_name": "euler_ancestral", "scheduler": "normal", "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0], "denoise": 1.0}},
-        "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
-        "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "img%s" % jid}},
-    }
-    if M.get("sdxlvae"):
-        wf["8"] = {"class_type": "VAELoader", "inputs": {"vae_name": M["sdxlvae"]}}
-        wf["6"]["inputs"]["vae"] = ["8", 0]
+    if engine == "sdxl":
+        wf = {
+            "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": M["sdxl"]}},
+            "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_POS + (j.get("prompt") or "")}},
+            "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_NEG}},
+            "4": {"class_type": "EmptyLatentImage", "inputs": {"width": W, "height": H, "batch_size": 1}},
+            "5": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed, "steps": steps, "cfg": 6.0, "sampler_name": "euler_ancestral", "scheduler": "normal", "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0], "denoise": 1.0}},
+            "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+            "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "img%s" % jid}},
+        }
+        if M.get("sdxlvae"):
+            wf["8"] = {"class_type": "VAELoader", "inputs": {"vae_name": M["sdxlvae"]}}
+            wf["6"]["inputs"]["vae"] = ["8", 0]
+    else:
+        wf = {
+            "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["flux"]}},
+            "2": {"class_type": "DualCLIPLoader", "inputs": {"clip_name1": "t5xxl_fp8_e4m3fn.safetensors", "clip_name2": "clip_l.safetensors", "type": "flux"}},
+            "3": {"class_type": "VAELoader", "inputs": {"vae_name": M["fluxvae"]}},
+            "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": (j.get("prompt") or "")}},
+            "5": {"class_type": "FluxGuidance", "inputs": {"conditioning": ["4", 0], "guidance": float(opt.get("guidance") or FLUX_GUIDANCE)}},
+            "6": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": ""}},
+            "7": {"class_type": "EmptySD3LatentImage", "inputs": {"width": W, "height": H, "batch_size": 1}},
+            "8": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed, "steps": steps, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "positive": ["5", 0], "negative": ["6", 0], "latent_image": ["7", 0], "denoise": 1.0}},
+            "9": {"class_type": "VAEDecode", "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
+            "10": {"class_type": "SaveImage", "inputs": {"images": ["9", 0], "filename_prefix": "img%s" % jid}},
+        }
     t0 = time.time()
     pid = comfy("/prompt", {"prompt": wf, "client_id": "bot"}, port=port)["prompt_id"]
     while True:
@@ -1440,7 +1520,7 @@ def worker(port, first, stat):
             if job.get("kind") != "img":
                 log("เสร็จช็อต %s ใน %d นาที (%d KB)" % (job.get("shot"), sec / 60, len(data) / 1024))
             elif stat["done"] % 20 == 0:
-                log("เจนภาพ SDXL แล้ว %d ภาพในรอบนี้ (ล่าสุด %d วินาที)" % (stat["done"], sec))
+                log("เจนภาพบน Kaggle แล้ว %d ภาพในรอบนี้ (ล่าสุด %d วินาที)" % (stat["done"], sec))
         except Exception as e:
             log("ช็อต %s พัง: %s" % (job.get("shot"), str(e)[:400]))
             if port and healed != job["id"]:  # ซ่อมแล้วลองใหม่ในเครื่องก่อน 1 ครั้ง
