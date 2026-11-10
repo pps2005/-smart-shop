@@ -1,4 +1,4 @@
-/* SMART SHOP add-on: pages.js  (รายงาน / AI Assistant / ตั้งค่า / ปัดซ้ายหน้าอสังหาเช่า)
+/* Xiress add-on: pages.js  (รายงาน / AI Assistant / ตั้งค่า / ปัดซ้ายหน้าอสังหาเช่า)
    Load LAST in index.html:  <script src="pages.js"></script>
    To undo: delete that one line from index.html. */
 (function () {
@@ -328,7 +328,7 @@
       '<label>รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)<input id="stp1" class="set-i" type="password" autocomplete="new-password"></label>' +
       '<label>ยืนยันรหัสผ่านใหม่<input id="stp2" class="set-i" type="password" autocomplete="new-password"></label>' +
       '<div class="err" id="sterr"></div><button class="btn" data-a="setPw">เปลี่ยนรหัสผ่าน</button><button class="btn o" data-a="logout">ออกจากระบบ</button></div>' +
-      '<div class="note">SMART SHOP · ข้อมูลเก็บใน Supabase ไม่หายเมื่อเปลี่ยนเครื่อง</div>';
+      '<div class="note">Xiress · ข้อมูลเก็บใน Supabase ไม่หายเมื่อเปลี่ยนเครื่อง</div>';
   }
   A.setTheme = function () { A.theme(); render(); };
   A.setSave = function () {

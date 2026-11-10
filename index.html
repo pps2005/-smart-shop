@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#4f46e5">
-<title>SMART SHOP</title>
+<title>Xiress</title>
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--text:#0f172a;--mute:#64748b;--line:#e5e9f2;--pri:#4f46e5;--pri2:#7c3aed;--green:#16a34a;--blue:#2563eb;--red:#dc2626;--black:#1f2937}
 [data-theme=dark]{--bg:#0b1020;--card:#151b2e;--text:#e8ecf6;--mute:#94a3b8;--line:#243049;--black:#94a3b8}
@@ -94,10 +94,10 @@ label input,label select,label textarea,.two input{width:100%;margin-top:4px;pad
 </style>
 </head>
 <body>
-<div id="splash"><div class="sl">🛍️</div><b style="font-size:1.6rem;margin-top:10px">SMART SHOP</b><div class="ld"><i></i></div></div>
+<div id="splash"><div class="sl">🛍️</div><b style="font-size:1.6rem;margin-top:10px">Xiress</b><div class="ld"><i></i></div></div>
 <nav class="side" id="side"></nav>
 <header class="top">
- <div class="tr"><span class="logo">SMART SHOP</span><span class="ba"><button class="ic" id="theme" data-a="theme" aria-label="สลับธีม"></button><button class="ic" id="out" data-a="logout" aria-label="ออกจากระบบ"></button></span></div>
+ <div class="tr"><span class="logo">Xiress</span><span class="ba"><button class="ic" id="theme" data-a="theme" aria-label="สลับธีม"></button><button class="ic" id="out" data-a="logout" aria-label="ออกจากระบบ"></button></span></div>
  <div id="sw"><input id="q" placeholder="ค้นหาชื่อสินค้าหรือรหัส เช่น PAN-001" autocomplete="off"></div>
 </header>
 <main id="view"></main>
@@ -165,7 +165,7 @@ function render(){
  const id=S.cur;$('sw').style.display=(id==='prod'||id==='stock')?'block':'none';
  $('view').innerHTML=!S.ready?'<div class="empty">กำลังโหลดข้อมูล...</div>':id==='prod'?prodPage():id==='stock'?stockPage():id==='dash'?dashPage():other(M.find(x=>x.id===id));
  if(S.ready&&id==='prod')list();
- $('side').innerHTML='<span class="logo">SMART SHOP</span>'+M.map(m=>`<button class="${m.id===id?'on':''}" data-a="go" data-v="${m.id}">${ic(m.i,20)}${m.t}</button>`).join('');
+ $('side').innerHTML='<span class="logo">Xiress</span>'+M.map(m=>`<button class="${m.id===id?'on':''}" data-a="go" data-v="${m.id}">${ic(m.i,20)}${m.t}</button>`).join('');
  $('bot').innerHTML=M.slice(0,3).map(m=>`<button class="${m.id===id?'on':''}" data-a="go" data-v="${m.id}">${ic(m.i)}${m.t}</button>`).join('')+`<button class="${M.slice(3).some(m=>m.id===id)?'on':''}" data-a="more">${ic('menu')}เพิ่มเติม</button>`;
 }
 function go(id){S.cur=id;closeSheet();render();window.scrollTo(0,0)}
@@ -257,6 +257,7 @@ setTimeout(()=>{$('splash').classList.add('hide');setTimeout(()=>$('splash').rem
 <script src="crm.js"></script>
 <script src="anim-link.js"></script>
 <script src="oracle-link.js"></script>
+<script src="acc-merge.js"></script>
 
 </body>
 </html>

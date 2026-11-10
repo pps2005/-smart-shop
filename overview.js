@@ -1,4 +1,4 @@
-/* SMART SHOP add-on: week/month/year overview + expandable popups + UI refresh.
+/* Xiress add-on: week/month/year overview + expandable popups + UI refresh.
    Load LAST in index.html:  <script src="overview.js"></script>
    To undo: delete that one line from index.html. */
 (function(){

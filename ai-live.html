@@ -306,7 +306,7 @@ const LANG_EN = { 'ja-JP': 'Japanese', 'ko-KR': 'Korean', 'zh-CN': 'Chinese (Man
 let hist = [];
 async function askOllama(text, facts) {
   const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 60000);
-  const sys = `คุณคือ "${cfg.name}" เลขา AI หูแมวประจำร้าน SMART SHOP กำลังไลฟ์สด
+  const sys = `คุณคือ "${cfg.name}" เลขา AI หูแมวประจำร้าน Xiress กำลังไลฟ์สด
 บุคลิก: ${cfg.personality}
 หัวข้อไลฟ์: ${$('topic').textContent}
 ตอบสั้น 1-3 ประโยค เป็นธรรมชาติ น่ารัก ห้ามแต่งข้อมูลร้านเอง

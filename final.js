@@ -1,4 +1,4 @@
-/* SMART SHOP add-on (ต่อยอดจากของเดิม ไม่แทนที่ไฟล์เดิม)
+/* Xiress add-on (ต่อยอดจากของเดิม ไม่แทนที่ไฟล์เดิม)
    วิธีใช้: ใส่บรรทัดนี้ใน index.html "ต่อจาก" overview.js ->  <script src="final.js"></script>
    วิธียกเลิก: ลบบรรทัดนั้นออก ระบบกลับเป็นเหมือนเดิม */
 (function () {
@@ -882,7 +882,7 @@
         ex.forEach(function (x) { r4.push([x.paid_on, EXK[x.kind] || x.kind, x.amount, x.note, x.voided_at ? 'ยกเลิก' : 'ปกติ']); });
         download('expenses-' + d + '.csv', csv(r4));
       } else {
-        var out = { exported_at: new Date().toISOString(), note: 'สำรองข้อมูล SMART SHOP' };
+        var out = { exported_at: new Date().toISOString(), note: 'สำรองข้อมูล Xiress' };
         var T = ['categories', 'locations', 'products', 'variants', 'stock_levels', 'sales', 'status_history', 'expenses', 'incomes', 'daily_closes', 'properties', 'units', 'tenants', 'leases', 'rent_payments', 'unit_costs'];
         for (var i = 0; i < T.length; i++) {
           try { out[T[i]] = await fetchAll(function () { return S.sb.from(T[i]).select('*').order('created_at'); }); }

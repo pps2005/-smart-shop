@@ -17,7 +17,7 @@
   var box = document.createElement('div');
   box.id = 'lg';
   box.innerHTML =
-    '<div class="bx"><div style="font-size:2.6rem;line-height:1">🛍️</div><h1>SMART SHOP</h1>' +
+    '<div class="bx"><div style="font-size:2.6rem;line-height:1">🛍️</div><h1>Xiress</h1>' +
     '<p id="lgmsg">กำลังตรวจสอบ...</p>' +
     '<div id="lgform" style="display:none"><form id="lgf" autocomplete="on">' +
     '<input id="lge" name="email" type="email" placeholder="อีเมล" autocomplete="username" required>' +

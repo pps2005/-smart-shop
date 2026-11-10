@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#eef4fb">
-<title>คลังไพ่ออราเคิล 78 ใบ · SMART SHOP</title>
+<title>คลังไพ่ออราเคิล 78 ใบ · Xiress</title>
 <style>
 :root{--bg:#f1f6fc;--card:#fff;--text:#1e2a3d;--mute:#6b7a90;--line:#dde7f3;--pri:#5b7cfa;--pri2:#8b6cf0;--chip:#e6eefb;--ok:#22a06b;--bad:#d9534f}
 @media (prefers-color-scheme:dark){:root{--bg:#121826;--card:#1b2436;--text:#e8eef9;--mute:#9aa8c0;--line:#2a364d;--chip:#25314a}}
@@ -86,6 +86,7 @@ main{max-width:1100px;margin:auto;padding:12px 14px calc(40px + env(safe-area-in
 .fm{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px}
 .fm h2{font-size:1rem;margin-bottom:2px}
 .fm .hint{text-align:left;margin-bottom:6px}
+textarea.tx.big{min-height:150px}
 textarea.tx{min-height:92px;resize:vertical;font-family:inherit;line-height:1.4}
 .ck{display:flex;align-items:center;gap:8px;font-size:.84rem;margin:8px 0}
 .ck input{width:18px;height:18px}
@@ -172,19 +173,34 @@ function one(a,id){return a.filter(function(x){return x.id===id;})[0];}
 function K(id){return one(CATS,id);}
 function promptFor(i,d){
  if(d.custom)return (d.couple?COUPLE+', ':'')+CARDS[i].sc+', '+d.tp+', '+d.sp+', no text, no letters, no watermark';
+ var ls=d.fs?lsOf(d.fs):null;
+ if(ls)return COUPLE+', '+CARDS[i].sc+', '+one(THEMES,d.theme).p+', tarot card illustration, tall vertical portrait composition with the couple centered, '+ls.p+', decorative symbolic details, no text, no letters, no border, no frame, no watermark';
  return COUPLE+', '+CARDS[i].sc+', '+one(THEMES,d.theme).p+', '+STYLE;
 }
-function deckLabel(d){return d.custom?'ธีม: '+esc(d.tn)+' · สไตล์: '+esc(d.sn):'ธีมด้านหน้า: '+esc(one(THEMES,d.theme).t)+' · ด้านหลัง: '+esc(one(BACKS,d.bs).t);}
+function deckLabel(d){if(d.custom)return 'หน้า: '+esc(d.tn)+' · '+esc(d.sn)+(d.bsn?' · หลัง: '+esc(d.bsn):'');var a=d.fs&&lsOf(d.fs),b=d.bst&&lsOf(d.bst);return 'ธีมด้านหน้า: '+esc(one(THEMES,d.theme).t)+(a?' ('+esc(a.n)+')':'')+' · ด้านหลัง: '+esc(one(BACKS,d.bs).t)+(b?' ('+esc(b.n)+')':'');}
 function backPrompt(d){
+ if(d.custom&&(d.bp||d.bsp))return 'tarot card back design, perfectly symmetrical ornate pattern centered, '+[d.bp,d.bsp].filter(Boolean).join(', ')+', tall vertical composition, no text, no letters, no characters, no border';
  if(d.custom)return 'tarot card back design, perfectly symmetrical ornate pattern centered, '+d.tp+', '+d.sp+', tall vertical composition, no text, no letters, no characters, no border';
- return 'tarot card back design, perfectly symmetrical ornate pattern centered, '+one(BACKS,d.bs).p+', tall vertical composition, flat illustration, no text, no letters, no characters, no border';
+ var bl=d.bst?lsOf(d.bst):null;
+ return 'tarot card back design, perfectly symmetrical ornate pattern centered, '+one(BACKS,d.bs).p+', tall vertical composition, '+(bl?bl.p:'flat illustration')+', no text, no letters, no characters, no border';
 }
 
-var ST={st:[],form:{},vd:'',vi:0,tab:'lib',cat:'all',q:'',decks:[],cur:'',S:null,err:'',draft:{th:'sky',bs:'moon'},sig:'',T:0,open:'',inf:{},idx:-1};
+var ST={st:[],form:{},vd:'',vi:0,tab:'lib',cat:'all',q:'',decks:[],cur:'',S:null,err:'',draft:{th:'sky',bs:'moon',fs:'anime',bst:'flat'},ls:[],sig:'',T:0,open:'',inf:{},idx:-1};
 try{ST.st=JSON.parse(localStorage.getItem('oc_styles')||'[]');}catch(e){}
 try{ST.decks=JSON.parse(localStorage.getItem('oc_decks')||'[]');ST.cur=localStorage.getItem('oc_cur')||'';}catch(e){}
 function persist(){try{localStorage.setItem('oc_decks',JSON.stringify(ST.decks));localStorage.setItem('oc_cur',ST.cur);}catch(e){}}
 function persistSt(){try{localStorage.setItem('oc_styles',JSON.stringify(ST.st));}catch(e){}}
+var LS0=[
+{id:'anime',n:'อนิเมะเส้นสะอาด พาสเทล',p:'anime style, clean fine line art, soft pastel flat colors with gentle shading'},
+{id:'story',n:'ภาพประกอบนิทานแฟนตาซี (แบบไพ่ตัวอย่าง)',p:'ornate fantasy oracle card illustration, painterly storybook style, fine ink linework, rich saturated colors, soft glowing magical light, East Asian mythology aesthetic, detailed environment'},
+{id:'water',n:'สีน้ำนุ่มฝัน',p:'soft watercolor illustration, delicate ink outlines, paper texture, dreamy'},
+{id:'ink',n:'หมึกพู่กันญี่ปุ่น',p:'japanese sumi-e ink wash painting, expressive brush strokes, muted tones with a single red accent, rice paper texture'},
+{id:'flat',n:'ภาพเรียบสีสด (เหมาะกับลายหลังไพ่)',p:'flat vector illustration, bold clean shapes, limited color palette'}];
+try{ST.ls=JSON.parse(localStorage.getItem('oc_ls')||'[]');}catch(e){}
+function persistLs(){try{localStorage.setItem('oc_ls',JSON.stringify(ST.ls));}catch(e){}}
+function allLS(){return LS0.concat(ST.ls);}
+function lsOf(id){return one(allLS(),id);}
+function lsChips(act,sel){return allLS().map(function(x){return '<button class="opt'+(sel===x.n?' on':'')+'" data-a="'+act+'" data-v="'+x.id+'">'+esc(x.n)+'</button>';}).join('');}
 function $(s){return document.querySelector(s);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function toast(m){var t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(function(){t.style.display='none';},3200);}
@@ -260,7 +276,7 @@ function renderDecks(){
   +'<div class="row" style="margin-top:8px">'+'<button class="bt s" data-a="view" data-v="'+d.id+'">ดูไพ่ทีละใบ</button>'+(d.custom?'<button class="bt s g" data-a="eddk" data-v="'+d.id+'">แก้ prompt</button>':'')+(cur?'':'<button class="bt s" data-a="use" data-v="'+d.id+'">ใช้สำรับนี้</button>')
   +'<button class="bt s g" data-a="bkm" data-v="'+d.id+'">ด้านหลัง</button>'
   +(inf.done<78?'<button class="bt s g" data-a="fill" data-v="'+d.id+'">สร้างใบที่ขาด</button>':'')
-  +(inf.fail?'<button class="bt s g" data-a="resume">ลองงานที่ล้มเหลวใหม่</button>':'')
+  +(inf.n?'<button class="bt s g" data-a="stop" data-v="'+d.id+'">หยุดสร้าง</button>':'')+(inf.fail?'<button class="bt s g" data-a="resume">ลองงานที่ล้มเหลวใหม่</button>':'')
   +'<button class="bt s g" data-a="del" data-v="'+d.id+'">ลบ</button></div></div></div>';
  });
  $('#main').innerHTML=h;
@@ -287,36 +303,43 @@ function newDeckSheet(){
  +'<input class="tx" id="dn" placeholder="ชื่อสำรับ" value="'+esc(nm)+'" maxlength="30">'
  +'<div class="lb">ธีมด้านหน้า (ฉากหลังของไพ่ทั้ง 78 ใบ)</div><div class="row">'+THEMES.map(function(t){return '<button class="opt'+(ST.draft.th===t.id?' on':'')+'" data-a="th" data-v="'+t.id+'">'+t.ic+' '+t.t+'</button>';}).join('')+'</div>'
  +'<div class="lb">ลายด้านหลัง (สร้าง 3 แบบให้เลือก 1)</div><div class="row">'+BACKS.map(function(t){return '<button class="opt'+(ST.draft.bs===t.id?' on':'')+'" data-a="bs" data-v="'+t.id+'">'+t.ic+' '+t.t+'</button>';}).join('')+'</div>'
+ +'<div class="lb">ลายเส้นด้านหน้า (แยกจากสตูดิโอ)</div><div class="row">'+allLS().map(function(x){return '<button class="opt'+(ST.draft.fs===x.id?' on':'')+'" data-a="fsd" data-v="'+x.id+'">'+esc(x.n)+'</button>';}).join('')+'</div>'
+ +'<div class="lb">ลายเส้นด้านหลัง</div><div class="row">'+allLS().map(function(x){return '<button class="opt'+(ST.draft.bst===x.id?' on':'')+'" data-a="bsd" data-v="'+x.id+'">'+esc(x.n)+'</button>';}).join('')+'</div>'
  +'<div class="hint" style="margin-top:12px">ใช้ภาพรวม 81 ภาพ บอทจะทยอยสร้างตามรอบและโควตาที่ตั้งไว้ในสตูดิโอ</div>'
  +'<div class="act"><button data-a="mk">เริ่มสร้างสำรับ</button><button class="g" data-a="close">ยกเลิก</button></div>');
 }
 
 function renderDesign(){
- var c=cfg(),f=ST.form,s=f.sid?one(ST.st,f.sid):null;
- if(f.sid&&!s){f.sid='';}
+ var c=cfg(),f=ST.form,ed=!!f.eid;
  var h='<div class="bn"><span>'+(c.url?'เชื่อมบอท Flux แล้ว':'ยังไม่ได้ตั้งค่าบอท Flux')+'</span><button class="bt s g" data-a="bot">ตั้งค่าบอท</button></div>';
  if(ST.err)h+='<div class="er">'+esc(ST.err)+'</div>';
- h+='<div class="fm"><h2>'+(f.eid?'แก้ไข prompt ของสไตล์':'สั่งออกแบบสำรับด้วย prompt ของคุณ')+'</h2><div class="hint">เขียนเองได้อิสระ ระบบจะจำ prompt ไว้ใช้ซ้ำ แต่แสดงแค่ชื่อธีมกับชื่อสไตล์ · ใช้ภาพรวม 81 ภาพ</div>'
- +(f.eid?'':'<input class="tx" data-f="name" placeholder="ชื่อสำรับ (เว้นว่าง = ใช้ชื่อธีม)" maxlength="30" value="'+esc(f.name||'')+'">');
- if(s){
-  h+='<div class="sel"><span>ใช้ธีม <b>'+esc(s.tn)+'</b> · สไตล์ <b>'+esc(s.sn)+'</b></span><button class="bt s g" data-a="clrst">เขียนใหม่</button></div>';
- }else{
-  h+='<div class="lb">ธีม</div><input class="tx" data-f="tn" placeholder="ชื่อธีม เช่น ป่าเวทมนตร์ยามค่ำ" maxlength="30" value="'+esc(f.tn||'')+'">'
-  +'<textarea class="tx" data-f="tp" placeholder="prompt ธีม/ฉากหลัง (ภาษาอังกฤษจะได้ผลดีสุด) เช่น enchanted forest at night, glowing mushrooms, fireflies, deep green and violet tones">'+esc(f.tp||'')+'</textarea>'
-  +'<div class="lb">สไตล์</div><input class="tx" data-f="sn" placeholder="ชื่อสไตล์ เช่น สีน้ำญี่ปุ่น" maxlength="30" value="'+esc(f.sn||'')+'">'
-  +'<textarea class="tx" data-f="sp" placeholder="prompt สไตล์ภาพ เช่น soft watercolor illustration, delicate ink outlines, paper texture, dreamy">'+esc(f.sp||'')+'</textarea>';
- }
- var cp=s?s.couple:(f.couple!==false);
- if(!s)h+='<label class="ck"><input type="checkbox" data-f="couple"'+(cp?' checked':'')+'> ใช้คู่ตัวละครเดิมในไพ่ทุกใบ</label>';
- else h+='<div class="hint">'+(s.couple?'ใช้คู่ตัวละครเดิม':'ไม่ใช้คู่ตัวละคร')+'</div>';
- h+=f.eid?'<div class="hint">แก้แล้วสำรับที่ใช้สไตล์นี้จะใช้ prompt ใหม่กับใบที่สร้างต่อจากนี้ (ภาพเดิมไม่เปลี่ยน)</div><div class="act"><button data-a="savest">บันทึกการแก้ไข</button><button class="g" data-a="cancst">ยกเลิก</button></div></div>':'<div class="act"><button data-a="mkc">เริ่มสร้างสำรับ</button></div></div>';
- h+='<h2 style="font-size:1rem;margin:4px 0 8px">สไตล์ที่บันทึกไว้ <small style="color:var(--mute);font-weight:400">'+ST.st.length+'</small></h2>';
- if(!ST.st.length)h+='<div class="em">ยังไม่มีสไตล์ที่บันทึก สร้างสำรับด้วย prompt แล้วระบบจะจำให้อัตโนมัติ</div>';
+ var ta=function(k,ph,r){var v=f[k]||'';return '<textarea class="tx big" rows="'+r+'" data-f="'+k+'" placeholder="'+ph+'">'+esc(v)+'</textarea><div class="hint cnt">'+v.length+' ตัวอักษร</div>';};
+ var tx=function(k,ph){return '<input class="tx" data-f="'+k+'" placeholder="'+ph+'" maxlength="40" value="'+esc(f[k]||'')+'">';};
+ h+='<div class="fm"><h2>'+(ed?'แก้ prompt ของชุดสไตล์':'ออกแบบสำรับด้วย prompt ของคุณ')+'</h2><div class="hint">เขียนยาวได้ ระบบจำไว้ใช้ซ้ำ ด้านหน้ากับด้านหลังแยกกัน ใช้ภาพรวม 81 ภาพ prompt รวมต่อใบควรไม่เกินราว 2,000 ตัวอักษร</div>';
+ if(!ed)h+=tx('name','ชื่อสำรับ (เว้นว่าง = ใช้ชื่อธีม)');
+ h+='<div class="lb">ด้านหน้า · ธีม/ฉากหลัง</div>'+tx('tn','ชื่อธีม เช่น ป่าเวทมนตร์ยามค่ำ')
+  +ta('tp','prompt ธีม/ฉากหลังด้านหน้า (ภาษาอังกฤษได้ผลดีสุด) เช่น enchanted forest at night, glowing mushrooms, fireflies, deep green and violet tones',5)
+  +'<div class="lb">ด้านหน้า · ลายเส้น/สไตล์ภาพ</div><div class="row">'+lsChips('pickfs',f.sn)+'</div>'+tx('sn','ชื่อสไตล์ เช่น สีน้ำญี่ปุ่น')
+  +ta('sp','prompt สไตล์ภาพด้านหน้า เช่น soft watercolor illustration, delicate ink outlines, paper texture, dreamy',5)
+  +'<div class="row"><button class="bt s g" data-a="savels" data-v="f">บันทึกเป็นลายเส้นของฉัน</button></div>'
+  +'<label class="ck"><input type="checkbox" data-f="couple"'+(f.couple!==false?' checked':'')+'> ใช้คู่ตัวละครเดิมในไพ่ทุกใบ</label>'
+  +'<div class="lb">ด้านหลัง · ลวดลาย</div>'
+  +ta('bp','prompt ลวดลายด้านหลัง เช่น symmetrical ornate mandala, moon phases in the center, celtic knot corners (ไม่ต้องใส่ตัวละคร)',4)
+  +'<div class="lb">ด้านหลัง · ลายเส้น/สไตล์ภาพ</div><div class="row">'+lsChips('pickbs',f.bsn)+'</div>'+tx('bsn','ชื่อสไตล์ด้านหลัง')
+  +ta('bsp','prompt สไตล์ภาพด้านหลัง เช่น flat vector illustration, gold line details on navy',4)
+  +'<div class="row"><button class="bt s g" data-a="savels" data-v="b">บันทึกเป็นลายเส้นของฉัน</button></div>';
+ h+=ed?'<div class="hint">แก้แล้วสำรับที่ใช้ชุดนี้จะใช้ prompt ใหม่กับใบที่สร้างต่อจากนี้ (ภาพเดิมไม่เปลี่ยน)</div><div class="act"><button data-a="savest">บันทึกการแก้ไข</button><button class="g" data-a="cancst">ยกเลิก</button></div></div>':'<div class="act"><button data-a="mkc">เริ่มสร้างสำรับ</button></div></div>';
+ h+='<div class="fm"><h2>คลังลายเส้น <small style="color:var(--mute);font-weight:400">'+allLS().length+'</small></h2><div class="hint">ใช้ได้ทั้งด้านหน้าและด้านหลัง แยกจากสไตล์ในสตูดิโอ เพิ่มลายเส้นของคุณเองได้</div>';
+ allLS().forEach(function(x){var mine=ST.ls.indexOf(x)>=0;h+='<div class="sel"><span><b>'+esc(x.n)+'</b>'+(mine?' · ของฉัน':'')+'<br><small style="color:var(--mute)">'+esc(x.p.slice(0,90))+(x.p.length>90?'…':'')+'</small></span>'+(mine?'<button class="bt s g" data-a="dells" data-v="'+x.id+'">ลบ</button>':'')+'</div>';});
+ h+='<div class="lb">เพิ่มลายเส้นใหม่</div>'+tx('lsn','ชื่อลายเส้น เช่น ภาพประกอบหนังสือนิทาน')+ta('lsp','prompt ลายเส้น/สไตล์ภาพ (ภาษาอังกฤษได้ผลดีสุด)',4)+'<div class="act"><button data-a="addls">เพิ่มลายเส้น</button></div></div>';
+ h+='<h2 style="font-size:1rem;margin:4px 0 8px">ชุดสไตล์ที่บันทึกไว้ <small style="color:var(--mute);font-weight:400">'+ST.st.length+'</small></h2>';
+ if(!ST.st.length)h+='<div class="em">ยังไม่มีชุดสไตล์ที่บันทึก สร้างสำรับด้วย prompt แล้วระบบจะจำให้อัตโนมัติ</div>';
  ST.st.forEach(function(x){
-  h+='<div class="dk"><div class="di"><b>'+esc(x.tn)+'</b><small>สไตล์: '+esc(x.sn)+'</small><div class="row" style="margin-top:8px"><button class="bt s'+(f.sid===x.id?' g':'')+'" data-a="usest" data-v="'+x.id+'">'+(f.sid===x.id?'กำลังเลือก':'ใช้สไตล์นี้')+'</button><button class="bt s g" data-a="edst" data-v="'+x.id+'">แก้ไข</button><button class="bt s g" data-a="delst" data-v="'+x.id+'">ลบ</button></div></div></div>';
+  h+='<div class="dk"><div class="di"><b>'+esc(x.tn)+'</b><small>หน้า: '+esc(x.sn)+(x.bsn?' · หลัง: '+esc(x.bsn):'')+'</small><div class="row" style="margin-top:8px"><button class="bt s'+(f.sid===x.id?' g':'')+'" data-a="usest" data-v="'+x.id+'">'+(f.sid===x.id?'กำลังเลือก':'ใช้ชุดนี้')+'</button><button class="bt s g" data-a="edst" data-v="'+x.id+'">แก้ไข</button><button class="bt s g" data-a="delst" data-v="'+x.id+'">ลบ</button></div></div></div>';
  });
  $('#main').innerHTML=h;
 }
+
 function viewSheet(i,keep){
  var d=deck(ST.vd);if(!d)return;
  var inf=ST.inf[d.id]||info(d),c=CARDS[i],was=keep&&$('#fl')&&$('#fl').classList.contains('on');
@@ -360,12 +383,20 @@ var A={
  card:function(v){cardSheet(+v);},
  close:close_,
  newdeck:function(){newDeckSheet();},
+ fsd:function(v){ST.draft.fs=v;newDeckSheet();},
+ bsd:function(v){ST.draft.bst=v;newDeckSheet();},
+ pickfs:function(v){var x=lsOf(v);if(!x)return;ST.form.sn=x.n;ST.form.sp=x.p;render();},
+ pickbs:function(v){var x=lsOf(v);if(!x)return;ST.form.bsn=x.n;ST.form.bsp=x.p;render();},
+ savels:function(v){var f=ST.form,n=String((v==='b'?f.bsn:f.sn)||'').trim(),p=String((v==='b'?f.bsp:f.sp)||'').trim();if(!n||!p){toast('ใส่ชื่อและ prompt ของลายเส้นก่อน');return;}ST.ls.push({id:'u'+Math.random().toString(36).slice(2,7),n:n,p:p});persistLs();render();toast('เพิ่มลายเส้นในคลังแล้ว');},
+ addls:function(){var f=ST.form,n=String(f.lsn||'').trim(),p=String(f.lsp||'').trim();if(!n||!p){toast('ใส่ชื่อและ prompt ของลายเส้นก่อน');return;}ST.ls.push({id:'u'+Math.random().toString(36).slice(2,7),n:n,p:p});persistLs();f.lsn='';f.lsp='';render();toast('เพิ่มลายเส้นในคลังแล้ว');},
+ dells:function(v){ST.ls=ST.ls.filter(function(x){return x.id!==v;});persistLs();render();toast('ลบลายเส้นแล้ว (สำรับที่สร้างไปแล้วไม่กระทบ)');},
+ stop:async function(v){var d=deck(v);if(!d||!need())return;if(!confirm('หยุดสร้างสำรับ "'+d.name+'"? งานที่ยังรอคิวจะถูกยกเลิก (ภาพที่เสร็จแล้วยังอยู่)'))return;try{var a=await api('/api/clearjobs',{prefix:P(d,'front')}),b=await api('/api/clearjobs',{prefix:P(d,'back')});toast('ยกเลิกงานที่รอคิว '+((a.n||0)+(b.n||0))+' งาน ภาพที่กำลังเจนอยู่อีก 1 ใบจะเสร็จเอง');}catch(e){toast(errMsg(e));}ST.sig='';poll();},
  th:function(v){ST.draft.th=v;newDeckSheet();},
  bs:function(v){ST.draft.bs=v;newDeckSheet();},
  mk:async function(){
   if(!need())return;
   var nm=($('#dn').value||'').trim()||('สำรับ '+(ST.decks.length+1));
-  var d={id:Math.random().toString(36).slice(2,8),name:nm,theme:ST.draft.th,bs:ST.draft.bs,back:0};
+  var d={id:Math.random().toString(36).slice(2,8),name:nm,theme:ST.draft.th,bs:ST.draft.bs,fs:ST.draft.fs,bst:ST.draft.bst,back:0};
   var ok=await enqueue({project:P(d,'back'),items:[{scene:1,prompt:backPrompt(d)}],variants:3,raw:true},'');
   if(ok)ok=await enqueue({project:P(d,'front'),items:CARDS.map(function(c,i){return{scene:i+1,prompt:promptFor(i,d)};}),raw:true},'เริ่มสร้างสำรับแล้ว ภาพจะทยอยขึ้นมา');
   if(!ok)return;
@@ -379,7 +410,7 @@ var A={
   if(await enqueue({project:P(d,'front'),items:items,raw:true}))poll();
  },
  resume:async function(){try{await api('/api/resume',{});toast('ส่งงานที่ล้มเหลวกลับเข้าคิวแล้ว');poll();}catch(e){toast(errMsg(e));}},
- del:function(v){var d=deck(v);if(!d||!confirm('ลบสำรับ "'+d.name+'" ออกจากรายการนี้? (ภาพที่บอทสร้างแล้วยังอยู่ในบอท)'))return;ST.decks=ST.decks.filter(function(x){return x.id!==v;});if(ST.cur===v)ST.cur='';persist();ST.sig='';render();},
+ del:async function(v){var d=deck(v);if(!d)return;var inf=ST.inf[v]||info(d),busy=inf.n>0;if(!confirm('ลบสำรับ "'+d.name+'" ออกจากรายการนี้?'+(busy?' งานที่ยังรอคิวของสำรับนี้จะถูกยกเลิกด้วย':'')+' (ภาพที่บอทสร้างแล้วยังอยู่ในบอท)'))return;if(cfg().url){try{var a=await api('/api/clearjobs',{prefix:P(d,'front')}),b=await api('/api/clearjobs',{prefix:P(d,'back')});if((a.n||0)+(b.n||0))toast('ยกเลิกงานที่รอคิว '+((a.n||0)+(b.n||0))+' งานแล้ว');}catch(e){toast(errMsg(e));}}ST.decks=ST.decks.filter(function(x){return x.id!==v;});if(ST.cur===v)ST.cur='';persist();ST.sig='';render();poll();},
  bot:function(){botSheet();},
  botsave:function(){var c=cfg();c.url=($('#bu').value||'').trim();c.key=$('#bkk').value||'';try{localStorage.setItem('ss_imgbot',JSON.stringify(c));}catch(e){}close_();toast('บันทึกแล้ว');ST.sig='';poll();},
  bkm:function(v){backSheet(v);},
@@ -391,34 +422,38 @@ var A={
  vprev:function(){viewSheet((ST.vi+CARDS.length-1)%CARDS.length);},
  vnext:function(){viewSheet((ST.vi+1)%CARDS.length);},
  cmp:function(){location.href='oracle-compose.html';},
- edst:function(v){var x=one(ST.st,v);if(!x)return;ST.form={eid:v,tn:x.tn,tp:x.tp,sn:x.sn,sp:x.sp,couple:!!x.couple};ST.tab='design';render();window.scrollTo(0,0);},
- eddk:function(v){var d=deck(v);if(!d)return;var id=d.sid||d.id;if(!one(ST.st,id)){ST.st.push({id:id,tn:d.tn,sn:d.sn,tp:d.tp,sp:d.sp,couple:!!d.couple});persistSt();}d.sid=id;persist();A.edst(id);},
+ edst:function(v){var x=one(ST.st,v);if(!x)return;ST.form={eid:v,tn:x.tn,tp:x.tp,sn:x.sn,sp:x.sp,bp:x.bp||'',bsn:x.bsn||'',bsp:x.bsp||'',couple:!!x.couple};ST.tab='design';render();window.scrollTo(0,0);},
+ eddk:function(v){var d=deck(v);if(!d)return;var id=d.sid||d.id;if(!one(ST.st,id)){ST.st.push({id:id,tn:d.tn,sn:d.sn,tp:d.tp,sp:d.sp,bp:d.bp||'',bsn:d.bsn||'',bsp:d.bsp||'',couple:!!d.couple});persistSt();}d.sid=id;persist();A.edst(id);},
  cancst:function(){ST.form={};render();},
  savest:function(){
   var f=ST.form,x=one(ST.st,f.eid),t=function(v){return String(v||'').trim();};
   if(!x)return;var tn=t(f.tn),sn=t(f.sn),tp=t(f.tp),sp=t(f.sp);
   if(!tn||!sn||!tp||!sp){toast('กรอกชื่อธีม ชื่อสไตล์ และ prompt ให้ครบ');return;}
-  x.tn=tn;x.sn=sn;x.tp=tp;x.sp=sp;x.couple=f.couple!==false;
-  ST.decks.forEach(function(d){if(d.sid===x.id){d.tn=tn;d.sn=sn;d.tp=tp;d.sp=sp;d.couple=x.couple;}});
+  x.tn=tn;x.sn=sn;x.tp=tp;x.sp=sp;x.bp=t(f.bp);x.bsn=t(f.bsn);x.bsp=t(f.bsp);x.couple=f.couple!==false;
+  ST.decks.forEach(function(d){if(d.sid===x.id){d.tn=tn;d.sn=sn;d.tp=tp;d.sp=sp;d.bp=x.bp;d.bsn=x.bsn;d.bsp=x.bsp;d.couple=x.couple;}});
   persistSt();persist();ST.form={};ST.sig='';render();toast('บันทึกแล้ว ใบที่สร้างต่อจากนี้จะใช้ prompt ใหม่');
  },
- usest:function(v){ST.form.sid=v;render();},
+ usest:function(v){var x=one(ST.st,v);if(!x)return;var nm=ST.form.name;ST.form={sid:v,name:nm,tn:x.tn,tp:x.tp,sn:x.sn,sp:x.sp,bp:x.bp||'',bsn:x.bsn||'',bsp:x.bsp||'',couple:!!x.couple};render();},
  clrst:function(){ST.form.sid='';render();},
  delst:function(v){ST.st=ST.st.filter(function(x){return x.id!==v;});if(ST.form.sid===v)ST.form.sid='';persistSt();render();toast('ลบสไตล์แล้ว (สำรับที่สร้างไปแล้วยังใช้ได้)');},
  mkc:async function(){
   if(!need())return;
-  var f=ST.form,s=f.sid?one(ST.st,f.sid):null,t=function(x){return String(x||'').trim();};
-  var tn=s?s.tn:t(f.tn),sn=s?s.sn:t(f.sn),tp=s?s.tp:t(f.tp),sp=s?s.sp:t(f.sp),cp=s?!!s.couple:(f.couple!==false);
-  if(!tn||!sn||!tp||!sp){toast('กรอกชื่อธีม ชื่อสไตล์ และ prompt ให้ครบ');return;}
-  var d={id:Math.random().toString(36).slice(2,8),name:t(f.name)||tn,custom:1,tn:tn,sn:sn,tp:tp,sp:sp,couple:cp,theme:'',bs:'',back:0};
+  var f=ST.form,t=function(x){return String(x||'').trim();};
+  var tn=t(f.tn),sn=t(f.sn),tp=t(f.tp),sp=t(f.sp),bp=t(f.bp),bsn=t(f.bsn),bsp=t(f.bsp),cp=f.couple!==false;
+  if(!tn||!sn||!tp||!sp){toast('กรอกชื่อธีม ชื่อสไตล์ และ prompt ด้านหน้าให้ครบ');return;}
+  if(!bp&&!bsp){toast('กรอก prompt ด้านหลัง (ลวดลายหรือสไตล์ อย่างน้อย 1 ช่อง)');return;}
+  var d={id:Math.random().toString(36).slice(2,8),name:t(f.name)||tn,custom:1,tn:tn,sn:sn,tp:tp,sp:sp,bp:bp,bsn:bsn,bsp:bsp,couple:cp,theme:'',bs:'',back:0};
+  var mx=0;CARDS.forEach(function(c,i){mx=Math.max(mx,promptFor(i,d).length);});
+  if(mx>2000&&!confirm('prompt ด้านหน้ายาวสุด '+mx+' ตัวอักษร เกินราว 2,000 ส่วนท้ายอาจถูกตัด ต่อไหม?'))return;
   var ok=await enqueue({project:P(d,'back'),items:[{scene:1,prompt:backPrompt(d)}],variants:3,raw:true},'');
   if(ok)ok=await enqueue({project:P(d,'front'),items:CARDS.map(function(c,i){return{scene:i+1,prompt:promptFor(i,d)};}),raw:true},'เริ่มสร้างสำรับแล้ว ภาพจะทยอยขึ้นมา');
   if(!ok)return;
-  d.sid=s?s.id:d.id;if(!s){ST.st.push({id:d.id,tn:tn,sn:sn,tp:tp,sp:sp,couple:cp});persistSt();}
-  ST.decks.push(d);ST.cur=d.id;persist();ST.form={};ST.tab='decks';ST.sig='';poll();render();
+  var x=ST.st.filter(function(y){return y.tn===tn&&y.sn===sn&&y.tp===tp&&y.sp===sp&&(y.bp||'')===bp&&(y.bsp||'')===bsp&&!!y.couple===cp;})[0];
+  if(!x){x={id:d.id,tn:tn,sn:sn,tp:tp,sp:sp,bp:bp,bsn:bsn,bsp:bsp,couple:cp};ST.st.push(x);persistSt();}
+  d.sid=x.id;ST.decks.push(d);ST.cur=d.id;persist();ST.form={};ST.tab='decks';ST.sig='';poll();render();
  },
 };
-function fld(e){var k=e.target.dataset&&e.target.dataset.f;if(k)ST.form[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;}
+function fld(e){var k=e.target.dataset&&e.target.dataset.f;if(k){ST.form[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;var n=e.target.nextElementSibling;if(n&&n.classList.contains('cnt'))n.textContent=e.target.value.length+' ตัวอักษร';}}
 document.addEventListener('input',fld);document.addEventListener('change',fld);
 var sx=null;
 document.addEventListener('touchstart',function(e){sx=(ST.vd&&e.target.closest('#pn'))?e.touches[0].clientX:null;},{passive:true});

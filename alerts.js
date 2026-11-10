@@ -1,4 +1,4 @@
-/* SMART SHOP add-on: alerts.js
+/* Xiress add-on: alerts.js
    1) ปุ่มขยาย/ปิดของ popup รวมเป็น "แคปซูลเดียว" (ไอคอนสี่เหลี่ยมมุม + ปุ่ม X)
    2) ศูนย์แจ้งเตือนบน Dashboard: ค่าเช่า สัญญา สต๊อก พยากรณ์อากาศ + ปฏิทินเหตุการณ์ 14 วัน
    Load LAST in index.html:  <script src="alerts.js"></script>

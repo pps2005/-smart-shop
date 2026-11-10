@@ -1,4 +1,4 @@
-/* SMART SHOP add-on: city.js v2 - เมือง 3D (Three.js r128)
+/* Xiress add-on: city.js v2 - เมือง 3D (Three.js r128)
    1 อาคาร = 1 ฝ่าย: เดินเข้าตึกได้ มีห้องข้างใน, คนในเมืองเยอะ, ตัวละครใหม่, NPC ทุกคนพิมพ์ถามได้ (ตอบจากข้อมูลจริงของร้าน)
    โหลดท้ายสุดใน index.html. ยกเลิก: ลบบรรทัด <script src="city.js"> */
 (function () {
@@ -419,7 +419,7 @@
     TK.forEach(function (t) {
       if (t.done || t.n || new Date(t.d + 'T' + (t.h || '09:00') + ':00') > now) return;
       t.n = 1; saveTK(); toast('เลขาเตือน: ' + t.t);
-      try { if (window.Notification && Notification.permission === 'granted') new Notification('SMART SHOP', { body: t.t }); } catch (e) {}
+      try { if (window.Notification && Notification.permission === 'granted') new Notification('Xiress', { body: t.t }); } catch (e) {}
     });
   }, 30000);
 

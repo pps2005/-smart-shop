@@ -1,4 +1,4 @@
-/* SMART SHOP add-on: world-ui.js — UI เต็มจอ + ข้อมูลจริง + แชทน้องฟ้า (ฝ่ายเลขา)
+/* Xiress add-on: world-ui.js — UI เต็มจอ + ข้อมูลจริง + แชทน้องฟ้า (ฝ่ายเลขา)
    แทน city.js เดิม · โหลดหลัง world-3d.js และ world-int.js
    การโต้ตอบ/แชท: เฉพาะฝ่ายเลขา (น้องฟ้า) · ตอบจากข้อมูลจริงในระบบ + ความรู้เกี่ยวกับเว็บ + คุยเล่น (กฎในเครื่อง ไม่เรียก AI API) */
 (function () {
@@ -155,7 +155,7 @@
     WD = document.createElement('div'); WD.id = 'wd'; WD.className = 'wext';
     WD.innerHTML =
       '<div id="wgl"></div>' +
-      '<header class="wtop wg"><div class="wlogo"><i>' + IC.cube + '</i><span>SMART SHOP</span></div>' +
+      '<header class="wtop wg"><div class="wlogo"><i>' + IC.cube + '</i><span>Xiress</span></div>' +
       '<div class="wsrch"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input id="wq" placeholder="ค้นหาสินค้า รหัส หรือฝ่าย..." autocomplete="off"><div id="wsr" class="wg"></div></div>' +
       '<div class="wchip loc" id="wloc">📍 ร้านของฉัน</div><button class="wib" data-a="wbell" aria-label="แจ้งเตือน">' + IC.bell + '<b id="wbadge" style="display:none">0</b></button>' +
       '<button class="wib wav" id="wav" data-a="wset" aria-label="ตั้งค่า">ก</button><button class="wib" data-a="wmenu" aria-label="เมนู">' + IC.menu + '</button></header>' +
@@ -310,7 +310,7 @@
   setInterval(function () {
     var now = new Date(); TK.forEach(function (t) {
       if (t.done || t.n || new Date(t.d + 'T' + (t.h || '09:00') + ':00') > now) return; t.n = 1; saveTK(); toast('เลขาเตือน: ' + t.t);
-      try { if (window.Notification && Notification.permission === 'granted') new Notification('SMART SHOP', { body: t.t }); } catch (e) {}
+      try { if (window.Notification && Notification.permission === 'granted') new Notification('Xiress', { body: t.t }); } catch (e) {}
     });
   }, 30000);
 

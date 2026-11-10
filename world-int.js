@@ -1,4 +1,4 @@
-/* SMART SHOP add-on: world-int.js — ภายในออฟฟิศมืดสไตล์ Sims (8 ห้อง = 8 ฝ่าย)
+/* Xiress add-on: world-int.js — ภายในออฟฟิศมืดสไตล์ Sims (8 ห้อง = 8 ฝ่าย)
    ต้องโหลดต่อจาก world-3d.js */
 (function () {
   'use strict';
@@ -208,7 +208,7 @@
     rug(IS, 0, 0, 20, 7, '#7a1f33', 'hall'); rug(IS, -34, 0, 10, 6, '#1f3a5f', 'hl'); rug(IS, 34, 0, 10, 6, '#1f3a5f', 'hr');
     cherry(IS, -8.5, -3.2, 1.1); cherry(IS, 8.5, -3.2, 1.1); plant(IS, -9.5, 3.6, 1.4); plant(IS, 9.5, 3.6, 1.4);
     [-1, 1].forEach(function (s) { for (var i = 0; i < 2; i++) { var bx = s * (44 + i * 6); table(IS, bx, -3.6, 4, 1, .9, 0x6b4426); table(IS, bx, 3.6, 4, 1, .9, 0x6b4426); floorLamp(IS, s * 50.5, i ? 3.6 : -3.6, 0xffc27a); } });
-    var hs = new T.Mesh(new T.PlaneGeometry(10, 1.6), new T.MeshBasicMaterial({ map: neon('SMART SHOP · ชั้น 1', '#f9a8d4'), transparent: true })); hs.position.set(0, 5.4, -4.2); IS.add(hs);
+    var hs = new T.Mesh(new T.PlaneGeometry(10, 1.6), new T.MeshBasicMaterial({ map: neon('Xiress · ชั้น 1', '#f9a8d4'), transparent: true })); hs.position.set(0, 5.4, -4.2); IS.add(hs);
 
     /* ---- ชั้น 2: เลานจ์ระเบียง 2 ฝั่ง + บันไดจากฮอลล์ ---- */
     var n0 = IS.children.length;
