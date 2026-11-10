@@ -1,0 +1,56 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Anime Studio</title>
+<style>:root{--bg:#fff;--fg:#1c1c20;--card:#f3f3f6;--ac:#7c5cff;--mu:#777}@media(prefers-color-scheme:dark){:root{--bg:#14141a;--fg:#ececf1;--card:#22222b;--mu:#999}}
+body{margin:0;padding:12px;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;max-width:720px;margin:auto}
+.c{background:var(--card);border-radius:12px;padding:12px;margin:10px 0}textarea,input{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #8884;background:var(--bg);color:var(--fg);font:inherit}
+button{padding:8px 12px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;margin:4px 4px 0 0}button.g{background:#8883;color:var(--fg)}small{color:var(--mu)}ol{padding-left:20px;margin:6px 0}</style></head><body>
+<h2>🎬 Anime Studio</h2><div id="cfg" class="c" hidden><small>ลิงก์บอท + รหัสผ่าน (ใช้ค่าเดียวกับหน้าสตูดิโอเดิม)</small><input id="u" placeholder="https://...workers.dev"><input id="k" type="password" placeholder="รหัสผ่านบอท"><button id="sv">บันทึก</button></div>
+<div class="c"><b>1 · อยากได้อนิเมะแบบไหน</b><textarea id="brief" rows="3" placeholder="เช่น ผจญภัยแฟนตาซี ตลกอบอุ่น ตัวเอกเป็นเด็กสาวช่างซ่อม"></textarea><button id="go">สร้างซีรีส์ + ขอบท 3 แบบ</button> <small id="st"></small></div>
+<div id="ser"></div><div id="sc"></div><div id="sb"></div>
+<div class="c"><b>2 · ตัวละคร (ชุดภาพสำหรับเทรน LoRA)</b><input id="cn" placeholder="ชื่อตัวละคร"><textarea id="cd" rows="2" placeholder="ลักษณะ เช่น เด็กสาวผมสั้นสีส้ม ตาเขียว ใส่เอี๊ยมช่างยีนส์"></textarea><button id="cg">สร้างตัวละคร + ภาพอ้างอิง 16 ภาพ</button><br><small>เว็บเทรน LoRA ให้เองเมื่อภาพครบ — แตะเลือกภาพที่ชอบไว้ก่อน (≥8 ภาพ) ถ้าอยากคุมชุดเทรน ไม่เลือกก็ใช้ทุกภาพ</small></div><div id="chs"></div>
+<div class="c"><small>4 · วิดีโอจากภาพคีย์ · 5 · ตอน/เรื่อง — กำลังทำต่อ</small></div>
+<script>
+const $=i=>document.getElementById(i);let cfg={};try{cfg=JSON.parse(localStorage.getItem('ss_imgbot')||'{}')}catch(e){}
+if(!cfg.url)$('cfg').hidden=false;$('sv').onclick=()=>{localStorage.setItem('ss_imgbot',JSON.stringify({url:$('u').value.trim(),key:$('k').value}));location.reload()};
+async function api(b,pth){const r=await fetch(String(cfg.url||'').replace(/\/+$/,'')+(pth||'/api/anime')+'?k='+encodeURIComponent(cfg.key||''),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});const j=await r.json().catch(()=>({error:'บอทตอบไม่ถูกต้อง'}));if(!r.ok||j.error)throw new Error(j.error||r.status);return j}
+let sid=0;const busy=m=>$('st').textContent=m||'';
+async function load0(){try{const d=await api({act:'list',series_id:sid});sid=d.series_id;pid=((d.scripts||[]).find(x=>x.picked)||{}).id||0;
+$('ser').innerHTML='';d.series.forEach(s=>{const b=document.createElement('button');b.className=s.id===sid?'':'g';b.textContent=s.title;b.onclick=()=>{sid=s.id;load()};$('ser').append(b)});
+$('sc').innerHTML='';d.scripts.forEach(x=>{let o={};try{o=JSON.parse(x.body)}catch(e){}const c=document.createElement('div');c.className='c';
+const h=document.createElement('b');h.textContent=(x.picked?'✅ ':'')+(o.title||'บท')+' · v'+x.ver;const p=document.createElement('div');p.textContent=o.logline||'';
+const ol=document.createElement('ol');(o.beats||[]).forEach(t=>{const li=document.createElement('li');li.textContent=t;ol.append(li)});
+const inp=document.createElement('input');inp.placeholder='สั่งแก้ เช่น เพิ่มฉากต่อสู้ตอนท้าย';
+const mk=(t,cls,fn)=>{const b=document.createElement('button');b.textContent=t;b.className=cls;b.onclick=async()=>{try{busy('กำลังทำ…');await fn();await load();busy('')}catch(e){busy(e.message)}};return b};
+c.append(h,p,ol,inp,mk('แก้','',()=>api({act:'edit',id:x.id,command:inp.value})),mk('เลือกบทนี้','g',()=>api({act:'pick',id:x.id})),mk('ลบ','g',()=>api({act:'del',id:x.id})));$('sc').append(c)});
+if(sid)$('sc').append(Object.assign(document.createElement('button'),{textContent:'ขอบทเพิ่ม',className:'g',onclick:async()=>{try{busy('กำลังคิดบท…');await api({act:'ideas',series_id:sid,n:3});await load();busy('')}catch(e){busy(e.message)}}}))}catch(e){busy(e.message)}}
+$('go').onclick=async()=>{try{busy('กำลังคิดบท…');const r=await api({act:'new',brief:$('brief').value});sid=r.id;await api({act:'ideas',series_id:sid,n:3});await load();busy('')}catch(e){busy(e.message)}};
+let pid=0,sh=[];async function load(){await load0();await loadChars();await loadShots()}
+const imgU=id=>String(cfg.url||'').replace(/\/+$/,'')+'/img/'+id+'?k='+encodeURIComponent(cfg.key||'');
+let cs=[];async function loadChars(){if(!sid)return;try{cs=(await api({act:'chars',series_id:sid})).chars;drawChars()}catch(e){busy(e.message)}}
+function drawChars(){const box=$('chs');box.innerHTML='';cs.forEach(c=>{const d=document.createElement('div');d.className='c';const n=c.images.filter(i=>i.starred).length;
+const h=document.createElement('b');h.textContent=c.name+' · เลือกแล้ว '+n+' ภาพ'+(c.pending?' · กำลังสร้างอีก '+c.pending:'');const p=document.createElement('div');p.innerHTML='<small></small>';p.firstChild.textContent=c.desc;
+const g=document.createElement('div');g.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:6px 0';
+c.images.forEach(i=>{const im=document.createElement('img');im.src=imgU(i.id);im.loading='lazy';im.style.cssText='width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:3px solid '+(i.starred?'#7c5cff':'transparent');im.onclick=async()=>{try{await api({id:i.id},'/api/star');await loadChars()}catch(e){busy(e.message)}};g.append(im)});
+const b1=document.createElement('button');b1.textContent='ขอภาพเพิ่ม 8 ภาพ';b1.className='g';b1.onclick=async()=>{try{await api({act:'char_refs',char_id:c.id,n:8});await loadChars()}catch(e){busy(e.message)}};
+const b2=document.createElement('button');b2.textContent='ลบตัวละคร';b2.className='g';b2.onclick=async()=>{if(confirm('ลบ '+c.name+' และภาพทั้งหมด?')){await api({act:'char_del',char_id:c.id});await loadChars()}};
+const L=c.lora,lb=document.createElement('div');const ST={queued:'⏳ รอเทรน (เริ่มเองเมื่อ Kaggle ว่าง)',training:'🔧 กำลังเทรน',ready:'✅ พร้อมใช้',failed:'⚠️ เทรนพัง'};
+lb.innerHTML='<small></small>';lb.firstChild.textContent=L?'LoRA: '+(ST[L.status]||L.status)+(L.size?' · '+Math.round(L.size/1048576)+' MB':'')+(L.error?' · '+L.error:''):(c.images.length<12?'LoRA: จะเทรนเองเมื่อมีภาพครบ 12 ภาพ':'LoRA: รอเข้าคิว');
+d.append(h,p,g,lb);
+if(L&&L.status==='ready'){const lab=document.createElement('label');const cb=document.createElement('input');cb.type='checkbox';cb.checked=!!L.use;cb.style.cssText='width:auto;margin-right:6px';cb.onchange=async()=>{try{await api({act:'lora_use',id:L.id,on:cb.checked})}catch(e){busy(e.message)}};lab.append(cb,'ใช้ตัวละครนี้ในเรื่อง');d.append(lab,document.createElement('br'))}
+if(L&&(L.status==='ready'||L.status==='failed')){const b3=document.createElement('button');b3.textContent='เทรนใหม่';b3.className='g';b3.onclick=async()=>{try{await api({act:'lora_retrain',char_id:c.id});await loadChars()}catch(e){busy(e.message)}};d.append(b3)}
+d.append(b1,b2);box.append(d)})}
+async function loadShots(){const box=$('sb');if(!pid){box.innerHTML='<div class="c"><small>3 · เลือกบทก่อน (กด "เลือกบทนี้") แล้วจะแตกเป็นช็อตให้ดูและสั่งแก้ได้</small></div>';sh=[];return}
+try{sh=(await api({act:'shots',script_id:pid})).shots;drawShots()}catch(e){busy(e.message)}}
+function drawShots(){const box=$('sb');box.innerHTML='';const c=document.createElement('div');c.className='c';const done=sh.filter(x=>x.img).length,pend=sh.filter(x=>x.pending).length;
+c.innerHTML='<b>3 · ซีน (Storyboard + ภาพคีย์)</b><br><small>ความยาวซีน (นาที) <input id="mn" type="number" value="5" min="1" max="15" style="width:70px"> · ช็อตละ ~5 วินาที</small><br>';
+const mk=(t,cls,fn)=>{const b=document.createElement('button');b.textContent=t;b.className=cls;b.onclick=async()=>{try{await fn()}catch(e){busy(e.message)}};return b};
+c.append(mk(sh.length?'สร้าง Storyboard ใหม่':'สร้าง Storyboard','',async()=>{let b=0;const m=+$('mn').value||5;while(b>=0){busy('คิดช็อตเหตุการณ์ที่ '+(b+1)+'…');const r=await api({act:'sb_beat',script_id:pid,beat:b,minutes:m});b=r.next;await loadShots()}busy('')}));
+if(sh.length)c.append(mk('สร้างภาพคีย์ที่ยังไม่มี','',async()=>{const r=await api({act:'kf',script_id:pid});busy('เข้าคิว '+r.queued+' ภาพ');await loadShots()}));
+const info=document.createElement('div');info.innerHTML='<small></small>';info.firstChild.textContent=sh.length?'ช็อตทั้งหมด '+sh.length+' · มีภาพคีย์ '+done+(pend?' · กำลังสร้าง '+pend:''):'';c.append(info);box.append(c);
+sh.forEach(x=>{const d=document.createElement('div');d.className='c';const t=document.createElement('div');t.textContent='#'+x.idx+' '+x.th;d.append(t);
+if(x.img){const im=document.createElement('img');im.src=imgU(x.img);im.loading='lazy';im.style.cssText='width:100%;border-radius:8px;margin:6px 0';d.append(im)}else if(x.pending){d.append(Object.assign(document.createElement('small'),{textContent:'⏳ กำลังสร้างภาพ…'}))}
+const inp=document.createElement('input');inp.placeholder='สั่งแก้ช็อต เช่น เปลี่ยนเป็นมุมต่ำ ฝนตก';d.append(inp,mk('แก้','',async()=>{busy('กำลังแก้…');await api({act:'sb_edit',id:x.id,command:inp.value});await loadShots();busy('')}),mk('ทำภาพใหม่','g',async()=>{await api({act:'kf',script_id:pid,ids:[x.id]});await loadShots()}));box.append(d)})}
+setInterval(()=>{if(sh.some(x=>x.pending))loadShots()},15000);
+$('cg').onclick=async()=>{try{if(!sid)throw new Error('สร้างซีรีส์ก่อน');busy('กำลังเข้าคิวภาพ…');await api({act:'char_new',series_id:sid,name:$('cn').value,desc:$('cd').value});$('cn').value='';$('cd').value='';await loadChars();busy('')}catch(e){busy(e.message)}};
+setInterval(()=>{if(cs.some(c=>c.pending))loadChars()},15000);
+if(cfg.url)load();
+</script></body></html>

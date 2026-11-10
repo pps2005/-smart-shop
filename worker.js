@@ -38,10 +38,11 @@ export default {
       const body = await req.json().catch(() => ({}));
       if (p.startsWith('/api/vcast')) { const cr = await castApi(req, env, url, body); if (cr) return cr; }
       if (p.startsWith('/api/v')) { const vr = await vApi(req, env, url, ctx, body); if (vr) return vr; }
+      if (p === '/api/anime') return json(await animeApi(env, body));
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/fluxkeys') return json(await fluxKeysApi(env, body));
       if (p === '/api/settings') {
-        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill', 'img_engine', 'auto_char_engine', 'auto_obj_engine', 'img_model', 'img_quant', 'img_w', 'img_h', 'img_cap'])
+        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill', 'script_model', 'img_engine', 'auto_char_engine', 'auto_obj_engine', 'img_model', 'img_quant', 'img_w', 'img_h', 'img_cap'])
           if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
         return json({ ok: true });
       }
@@ -338,6 +339,159 @@ function imgEngineFor(j, s) {
     /plain soft background|single object|creature design|dress form|faceless mannequin|environment element design|product design sheet/.test(p);
   return obj ? (s.auto_obj_engine === 'sdxl' ? 'sdxl' : 'dev') : (s.auto_char_engine === 'dev' ? 'dev' : 'sdxl');
 }
+// ===== เวอร์ชันเรียบ: ซีรีส์ → บท (AI เสนอ/สั่งแก้) → (ต่อไป: ตัวละคร LoRA → ซีน → ตอน) =====
+const SCRIPT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'; // เปลี่ยนได้ที่ settings.script_model (ชื่อโมเดล Workers AI)
+async function llmJson(env, s, user) {
+  const out = await env.AI.run(s.script_model || SCRIPT_MODEL, { messages: [{ role: 'system', content: 'คุณเป็นนักเขียนบทอนิเมะ ตอบเป็นภาษาไทย และตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น' }, { role: 'user', content: user }], max_tokens: 2400 });
+  let t = out && out.response; if (t && typeof t === 'object') t = JSON.stringify(t);
+  t = String(t || '').replace(/```json|```/g, '');
+  const a = t.search(/[\[{]/); if (a < 0) throw new Error('AI ไม่ได้ตอบเป็น JSON ลองใหม่อีกครั้ง');
+  return JSON.parse(t.slice(a, t.lastIndexOf(t[a] === '[' ? ']' : '}') + 1));
+}
+let animeReady = false;
+async function animeSchema(env) {
+  if (animeReady) return;
+  await env.DB.batch([
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS series (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, brief TEXT, created INTEGER)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS chars (id INTEGER PRIMARY KEY AUTOINCREMENT, series_id INTEGER, name TEXT, desc TEXT, created INTEGER)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS scripts (id INTEGER PRIMARY KEY AUTOINCREMENT, series_id INTEGER, body TEXT, ver INTEGER DEFAULT 1, picked INTEGER DEFAULT 0, created INTEGER)'),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS loras (id INTEGER PRIMARY KEY AUTOINCREMENT, char_id INTEGER, vjob INTEGER, status TEXT DEFAULT 'queued', error TEXT, size INTEGER DEFAULT 0, use INTEGER DEFAULT 0, created INTEGER)"),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS lchunks (lid INTEGER, idx INTEGER, data TEXT)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS shots (id INTEGER PRIMARY KEY AUTOINCREMENT, script_id INTEGER, idx INTEGER, beat INTEGER, th TEXT, en TEXT, chars TEXT, loras TEXT, kproj TEXT, created INTEGER)')]);
+  animeReady = true;
+}
+// เทรน LoRA ตัวละครอัตโนมัติ: ภาพอ้างอิงครบและไม่มีงานค้าง → เข้าคิวเทรนบน Kaggle (ใช้ภาพที่ติดดาว ถ้าเลือกไว้ ≥8 ภาพ ไม่งั้นใช้ทุกภาพ) · ปิดได้ที่ settings.auto_lora = 0
+async function animeAuto(env, s) {
+  if (s.auto_lora === '0') return;
+  await animeSchema(env);
+  const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
+  for (const c of cs) {
+    const pj = charProj(c);
+    if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n) continue;
+    const all = (await env.DB.prepare('SELECT id,scene,starred FROM images WHERE project=? ORDER BY id').bind(pj).all()).results;
+    if (all.length < 12) continue;
+    const st = all.filter(x => x.starred), use = (st.length >= 8 ? st : all).slice(0, 24), trig = 'chr' + c.id + 'x';
+    const imgs = use.map(x => ({ id: x.id, cap: `${trig}, ${CHAR_VARS[((+x.scene || 1) - 1) % CHAR_VARS.length]}` }));
+    const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: c.id, trigger: trig, images: imgs })).run();
+    await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(c.id, r.meta.last_row_id, Date.now()).run();
+  }
+}
+// ตัวละครต่อซีรีส์: สร้างชุดภาพอ้างอิงหลายมุม/อารมณ์ (เข้าคิวภาพเดิม → โหมดอัตโนมัติเลือก SDXL ให้) ภาพที่ติดดาว = ชุดเทรน LoRA
+const CHAR_VARS = ['front view, full body, standing, neutral expression', 'three-quarter view, upper body, smiling', 'side profile, upper body', 'back view, full body', 'close-up face, happy', 'close-up face, serious', 'close-up face, surprised', 'full body, walking', 'sitting on a chair, full body', 'running, dynamic pose, full body', 'looking up, upper body', 'waving at viewer, upper body', 'angry expression, upper body', 'sad expression, close-up face', 'laughing, upper body', 'arms crossed, full body, confident'];
+const charProj = c => `ซีรีส์${c.series_id}·${c.name}`;
+async function charRefs(env, cid, n) {
+  const c = await env.DB.prepare('SELECT * FROM chars WHERE id=?').bind(cid).first(); if (!c) throw new Error('ไม่พบตัวละคร');
+  const pj = charProj(c);
+  const have = (await env.DB.prepare('SELECT (SELECT COUNT(*) FROM images WHERE project=?1)+(SELECT COUNT(*) FROM jobs WHERE project=?1 AND status<>\'failed\') n').bind(pj).first()).n || 0;
+  const now = Date.now(), st = [];
+  for (let i = 0; i < n; i++) st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,4)").bind(pj, have + i + 1, `${c.desc}, ${CHAR_VARS[(have + i) % CHAR_VARS.length]}, plain light background, same character design in every image, [[STYLE]]`.slice(0, 1800), now));
+  await env.DB.batch(st);
+  return { queued: n };
+}
+async function animeApi(env, b) {
+  await animeSchema(env);
+  const act = b.act || 'list', s = await getSettings(env);
+  const shape = '{"title":"ชื่อซีน","logline":"สรุป 1-2 ประโยค","beats":["เหตุการณ์ตามลำดับเวลา"]}';
+  if (act === 'new') {
+    const brief = String(b.brief || '').trim().slice(0, 1500); if (!brief) throw new Error('พิมพ์ก่อนว่าอยากได้อนิเมะแบบไหน');
+    const r = await env.DB.prepare('INSERT INTO series (title,brief,created) VALUES (?,?,?)').bind(String(b.title || '').slice(0, 80) || brief.slice(0, 40), brief, Date.now()).run();
+    return { id: r.meta.last_row_id };
+  }
+  if (act === 'ideas') {
+    const sr = await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(+b.series_id).first(); if (!sr) throw new Error('ไม่พบซีรีส์');
+    const n = Math.min(4, Math.max(1, +b.n || 3));
+    const arr = await llmJson(env, s, `แนวอนิเมะที่ต้องการ: ${sr.brief}\n${b.extra ? 'เพิ่มเติม: ' + String(b.extra).slice(0, 500) + '\n' : ''}เสนอบทสำหรับ 1 ซีน (ยาวราว 5 นาที) จำนวน ${n} แบบที่ต่างกัน ตอบเป็น JSON array ของ ${shape} โดย beats มี 6-10 ข้อ`);
+    const list = (Array.isArray(arr) ? arr : [arr]).slice(0, n);
+    await env.DB.batch(list.map(x => env.DB.prepare('INSERT INTO scripts (series_id,body,created) VALUES (?,?,?)').bind(sr.id, JSON.stringify(x).slice(0, 8000), Date.now())));
+    return { ok: true, added: list.length };
+  }
+  if (act === 'edit') {
+    const sc = await env.DB.prepare('SELECT * FROM scripts WHERE id=?').bind(+b.id).first(); if (!sc) throw new Error('ไม่พบบท');
+    const cmd = String(b.command || '').trim().slice(0, 600); if (!cmd) throw new Error('พิมพ์คำสั่งแก้ก่อน');
+    const o = await llmJson(env, s, `บทปัจจุบัน: ${sc.body}\nคำสั่งแก้: ${cmd}\nแก้บทตามคำสั่ง แล้วตอบเป็น JSON object ${shape}`);
+    await env.DB.prepare('UPDATE scripts SET body=?, ver=ver+1 WHERE id=?').bind(JSON.stringify(Array.isArray(o) ? o[0] : o).slice(0, 8000), sc.id).run();
+    return { ok: true };
+  }
+  if (act === 'pick') { const sc = await env.DB.prepare('SELECT series_id FROM scripts WHERE id=?').bind(+b.id).first(); if (sc) await env.DB.batch([env.DB.prepare('UPDATE scripts SET picked=0 WHERE series_id=?').bind(sc.series_id), env.DB.prepare('UPDATE scripts SET picked=1 WHERE id=?').bind(+b.id)]); return { ok: true }; }
+  if (act === 'del') { await env.DB.prepare('DELETE FROM scripts WHERE id=?').bind(+b.id).run(); return { ok: true }; }
+  if (act === 'char_new') {
+    const name = String(b.name || '').trim().slice(0, 40), desc = String(b.desc || '').trim().slice(0, 600);
+    if (!name || !desc) throw new Error('ใส่ชื่อและลักษณะตัวละครก่อน');
+    const r = await env.DB.prepare('INSERT INTO chars (series_id,name,desc,created) VALUES (?,?,?,?)').bind(+b.series_id, name, desc, Date.now()).run();
+    return { id: r.meta.last_row_id, ...(await charRefs(env, r.meta.last_row_id, 16)) };
+  }
+  if (act === 'char_refs') return await charRefs(env, +b.char_id, Math.min(16, +b.n || 8));
+  if (act === 'char_del') {
+    const c = await env.DB.prepare('SELECT * FROM chars WHERE id=?').bind(+b.char_id).first();
+    if (c) await env.DB.batch([env.DB.prepare('DELETE FROM images WHERE project=?').bind(charProj(c)), env.DB.prepare("DELETE FROM jobs WHERE project=? AND status IN ('queued','failed')").bind(charProj(c)), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(c.id)]);
+    return { ok: true };
+  }
+  if (act === 'sb_beat') { // แตกบทเป็นช็อตทีละเหตุการณ์ (หน้าเว็บเรียกวนจนครบ)
+    const sc = await env.DB.prepare('SELECT * FROM scripts WHERE id=?').bind(+b.script_id).first(); if (!sc) throw new Error('ไม่พบบท');
+    let o = {}; try { o = JSON.parse(sc.body); } catch { o = {}; }
+    const beats = o.beats || [], bi = +b.beat || 0; if (!beats.length) throw new Error('บทนี้ยังไม่มีเหตุการณ์');
+    if (bi === 0) await env.DB.batch([env.DB.prepare('DELETE FROM shots WHERE script_id=?').bind(sc.id), env.DB.prepare('DELETE FROM images WHERE project LIKE ?').bind(`ฉาก${sc.id}·%`)]);
+    const sr = await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(sc.series_id).first();
+    const cs = (await env.DB.prepare('SELECT name,desc FROM chars WHERE series_id=?').bind(sc.series_id).all()).results;
+    const total = 12 * Math.min(15, Math.max(1, +b.minutes || 5)), N = Math.min(10, Math.max(2, Math.ceil(total / beats.length)));
+    const arr = await llmJson(env, s, `ซีรีส์: ${sr ? sr.brief : ''}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nชื่อซีน: ${o.title || ''}\nเหตุการณ์ที่ ${bi + 1}/${beats.length}: ${beats[bi]}\nเขียน ${N} ช็อตต่อเนื่องของเหตุการณ์นี้ (ช็อตละราว 5 วินาที ระบุมุมกล้องและการกระทำ) ตอบเป็น JSON array ของ {"th":"คำอธิบายช็อตภาษาไทยสั้นๆ","en":"English image prompt: setting, action, camera angle (no character names, no hair/clothes details)","chars":["ชื่อตัวละครที่อยู่ในช็อต"]}`);
+    const list = (Array.isArray(arr) ? arr : [arr]).slice(0, N);
+    const base = (await env.DB.prepare('SELECT COUNT(*) n FROM shots WHERE script_id=?').bind(sc.id).first()).n;
+    await env.DB.batch(list.map((x, i) => env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created) VALUES (?,?,?,?,?,?,?,?)').bind(sc.id, base + i + 1, bi, String(x.th || '').slice(0, 300), String(x.en || '').slice(0, 600), JSON.stringify(Array.isArray(x.chars) ? x.chars : []), `ฉาก${sc.id}·${base + i + 1}`, Date.now())));
+    return { next: bi + 1 < beats.length ? bi + 1 : -1, added: list.length };
+  }
+  if (act === 'sb_edit') {
+    const sh = await env.DB.prepare('SELECT * FROM shots WHERE id=?').bind(+b.id).first(); if (!sh) throw new Error('ไม่พบช็อต');
+    const cmd = String(b.command || '').trim().slice(0, 400); if (!cmd) throw new Error('พิมพ์คำสั่งแก้ก่อน');
+    const o = await llmJson(env, s, `ช็อตปัจจุบัน: ${JSON.stringify({ th: sh.th, en: sh.en, chars: JSON.parse(sh.chars || '[]') })}\nคำสั่งแก้: ${cmd}\nแก้ช็อตตามคำสั่ง ตอบเป็น JSON object {"th":"...","en":"English image prompt","chars":["..."]}`);
+    await env.DB.prepare('UPDATE shots SET th=?, en=?, chars=? WHERE id=?').bind(String(o.th || sh.th).slice(0, 300), String(o.en || sh.en).slice(0, 600), JSON.stringify(Array.isArray(o.chars) ? o.chars : JSON.parse(sh.chars || '[]')), sh.id).run();
+    return { ok: true };
+  }
+  if (act === 'kf') { // สร้างภาพคีย์ (SDXL + LoRA ตัวละครที่ติ๊กใช้) · ไม่ส่ง ids = ทำเฉพาะช็อตที่ยังไม่มีภาพ
+    const sc = await env.DB.prepare('SELECT series_id FROM scripts WHERE id=?').bind(+b.script_id).first(); if (!sc) throw new Error('ไม่พบบท');
+    const rows = (await env.DB.prepare('SELECT * FROM shots WHERE script_id=? ORDER BY idx').bind(+b.script_id).all()).results;
+    const only = Array.isArray(b.ids) ? new Set(b.ids.map(Number)) : null;
+    const lc = (await env.DB.prepare("SELECT c.id cid,c.name,l.id lid FROM chars c JOIN loras l ON l.char_id=c.id AND l.status='ready' AND l.use=1 WHERE c.series_id=?").bind(sc.series_id).all()).results;
+    const hv = new Set((await env.DB.prepare('SELECT DISTINCT project FROM images WHERE project LIKE ?').bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
+    const pd = new Set((await env.DB.prepare("SELECT DISTINCT project FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle')").bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
+    const st = []; let n = 0;
+    for (const sh of rows) {
+      if (only ? !only.has(sh.id) : (hv.has(sh.kproj) || pd.has(sh.kproj))) continue;
+      let names = []; try { names = JSON.parse(sh.chars || '[]'); } catch { names = []; }
+      const m = lc.filter(c => names.includes(c.name));
+      st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: 0.8 }))), sh.id));
+      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,4)").bind(sh.kproj, `${m.map(c => 'chr' + c.cid + 'x').join(', ')}${m.length ? ', ' : ''}${sh.en}, [[STYLE]]`.slice(0, 1800), Date.now()));
+      n++;
+    }
+    if (st.length) await env.DB.batch(st);
+    return { queued: n };
+  }
+  if (act === 'shots') {
+    const like = `ฉาก${+b.script_id}·%`;
+    const rows = (await env.DB.prepare('SELECT id,idx,beat,th,chars FROM shots WHERE script_id=? ORDER BY idx').bind(+b.script_id).all()).results;
+    const im = {}, pd = {};
+    for (const x of (await env.DB.prepare('SELECT project, MAX(id) id FROM images WHERE project LIKE ? GROUP BY project').bind(like).all()).results) im[x.project] = x.id;
+    for (const x of (await env.DB.prepare("SELECT project, COUNT(*) n FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle') GROUP BY project").bind(like).all()).results) pd[x.project] = x.n;
+    return { shots: rows.map(r => ({ ...r, img: im[`ฉาก${+b.script_id}·${r.idx}`] || 0, pending: pd[`ฉาก${+b.script_id}·${r.idx}`] || 0 })) };
+  }
+  if (act === 'lora_use') { await env.DB.prepare('UPDATE loras SET use=? WHERE id=?').bind(b.on ? 1 : 0, +b.id).run(); return { ok: true }; }
+  if (act === 'lora_retrain') { await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(+b.char_id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=(SELECT 'ซีรีส์'||series_id||'·'||name FROM chars WHERE id=?)").bind(+b.char_id)]); return { ok: true }; }
+  if (act === 'chars') {
+    const cs = (await env.DB.prepare('SELECT * FROM chars WHERE series_id=? ORDER BY id').bind(+b.series_id).all()).results;
+    for (const c of cs) {
+      const pj = charProj(c);
+      c.images = (await env.DB.prepare('SELECT id,starred FROM images WHERE project=? ORDER BY id').bind(pj).all()).results;
+      c.pending = (await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n;
+      const l = await env.DB.prepare("SELECT l.id,l.status,l.error,l.size,l.use,v.status vs FROM loras l LEFT JOIN vjobs v ON v.id=l.vjob WHERE l.char_id=? AND l.status<>'old' ORDER BY l.id DESC LIMIT 1").bind(c.id).first();
+      if (l) { if (l.status === 'queued' && l.vs === 'running') l.status = 'training'; c.lora = l; }
+    }
+    return { chars: cs };
+  }
+  const sers = (await env.DB.prepare('SELECT id,title,brief FROM series ORDER BY id DESC LIMIT 20').all()).results;
+  const sid = +b.series_id || (sers[0] && sers[0].id) || 0;
+  const scripts = sid ? (await env.DB.prepare('SELECT id,body,ver,picked FROM scripts WHERE series_id=? ORDER BY id DESC').bind(sid).all()).results : [];
+  return { series: sers, series_id: sid, scripts };
+}
 async function kImgOn(env, s, now) {
   if ((s.img_engine || 'auto') === 'flux') return false;
   kEnv(env, s);
@@ -350,8 +504,10 @@ async function bridgeImg(env, s) {
   if (!rows.length) return 0;
   const st = [], now = Date.now();
   for (const j of rows) {
-    const eg = imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
-    const opt = { jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '', quant: s.img_quant || '' };
+    let lo = [];
+    if (String(j.project).startsWith('ฉาก')) { const sh = await env.DB.prepare('SELECT loras FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { lo = JSON.parse((sh && sh.loras) || '[]'); } catch { lo = []; } }
+    const eg = lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
+    const opt = { jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), withStyle(j.prompt, s).slice(0, 1800), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -374,6 +530,7 @@ async function kTopUp(env, s) {
 async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
+  await animeAuto(env, s).catch(() => {});
   const useK = await kImgOn(env, s, now);
   if (useK) {
     if (!force && s.auto_fill === '1') await kTopUp(env, s);
@@ -623,9 +780,39 @@ async function vRoutes(req, env, url, ctx) {
       if (!r) return new Response('not found', { status: 404 });
       return new Response(b64ToBytes(r.image), { headers: { 'content-type': 'image/jpeg' } });
     }
+    if (p.startsWith('/k/limg/')) { // รูปในชุดเทรน LoRA ให้เครื่อง Kaggle ดึง
+      await animeSchema(env);
+      const j = await env.DB.prepare('SELECT opt FROM vjobs WHERE id=? AND kind=\'lora\'').bind(id).first(); let o = {}; try { o = JSON.parse((j && j.opt) || '{}'); } catch { o = {}; }
+      const iid = +p.split('/')[4];
+      if (!j || !(o.images || []).some(x => x.id === iid)) return new Response('not found', { status: 404 });
+      const r = await env.DB.prepare('SELECT data FROM images WHERE id=?').bind(iid).first();
+      return r ? new Response(b64ToBytes(r.data), { headers: { 'content-type': 'image/jpeg' } }) : new Response('not found', { status: 404 });
+    }
+    if (p.startsWith('/k/lora/')) { // รับไฟล์ LoRA ที่เทรนเสร็จ → เก็บเป็นก้อนใน D1 (ฟรี ไม่ต้องใช้ที่เก็บเพิ่ม)
+      await animeSchema(env);
+      const l = await env.DB.prepare('SELECT id FROM loras WHERE vjob=?').bind(id).first();
+      const buf = new Uint8Array(await req.arrayBuffer());
+      if (!l) return json({ error: 'no lora' }, 404);
+      if (buf.length < 100000) return json({ error: 'ไฟล์ LoRA เล็กผิดปกติ' }, 400);
+      await env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id).run();
+      const st = [];
+      for (let i = 0, n = 0; i < buf.length; i += VCHUNK, n++) st.push(env.DB.prepare('INSERT INTO lchunks (lid,idx,data) VALUES (?,?,?)').bind(l.id, n, bytesToB64(buf.subarray(i, i + VCHUNK))));
+      await env.DB.batch(st);
+      await env.DB.prepare("UPDATE loras SET status='ready', size=?, error=NULL WHERE id=?").bind(buf.length, l.id).run();
+      await notify(env, `🧬 เทรน LoRA ตัวละครเสร็จแล้ว (${Math.round(buf.length / 1048576)} MB) เข้าไปเลือกใช้ในเรื่องได้เลย`);
+      return json({ ok: true });
+    }
+    if (p.startsWith('/k/lget/')) { // ให้เครื่อง Kaggle ดึง LoRA ไปใช้ตอนสร้างภาพ/ซีน (id = id ของ LoRA)
+      await animeSchema(env);
+      const rows = (await env.DB.prepare('SELECT data FROM lchunks WHERE lid=? ORDER BY idx').bind(id).all()).results;
+      if (!rows.length) return new Response('not found', { status: 404 });
+      const parts = rows.map(r => b64ToBytes(r.data)); const out = new Uint8Array(parts.reduce((a, x) => a + x.length, 0)); let o = 0; for (const x of parts) { out.set(x, o); o += x.length; }
+      return new Response(out, { headers: { 'content-type': 'application/octet-stream' } });
+    }
     if (p.startsWith('/k/done/')) {
       const j = await env.DB.prepare('SELECT * FROM vjobs WHERE id=?').bind(id).first();
       if (!j) return json({ error: 'no job' }, 404);
+      if (j.kind === 'lora') { await env.DB.prepare("UPDATE vjobs SET status='done' WHERE id=?").bind(id).run(); return json({ ok: true }); }
       const buf = new Uint8Array(await req.arrayBuffer());
       if (buf.length < 1000) return json({ error: 'ไฟล์เล็กผิดปกติ' }, 400);
       if (j.kind === 'img') { // ภาพ FLUX.1-dev จาก Kaggle → เข้าคลังภาพเหมือนภาพ Flux
@@ -636,6 +823,7 @@ async function vRoutes(req, env, url, ctx) {
           env.DB.prepare('DELETE FROM jobs WHERE id=?').bind(+o.jobId || 0),
           env.DB.prepare('DELETE FROM vjobs WHERE id=?').bind(id),
         ]);
+        if (String(j.project).startsWith('ฉาก')) await env.DB.prepare('DELETE FROM images WHERE project=?1 AND id<(SELECT MAX(id) FROM images WHERE project=?1)').bind(j.project).run().catch(() => {});
         if (hid) await env.DB.prepare('UPDATE helpers SET done=done+1, seen=?, cur=? WHERE id=?').bind(Date.now(), '', hid).run();
         return json({ ok: true, img: true });
       }
@@ -657,6 +845,7 @@ async function vRoutes(req, env, url, ctx) {
       if (!j) return json({ ok: true });
       const again = b.requeue || j.tries < 2;
       await env.DB.prepare('UPDATE vjobs SET status=?, error=? WHERE id=?').bind(again ? 'queued' : 'failed', String(b.error || '').slice(0, 500), id).run();
+      if (j.kind === 'lora' && !again) await env.DB.prepare("UPDATE loras SET status='failed', error=? WHERE vjob=?").bind(String(b.error || '').slice(0, 300), id).run().catch(() => {});
       if (j.kind === 'img' && !again) { // ภาพ Kaggle พังซ้ำ → ส่งให้ Flux ทำแทน และกันไม่ให้ซ่อมอัตโนมัติซ้ำจนได้ภาพซ้อน
         let o = {}; try { o = JSON.parse(j.opt || '{}'); } catch { o = {}; }
         if (o.jobId) await env.DB.prepare("UPDATE jobs SET status='queued', eng='flux' WHERE id=?").bind(+o.jobId).run();
@@ -1367,6 +1556,15 @@ def ensure_image(engine="dev", model_spec="", quant=""):
             ensure_flux(model_spec, quant)
 
 
+def ensure_lora(lid):
+    fn = "lora%s.safetensors" % lid
+    dst = os.path.join(COMFY, "models", "loras", fn)
+    if not os.path.exists(dst) or os.path.getsize(dst) < 100000:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        open(dst, "wb").write(call("/k/lget/%s" % lid, timeout=600))
+    return fn
+
+
 def gen_image(j, port=8188):
     opt = j.get("opt") or {}
     engine = "sdxl" if opt.get("engine") == "sdxl" else "dev"
@@ -1393,6 +1591,14 @@ def gen_image(j, port=8188):
         if M.get("sdxlvae"):
             wf["8"] = {"class_type": "VAELoader", "inputs": {"vae_name": M["sdxlvae"]}}
             wf["6"]["inputs"]["vae"] = ["8", 0]
+        pm, pc = ["1", 0], ["1", 1]
+        for n, lo in enumerate(opt.get("loras") or []):
+            nid = str(30 + n)
+            wf[nid] = {"class_type": "LoraLoader", "inputs": {"model": pm, "clip": pc, "lora_name": ensure_lora(lo["id"]), "strength_model": float(lo.get("w") or 0.8), "strength_clip": 1.0}}
+            pm, pc = [nid, 0], [nid, 1]
+        wf["2"]["inputs"]["clip"] = pc
+        wf["3"]["inputs"]["clip"] = pc
+        wf["5"]["inputs"]["model"] = pm
     else:
         wf = {
             "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["flux"]}},
@@ -1463,7 +1669,75 @@ def concat(j):
     return out, 0, W, H
 
 
+# ---------- เทรน LoRA ตัวละคร (kohya sd-scripts · SDXL อนิเมะ · อัตโนมัติจากงาน kind=lora) ----------
+KV = os.path.join(ROOT, "kohya")
+
+
+def ensure_kohya():
+    with LOCK:
+        if M.get("kohya"):
+            return
+        log("กำลังติดตั้งตัวเทรน LoRA (ครั้งแรกประมาณ 5–10 นาที)")
+        if not os.path.exists(KV):
+            sh("git clone --depth 1 https://github.com/kohya-ss/sd-scripts " + KV)
+        sh("python3 -m venv --system-site-packages " + KV + "/venv", check=False)
+        keep = []
+        for ln in open(KV + "/requirements.txt").read().splitlines():
+            t = ln.strip()
+            if t and not t.startswith(("#", "-e", "torch", "xformers")):
+                keep.append(t)
+        open("/tmp/kreq.txt", "w").write("\n".join(keep) + "\naccelerate\nbitsandbytes\n")
+        sh(KV + "/venv/bin/pip install -q -r /tmp/kreq.txt")
+        M["kohya"] = True
+
+
+def train_lora(job, port):
+    opt = job.get("opt") or {}
+    imgs = opt.get("images") or []
+    if len(imgs) < 8:
+        raise RuntimeError("ภาพสำหรับเทรนน้อยกว่า 8 ภาพ")
+    ensure_image("sdxl", "", "")
+    ensure_kohya()
+    trig = opt.get("trigger") or "chr"
+    d = os.path.join(ROOT, "lora%s" % job["id"])
+    data = os.path.join(d, "data", "10_" + trig)
+    out = os.path.join(d, "out")
+    os.makedirs(data, exist_ok=True)
+    os.makedirs(out, exist_ok=True)
+    for i, it in enumerate(imgs):
+        open(os.path.join(data, "%03d.jpg" % i), "wb").write(call("/k/limg/%s/%s" % (job["id"], it["id"])))
+        open(os.path.join(data, "%03d.txt" % i), "w").write(it.get("cap") or trig)
+    if port:
+        try:
+            comfy("/free", {"unload_models": True, "free_memory": True}, port=port)
+        except Exception:
+            pass
+    steps = max(600, min(1500, len(imgs) * 60))
+    ckpt = os.path.join(COMFY, "models", "checkpoints", M["sdxl"])
+    vae = os.path.join(COMFY, "models", "vae", M["sdxlvae"]) if M.get("sdxlvae") else ""
+    cmd = ('CUDA_VISIBLE_DEVICES=%d "%s/venv/bin/python" "%s/sdxl_train_network.py" --pretrained_model_name_or_path "%s" %s'
+           ' --train_data_dir "%s" --output_dir "%s" --output_name lora --caption_extension .txt'
+           ' --network_module networks.lora --network_dim 8 --network_alpha 4 --network_train_unet_only'
+           ' --resolution 768,768 --enable_bucket --train_batch_size 1 --max_train_steps %d'
+           ' --learning_rate 1e-4 --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
+           ' --mixed_precision fp16 --save_precision fp16 --gradient_checkpointing --cache_latents --sdpa --no_half_vae --seed 1'
+           % (max(0, (port or 8188) - 8188), KV, KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, steps))
+    log("เริ่มเทรน LoRA %s (%d ภาพ · %d สเต็ป)" % (trig, len(imgs), steps))
+    t0 = time.time()
+    sh(cmd)
+    f = os.path.join(out, "lora.safetensors")
+    if not os.path.exists(f):
+        raise RuntimeError("เทรนจบแต่ไม่พบไฟล์ LoRA")
+    call("/k/lora/%s" % job["id"], raw=open(f, "rb").read(), timeout=900)
+    shutil.rmtree(d, ignore_errors=True)
+    dummy = os.path.join(ROOT, "lora_done_%s.bin" % job["id"])
+    open(dummy, "wb").write(b"0" * 2048)
+    return dummy, time.time() - t0, 0, 0
+
+
 def work(job, port):
+    if job.get("kind") == "lora":
+        return train_lora(job, port)
     if job.get("kind") == "concat":
         log("กำลังรวมคลิป %s → %s" % (job.get("project"), job.get("shot")))
         return concat(job)
