@@ -4,7 +4,7 @@ body{margin:0;padding:12px;background:var(--bg);color:var(--fg);font:15px/1.5 sy
 .c{background:var(--card);border-radius:12px;padding:12px;margin:10px 0}textarea,input{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #8884;background:var(--bg);color:var(--fg);font:inherit}
 button{padding:8px 12px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;margin:4px 4px 0 0}button.g{background:#8883;color:var(--fg)}small{color:var(--mu)}ol{padding-left:20px;margin:6px 0}</style></head><body>
 <h2>🎬 Anime Studio</h2><div id="cfg" class="c" hidden><small>ลิงก์บอท + รหัสผ่าน (ใช้ค่าเดียวกับหน้าสตูดิโอเดิม)</small><input id="u" placeholder="https://...workers.dev"><input id="k" type="password" placeholder="รหัสผ่านบอท"><button id="sv">บันทึก</button></div>
-<div class="c"><b>1 · อยากได้อนิเมะแบบไหน</b><textarea id="brief" rows="3" placeholder="เช่น ผจญภัยแฟนตาซี ตลกอบอุ่น ตัวเอกเป็นเด็กสาวช่างซ่อม"></textarea><button id="go">สร้างซีรีส์ + ขอบท 3 แบบ</button> <small id="st"></small></div>
+<div class="c"><b>1 · วางโครงเรื่อง / prompt</b><textarea id="brief" rows="6" placeholder="วางเรื่องย่อ ตัวละคร โลก และเรื่องย่อ 12 ตอน หรือพิมพ์แนวสั้นๆ"></textarea><button id="go2">เริ่มจากเรื่องนี้ (สร้างตัวละคร + LoRA + แบ่ง 12 ตอน × 3 ซีน)</button><button id="go" class="g">ขอบทตัวอย่าง 3 แบบ</button> <small id="st"></small></div>
 <div id="ser"></div><div id="sc"></div><div id="sb"></div>
 <div class="c"><b>2 · ตัวละคร (ชุดภาพสำหรับเทรน LoRA)</b><input id="cn" placeholder="ชื่อตัวละคร"><textarea id="cd" rows="2" placeholder="ลักษณะ เช่น เด็กสาวผมสั้นสีส้ม ตาเขียว ใส่เอี๊ยมช่างยีนส์"></textarea><button id="cg">สร้างตัวละคร + ภาพอ้างอิง 16 ภาพ</button><br><small>เว็บเทรน LoRA ให้เองเมื่อภาพครบ — แตะเลือกภาพที่ชอบไว้ก่อน (≥8 ภาพ) ถ้าอยากคุมชุดเทรน ไม่เลือกก็ใช้ทุกภาพ</small></div><div id="chs"></div>
 <div id="eps"></div>
@@ -22,6 +22,7 @@ const inp=document.createElement('input');inp.placeholder='สั่งแก้
 const mk=(t,cls,fn)=>{const b=document.createElement('button');b.textContent=t;b.className=cls;b.onclick=async()=>{try{busy('กำลังทำ…');await fn();await load();busy('')}catch(e){busy(e.message)}};return b};
 c.append(h,p,ol,inp,mk('แก้','',()=>api({act:'edit',id:x.id,command:inp.value})),mk('เลือกบทนี้','g',()=>api({act:'pick',id:x.id})),mk('ลบ','g',()=>api({act:'del',id:x.id})));$('sc').append(c)});
 if(sid)$('sc').append(Object.assign(document.createElement('button'),{textContent:'ขอบทเพิ่ม',className:'g',onclick:async()=>{try{busy('กำลังคิดบท…');await api({act:'ideas',series_id:sid,n:3});await load();busy('')}catch(e){busy(e.message)}}}))}catch(e){busy(e.message)}}
+$('go2').onclick=async()=>{try{busy('กำลังสร้างซีรีส์…');const r=await api({act:'new',brief:$('brief').value});sid=r.id;busy('กำลังสร้างตัวละครจากเรื่อง…');await api({act:'chars_auto',series_id:sid});await planEps();await load();busy('')}catch(e){busy(e.message)}};
 $('go').onclick=async()=>{try{busy('กำลังคิดบท…');const r=await api({act:'new',brief:$('brief').value});sid=r.id;await api({act:'ideas',series_id:sid,n:3});await load();busy('')}catch(e){busy(e.message)}};
 let pid=0,sh=[];async function load(){await load0();await loadChars();await loadShots();await loadEps()}
 const imgU=id=>String(cfg.url||'').replace(/\/+$/,'')+'/img/'+id+'?k='+encodeURIComponent(cfg.key||'');
@@ -54,20 +55,24 @@ $('cg').onclick=async()=>{try{if(!sid)throw new Error('สร้างซีร�
 setInterval(()=>{if(cs.some(c=>c.pending))loadChars()},15000);
 const mkb=(t,cls,fn)=>{const b=document.createElement('button');b.textContent=t;b.className=cls;b.onclick=async()=>{try{await fn()}catch(e){busy(e.message)}};return b};
 const vidU=id=>String(cfg.url||'').replace(/\/+$/,'')+'/vid/'+id+'?k='+encodeURIComponent(cfg.key||'');
-let E50=[];async function loadEps(){const box=$('eps');if(!sid){box.innerHTML='';return}try{E50=(await api({act:'eps',series_id:sid})).eps;drawEps()}catch(e){busy(e.message)}}
-function epState(e){if(!e.script_id)return'ยังไม่เขียนบท';if(e.sb>=0)return'กำลังแตกช็อต (เหตุการณ์ '+(e.sb+1)+')';if(e.final)return'✅ เสร็จแล้ว';if(e.fin)return'กำลังรวมตอน';return'ภาพคีย์ '+e.img+'/'+e.tot+' · วิดีโอ '+e.vid+'/'+e.tot}
-async function planEps(){let f=1;while(f>0){busy('วางโครงตอนที่ '+f+'…');f=(await api({act:'ep_plan',series_id:sid,from:f})).next}busy('');await loadEps()}
+let E50=[],EF={},EOK=0;async function loadEps(){const box=$('eps');if(!sid){box.innerHTML='';return}try{const r=await api({act:'eps',series_id:sid});E50=r.eps;EF=r.efinal||{};EOK=r.ok||0;drawEps()}catch(e){busy(e.message)}}
+function epState(e){if(!e.script_id)return'ยังไม่เขียนบท';if(e.sb>=0)return'กำลังแตกช็อต (เหตุการณ์ '+(e.sb+1)+')';if(e.fin)return'✅ เสร็จ ('+e.tot+' ช็อต)';return'ภาพคีย์ '+e.img+'/'+e.tot+' · วิดีโอ '+e.vid+'/'+e.tot}
+async function planEps(){let f=1;while(f>0){busy('วางโครงตอนที่ '+f+'/12…');f=(await api({act:'ep_plan',series_id:sid,from:f})).next}busy('');await loadEps()}
 function drawEps(){const box=$('eps');box.innerHTML='';const c=document.createElement('div');c.className='c';
-c.innerHTML='<b>4 · ตอน (50 ตอน × 5 นาที)</b><br><small>กด ▶️ แล้วระบบทำต่อเองทีละตอนตามลำดับ: เขียนบท → ช็อต → ภาพคีย์ → วิดีโอ → รวมตอน (ปิดเว็บได้) · เลือกตัวละครที่ใช้ในข้อ 2</small><br>';
-if(!E50.length){c.append(mkb('วางโครง 50 ตอน','',planEps));box.append(c);return}
+c.innerHTML='<b>4 · 12 ตอน (ตอนละ 15 นาที = 3 ซีน ซีนละ 5 นาที)</b><br><small>กด ▶️ แล้วระบบเลือกวิธีทำเอง (ช็อตมีตัวละคร = SDXL+LoRA · ฉาก/บรรยากาศ = FLUX · ช็อตสำคัญ = วิดีโอ · ที่เหลือ = ภาพนิ่งซูมเลื่อน) ทำตอนที่ 1 ให้ก่อน แล้วรอคุณตรวจ (ปิดเว็บได้) · เลือกตัวละครที่ใช้ในข้อ 2</small><br>';
+if(!E50.length){c.append(mkb('วางโครง 12 ตอน','',planEps));box.append(c);return}
 const run=E50.filter(e=>e.auto&&!e.fin).length;
 c.append(mkb(run?'⏸ หยุดทุกตอน':'▶️ ทำทุกตอนให้เลย','',async()=>{await api({act:'ep_auto',series_id:sid,on:!run});await loadEps()}));box.append(c);
-E50.forEach(e=>{const d=document.createElement('div');d.className='c';const t=document.createElement('b');t.textContent='ตอน '+e.no+' · '+e.title;
+let lastEp=0;E50.forEach(e=>{if(e.ep!==lastEp){lastEp=e.ep;const g=document.createElement('div');g.className='c';g.innerHTML='<b>ตอนที่ '+e.ep+' (15 นาที)</b> ';const sc=E50.filter(x=>x.ep===e.ep);if(sc.length===3&&sc.every(x=>x.fin)){if(EOK>=e.ep)g.append('✅ ตรวจผ่านแล้ว');else g.append(mkb('ตรวจแล้ว ผ่าน → ทำตอนต่อไป','',async()=>{await api({act:'ep_ok',series_id:sid,ep:e.ep});await loadEps()}))}else if(e.ep>EOK+1)g.append(Object.assign(document.createElement('small'),{textContent:'รอตรวจตอนก่อนหน้า'}));box.append(g)}const d=document.createElement('div');d.className='c';const t=document.createElement('b');t.textContent='ซีน '+e.sc+' · '+e.title;
 const s=document.createElement('div');s.innerHTML='<small></small>';s.firstChild.textContent=e.logline+' — '+epState(e)+(e.auto&&!e.fin?' · ⏳ กำลังทำ':'');d.append(t,s);
-if(e.final){const v=document.createElement('video');v.src=vidU(e.final);v.controls=true;v.playsInline=true;v.preload='metadata';v.style.cssText='width:100%;border-radius:8px;margin-top:6px';d.append(v)}
+if(e.fin)d.append(mkb('▶️ เล่นซีนนี้','',()=>playScene(e,d)));
 d.append(mkb(e.auto&&!e.fin?'⏸ หยุด':'▶️ ทำตอนนี้','',async()=>{await api({act:'ep_auto',id:e.id,on:!(e.auto&&!e.fin)});await loadEps()}));
 if(e.script_id)d.append(mkb('ดู/แก้ช็อต','g',async()=>{pid=e.script_id;await loadShots();$('sb').scrollIntoView({behavior:'smooth'})}));
 box.append(d)})}
+async function playScene(e,d){const S=(await api({act:'shots',script_id:e.script_id})).shots;let box=d.querySelector('.pl');if(box)box.remove();box=document.createElement('div');box.className='pl';box.style.cssText='margin-top:6px;overflow:hidden;border-radius:8px;background:#000;aspect-ratio:16/9;position:relative';d.append(box);let i=0;
+const next=()=>{if(i>=S.length){box.innerHTML='<small style="color:#fff;padding:8px;display:block">จบซีน</small>';return}const x=S[i++];box.innerHTML='';
+if(x.vid){const v=document.createElement('video');v.src=vidU(x.vid);v.autoplay=true;v.muted=true;v.playsInline=true;v.style.cssText='width:100%;height:100%;object-fit:cover';v.onended=next;v.onerror=next;box.append(v)}
+else if(x.img){const m=document.createElement('img');m.src=imgU(x.img);m.style.cssText='width:100%;height:100%;object-fit:cover;transition:transform 5s linear';box.append(m);requestAnimationFrame(()=>requestAnimationFrame(()=>{m.style.transform='scale(1.12) translate(-2%,-1%)'}));setTimeout(next,5000)}else next()};next()}
 setInterval(()=>{if(E50.some(e=>e.auto&&!e.fin))loadEps()},20000);
 if(cfg.url)load();
 </script></body></html>
