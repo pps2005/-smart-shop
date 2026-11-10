@@ -25,7 +25,7 @@
       c.title = 'เลือกฉากทำตอน';
       c.textContent = '🔒';
       c.style.fontSize = '1.15rem';
-      c.addEventListener('click', function (e) { e.stopPropagation(); location.href = 'scene-pick.html'; });
+      c.addEventListener('click', function (e) { e.stopPropagation(); location.href = 'anime-core.html'; });
       ctl.appendChild(c);
     }
     return true;

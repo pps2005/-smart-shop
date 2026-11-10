@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ตัวละคร · สถานที่ · ซีน</title>
+<style>
+:root{--bg:#f7f5fc;--ink:#241b3a;--mut:#7a7194;--pri:#8b5cf6;--pri2:#ede7fe;--gold:#f0b429;--red:#e0405a;--ok:#1fa971;--line:#e5e0f3}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,"Sarabun","Noto Sans Thai",sans-serif;padding-bottom:90px}
+header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:10px 14px;display:flex;gap:10px;align-items:center}
+header h1{font-size:18px;margin:0;flex:1}header a{color:var(--pri);text-decoration:none;font-size:14px}
+main{max-width:900px;margin:0 auto;padding:12px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.muted{color:var(--mut)}.small{font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 13px;min-height:40px;cursor:pointer;color:var(--ink);font:inherit}
+.btn.main{background:var(--pri);border-color:var(--pri);color:#fff}.btn.sm{padding:6px 10px;min-height:34px;font-size:14px}
+.btn.on{background:var(--pri2);border-color:var(--pri);color:var(--pri)}.btn.red{color:var(--red)}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs .btn{flex:1;text-align:center}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font:inherit;background:#fff;color:var(--ink)}
+textarea{min-height:70px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.ph{border:2px solid var(--line);border-radius:10px;padding:4px;background:#fff}
+.ph.m{border-color:var(--pri)}.ph.x{border-color:var(--gold)}
+.ph img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;border-radius:8px;background:var(--pri2);display:block}
+.ph.wide img{aspect-ratio:16/9;object-position:center}
+.av{width:44px;height:44px;border-radius:50%;object-fit:cover;object-position:top;background:var(--pri2);display:inline-flex;align-items:center;justify-content:center;font-size:20px}
+.badge{display:inline-block;font-size:12px;border-radius:6px;padding:1px 7px;background:var(--pri2);color:var(--pri);margin-right:4px}
+.badge.ok{background:#e3f6ee;color:var(--ok)}.badge.warn{background:#fff4d6;color:#a87400}.badge.fight{background:#fde7ec;color:var(--red)}
+h3{margin:0 0 6px;font-size:16px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);border-radius:999px;padding:3px 10px 3px 3px;background:#fff;font-size:14px;cursor:pointer}
+.chip img,.chip i{width:28px;height:28px;border-radius:50%;object-fit:cover;object-position:top;background:var(--pri2);display:inline-flex;align-items:center;justify-content:center;font-style:normal}
+.chip.sel{border-color:var(--pri);background:var(--pri2)}
+.bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:8px 12px calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center;z-index:6}
+.bar .btn{flex:1;max-width:260px}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#241b3a;color:#fff;border-radius:10px;padding:9px 14px;z-index:9;font-size:14px;max-width:90%}
+.hide{display:none}.item{border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px;background:#fff}
+</style>
+</head>
+<body>
+<header><a href="index.html">⬅</a><h1>🎬 ตัวละคร · สถานที่ · ซีน</h1><a href="studio.html">สตูดิโอ</a></header>
+<main>
+  <div class="tabs"><button class="btn on" data-tab="chars">👤 ตัวละคร</button><button class="btn" data-tab="locs">📍 สถานที่</button><button class="btn" data-tab="scenes">🎞️ ซีน</button></div>
+  <div id="view"></div>
+</main>
+<div class="bar" id="bar"></div>
+<div class="toast hide" id="toast"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const STYLE='soft anime style, clean detailed illustration, cinematic lighting, vertical 9:16';
+const LOCP='@ที่·', K='ss_core';
+let PROF={}, IMGS=[], HAND=[], SCN=[], OK=false, EP=null, OPEN={};
+let ST=Object.assign({tab:'chars',cur:'',loc:'',sc:'',q:''},JSON.parse(localStorage.getItem(K)||'{}'));
+let SC=JSON.parse(localStorage.getItem('ss_core_scenes')||'[]');
+const sv=()=>{localStorage.setItem(K,JSON.stringify(ST));localStorage.setItem('ss_core_scenes',JSON.stringify(SC));};
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.remove('hide');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.add('hide'),2600);}
+/* ---------- บอท ---------- */
+function cfg(){try{return JSON.parse(localStorage.getItem('ss_imgbot')||'{}')||{};}catch(e){return {};}}
+function U(p){const c=cfg();return String(c.url||'').replace(/\/+$/,'')+p+(p.includes('?')?'&':'?')+'k='+encodeURIComponent(c.key||'');}
+async function api(p,b){const r=await fetch(U(p),b?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)}:{});
+  if(r.status===401)throw new Error('รหัสผ่านบอทไม่ถูกต้อง');const j=await r.json().catch(()=>({error:'บอทตอบกลับไม่ถูกต้อง'}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j;}
+const img=id=>U('/img/'+id);
+async function load(){
+  if(!cfg().url){OK=false;render();return;}
+  try{PROF=(await api('/api/vcastprofile',{})).profiles||{};Object.keys(PROF).forEach(k=>{if(PROF[k]&&PROF[k].deleted)delete PROF[k];});OK=true;}catch(e){toast(String(e.message||e));}
+  try{const s=await api('/api/state');IMGS=s.images||[];}catch(e){}
+  try{HAND=(await api('/api/vcastmanual',{act:'list'})).tasks||[];}catch(e){}
+  render();
+}
+async function psave(n){try{await api('/api/vcastprofile',{act:'set',name:n,data:PROF[n]||{}});}catch(e){toast(String(e.message||e));}}
+const chName=t=>String(t||'').replace(/^ชีตใหม่\s*·\s*/,'').replace(/\s*\(.*\)\s*$/,'').trim();
+function charNames(){const s=new Set();Object.keys(PROF).filter(k=>!k.startsWith('@')).forEach(k=>s.add(k));HAND.filter(t=>t.kind==='char').forEach(t=>{const n=chName(t.title);if(n)s.add(n);});return [...s];}
+function locNames(){return Object.keys(PROF).filter(k=>k.startsWith(LOCP)&&PROF[k]&&!PROF[k].deleted).map(k=>k.slice(LOCP.length));}
+const P=n=>(PROF[n]=PROF[n]||{});
+const lockOf=n=>(PROF[n]&&PROF[n].lock&&PROF[n].lock.main)?PROF[n].lock:null;
+const av=n=>lockOf(n)?`<img class="av" src="${esc(img(lockOf(n).main))}" alt="">`:'<span class="av">👤</span>';
+
+/* ---------- ตัวละคร: ล็อกหน้าที่เดียว ---------- */
+function faceCands(n){const out=[],seen={};
+  HAND.filter(t=>t.kind==='char'&&t.image_id&&chName(t.title)===n).forEach(t=>{if(!seen[t.image_id]){seen[t.image_id]=1;out.push({id:+t.image_id,lb:'ชีตตัวละคร'});}});
+  IMGS.filter(i=>String(i.project||'').startsWith('หน้า·'+n+'·')||String(i.project||'').startsWith('แฟ้ม·'+n+'·')).sort((a,b)=>b.id-a.id).forEach(i=>{if(!seen[i.id]){seen[i.id]=1;out.push({id:+i.id,lb:String(i.project).split('·')[2]||'หน้า'});}});
+  return out;}
+function viewChars(){
+  if(!cfg().url)return '<div class="card">เชื่อมบอทที่ สตูดิโอ › เจนภาพ ก่อน</div>';
+  const names=charNames(),done=names.filter(lockOf).length;
+  let h=`<div class="card"><div class="row" style="justify-content:space-between"><h3>👤 ตัวละคร</h3><span class="muted small">ล็อกแล้ว ${done}/${names.length}</span></div>
+   <div class="muted small">ที่เดียวสำหรับหน้า + ชุดของแต่ละคน ทุกซีนดึงจากที่นี่ ไม่มีหน้าคนปนในคลังของ/ชุดอีก</div>
+   <div class="row" style="margin-top:8px"><input id="newc" placeholder="เพิ่มตัวละครใหม่ (ชื่อ)" style="flex:1"><button class="btn sm" id="addc">＋ เพิ่ม</button></div></div>`;
+  h+=names.map(n=>{const L=lockOf(n),o=OPEN[n];
+    let body='';
+    if(o){const cs=faceCands(n),ex=(L&&L.extra)||[],p=P(n);
+      body=`<div class="muted small">หน้าหลัก = หน้าตรง พื้นเรียบ ชัดที่สุด · เสริมได้ 3 ภาพ (หน้าข้าง ยิ้ม ตกใจ) · ใช้ทีละคน ไม่รวมหลายหน้าเป็นภาพเดียว</div>
+      <div class="grid" style="margin-top:8px">${cs.map(c=>{const m=L&&L.main===c.id,x=ex.includes(c.id);return `<div class="ph ${m?'m':x?'x':''}"><img loading="lazy" src="${esc(img(c.id))}" alt=""><div class="muted small">${esc(c.lb)}${m?' · 🔒':x?' · ⭐':''}</div><div class="row" style="gap:4px"><button class="btn sm ${m?'main':''}" data-lk="${esc(n)}|main|${c.id}">${m?'🔒 หลัก':'ใช้เป็นหลัก'}</button><button class="btn sm ${x?'on':''}" data-lk="${esc(n)}|extra|${c.id}" ${m?'disabled':''}>＋เสริม</button></div></div>`;}).join('')||'<div class="muted small">ยังไม่มีรูปของตัวละครนี้ เจนด้านล่างได้เลย</div>'}</div>
+      <h3 style="margin-top:12px">🧬 เจนหน้าใหม่ (4 แบบให้เลือก)</h3>
+      <textarea data-f="desc|${esc(n)}" placeholder="ลักษณะ เป็นภาษาอังกฤษ เช่น: adult woman in her 20s, short chestnut bob hair, brown eyes, calm gentle look">${esc(p.desc||'')}</textarea>
+      <div class="row" style="margin-top:6px"><button class="btn sm main" data-genface="${esc(n)}">🎨 เจนหน้าตรง 4 แบบ</button><button class="btn sm" data-genext="${esc(n)}">เจนหน้าข้าง+ยิ้ม+ตกใจ</button></div>
+      <h3 style="margin-top:12px">👗 ชุดของ${esc(n)}</h3>
+      ${(p.outfits||[]).map((f,i)=>`<div class="item"><div class="row" style="justify-content:space-between"><b>${esc(f.n)}</b><button class="btn sm red" data-rmo="${esc(n)}|${i}">ลบ</button></div><div class="muted small">${esc(f.d)}</div></div>`).join('')||'<div class="muted small">ยังไม่มีชุด</div>'}
+      <div class="row" style="margin-top:8px"><input id="on_${esc(n)}" placeholder="ชื่อชุด เช่น ชุดนักศึกษา" style="flex:1;min-width:120px"><input id="od_${esc(n)}" placeholder="รายละเอียด (อังกฤษ) เช่น dark long-sleeve top with a light rain jacket" style="flex:2;min-width:180px"><button class="btn sm" data-addo="${esc(n)}">＋ ชุด</button></div>
+      ${L?`<div class="row" style="margin-top:8px"><button class="btn sm red" data-lk="${esc(n)}|clear|0">ปลดล็อกหน้า</button></div>`:''}`;}
+    return `<div class="card"><div class="row" style="justify-content:space-between"><div class="row">${av(n)}<b>${esc(n)}</b> <span class="badge ${L?'ok':'warn'}">${L?'🔒 ล็อกแล้ว'+((L.extra||[]).length?' +'+L.extra.length:''):'ยังไม่ล็อก'}</span></div><button class="btn sm" data-open="${esc(n)}">${o?'ย่อ':'เปิด'}</button></div>${body}</div>`;}).join('');
+  return h;}
+async function genFace(n,ext){
+  const d=(P(n).desc||'').trim();if(!d)return toast('ใส่ลักษณะตัวละครก่อน');
+  const base=`original adult anime character reference, ${d}, plain light gray background, [[STYLE]]`;
+  const views=ext?[['side profile view, head and shoulders'],['gentle smile, front view, head and shoulders'],['surprised expression, front view, head and shoulders']]
+    :[['front-facing head and shoulders portrait, neutral expression'],['front-facing head and shoulders portrait, neutral expression'],['front-facing head and shoulders portrait, neutral expression'],['front-facing head and shoulders portrait, neutral expression']];
+  const items=views.map((v,i)=>({scene:i+1,prompt:`${v[0]}, ${base}`}));
+  try{const r=await api('/api/enqueue',{project:`หน้า·${n}·${ext?'เสริม':'หลัก'}`,items,variants:1,raw:true});toast('ส่งเข้าคิวแล้ว '+r.added+' ภาพ รอสักครู่แล้วกดรีเฟรช');}catch(e){toast(String(e.message||e));}
+}
+
+/* ---------- สถานที่: ล็อกหน้าตาสถานที่ + มุมกล้อง ---------- */
+const ANG=[['wide','มุมกว้างสร้างฉาก','wide establishing shot at eye level'],['mid1','มุมกลาง A','medium shot from the left side, foreground and background layers'],['mid2','มุมกลาง B','medium shot from the right side, different angle of the same place'],['high','มุมสูง','high angle view looking down on the whole place'],['detail','รายละเอียด','close view of a characteristic detail of the place, shallow depth of field'],['dusk','ช่วงเย็น','wide establishing shot at golden dusk, warm light'],['night','กลางคืน','wide establishing shot at night, lights glowing']];
+function locImgs(l){return IMGS.filter(i=>String(i.project||'').startsWith('ที่·'+l+'·'));}
+function viewLocs(){
+  if(!cfg().url)return '<div class="card">เชื่อมบอทก่อน</div>';
+  const names=locNames();
+  let h=`<div class="card"><h3>📍 สถานที่</h3><div class="muted small">ล็อกหน้าตาสถานที่หนึ่งแห่ง (คำบรรยายเดียวกัน หลายมุมกล้อง กลางวัน/เย็น/คืน) แล้วซีนทั้งหลายอ้างสถานที่นี้ จะได้พื้นหลังหน้าตาเดียวกัน</div>
+   <input id="lq" placeholder="ค้นหาจากคลังฉาก 1000 ฉาก เช่น ศาลเจ้า สะพาน" value="${esc(ST.q)}" style="margin-top:8px">`;
+  const q=ST.q.trim().toLowerCase();
+  if(q)h+=SCN.filter(x=>(x.n+x.e).toLowerCase().includes(q)).slice(0,6).map(x=>`<div class="item"><b>${esc(x.n)}</b><div class="muted small">${esc(x.e)}</div><button class="btn sm main" data-useloc="${x.i}">ใช้เป็นสถานที่</button></div>`).join('');
+  h+=`<div class="row" style="margin-top:8px"><input id="nl" placeholder="หรือตั้งชื่อสถานที่เอง" style="flex:1"><button class="btn sm" data-addl="1">＋ สร้าง</button></div></div>`;
+  h+=names.map(l=>{const p=PROF[LOCP+l],o=OPEN['L'+l],im=locImgs(l);let body='';
+    if(o){body=`<textarea data-f="ldesc|${esc(l)}" placeholder="บรรยายสถานที่เป็นภาษาอังกฤษ ละเอียด เช่น: old stone shrine courtyard, red torii gate, moss on lanterns, cherry trees">${esc(p.desc||'')}</textarea>
+      <div class="row" style="margin-top:6px"><button class="btn sm main" data-genloc="${esc(l)}">🎨 สร้างชุดมุมกล้อง ${ANG.length} มุม</button><button class="btn sm red" data-rml="${esc(l)}">ลบสถานที่</button></div>
+      <div class="muted small" style="margin-top:6px">เลือกภาพที่ดีที่สุดของแต่ละมุมด้วยปุ่ม "ใช้" (ภาพจาก Flux แต่ละมุมจะคล้ายกันเพราะใช้คำบรรยายเดียวกัน แต่ไม่ใช่ภาพเดิมเป๊ะ)</div>
+      ${ANG.map(a=>{const c=im.filter(i=>+i.scene===ANG.indexOf(a)+1);const pk=(p.pick||{})[a[0]];return `<h3 style="margin-top:10px">${a[1]} ${pk?'<span class="badge ok">เลือกแล้ว</span>':''}</h3><div class="grid">${c.map(i=>`<div class="ph wide ${pk===i.id?'m':''}"><img loading="lazy" src="${esc(img(i.id))}" alt=""><button class="btn sm ${pk===i.id?'main':''}" data-pk="${esc(l)}|${a[0]}|${i.id}" style="width:100%">${pk===i.id?'✓ ใช้อยู่':'ใช้'}</button></div>`).join('')||'<div class="muted small">ยังไม่มีภาพ</div>'}</div>`;}).join('')}`;}
+    const hero=(p.pick||{}).wide;
+    return `<div class="card"><div class="row" style="justify-content:space-between"><div class="row">${hero?`<img class="av" src="${esc(img(hero))}" alt="">`:'<span class="av">📍</span>'}<b>${esc(l)}</b> <span class="badge ${Object.keys(p.pick||{}).length>=3?'ok':'warn'}">${Object.keys(p.pick||{}).length}/${ANG.length} มุม</span></div><button class="btn sm" data-open="L${esc(l)}">${o?'ย่อ':'เปิด'}</button></div>${body}</div>`;}).join('');
+  return h;}
+async function genLoc(l){
+  const d=(PROF[LOCP+l].desc||'').trim();if(!d)return toast('บรรยายสถานที่ก่อน');
+  const items=ANG.map((a,i)=>({scene:i+1,prompt:`${d}, an empty quiet location, scenery only, ${a[2]}, detailed anime background art, [[STYLE_ENV]]`}));
+  try{const r=await api('/api/enqueue',{project:`ที่·${l}·มุม`,items,variants:2,raw:true});toast('ส่งเข้าคิวแล้ว '+r.added+' ภาพ');}catch(e){toast(String(e.message||e));}
+}
+
+/* ---------- ซีน: ลำดับช็อตที่อ้างสถานที่ + ตัวละคร ---------- */
+const BEATS=[['ตั้งท่า','tense stand-off, {A} and {B} face each other, glowing paper talismans drifting in the air, wind moving hair and clothes, wide shot'],['ปะทะแรก','first clash, low dynamic angle, {A} lunges forward while {B} blocks, speed lines and light trails'],['จังหวะกระแทก','impact close-up, hands and guard colliding with a burst of sparks and a soft shockwave, determined faces'],['พลิกเกม','reversal, {B} dodges and spins mid-air, {A} turns to follow, wide action shot'],['ท่าตัดสิน','decisive strike, close-up of {A}\'s eyes then a bright glowing burst, intense expression'],['หลังการต่อสู้','aftermath, {A} breathing hard as the light fades, dust settling, quiet mood, medium shot']];
+const cur=()=>SC.find(s=>s.id===ST.sc);
+function viewScenes(){
+  let h=`<div class="card"><h3>🎞️ ซีน</h3><div class="muted small">ซีน = ลำดับช็อตของเหตุการณ์หนึ่ง (เช่น ฉากต่อสู้ 1 ซีน) อ้างสถานที่ที่ล็อกไว้และตัวละครที่ล็อกหน้าแล้ว</div>
+   <div class="row" style="margin-top:8px"><input id="ns" placeholder="ชื่อซีนใหม่" style="flex:1"><select id="nk" style="width:auto"><option value="fight">⚔️ ต่อสู้</option><option value="drama">📖 ตามบท</option></select><button class="btn sm main" data-adds="1">＋ สร้างซีน</button></div></div>`;
+  h+=SC.map(s=>{const o=OPEN['S'+s.id],lk=(s.chars||[]).filter(n=>!lockOf(n));let body='';
+    if(o){body=`<div class="muted small">สถานที่</div><select data-sf="loc|${s.id}"><option value="">- เลือก -</option>${locNames().map(l=>`<option ${s.loc===l?'selected':''}>${esc(l)}</option>`).join('')}</select>
+      <div class="muted small" style="margin-top:6px">ตัวละคร (ตัวแรก=A ตัวที่สอง=B)</div><div class="row">${charNames().map(n=>`<span class="chip ${(s.chars||[]).includes(n)?'sel':''}" data-sc="${s.id}|${esc(n)}">${av(n).replace('class="av"','')}${esc(n)} ${lockOf(n)?'🔒':''}</span>`).join('')||'<span class="muted small">ยังไม่มีตัวละคร</span>'}</div>
+      <div class="row" style="margin-top:8px">${s.kind==='fight'?`<button class="btn sm" data-fb="${s.id}">⚔️ ใส่ 6 จังหวะต่อสู้</button>`:`<button class="btn sm" data-imp="${s.id}">📖 นำเข้าช็อตจากบทตอน 1</button>`}<button class="btn sm" data-ab="${s.id}">＋ ช็อตเปล่า</button></div>
+      ${(s.beats||[]).map((b,i)=>`<div class="item"><div class="row" style="justify-content:space-between"><b>${i+1}. ${esc(b.t||'ช็อต')}</b><span class="row"><button class="btn sm" data-bm="${s.id}|${i}|-1">↑</button><button class="btn sm" data-bm="${s.id}|${i}|1">↓</button><button class="btn sm red" data-br="${s.id}|${i}">✕</button></span></div><textarea data-bt="${s.id}|${i}">${esc(b.x)}</textarea></div>`).join('')}
+      <div class="row" style="margin-top:8px"><button class="btn sm red" data-ds="${s.id}">ลบซีน</button></div>`;}
+    return `<div class="card"><div class="row" style="justify-content:space-between"><div><span class="badge ${s.kind==='fight'?'fight':''}">${s.kind==='fight'?'ต่อสู้':'ตามบท'}</span><b>${esc(s.title)}</b><div class="muted small">${esc(s.loc||'ยังไม่เลือกสถานที่')} · ${(s.beats||[]).length} ช็อต${lk.length?' · ⚠️ ยังไม่ล็อกหน้า: '+lk.map(esc).join(', '):''}</div></div><span class="row"><label class="small"><input type="checkbox" data-ine="${s.id}" ${s.ep?'checked':''} style="width:auto"> ในตอน</label><button class="btn sm" data-open="S${s.id}">${o?'ย่อ':'เปิด'}</button></span></div>${body}</div>`;}).join('');
+  return h;}
+function shotPrompt(s,b){
+  const L=PROF[LOCP+s.loc]||{},cs=(s.chars||[]),A=cs[0]||'fighter A',B=cs[1]||'fighter B';
+  let t=STYLE+', '+String(b.x).replace(/\{A\}/g,A).replace(/\{B\}/g,B);
+  if(L.desc)t+='. Setting: '+L.desc;
+  if(cs.length)t+='. Characters: '+cs.map(n=>{const o=((PROF[n]||{}).outfits||[])[0];const dsc=(PROF[n]||{}).desc;return n+(dsc||o?' ('+[dsc,o&&o.d].filter(Boolean).join(', ')+')':'');}).join('; ');
+  const lk=cs.filter(lockOf);if(lk.length)t+='. Face lock: keep the face, hairstyle and proportions of '+lk.join(', ')+' identical to their locked reference sheets in every shot';
+  return t;}
+function episodePlan(){const sc=SC.filter(s=>s.ep);let n=0;return {style:STYLE,scenes:sc.map(s=>({title:s.title,kind:s.kind,location:s.loc,characters:s.chars,shots:(s.beats||[]).map(b=>({n:++n,title:b.t,prompt:shotPrompt(s,b)}))}))};}
+function renderBar(){const n=SC.filter(s=>s.ep).length;$('#bar').innerHTML=ST.tab==='scenes'&&n?`<button class="btn" id="bCopy">📋 คัดลอก</button><button class="btn" id="bDl">⬇️ แผนตอน</button><button class="btn main" id="bSend">🚀 ส่งตอนเข้าคิว (${n} ซีน)</button>`:`<button class="btn" id="bRef">🔄 รีเฟรชจากบอท</button>`;}
+
+/* ---------- วาด + อีเวนต์ ---------- */
+function render(){document.querySelectorAll('.tabs [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===ST.tab));
+  $('#view').innerHTML=ST.tab==='chars'?viewChars():ST.tab==='locs'?viewLocs():viewScenes();renderBar();sv();}
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('button,.chip');if(!t)return;const d=t.dataset;
+  if(d.tab){ST.tab=d.tab;render();return;}
+  if(d.open){OPEN[d.open]=!OPEN[d.open];render();return;}
+  if(t.id==='bRef'){await load();toast('รีเฟรชแล้ว');return;}
+  if(t.id==='addc'){const v=$('#newc').value.trim();if(v){P(v);await psave(v);OPEN[v]=true;render();}return;}
+  if(d.lk){const [n,a,id]=d.lk.split('|'),v=+id,p=P(n);
+    if(a==='clear')delete p.lock;else{const L=p.lock=p.lock||{main:0,extra:[]};L.extra=L.extra||[];
+      if(a==='main'){L.main=L.main===v?0:v;L.extra=L.extra.filter(x=>x!==v);}
+      else{const i=L.extra.indexOf(v);if(i>=0)L.extra.splice(i,1);else if(L.extra.length>=3)return toast('เสริมได้สูงสุด 3 ภาพ');else L.extra.push(v);}
+      if(!L.main&&!L.extra.length)delete p.lock;}
+    render();psave(n);return;}
+  if(d.genface){await genFace(d.genface,false);return;}
+  if(d.genext){await genFace(d.genext,true);return;}
+  if(d.addo){const n=d.addo,a=$('#on_'+n).value.trim(),b=$('#od_'+n).value.trim();if(!a||!b)return toast('ใส่ชื่อชุดและรายละเอียด');const p=P(n);(p.outfits=p.outfits||[]).push({n:a,d:b});render();psave(n);return;}
+  if(d.rmo){const [n,i]=d.rmo.split('|');P(n).outfits.splice(+i,1);render();psave(n);return;}
+  if(d.useloc){const x=SCN.find(s=>s.i===+d.useloc);if(!x)return;const nm=x.n.split(' — ')[0].trim();const k=LOCP+nm;P(k).desc=x.e;ST.q='';OPEN['L'+nm]=true;await psave(k);render();return;}
+  if(d.addl){const v=$('#nl').value.trim();if(!v)return;const k=LOCP+v;P(k);await psave(k);OPEN['L'+v]=true;render();return;}
+  if(d.genloc){await genLoc(d.genloc);return;}
+  if(d.rml){if(!confirm('ลบสถานที่ '+d.rml+' ?'))return;const k=LOCP+d.rml;delete PROF[k];try{await api('/api/vcastprofile',{act:'set',name:k,data:{deleted:1}});}catch(er){}render();return;}
+  if(d.pk){const [l,a,id]=d.pk.split('|'),p=PROF[LOCP+l];p.pick=p.pick||{};p.pick[a]=p.pick[a]===+id?undefined:+id;if(!p.pick[a])delete p.pick[a];render();psave(LOCP+l);return;}
+  if(d.adds){const v=$('#ns').value.trim()||'ซีนใหม่';const s={id:Math.random().toString(36).slice(2,8),title:v,kind:$('#nk').value,loc:'',chars:[],beats:[],ep:true};SC.push(s);OPEN['S'+s.id]=true;render();return;}
+  if(d.sc){const [id,n]=d.sc.split('|'),s=SC.find(x=>x.id===id),i=s.chars.indexOf(n);if(i>=0)s.chars.splice(i,1);else s.chars.push(n);render();return;}
+  if(d.fb){const s=SC.find(x=>x.id===d.fb);BEATS.forEach(b=>s.beats.push({t:b[0],x:b[1]}));render();return;}
+  if(d.ab){SC.find(x=>x.id===d.ab).beats.push({t:'ช็อต',x:''});render();return;}
+  if(d.imp){if(!EP)return toast('โหลดบทไม่ได้');const s=SC.find(x=>x.id===d.imp);const a=prompt('นำเข้าช็อตที่ ... ถึง ... (จาก 1-'+EP.panels.length+') เช่น 2-6','1-'+EP.panels.length);if(!a)return;const [x,y]=a.split('-').map(Number);
+    EP.panels.forEach((p,i)=>{if(i+1>=x&&i+1<=(y||x)){s.beats.push({t:'บทช็อต '+(i+1),x:p.shot});(p.chars||[]).forEach(c=>{if(!s.chars.includes(c))s.chars.push(c);});}});render();return;}
+  if(d.bm){const [id,i,dd]=d.bm.split('|').map((v,k)=>k?+v:v),s=SC.find(x=>x.id===id),j=i+dd;if(j<0||j>=s.beats.length)return;[s.beats[i],s.beats[j]]=[s.beats[j],s.beats[i]];render();return;}
+  if(d.br){const [id,i]=d.br.split('|'),s=SC.find(x=>x.id===id);s.beats.splice(+i,1);render();return;}
+  if(d.ds){if(!confirm('ลบซีนนี้?'))return;SC=SC.filter(x=>x.id!==d.ds);render();return;}
+  if(t.id==='bCopy'){const txt=episodePlan().scenes.flatMap(s=>s.shots.map(x=>x.n+'. '+x.prompt)).join('\n\n');try{await navigator.clipboard.writeText(txt);toast('คัดลอกแล้ว');}catch(er){toast('คัดลอกไม่ได้');}return;}
+  if(t.id==='bDl'){const b=new Blob([JSON.stringify(episodePlan(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='episode-plan.json';a.click();return;}
+  if(t.id==='bSend'){if(!cfg().url)return toast('ยังไม่ได้เชื่อมบอท');const pl=episodePlan(),un=[...new Set(pl.scenes.flatMap(s=>s.characters).filter(n=>!lockOf(n)))];
+    if(un.length&&!confirm('ยังไม่ล็อกหน้า: '+un.join(', ')+' ส่งต่อไหม?'))return;
+    const items=pl.scenes.flatMap(s=>s.shots).map(x=>({scene:x.n,prompt:x.prompt}));
+    try{const r=await api('/api/enqueue',{project:'ตอน·'+(SC.find(s=>s.ep)||{title:'ใหม่'}).title.slice(0,40),items,variants:1,raw:true});toast('ส่งเข้าคิว '+r.added+' ภาพ');}catch(er){toast(String(er.message||er));}return;}
+});
+document.addEventListener('input',e=>{const t=e.target,d=t.dataset;
+  if(t.id==='lq'){ST.q=t.value;const p=t.selectionStart;render();const q=$('#lq');q.focus();q.setSelectionRange(p,p);return;}
+  if(d.f){const [k,n]=d.f.split('|');if(k==='desc')P(n).desc=t.value.slice(0,400);if(k==='ldesc')PROF[LOCP+n].desc=t.value.slice(0,900);clearTimeout(input.t);input.t=setTimeout(()=>psave(k==='desc'?n:LOCP+n),700);return;}
+  if(d.bt){const [id,i]=d.bt.split('|');SC.find(x=>x.id===id).beats[+i].x=t.value;sv();}
+});
+function input(){}
+document.addEventListener('change',e=>{const t=e.target,d=t.dataset;
+  if(d.sf){const [k,id]=d.sf.split('|');SC.find(x=>x.id===id)[k]=t.value;sv();render();}
+  if(d.ine){SC.find(x=>x.id===d.ine).ep=t.checked;sv();renderBar();}
+});
+(async()=>{render();
+  try{SCN=await (await fetch('scenes.json')).json();}catch(e){}
+  try{const m=await (await fetch('mangaep.json')).json();EP=m['1'];}catch(e){}
+  await load();})();
+</script>
+</body>
+</html>

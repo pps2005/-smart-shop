@@ -298,8 +298,19 @@ async function genImage(env, s, prompt, steps, seed) {
 // ---- สไตล์ลายเส้นกลาง: พรอมต์เก็บ [[STYLE]] ไว้ แล้วแทนด้วยสไตล์ปัจจุบันตอนสร้าง/แสดง เปลี่ยนสไตล์ทีเดียวมีผลกับทุกอย่าง (รวมงานที่ยังรอคิว) ----
 const DEF_STYLE = 'soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading';
 function curStyle(s) { return String((s && s.style) || '').trim() || DEF_STYLE; }
-function envStyle(s) { return curStyle(s).split(',').map(x => x.trim()).filter(x => x && !/hair|fabric|character|face|portrait|girl|person|people|skin/i.test(x)).join(', ') || 'soft anime style, detailed anime background art'; }
-function withStyle(p, s) { p = String(p || ''); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
+function envStyle(s) { return curStyle(s).split(',').map(x => x.trim()).filter(x => x && !/hair|fabric|character|face|portrait|girl|person|people|skin|beautiful/i.test(x)).join(', ') || 'soft anime style, detailed anime background art'; }
+// สไตล์สำหรับ "ของ/ชุด/สัตว์/อาวุธ" (งานออกแบบวัตถุ): ตัดคำที่ดึงให้โมเดลวาดหน้าคน/ผม/สาวสวย ออก (Flux ไม่มี negative prompt คำว่า hair/beautiful จึงดึงหน้าเข้ามา)
+function objStyle(s) { return curStyle(s).split(',').map(x => x.trim()).filter(x => x && !/hair|fabric|character|face|portrait|girl|person|people|skin|beautiful/i.test(x)).join(', ') || 'soft anime style, clean detailed design illustration'; }
+// พรอมต์เก่าในคิว/คลัง: ล้างประโยคปฏิเสธ (no face, no head ฯลฯ — ใน Flux กลับดึงสิ่งนั้นเข้ามา) และเลือกสไตล์ตามชนิดงาน
+function legacyFix(p) {
+  const objy = /plain soft background|single object|creature design|dress form|faceless mannequin|environment element design|product design sheet/.test(p);
+  p = p.split(', not worn, no person, no face, no head, no body, no hands, no mannequin').join('').split('laid flat or floating').join('isolated')
+    .split('displayed on a faceless mannequin').join("displayed on a headless tailor's dress form")
+    .split(', no people').join('').split('no people, ').join('');
+  if (objy && p.includes('[[STYLE]]')) p = p.split('[[STYLE]]').join('[[STYLE_OBJ]]');
+  return p;
+}
+function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
 // เจนต่อเนื่อง: คิวว่างเมื่อไร เติมงานใหม่เอง สลับระหว่างผู้สมัครออดิชัน 1 คน กับของในคลัง 1 ชิ้น (ฉาก อาวุธ เวท โลก ฯลฯ)
 async function autoFill(env, s) {
   const n = +s.fill_n || 0; await setSetting(env, 'fill_n', String(n + 1));
@@ -1587,7 +1598,7 @@ function castMake2(cat, r, style) {
     used.add(sc.n);
     return { name: sc.n, desc: `#${sc.i} ${sc.c} · ${sc.m} · เหมาะกับ ${sc.g}`, prompt: `${sc.e}, an empty deserted unpopulated location, scenery only, wide environment background plate, no characters, nothing alive in the frame, detailed anime background art, ${tail.split('[[STYLE]]').join('[[STYLE_ENV]]')}` }; }
   const it = pick(r() < 0.5 ? IDEAS.prop : IDEAS.element, r);
-  return { name: it.n, desc: `${it.id} · ${it.d} · เหมาะกับ${it.fit}`, prompt: `a ${it.e}, single object design, centered, plain soft background, the item alone as a product design sheet, laid flat or floating, not worn, no person, no face, no head, no body, no hands, no mannequin, ${tail}` };
+  return { name: it.n, desc: `${it.id} · ${it.d} · เหมาะกับ${it.fit}`, prompt: `a ${it.e}, single object design, centered, product design sheet on a plain soft background, still life of the object only, ${tail}` };
 }
 
 // ---------- คลังเสียง: เพลงบรรเลง (ACE-Step) + เสียงประกอบ (Stable Audio Open) ----------
@@ -1605,16 +1616,17 @@ function manualPrompt(kind, desc, chars) {
   return `Create ONE anime illustration. Subject: ${desc}. ${base}`;
 }
 const LIB_TAIL = '[[STYLE]], high quality';
+const LIB_OBJ = '[[STYLE_OBJ]], high quality', LIB_ENV = '[[STYLE_ENV]], high quality';
 const LIBD = [
   ['ฉาก', () => SCENES, it => `${it.e}, an empty deserted unpopulated location, scenery only, wide environment background plate, no characters, nothing alive in the frame, detailed anime background art, cinematic lighting, ${LIB_TAIL.split('[[STYLE]]').join('[[STYLE_ENV]]')}`],
-  ['สัตว์และอสูร', () => IDEAS.creature, it => `a ${it.e}, full body, creature design, front view, plain soft background, ${LIB_TAIL}`],
-  ['ของประกอบ', () => IDEAS.prop, it => `a ${it.e}, single object design, centered, plain soft background, the item alone as a product design sheet, laid flat or floating, not worn, no person, no face, no head, no body, no hands, no mannequin, ${LIB_TAIL}`],
-  ['ชุด', () => IDEAS.costume, it => `${it.e} outfit displayed on a faceless mannequin, fashion design sheet, front and back view, plain soft background, ${LIB_TAIL}`],
-  ['องค์ประกอบฉาก', () => IDEAS.element, it => `a ${it.e}, environment element design, no people, ${LIB_TAIL}`],
-  ['อาวุธ', () => WORLD.weapon, it => `a ${it.e}, weapon design, single object, centered, plain soft background, ${LIB_TAIL}`],
-  ['พลังอาคม', () => WORLD.power, it => `${it.e}, magic power visual effect, anime spell, dramatic lighting, dark background, no people, ${LIB_TAIL}`],
-  ['ของวิเศษ', () => WORLD.artifact, it => `a ${it.e}, magical item design, single object, centered, plain soft background, ${LIB_TAIL}`],
-  ['โลกและจักรวาล', () => WORLD.realm, it => `${it.e}, epic anime world landscape, no people, cinematic lighting, detailed background art, ${LIB_TAIL}`],
+  ['สัตว์และอสูร', () => IDEAS.creature, it => `a ${it.e}, full body creature design, front view, centered on a plain soft background, ${LIB_OBJ}`],
+  ['ของประกอบ', () => IDEAS.prop, it => `a ${it.e}, a single isolated object, centered, product design sheet on a plain soft background, still life of the object only, ${LIB_OBJ}`],
+  ['ชุด', () => IDEAS.costume, it => `${it.e} outfit displayed on a headless tailor's dress form, fashion design sheet, front view and back view side by side, plain soft background, ${LIB_OBJ}`],
+  ['องค์ประกอบฉาก', () => IDEAS.element, it => `a ${it.e}, environment element design, isolated on a plain soft background, ${LIB_OBJ}`],
+  ['อาวุธ', () => WORLD.weapon, it => `a ${it.e}, weapon design, single object, centered, plain soft background, ${LIB_OBJ}`],
+  ['พลังอาคม', () => WORLD.power, it => `${it.e}, magic power visual effect, anime spell, dramatic lighting, dark background, abstract energy only, ${LIB_ENV}`],
+  ['ของวิเศษ', () => WORLD.artifact, it => `a ${it.e}, magical item design, single object, centered, plain soft background, ${LIB_OBJ}`],
+  ['โลกและจักรวาล', () => WORLD.realm, it => `${it.e}, epic anime world landscape, cinematic lighting, detailed background art, ${LIB_ENV}`],
 ];
 // สเต็ปภาพคลัง: ฉาก/เอฟเฟกต์/พลังงาน 4 สเต็ป (พอแล้วสำหรับโมเดลนี้) ส่วนงานออกแบบที่ต้องละเอียดกว่า (สัตว์ ชุด อาวุธ ของ) 6 สเต็ป
 const LIB_STEP4 = new Set(['ฉาก', 'องค์ประกอบฉาก', 'พลังอาคม', 'โลกและจักรวาล', 'เอฟเฟกต์']);
