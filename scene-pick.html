@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>เลือกฉากทำตอน · ล็อกหน้า</title>
+<style>
+:root{--bg:#f7f5fc;--card:#fff;--ink:#241b3a;--mut:#7a7194;--pri:#8b5cf6;--pri2:#ede7fe;--gold:#f0b429;--red:#e0405a;--ok:#1fa971;--line:#e5e0f3}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,"Sarabun","Noto Sans Thai",sans-serif;padding:0 0 90px}
+header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:18px;margin:0;flex:1}
+header a{color:var(--pri);text-decoration:none;font-size:14px}
+main{max-width:860px;margin:0 auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.muted{color:var(--mut)}.small{font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button,select,input,textarea{font:inherit}
+.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 13px;min-height:40px;cursor:pointer;color:var(--ink)}
+.btn.main{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.sm{padding:6px 10px;min-height:34px;font-size:14px}
+.btn.on{background:var(--pri2);border-color:var(--pri);color:var(--pri)}
+.btn.red{color:var(--red)}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs .btn{flex:1;text-align:center}
+input[type=text],input[type=search],select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#fff;color:var(--ink)}
+.chip{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);border-radius:999px;padding:3px 10px 3px 3px;background:#fff;font-size:14px;cursor:pointer}
+.chip img,.chip i{width:30px;height:30px;border-radius:50%;object-fit:cover;object-position:top;background:var(--pri2);display:inline-flex;align-items:center;justify-content:center;font-style:normal}
+.chip.lock{border-color:var(--pri)}
+.chip.sel{background:var(--pri2);border-color:var(--pri)}
+.chip.warn{border-color:var(--gold)}
+.badge{display:inline-block;font-size:12px;border-radius:6px;padding:1px 7px;background:var(--pri2);color:var(--pri);margin-right:4px}
+.badge.fight{background:#fde7ec;color:var(--red)}
+.badge.script{background:#e3f6ee;color:var(--ok)}
+.item{border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px;background:#fff}
+.item.picked{border-color:var(--pri);background:#faf8ff}
+.shot{font-size:14px;margin:4px 0}
+.dlg{font-size:14px;color:var(--mut);margin:2px 0}
+.bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:8px 12px calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:center;z-index:6}
+.bar .btn{flex:1;max-width:260px}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#241b3a;color:#fff;border-radius:10px;padding:9px 14px;z-index:9;font-size:14px;max-width:90%}
+.hide{display:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+</style>
+</head>
+<body>
+<header><a href="index.html">⬅</a><h1>🎬 เลือกฉากทำตอน</h1><a href="studio.html">สตูดิโอ</a></header>
+<main>
+  <div class="card" id="lockCard"></div>
+  <div class="tabs">
+    <button class="btn on" data-tab="script">📖 บทตอน</button>
+    <button class="btn" data-tab="lib">🗂️ คลังฉาก</button>
+    <button class="btn" data-tab="mine">🎞️ ตอนของฉัน <b id="cnt">0</b></button>
+  </div>
+  <div id="view"></div>
+</main>
+<div class="bar" id="bar"></div>
+<div class="toast hide" id="toast"></div>
+
+<script>
+/* ================= ค่าคงที่ / สถานะ ================= */
+const STYLE='soft anime style, clean detailed background art, cinematic lighting, vertical 9:16';
+const KEY='ss_scenepick';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let EP=null, SCENES=[], LOCKS={}, BOTOK=false, NAMES=[];
+let S=(()=>{try{return Object.assign({title:'ตอนใหม่',items:[],tab:'script',anchor:-1,q:'',cat:'',gen:'',chars:[]},JSON.parse(localStorage.getItem(KEY)||'{}'));}catch(e){return {title:'ตอนใหม่',items:[],tab:'script',anchor:-1,q:'',cat:'',gen:'',chars:[]};}})();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.remove('hide');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.add('hide'),2600);}
+
+/* ================= บอท + ล็อกหน้า (อ่านจากข้อมูลเดียวกับ studio.html) ================= */
+function botCfg(){try{return JSON.parse(localStorage.getItem('ss_imgbot')||'{}')||{};}catch(e){return {};}}
+function botU(p){const c=botCfg();return String(c.url||'').replace(/\/+$/,'')+p+(p.includes('?')?'&':'?')+'k='+encodeURIComponent(c.key||'');}
+async function botApi(p,body){const r=await fetch(botU(p),body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});
+  if(r.status===401)throw new Error('รหัสผ่านบอทไม่ถูกต้อง');
+  const j=await r.json().catch(()=>({error:'บอทตอบกลับไม่ถูกต้อง'}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j;}
+function chName(t){return String(t||'').replace(/^ชีตใหม่\s*·\s*/,'').replace(/\s*\(.*\)\s*$/,'').trim();}
+async function loadLocks(){
+  LOCKS={};BOTOK=false;
+  if(botCfg().url){
+    try{const r=await botApi('/api/vcastprofile',{});const P=r.profiles||{};
+      Object.keys(P).forEach(n=>{const l=P[n]&&P[n].lock;if(l&&l.main)LOCKS[n]={main:+l.main,extra:(l.extra||[]).map(Number)};});BOTOK=true;}catch(e){}
+  }
+  const set=new Set([...Object.keys(LOCKS),...Object.keys((EP&&EP.outfit)||{}),...S.chars]);
+  NAMES=[...set];
+  renderLock();
+}
+function renderLock(){
+  const chips=NAMES.map(n=>{const L=LOCKS[n];
+    return `<span class="chip ${L?'lock':'warn'}" data-pc="${esc(n)}">${L?`<img src="${esc(botU('/img/'+L.main))}" alt="">`:'<i>👤</i>'}${esc(n)} ${L?'🔒':'· ยังไม่ล็อก'}</span>`;}).join(' ');
+  const nl=NAMES.filter(n=>!LOCKS[n]).length;
+  $('#lockCard').innerHTML=`<div class="row" style="justify-content:space-between"><b>🔒 ล็อกหน้าตัวละคร</b><span class="muted small">${NAMES.filter(n=>LOCKS[n]).length}/${NAMES.length} ล็อกแล้ว</span></div>
+   <div class="row" style="margin-top:8px">${chips||'<span class="muted small">ยังไม่มีตัวละคร</span>'}</div>
+   <div class="muted small" style="margin-top:8px">${BOTOK?(nl?'ตัวที่ยังไม่ล็อก ไปเลือกหน้าหลักได้ที่ สตูดิโอ › คลัง › 🔒 ล็อกหน้า':'ล็อกครบแล้ว ทุกช็อตที่ใส่ตัวละครเหล่านี้จะอ้างอิงหน้าเดิม'):'ยังเชื่อมบอทไม่ได้ (ตั้งลิงก์บอทที่ สตูดิโอ › เจนภาพ) ยังเลือกฉากและส่งออกแผนตอนได้ตามปกติ'}</div>
+   <div class="row" style="margin-top:8px"><input type="text" id="newch" placeholder="เพิ่มชื่อตัวละคร" style="flex:1;min-width:140px"><button class="btn sm" id="addch">＋ เพิ่ม</button></div>`;
+}
+
+/* ================= ฉากต่อสู้ (6 จังหวะ ต้นฉบับ ไม่ลอกงานใคร) ================= */
+const BEATS=[
+ ['ตั้งท่า','tense stand-off, {A} and {B} face each other across the space, glowing paper talismans drifting in the air, wind moving hair and clothes, wide shot'],
+ ['ปะทะแรก','first clash, low dynamic angle, {A} lunges forward while {B} blocks, speed lines and light trails from talismans'],
+ ['จังหวะกระแทก','impact close-up, hands and guard colliding with a burst of sparks and a soft shockwave, determined faces'],
+ ['พลิกเกม','reversal, {B} dodges and spins mid-air, {A} turns to follow, wide action shot with swirling talisman glow'],
+ ['ท่าตัดสิน','decisive strike, extreme close-up of {A}\'s eyes then a bright glowing talisman burst, intense expression'],
+ ['หลังการต่อสู้','aftermath, {A} breathing hard as the light fades, dust and paper talismans settling, quiet mood, medium shot']
+];
+
+/* ================= เพิ่ม / ลบ ฉาก ================= */
+const uid=()=>Math.random().toString(36).slice(2,9);
+function addItem(o){S.items.push(Object.assign({id:uid(),chars:[],cap:'',dlg:[]},o));save();upd();}
+function addPanel(i){const p=EP.panels[i];if(S.items.some(x=>x.src==='script'&&x.pi===i))return;
+  addItem({src:'script',kind:'script',pi:i,label:`${EP.tag||'ตอน'} · ช็อต ${i+1}`,text:p.shot,cap:p.cap||'',dlg:p.dlg||[],chars:(p.chars||[]).slice()});}
+function addScene(i,fight){const sc=SCENES.find(x=>x.i===i);if(!sc)return;
+  if(!fight){addItem({src:'lib',kind:'scene',sid:i,label:sc.n,text:sc.e});toast('เพิ่มฉากแล้ว');return;}
+  const A=S.chars[0]||NAMES[0]||'fighter A',B=S.chars[1]||NAMES[1]||'fighter B';
+  BEATS.forEach((b,k)=>S.items.push({id:uid(),src:'lib',kind:'fight',sid:i,label:`⚔️ ${sc.n} · ${b[0]}`,
+    text:`${b[1].replace(/\{A\}/g,A).replace(/\{B\}/g,B)}. Location: ${sc.e}`,chars:[A,B].filter(x=>NAMES.includes(x)),cap:'',dlg:[]}));
+  save();upd();toast('เพิ่มฉากต่อสู้ 6 จังหวะแล้ว');}
+function upd(){$('#cnt').textContent=S.items.length;renderBar();if(S.tab==='mine')renderView();else markPicked();}
+
+/* ================= สร้างพรอมต์ (ผูกล็อกหน้า) ================= */
+function promptOf(it){
+  const outfit=(EP&&EP.outfit)||{};
+  const cs=(it.chars||[]);
+  let t=STYLE+', '+it.text;
+  if(cs.length){
+    t+='. Characters: '+cs.map(n=>n+(outfit[n]?' ('+outfit[n]+')':'')).join('; ');
+    const lk=cs.filter(n=>LOCKS[n]);
+    if(lk.length)t+='. Face lock: keep the face, hairstyle and body proportions of '+lk.join(', ')+' identical to their locked reference sheets in every shot';
+  }
+  return t;
+}
+function plan(){
+  const chars={};S.items.forEach(it=>(it.chars||[]).forEach(n=>{chars[n]=LOCKS[n]?{locked:true,main:LOCKS[n].main,extra:LOCKS[n].extra}:{locked:false};}));
+  return {title:S.title,created:new Date().toISOString(),style:STYLE,characters:chars,
+    shots:S.items.map((it,i)=>({n:i+1,kind:it.kind,label:it.label,characters:it.chars||[],prompt:promptOf(it),caption:it.cap||'',dialogue:it.dlg||[]}))};
+}
+
+/* ================= หน้าจอ ================= */
+function itemHtml(it,extra){return `<div class="item" data-id="${it.id||''}">${extra}</div>`;}
+function renderScript(){
+  if(!EP)return '<div class="card muted">กำลังโหลดบท…</div>';
+  const P=EP.panels;
+  const rows=P.map((p,i)=>{const on=S.items.some(x=>x.src==='script'&&x.pi===i);
+    const dl=(p.dlg||[]).map(d=>`<div class="dlg">${esc(d[0])}: ${esc(d[1])}</div>`).join('');
+    return `<div class="item ${on?'picked':''}" data-sp="${i}"><div class="row" style="justify-content:space-between"><span><span class="badge script">ตามบท</span><b>ช็อต ${i+1}</b> ${(p.chars||[]).map(esc).join(', ')}</span>
+      <span class="row"><button class="btn sm ${on?'on':''}" data-addp="${i}">${on?'✓ เลือกแล้ว':'＋ เลือก'}</button>${S.anchor>=0&&S.anchor!==i?`<button class="btn sm" data-range="${i}">⤵ เลือกถึงตรงนี้</button>`:''}</span></div>
+      ${p.cap?`<div class="shot muted">📝 ${esc(p.cap)}</div>`:''}<div class="shot">${esc(p.shot)}</div>${dl}</div>`;}).join('');
+  return `<div class="card"><b>${esc(EP.title)}</b><div class="muted small">แตะ "＋ เลือก" ที่ช็อตแรกของช่วงที่ต้องการ แล้วกด "⤵ เลือกถึงตรงนี้" ที่ช็อตสุดท้าย (บทตอนนี้เป็นฉากดราม่า ถ้าต้องการช่วงต่อสู้ไปที่แท็บ คลังฉาก)</div>
+    <div class="row" style="margin-top:8px"><button class="btn sm" id="allp">เลือกทั้งตอน</button></div></div>${rows}`;
+}
+function renderLib(){
+  const cats=[...new Set(SCENES.map(x=>x.c))],gens=[...new Set(SCENES.map(x=>x.g))];
+  let L=SCENES;
+  if(S.cat)L=L.filter(x=>x.c===S.cat);if(S.gen)L=L.filter(x=>x.g===S.gen);
+  const q=S.q.trim().toLowerCase();if(q)L=L.filter(x=>(x.n+' '+x.e+' '+(x.m||'')).toLowerCase().includes(q));
+  const total=L.length;L=L.slice(0,40);
+  const rows=L.map(x=>`<div class="item"><div><b>${esc(x.n)}</b> <span class="muted small">${esc(x.m||'')}</span></div>
+    <div class="muted small">${esc(x.c)} · ${esc(x.g)}</div><div class="row" style="margin-top:6px"><button class="btn sm" data-adds="${x.i}">＋ ฉากธรรมดา</button><button class="btn sm main" data-addf="${x.i}">⚔️ ทำเป็นฉากต่อสู้</button></div></div>`).join('');
+  return `<div class="card"><input type="search" id="q" placeholder="ค้นหาฉาก เช่น ศาลเจ้า ฝน สะพาน" value="${esc(S.q)}">
+    <div class="row" style="margin-top:8px"><select id="cat"><option value="">ทุกหมวด</option>${cats.map(c=>`<option ${S.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    <select id="gen"><option value="">ทุกแนว</option>${gens.map(c=>`<option ${S.gen===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    <div class="muted small" style="margin-top:6px">พบ ${total} ฉาก (แสดง 40 แรก) · แนว "ไซไฟ / แอ็กชัน" และ "ผจญภัย / แฟนตาซี" เหมาะกับฉากต่อสู้</div>
+    <div class="muted small">ตัวละครฉากต่อสู้: ใช้ 2 ตัวแรกที่เลือกในแถบล็อกหน้า (แตะชื่อด้านบนเพื่อเลือก) ตอนนี้: <b>${esc((S.chars.slice(0,2).join(' vs '))||'ยังไม่ได้เลือก')}</b></div></div>${rows}`;
+}
+function renderMine(){
+  if(!S.items.length)return '<div class="card muted">ยังไม่ได้เลือกฉาก ไปแท็บ บทตอน หรือ คลังฉาก แล้วแตะเลือก</div>';
+  const rows=S.items.map((it,i)=>`<div class="item"><div class="row" style="justify-content:space-between"><span><span class="badge ${it.kind==='fight'?'fight':it.kind==='script'?'script':''}">${it.kind==='fight'?'ต่อสู้':it.kind==='script'?'ตามบท':'ฉาก'}</span><b>${i+1}. ${esc(it.label)}</b></span>
+    <span class="row"><button class="btn sm" data-mv="${i}|-1">↑</button><button class="btn sm" data-mv="${i}|1">↓</button><button class="btn sm red" data-rm="${i}">✕</button></span></div>
+    <div class="shot">${esc(it.text)}</div>
+    <div class="row" style="margin-top:4px">${NAMES.map(n=>`<span class="chip ${(it.chars||[]).includes(n)?'sel':''}" data-ic="${i}|${esc(n)}">${LOCKS[n]?`<img src="${esc(botU('/img/'+LOCKS[n].main))}" alt="">`:'<i>👤</i>'}${esc(n)}</span>`).join('')||'<span class="muted small">เพิ่มชื่อตัวละครที่แถบด้านบนก่อน</span>'}</div></div>`).join('');
+  const un=[...new Set(S.items.flatMap(x=>x.chars||[]).filter(n=>!LOCKS[n]))];
+  return `<div class="card"><input type="text" id="ttl" value="${esc(S.title)}" placeholder="ชื่อตอน"><div class="muted small" style="margin-top:6px">${S.items.length} ช็อต${un.length?` · ⚠️ ยังไม่ได้ล็อกหน้า: ${un.map(esc).join(', ')}`:S.items.some(x=>(x.chars||[]).length)?' · 🔒 ทุกตัวละครล็อกหน้าแล้ว':''}</div></div>${rows}`;
+}
+function renderView(){
+  document.querySelectorAll('.tabs [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
+  $('#view').innerHTML=S.tab==='script'?renderScript():S.tab==='lib'?renderLib():renderMine();
+}
+function markPicked(){if(S.tab==='script')renderView();}
+function renderBar(){
+  $('#bar').innerHTML=S.items.length?`<button class="btn" id="bCopy">📋 คัดลอกพรอมต์</button><button class="btn" id="bDl">⬇️ ไฟล์แผนตอน</button><button class="btn main" id="bSend">🚀 ส่งเข้าคิวภาพ</button>`:`<span class="muted small">เลือกฉากเพื่อเริ่มทำตอน</span>`;
+}
+
+/* ================= อีเวนต์ ================= */
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('button,.chip');if(!t)return;
+  if(t.dataset.tab){S.tab=t.dataset.tab;save();renderView();return;}
+  if(t.id==='addch'){const v=$('#newch').value.trim();if(v&&!NAMES.includes(v)){S.chars.push(v);NAMES.push(v);save();renderLock();}return;}
+  if(t.dataset.pc){const n=t.dataset.pc,i=S.chars.indexOf(n);if(i>=0)S.chars.splice(i,1);else S.chars.push(n);save();toast('ตัวละครฉากต่อสู้: '+(S.chars.slice(0,2).join(' vs ')||'-'));if(S.tab==='lib')renderView();return;}
+  if(t.dataset.addp!==undefined){const i=+t.dataset.addp,k=S.items.findIndex(x=>x.src==='script'&&x.pi===i);
+    if(k>=0){S.items.splice(k,1);if(S.anchor===i)S.anchor=-1;}else{addPanel(i);S.anchor=i;}save();upd();renderView();return;}
+  if(t.dataset.range!==undefined){const a=S.anchor,b=+t.dataset.range;for(let i=Math.min(a,b);i<=Math.max(a,b);i++)addPanel(i);S.anchor=-1;save();renderView();toast('เลือกช่วงแล้ว');return;}
+  if(t.id==='allp'){EP.panels.forEach((_,i)=>addPanel(i));S.anchor=-1;renderView();return;}
+  if(t.dataset.adds){addScene(+t.dataset.adds,false);return;}
+  if(t.dataset.addf){addScene(+t.dataset.addf,true);return;}
+  if(t.dataset.mv){const [i,d]=t.dataset.mv.split('|').map(Number),j=i+d;if(j<0||j>=S.items.length)return;[S.items[i],S.items[j]]=[S.items[j],S.items[i]];save();renderView();return;}
+  if(t.dataset.rm){S.items.splice(+t.dataset.rm,1);save();upd();renderView();return;}
+  if(t.dataset.ic){const [i,n]=t.dataset.ic.split('|'),it=S.items[+i],k=(it.chars||[]).indexOf(n);it.chars=it.chars||[];if(k>=0)it.chars.splice(k,1);else it.chars.push(n);save();renderView();return;}
+  if(t.id==='bCopy'){const txt=plan().shots.map(s=>`${s.n}. ${s.prompt}`).join('\n\n');try{await navigator.clipboard.writeText(txt);toast('คัดลอกพรอมต์ '+S.items.length+' ช็อตแล้ว');}catch(er){toast('คัดลอกไม่ได้ ใช้ปุ่มไฟล์แผนตอนแทน');}return;}
+  if(t.id==='bDl'){const b=new Blob([JSON.stringify(plan(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='episode-plan.json';a.click();return;}
+  if(t.id==='bSend'){
+    if(!botCfg().url)return toast('ยังไม่ได้เชื่อมบอท ตั้งที่ สตูดิโอ › เจนภาพ ก่อน');
+    const un=[...new Set(S.items.flatMap(x=>x.chars||[]).filter(n=>!LOCKS[n]))];
+    if(un.length&&!confirm('ยังไม่ได้ล็อกหน้า: '+un.join(', ')+'\nหน้าอาจไม่เหมือนกันทุกช็อต ส่งต่อไหม?'))return;
+    try{const items=plan().shots.map(s=>({scene:s.n,prompt:s.prompt}));
+      const r=await botApi('/api/enqueue',{project:'ตอน·'+S.title.slice(0,40),items,variants:1,raw:true});toast('ส่งเข้าคิวแล้ว '+r.added+' ภาพ');}
+    catch(er){toast(String(er.message||er));}
+    return;}
+});
+document.addEventListener('input',e=>{
+  if(e.target.id==='q'){S.q=e.target.value;save();const p=e.target.selectionStart;renderView();const q=$('#q');q.focus();q.setSelectionRange(p,p);}
+  if(e.target.id==='ttl'){S.title=e.target.value;save();}
+});
+document.addEventListener('change',e=>{
+  if(e.target.id==='cat'){S.cat=e.target.value;save();renderView();}
+  if(e.target.id==='gen'){S.gen=e.target.value;save();renderView();}
+});
+
+/* ================= เริ่มต้น ================= */
+(async()=>{
+  renderLock();renderView();renderBar();$('#cnt').textContent=S.items.length;
+  try{const m=await (await fetch('mangaep.json')).json();EP=m['1']||m[Object.keys(m)[0]];}catch(e){}
+  try{SCENES=await (await fetch('scenes.json')).json();}catch(e){}
+  await loadLocks();renderView();
+})();
+</script>
+</body>
+</html>

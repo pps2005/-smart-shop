@@ -18,6 +18,16 @@
     b.style.fontSize = '1.15rem';
     b.addEventListener('click', function (e) { e.stopPropagation(); go(); });
     ctl.appendChild(b);
+    if (!document.getElementById('wscenepick')) {
+      var c = document.createElement('button');
+      c.id = 'wscenepick'; c.type = 'button';
+      c.setAttribute('aria-label', 'เลือกฉากทำตอน + ล็อกหน้า');
+      c.title = 'เลือกฉากทำตอน';
+      c.textContent = '🔒';
+      c.style.fontSize = '1.15rem';
+      c.addEventListener('click', function (e) { e.stopPropagation(); location.href = 'scene-pick.html'; });
+      ctl.appendChild(c);
+    }
     return true;
   }
   var t = setInterval(function () { if (add()) clearInterval(t); }, 300);
