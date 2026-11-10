@@ -1418,7 +1418,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-wmak
 
 /* ---------- ผู้ช่วย: คนที่ช่วยเปิดเครื่อง Kaggle ของตัวเองมารับงานจากคิวเรา ---------- */
 let HNEW=null;
-function helperCell(key){const u=String(botCfg().url||'').replace(/\/+$/,'');return `import urllib.request\nexec(urllib.request.urlopen("${u}/h/${key}/run.py").read().decode())`;}
+function helperCell(key){const u=String(botCfg().url||'').replace(/\/+$/,'');return `import urllib.request\nreq = urllib.request.Request("${u}/h/${key}/run.py", headers={"User-Agent": "Mozilla/5.0"})\nexec(urllib.request.urlopen(req).read().decode())`;}
 function helpersHtml(){const V=BOT.v;
   if(!botCfg().url)return '<h3>🤝 ผู้ช่วย</h3><p class="muted small" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p>';
   if(!V)return '<h3>🤝 ผู้ช่วย</h3><p class="muted small" style="margin:0">กำลังโหลด…</p>';
