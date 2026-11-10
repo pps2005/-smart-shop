@@ -197,6 +197,8 @@ var LS0=[
 {id:'ink',n:'หมึกพู่กันญี่ปุ่น',p:'japanese sumi-e ink wash painting, expressive brush strokes, muted tones with a single red accent, rice paper texture'},
 {id:'flat',n:'ภาพเรียบสีสด (เหมาะกับลายหลังไพ่)',p:'flat vector illustration, bold clean shapes, limited color palette'}];
 try{ST.ls=JSON.parse(localStorage.getItem('oc_ls')||'[]');}catch(e){}
+try{ST.gone=JSON.parse(localStorage.getItem('oc_gone')||'[]');}catch(e){ST.gone=[];}
+function persistGone(){try{localStorage.setItem('oc_gone',JSON.stringify(ST.gone));}catch(e){}}
 function persistLs(){try{localStorage.setItem('oc_ls',JSON.stringify(ST.ls));}catch(e){}}
 function allLS(){return LS0.concat(ST.ls);}
 function lsOf(id){return one(allLS(),id);}
@@ -290,7 +292,7 @@ function render(){
 async function load(){
  if(!cfg().url){ST.S=null;render();return;}
  try{ST.S=await api('/api/state');ST.err='';
-  ST.S.images.concat(ST.S.jobs||[]).forEach(function(im){var m=/^oracle\|([a-z0-9]+)\|(front|back)$/.exec(im.project);if(m&&!deck(m[1])){ST.decks.push({id:m[1],name:'สำรับ '+m[1],theme:'sky',bs:'moon',back:0});persist();}});
+  ST.S.images.concat(ST.S.jobs||[]).forEach(function(im){var m=/^oracle\|([a-z0-9]+)\|(front|back)$/.exec(im.project);if(m&&!deck(m[1])&&ST.gone.indexOf(m[1])<0){ST.decks.push({id:m[1],name:'สำรับ '+m[1],theme:'sky',bs:'moon',back:0});persist();}});
  }catch(e){ST.err=errMsg(e);}
  var sig=JSON.stringify(ST.decks.map(function(d){var i=info(d);return[d.id,d.back,i.done,i.b,i.n,i.fail];}))+ST.cur+ST.err;
  if(sig!==ST.sig){ST.sig=sig;var ae=document.activeElement;if(!(ST.tab==='design'&&ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)))render();if(ST.vd&&$('#sheet').classList.contains('on'))viewSheet(ST.vi,1);}
@@ -390,7 +392,8 @@ var A={
  savels:function(v){var f=ST.form,n=String((v==='b'?f.bsn:f.sn)||'').trim(),p=String((v==='b'?f.bsp:f.sp)||'').trim();if(!n||!p){toast('ใส่ชื่อและ prompt ของลายเส้นก่อน');return;}ST.ls.push({id:'u'+Math.random().toString(36).slice(2,7),n:n,p:p});persistLs();render();toast('เพิ่มลายเส้นในคลังแล้ว');},
  addls:function(){var f=ST.form,n=String(f.lsn||'').trim(),p=String(f.lsp||'').trim();if(!n||!p){toast('ใส่ชื่อและ prompt ของลายเส้นก่อน');return;}ST.ls.push({id:'u'+Math.random().toString(36).slice(2,7),n:n,p:p});persistLs();f.lsn='';f.lsp='';render();toast('เพิ่มลายเส้นในคลังแล้ว');},
  dells:function(v){ST.ls=ST.ls.filter(function(x){return x.id!==v;});persistLs();render();toast('ลบลายเส้นแล้ว (สำรับที่สร้างไปแล้วไม่กระทบ)');},
- stop:async function(v){var d=deck(v);if(!d||!need())return;if(!confirm('หยุดสร้างสำรับ "'+d.name+'"? งานที่ยังรอคิวจะถูกยกเลิก (ภาพที่เสร็จแล้วยังอยู่)'))return;try{var a=await api('/api/clearjobs',{prefix:P(d,'front')}),b=await api('/api/clearjobs',{prefix:P(d,'back')});toast('ยกเลิกงานที่รอคิว '+((a.n||0)+(b.n||0))+' งาน ภาพที่กำลังเจนอยู่อีก 1 ใบจะเสร็จเอง');}catch(e){toast(errMsg(e));}ST.sig='';poll();},
+ stop:function(v){var d=deck(v);if(!d)return;sheet('<h3>หยุดสร้างสำรับ "'+esc(d.name)+'"</h3><div class="sub">งานที่ยังรอคิวจะถูกยกเลิก ภาพที่เสร็จแล้วยังอยู่ · ภาพที่กำลังเจนอยู่อีก 1 ใบจะเสร็จเอง</div><div class="act"><button data-a="stopgo" data-v="'+v+'">หยุดสร้าง</button><button class="g" data-a="close">ยกเลิก</button></div>');},
+ stopgo:async function(v){var d=deck(v);if(!d||!need())return;close_();try{var a=await api('/api/clearjobs',{prefix:P(d,'front')}),b=await api('/api/clearjobs',{prefix:P(d,'back')});toast('ยกเลิกงานที่รอคิว '+((a.n||0)+(b.n||0))+' งาน');}catch(e){toast(errMsg(e));}ST.sig='';poll();},
  th:function(v){ST.draft.th=v;newDeckSheet();},
  bs:function(v){ST.draft.bs=v;newDeckSheet();},
  mk:async function(){
@@ -410,7 +413,15 @@ var A={
   if(await enqueue({project:P(d,'front'),items:items,raw:true}))poll();
  },
  resume:async function(){try{await api('/api/resume',{});toast('ส่งงานที่ล้มเหลวกลับเข้าคิวแล้ว');poll();}catch(e){toast(errMsg(e));}},
- del:async function(v){var d=deck(v);if(!d)return;var inf=ST.inf[v]||info(d),busy=inf.n>0;if(!confirm('ลบสำรับ "'+d.name+'" ออกจากรายการนี้?'+(busy?' งานที่ยังรอคิวของสำรับนี้จะถูกยกเลิกด้วย':'')+' (ภาพที่บอทสร้างแล้วยังอยู่ในบอท)'))return;if(cfg().url){try{var a=await api('/api/clearjobs',{prefix:P(d,'front')}),b=await api('/api/clearjobs',{prefix:P(d,'back')});if((a.n||0)+(b.n||0))toast('ยกเลิกงานที่รอคิว '+((a.n||0)+(b.n||0))+' งานแล้ว');}catch(e){toast(errMsg(e));}}ST.decks=ST.decks.filter(function(x){return x.id!==v;});if(ST.cur===v)ST.cur='';persist();ST.sig='';render();poll();},
+ del:function(v){var d=deck(v);if(!d)return;var inf=ST.inf[v]||info(d);sheet('<h3>ลบสำรับ "'+esc(d.name)+'"</h3><div class="sub">'+(inf.n?'งานที่ยังรอคิวของสำรับนี้จะถูกยกเลิกด้วย · ':'')+'เลือกว่าจะเก็บหรือลบภาพที่บอทสร้างไว้</div><div class="act" style="flex-direction:column"><button data-a="delgo" data-v="'+v+':keep">ลบสำรับ (เก็บภาพไว้ในบอท)</button><button data-a="delgo" data-v="'+v+':all">ลบสำรับและภาพทั้งหมด</button><button class="g" data-a="close">ยกเลิก</button></div>');},
+ delgo:async function(v){var x=String(v).split(':'),d=deck(x[0]);if(!d)return;close_();var n=0;
+  if(cfg().url){try{var a=await api('/api/clearjobs',{prefix:P(d,'front')}),b=await api('/api/clearjobs',{prefix:P(d,'back')});n=(a.n||0)+(b.n||0);}catch(e){toast(errMsg(e));}
+   if(x[1]==='all'&&ST.S){var ids=ST.S.images.filter(function(im){return im.project===P(d,'front')||im.project===P(d,'back');}).map(function(im){return im.id;});
+    toast('กำลังลบภาพ '+ids.length+' ใบ…');
+    for(var i=0;i<ids.length;i+=6){try{await Promise.all(ids.slice(i,i+6).map(function(id){return api('/api/delete',{id:id});}));}catch(e){toast(errMsg(e));break;}}}}
+  if(ST.gone.indexOf(d.id)<0){ST.gone.push(d.id);persistGone();}
+  ST.decks=ST.decks.filter(function(y){return y.id!==d.id;});if(ST.cur===d.id)ST.cur='';persist();ST.sig='';render();
+  toast('ลบสำรับแล้ว'+(n?' · ยกเลิกคิว '+n+' งาน':''));poll();},
  bot:function(){botSheet();},
  botsave:function(){var c=cfg();c.url=($('#bu').value||'').trim();c.key=$('#bkk').value||'';try{localStorage.setItem('ss_imgbot',JSON.stringify(c));}catch(e){}close_();toast('บันทึกแล้ว');ST.sig='';poll();},
  bkm:function(v){backSheet(v);},
@@ -444,7 +455,7 @@ var A={
   if(!bp&&!bsp){toast('กรอก prompt ด้านหลัง (ลวดลายหรือสไตล์ อย่างน้อย 1 ช่อง)');return;}
   var d={id:Math.random().toString(36).slice(2,8),name:t(f.name)||tn,custom:1,tn:tn,sn:sn,tp:tp,sp:sp,bp:bp,bsn:bsn,bsp:bsp,couple:cp,theme:'',bs:'',back:0};
   var mx=0;CARDS.forEach(function(c,i){mx=Math.max(mx,promptFor(i,d).length);});
-  if(mx>2000&&!confirm('prompt ด้านหน้ายาวสุด '+mx+' ตัวอักษร เกินราว 2,000 ส่วนท้ายอาจถูกตัด ต่อไหม?'))return;
+  if(mx>2000&&!f.okLong){f.okLong=true;toast('prompt ยาวสุด '+mx+' ตัวอักษร เกินราว 2,000 ส่วนท้ายอาจถูกตัด กดเริ่มสร้างอีกครั้งเพื่อยืนยัน');return;}
   var ok=await enqueue({project:P(d,'back'),items:[{scene:1,prompt:backPrompt(d)}],variants:3,raw:true},'');
   if(ok)ok=await enqueue({project:P(d,'front'),items:CARDS.map(function(c,i){return{scene:i+1,prompt:promptFor(i,d)};}),raw:true},'เริ่มสร้างสำรับแล้ว ภาพจะทยอยขึ้นมา');
   if(!ok)return;
