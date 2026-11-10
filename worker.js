@@ -51,6 +51,7 @@ export default {
       if (p === '/api/push') return json(await ghPush(env, body.path, body.b64, body.message));
       if (p === '/api/resume') { await setSetting(env, 'paused_until', '0'); await env.DB.prepare("UPDATE jobs SET status='queued' WHERE status IN ('running','failed')").run(); return json({ ok: true }); }
       if (p === '/api/clearqueue') { await env.DB.prepare("DELETE FROM jobs WHERE status IN ('queued','failed')").run(); return json({ ok: true }); }
+      if (p === '/api/clearjobs') { const pre = String(body.prefix || ''); if (!pre) return json({ error: 'no prefix' }, 400); const r = await env.DB.prepare("DELETE FROM jobs WHERE instr(project,?)=1 AND status!='running'").bind(pre).run(); return json({ ok: true, n: (r.meta && r.meta.changes) || 0 }); }
       if (p === '/api/clearnotices') { await env.DB.prepare('DELETE FROM notices').run(); return json({ ok: true }); }
       return json({ error: 'not found' }, 404);
     } catch (e) {
