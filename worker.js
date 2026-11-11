@@ -10,10 +10,38 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'xlora-2';
+const BOT_VER = 'meter-1';
 
+// ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
+const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
+const readDay = () => 'rr:' + new Date().toISOString().slice(0, 10);
+function meterDB(db, acc) {
+  const add = r => { acc.n += (r && r.meta && +r.meta.rows_read) || 0; return r; };
+  const wrap = st => ({
+    __st: st,
+    bind: (...a) => wrap(st.bind(...a)),
+    all: async () => add(await st.all()),
+    run: async () => add(await st.run()),
+    first: async c => { const r = add(await st.all()), row = r.results && r.results[0]; return row == null ? null : (c ? row[c] : row); }
+  });
+  return { prepare: q => wrap(db.prepare(q)), batch: async l => { const r = await db.batch(l.map(x => x.__st || x)); for (const x of r) add(x); return r; } };
+}
+async function flushReads(db, acc, min) {
+  const n = acc.n; if (n < (min || 1)) return; acc.n = 0;
+  try { await db.prepare("INSERT INTO settings (key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(settings.value AS INTEGER)+CAST(excluded.value AS INTEGER) AS TEXT)").bind(readDay(), String(n)).run(); } catch (e) { }
+}
 export default {
-  async fetch(req, env, ctx) {
+  async fetch(req, env0, ctx) {
+    const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) };
+    try { return await handleFetch(req, env, ctx); } finally { ctx.waitUntil(flushReads(env0.DB, acc, 25)); }
+  },
+  async scheduled(event, env0, ctx) {
+    const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) }, jobs = [];
+    await handleCron(event, env, { waitUntil: p => jobs.push(p) });
+    ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
+  },
+};
+async function handleFetch(req, env, ctx) {
     const url = new URL(req.url);
     const p = url.pathname;
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -70,15 +98,14 @@ export default {
     } catch (e) {
       return json({ error: String(e.message || e) }, 500);
     }
-  },
-  async scheduled(event, env, ctx) {
+}
+async function handleCron(event, env, ctx) {
     await ensureSchema(env);
     ctx.waitUntil(tick(env, false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
     ctx.waitUntil(autoHeal(env).catch(() => {}).then(() => vTick(env, false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
     ctx.waitUntil(castBatch(env, 0, false).catch(() => {}));
     ctx.waitUntil(audDaily(env).catch(() => {}));
-  },
-};
+}
 
 // ---------- ซ่อมงานที่พังอัตโนมัติ ----------
 // งานวิดีโอ/เสียงที่พัง: รอ 2 ชม. (เผื่อแก้โค้ดหรือเครื่องว่าง) แล้วส่งกลับเข้าคิวเอง สูงสุด 6 ครั้ง
@@ -1012,6 +1039,7 @@ async function kTopUp(env, s) {
 async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
+  if (!force) { const rr = +s[readDay()] || 0; if (rr > READ_STOP) return { skipped: 'reads ' + rr }; if (rr > READ_SLOW && new Date().getUTCMinutes() % 5) return { skipped: 'reads-slow ' + rr }; } // ใกล้เพดานอ่านรายวัน: งานเบื้องหลังทำทุก 5 นาที · เกือบเต็ม: หยุดงานเบื้องหลัง (เครื่อง Kaggle ยังส่งงานได้)
   await animeAuto(env, s).catch(() => {});
   if (s.supa_test === '1') await supaSelfTest(env, s);
   await restyleTick(env, s).catch(() => { });
@@ -3310,7 +3338,7 @@ async function castApi(req, env, url, body) {
           }
           v.prog = g;
         }
-        return json({ ok: true, plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
+        return json({ ok: true, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
       }
       if (act === 'save') {
         const pl = b.plan || {}; if (!Array.isArray(pl.roles) || !Array.isArray(pl.eps) || !pl.roles.length || !pl.eps.length) return json({ error: 'โครงเรื่องไม่ครบ (ต้องมีบทและตอน)' }, 400);

@@ -82,7 +82,7 @@ const tierOf=r=>r.tier||(r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'
 const castOf=k=>ST.cands.find(c=>c.cast_role===k&&c.cast_story===ST.story);
 async function load(){
   clearTimeout(POLL);if(!botCfg().url||!ST.story){render();return;}
-  try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;if(r.kind)ST.kind=r.kind;ST.err='';}catch(e){ST.err=botErr(e);}
+  try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;if(r.kind)ST.kind=r.kind;ST.reads=+r.reads||0;ST.err='';}catch(e){ST.err=botErr(e);}
   const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
   if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
   try{const r=await api('lib');ST.lib=r.loras||[];ST.weights=r.weights||{};}catch(e){ST.lib=[];}
@@ -167,6 +167,7 @@ function render(){const A=$('#app');
     const bc=$('#bc');if(bc)bc.onclick=()=>{ST.editBot=false;render();};return;}
   const pl=ST.plan&&ST.plan.roles&&ST.plan.roles.length?ST.plan:null;let h='';
   if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button><button data-test="1">🧪 ทดสอบ</button></div>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
+  if(ST.reads>=60)h+=`<div class="c ${ST.reads>=85?'bad':'warn'}">⚠️ วันนี้ใช้โควตาอ่านฐานข้อมูลไปแล้ว ${ST.reads}% ${ST.reads>=85?'— ระบบหยุดงานเบื้องหลังไว้จนถึง 07:00 เพื่อไม่ให้ดับทั้งระบบ':ST.reads>=64?'— ระบบชะลองานเบื้องหลังลง':''}</div>`;
   if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
   if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
   const kd=`<div class="c"><h2><span class="stp">1</span>ประเภทงาน</h2><div class="kd">${KIND.map(x=>`<button class="${ST.kind===x[0]?'on':''}" data-kind="${x[0]}"><b>${x[1]}</b>${x[2]}</button>`).join('')}</div>${ST.kind?'':'<div class="mu" style="margin-top:6px">แตะเลือก ระบบตั้งสัดส่วนภาพ ความยาว และจังหวะตัดให้เอง</div>'}</div>`;
