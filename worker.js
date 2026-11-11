@@ -422,7 +422,7 @@ async function animeSchema(env) {
 async function animeAuto(env, s) {
   if (s.auto_lora === '0') return;
   await animeSchema(env);
-  const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE c.series_id<>0 AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
+  const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE (c.series_id<>0 OR EXISTS (SELECT 1 FROM aud_cands a WHERE a.char_id=c.id AND a.cast_role IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
   for (const c of cs) {
     const pj = charProj(c);
     if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n) continue;
@@ -488,7 +488,7 @@ async function epWaiting(env) { // ตอนที่รอ LoRA ตัวหล
       if (!v || v.status !== 'waiting') continue;
       const plan = await readPlan(env, story), E = plan && plan.eps.find(x => x.no === +no); if (!E) continue;
       const ck = await epCheck(env, story, plan, E); if (ck.miss.length || ck.nol.length) continue;
-      const sid = await epStart(env, story, plan, E); st[no] = { status: 'running', series: sid, at: Date.now() }; ch = true;
+      const sid = await epStart(env, story, plan, E); st[no] = { status: 'running', series: sid, at: Date.now(), all: !!v.all }; if (v.all) await setSetting(env, 'anime_ok_' + sid, '99'); ch = true;
     }
     if (ch) await setSetting(env, r.key, JSON.stringify(st));
   }
@@ -2482,8 +2482,9 @@ async function castApi(req, env, url, body) {
         const ck = await epCheck(env, story, plan, E);
         if (ck.miss.length) return json({ error: 'ยังไม่ได้ใส่บท: ' + ck.miss.join(', '), missing: ck.miss }, 400);
         const st = (await rd('epst:' + story)) || {};
-        if (ck.nol.length) { st[E.no] = { status: 'waiting', need: ck.nol, at: Date.now() }; await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true, waiting: ck.nol }); }
-        const sid = await epStart(env, story, plan, E); st[E.no] = { status: 'running', series: sid, at: Date.now() };
+        if (ck.nol.length) { st[E.no] = { status: 'waiting', need: ck.nol, at: Date.now(), all: !!b.all }; await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true, waiting: ck.nol }); }
+        const sid = await epStart(env, story, plan, E); st[E.no] = { status: 'running', series: sid, at: Date.now(), all: !!b.all };
+        if (b.all) await setSetting(env, 'anime_ok_' + sid, '99'); // ทำต่อเนื่องทุกตอน ไม่ต้องรอผู้ใช้กดผ่านตอนก่อน
         await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true, started: true });
       }
       if (act === 'stop') { // หยุดตอนนี้ (ของที่ทำไปแล้วยังอยู่)
