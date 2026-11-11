@@ -10,6 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
+const BOT_VER = 'lora-tab-3';
 
 export default {
   async fetch(req, env, ctx) {
@@ -30,7 +31,7 @@ export default {
     try {
       if (p === '/api/vstate' || p.startsWith('/vid/')) return await vApi(req, env, url, ctx, {});
       if (p === '/api/vcast') return await castApi(req, env, url, {});
-      if (p === '/api/ping') return json({ ok: true, bot: 'anime-image-bot', github: !!(env.GH_TOKEN && env.GH_REPO) });
+      if (p === '/api/ping') return json({ ok: true, bot: 'anime-image-bot', github: !!(env.GH_TOKEN && env.GH_REPO), ver: BOT_VER, kseen: +((await getSettings(env)).k_seen) || 0 });
       if (p === '/api/state') return json(await getState(env));
       if (p.startsWith('/img/')) return getImage(env, +p.split('/')[2]);
       if (p === '/api/zip') return makeZip(env, url.searchParams.get('project') || '', url.searchParams.get('starred') === '1');
@@ -232,6 +233,12 @@ async function charMake(env, b) {
   await charRefs(env, id, 12);
   return { ok: true, char_id: id };
 }
+async function loraPri(env, charId) { // 0 = ตัวหลัก (เทรนก่อน) · 1 = ตัวอื่น
+  try {
+    const c = await env.DB.prepare('SELECT cast_role,cast_story FROM aud_cands WHERE char_id=?').bind(+charId).first(); if (!c || !c.cast_role) return 1;
+    const pl = await readPlan(env, c.cast_story), r = pl && pl.roles.find(x => x.key === c.cast_role); return r && r.tier === 'main' ? 0 : 1;
+  } catch (e) { return 1; }
+}
 async function charTrain(env, b) {
   await animeSchema(env);
   const ch = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!ch) return { error: 'ไม่พบตัวละคร' };
@@ -242,7 +249,7 @@ async function charTrain(env, b) {
   if (use.length < 8) return { error: st.length ? `ติด ⭐ แค่ ${st.length} ภาพ ต้องอย่างน้อย 8 (หรือไม่ติดเลย = ใช้ทุกภาพ)` : `มีภาพแค่ ${all.length} ภาพ ต้องอย่างน้อย 8 ภาพ` };
   const trig = 'chr' + ch.id + 'x', imgs = use.map(x => ({ id: x.id, cap: `${trig}, ${CHAR_VARS[((+x.scene || 1) - 1) % CHAR_VARS.length]}` }));
   await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
-  const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs })).run();
+  const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs, pri: await loraPri(env, ch.id) })).run();
   await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(ch.id, r.meta.last_row_id, Date.now()).run();
   return { ok: true, images: imgs.length };
 }
@@ -449,7 +456,7 @@ async function animeAuto(env, s) {
     if (all.length < 12) continue;
     const st = all.filter(x => x.starred), use = (st.length >= 8 ? st : all).slice(0, 24), trig = 'chr' + c.id + 'x';
     const imgs = use.map(x => ({ id: x.id, cap: `${trig}, ${CHAR_VARS[((+x.scene || 1) - 1) % CHAR_VARS.length]}` }));
-    const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: c.id, trigger: trig, images: imgs })).run();
+    const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: c.id, trigger: trig, images: imgs, pri: await loraPri(env, c.id) })).run();
     await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(c.id, r.meta.last_row_id, Date.now()).run();
   }
 }
@@ -669,6 +676,7 @@ async function animeApi(env, b) {
     const only = Array.isArray(b.ids) ? new Set(b.ids.map(Number)) : null;
     const lc = (await env.DB.prepare("SELECT c.id cid,c.name,l.id lid FROM chars c JOIN loras l ON l.char_id=c.id AND l.status='ready' AND l.use=1 WHERE c.series_id=? OR c.series_id=0").bind(sc.series_id).all()).results;
     for (const c of await castList(env, await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(sc.series_id).first())) if (c.lid) lc.push({ cid: c.cid, name: c.name, lid: c.lid }); // LoRA ของนักแสดงที่ใส่บทไว้ (ชื่อบท = ชื่อใน shots.chars)
+    let wm = {}; try { const srt = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(sc.series_id).first(), wr = srt && await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('lw:' + srt.title).first(); wm = wr ? JSON.parse(wr.value) : {}; } catch (e) { wm = {}; }
     const hv = new Set((await env.DB.prepare('SELECT DISTINCT project FROM images WHERE project LIKE ?').bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
     const pd = new Set((await env.DB.prepare("SELECT DISTINCT project FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle')").bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
     const st = []; let n = 0;
@@ -676,7 +684,7 @@ async function animeApi(env, b) {
       if (only ? !only.has(sh.id) : (hv.has(sh.kproj) || pd.has(sh.kproj))) continue;
       let names = []; try { names = JSON.parse(sh.chars || '[]'); } catch { names = []; }
       const m = lc.filter(c => names.includes(c.name));
-      st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: 0.8 }))), sh.id));
+      st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: +wm[c.name] || 0.8 }))), sh.id));
       st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,4)").bind(sh.kproj, `${m.map(c => 'chr' + c.cid + 'x').join(', ')}${m.length ? ', ' : ''}${sh.en}, [[STYLE]]`.slice(0, 1800), Date.now()));
       n++;
     }
@@ -779,6 +787,7 @@ async function bridgeImg(env, s) {
   for (const j of rows) {
     let lo = [];
     if (String(j.project).startsWith('ฉาก')) { const sh = await env.DB.prepare('SELECT loras FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { lo = JSON.parse((sh && sh.loras) || '[]'); } catch { lo = []; } }
+    if (String(j.project).startsWith('ทดสอบLoRA·')) lo = [{ id: +String(j.project).split('·')[1] || 0, w: 0.8 }];
     const eg = lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
     const opt = { jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
@@ -1042,7 +1051,7 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p === '/k/claim') {
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' ORDER BY (kind='img'), CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -1061,6 +1070,11 @@ async function vRoutes(req, env, url, ctx) {
       if (!j || !(o.images || []).some(x => x.id === iid)) return new Response('not found', { status: 404 });
       const r = await env.DB.prepare('SELECT data FROM images WHERE id=?').bind(iid).first();
       return r ? new Response(b64ToBytes(r.data), { headers: { 'content-type': 'image/jpeg' } }) : new Response('not found', { status: 404 });
+    }
+    if (p.startsWith('/k/prog/')) { // ความคืบหน้าเทรน LoRA จากเครื่อง Kaggle (สเต็ป/ทั้งหมด/บรรทัดล่าสุด)
+      const b = await req.json().catch(() => ({}));
+      await setSetting(env, 'lprog:' + id, JSON.stringify({ step: +b.step || 0, total: +b.total || 0, tail: String(b.tail || '').slice(-400), at: Date.now() }));
+      return json({ ok: true });
     }
     if (p.startsWith('/k/lora/')) { // รับไฟล์ LoRA ที่เทรนเสร็จ → เก็บเป็นก้อนใน D1 (ฟรี ไม่ต้องใช้ที่เก็บเพิ่ม)
       await animeSchema(env);
@@ -1997,6 +2011,7 @@ def train_lora(job, port):
     imgs = opt.get("images") or []
     if len(imgs) < 8:
         raise RuntimeError("ภาพสำหรับเทรนน้อยกว่า 8 ภาพ")
+    prog(job["id"], 0, 0, "กำลังเตรียมโมเดลและตัวเทรน (ครั้งแรกอาจนาน 5–10 นาที)")
     ensure_image("sdxl", "", "")
     ensure_kohya()
     trig = opt.get("trigger") or "chr"
@@ -2026,7 +2041,8 @@ def train_lora(job, port):
            % (max(0, (port or 8188) - 8188), M.get("kpy") or ('"%s/venv/bin/python"' % KV), KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, steps))
     log("เริ่มเทรน LoRA %s (%d ภาพ · %d สเต็ป)" % (trig, len(imgs), steps))
     t0 = time.time()
-    sh(cmd, cwd=KV)
+    prog(job["id"], 0, steps, "เริ่มเทรน")
+    sh_prog(cmd, KV, job["id"], steps)
     f = os.path.join(out, "lora.safetensors")
     if not os.path.exists(f):
         raise RuntimeError("เทรนจบแต่ไม่พบไฟล์ LoRA")
@@ -2035,6 +2051,43 @@ def train_lora(job, port):
     dummy = os.path.join(ROOT, "lora_done_%s.bin" % job["id"])
     open(dummy, "wb").write(b"0" * 2048)
     return dummy, time.time() - t0, 0, 0
+
+
+def sh_prog(cmd, cwd, jid, total):
+    import re
+    print("$", cmd, flush=True)
+    p = subprocess.Popen(cmd, shell=True, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    tail, buf, last = [], "", 0.0
+    while True:
+        ch = p.stdout.read(1)
+        if ch == "":
+            break
+        if ch not in "\r\n":
+            buf += ch
+            continue
+        line, buf = buf.strip(), ""
+        if not line:
+            continue
+        tail.append(line[-200:])
+        tail = tail[-30:]
+        m = re.search(r"(\d+)/(\d+)", line)
+        if m and "steps" in line and time.time() - last > 15:
+            last = time.time()
+            try:
+                call("/k/prog/%s" % jid, {"step": int(m.group(1)), "total": int(m.group(2)) or total, "tail": line[-200:]}, timeout=20)
+            except Exception:
+                pass
+    p.wait()
+    print("\n".join(tail[-12:]), flush=True)
+    if p.returncode != 0:
+        raise RuntimeError("คำสั่งล้มเหลว: " + cmd[:80] + " :: " + "\n".join(tail)[-300:])
+
+
+def prog(jid, step, total, tail):
+    try:
+        call("/k/prog/%s" % jid, {"step": step, "total": total, "tail": tail}, timeout=20)
+    except Exception:
+        pass
 
 
 def work(job, port):
@@ -2547,10 +2600,39 @@ async function castApi(req, env, url, body) {
         if (!stories.includes(story)) { stories.push(story); await setSetting(env, 'stories', JSON.stringify(stories)); }
         return json({ ok: true, roles: plan.roles.length, eps: plan.eps.length });
       }
-      if (act === 'lib') { // คลัง LoRA: เฉพาะตัวที่เทรนเสร็จแล้ว (status=ready) ของนักแสดงในคลัง + ใช้เป็นบทไหนอยู่
+      if (act === 'lib') { // คลัง LoRA: เฉพาะตัวที่เทรนเสร็จแล้ว (status=ready) ของนักแสดงในคลัง + ใช้เป็นบทไหนอยู่ + ภาพทดสอบ + น้ำหนักต่อบท
         const rows = (await env.DB.prepare("SELECT l.id lid, l.char_id, l.size, l.created, a.id cand, a.name, a.role, a.cast_role, a.cast_story FROM loras l JOIN aud_cands a ON a.char_id=l.char_id WHERE l.status='ready' AND l.id=(SELECT MAX(x.id) FROM loras x WHERE x.char_id=l.char_id AND x.status='ready') ORDER BY l.id DESC").all()).results;
-        for (const c of rows) { const fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project LIKE ? AND scene=1').bind(`ออดิชัน·${c.role}·${c.cand}·%`).first(); c.face = (fr && fr.id) || 0; }
-        return json({ ok: true, loras: rows });
+        for (const c of rows) {
+          const fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project LIKE ? AND scene=1').bind(`ออดิชัน·${c.role}·${c.cand}·%`).first(); c.face = (fr && fr.id) || 0;
+          const tp = 'ทดสอบLoRA·' + c.lid, ti = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(tp).first(), tj = await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(tp).first();
+          c.test = (ti && ti.id) || 0; c.testing = !!(tj && tj.n);
+        }
+        return json({ ok: true, loras: rows, weights: (await rd('lw:' + story)) || {} });
+      }
+      if (act === 'training') { // LoRA ที่ยังไม่เสร็จ: รอคิว / กำลังเทรน (พร้อมความคืบหน้า) / เทรนพัง (พร้อมข้อผิดพลาด)
+        const rows = (await env.DB.prepare("SELECT l.id lid, l.char_id, l.vjob, l.status, l.error, l.created, v.status vs, json_extract(v.opt,'$.pri') pri, a.id cand, a.name, a.cast_role FROM loras l LEFT JOIN vjobs v ON v.id=l.vjob LEFT JOIN aud_cands a ON a.char_id=l.char_id WHERE l.status IN ('queued','failed') AND l.id=(SELECT MAX(x.id) FROM loras x WHERE x.char_id=l.char_id AND x.status<>'old') ORDER BY l.id").all()).results;
+        const waiting = rows.filter(x => x.status === 'queued' && x.vs !== 'running').sort((p, q) => ((+p.pri === 0 ? 0 : 1) - (+q.pri === 0 ? 0 : 1)) || (p.vjob - q.vjob));
+        const items = [];
+        for (const x of rows) {
+          let st = x.status; if (st === 'queued' && x.vs === 'running') st = 'training';
+          const it = { lid: x.lid, cand: x.cand || 0, name: x.name || ('ตัวละคร ' + x.char_id), cast_role: x.cast_role || '', status: st, pri: +x.pri === 0 ? 0 : 1, error: st === 'failed' ? String(x.error || '').slice(-400) : '', pos: st === 'queued' ? waiting.indexOf(x) + 1 : 0, step: 0, total: 0, tail: '', at: 0 };
+          if (st === 'training') { const pg = await rd('lprog:' + x.vjob); if (pg) { it.step = pg.step || 0; it.total = pg.total || 0; it.tail = pg.tail || ''; it.at = pg.at || 0; } }
+          items.push(it);
+        }
+        return json({ ok: true, items });
+      }
+      if (act === 'lora_test') { // วาดภาพทดสอบหน้าด้วย LoRA ที่เสร็จแล้ว (เห็นผลในคลัง LoRA)
+        const l = await env.DB.prepare('SELECT id,char_id,status FROM loras WHERE id=?').bind(+b.lora).first();
+        if (!l || l.status !== 'ready') return json({ error: 'LoRA นี้ยังไม่พร้อม' }, 400);
+        const pj = 'ทดสอบLoRA·' + l.id;
+        if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n) return json({ ok: true, pending: true });
+        await env.DB.batch([env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,4)").bind(pj, `chr${l.char_id}x, upper body portrait, looking at viewer, gentle smile, plain light background, [[STYLE]]`, Date.now())]);
+        return json({ ok: true });
+      }
+      if (act === 'lorawt') { // น้ำหนัก LoRA ต่อบท (0.3–1.2) ใช้ตอนสร้างภาพคีย์ของช็อตที่มีตัวละครนั้น
+        const key = clip(b.key, 40), v = Math.round(Math.max(0.3, Math.min(1.2, +b.w || 0.8)) * 100) / 100, m = (await rd('lw:' + story)) || {};
+        if (!key) return json({ error: 'ไม่พบบท' }, 400);
+        m[key] = v; await setSetting(env, 'lw:' + story, JSON.stringify(m)); return json({ ok: true, w: v });
       }
       const plan = await rd('plan:' + story); if (!plan) return json({ error: 'ยังไม่ได้อัปโหลดโครงเรื่องของเรื่องนี้' }, 404);
       if (act === 'setr') { // เปลี่ยนเพศ / ระดับบทของตัวละคร (ตัวหลัก = ใช้ LoRA ล็อกหน้า)

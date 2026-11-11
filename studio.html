@@ -28,6 +28,17 @@ function botU(p){const c=botCfg();return String(c.url||'').replace(/\/+$/,'')+p+
 function botErr(e){const m=String(e&&e.message||e);return /failed to fetch|load failed|networkerror|network request/i.test(m)?'ติดต่อบอทไม่ได้ ตรวจลิงก์บอท หรือบอทยังไม่ได้ deploy':m;}
 async function botApi(p,body){const r=await fetch(botU(p),body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});
   if(r.status===401)throw new Error('รหัสผ่านบอทไม่ถูกต้อง');const j=await r.json().catch(()=>({error:'บอทตอบกลับไม่ถูกต้อง (ลิงก์ถูกไหม?)'}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j;}
+async function testBot(url,key){
+  url=String(url||'').trim().replace(/\/+$/,'');
+  if(!/^https?:\/\//i.test(url))return{ok:false,m:'❌ ลิงก์ต้องขึ้นต้นด้วย https:// เช่น https://xxx.workers.dev'};
+  let r;try{r=await fetch(url+'/api/ping?k='+encodeURIComponent(key||''),{cache:'no-store'});}catch(e){return{ok:false,m:'❌ ติดต่อลิงก์นี้ไม่ได้ — ลิงก์พิมพ์ผิด หรือ Worker ยังไม่ได้ deploy / ถูกลบ'};}
+  if(r.status===401)return{ok:false,m:'❌ ลิงก์ถูก แต่รหัสผ่านบอทไม่ตรง'};
+  if(r.status===404)return{ok:false,m:'❌ ลิงก์นี้ตอบมา แต่ไม่ใช่บอทตัวนี้ (ไม่พบ /api/ping)'};
+  const j=await r.json().catch(()=>null);
+  if(!r.ok||!j||!j.ok)return{ok:false,m:'❌ บอทตอบกลับผิดปกติ (HTTP '+r.status+')'};
+  if(!j.ver)return{ok:true,m:'⚠️ เชื่อมได้ แต่บอทเป็นเวอร์ชันเก่า ยังไม่มีระบบ LoRA ใหม่ — deploy worker.js ล่าสุดก่อน'};
+  const ks=+j.kseen,ago=ks?Math.round((Date.now()-ks)/60000):null;
+  return{ok:true,m:'✅ เชื่อมบอทได้ (เวอร์ชัน '+j.ver+') · Kaggle '+(ago==null?'ยังไม่เคยต่อเข้ามา':ago<=10?'ออนไลน์ ('+ago+' นาทีก่อน)':'เงียบไป '+ago+' นาที — ตรวจว่า Kaggle ยังรันอยู่')};}
 /* ---------- อ่านไฟล์โครงเรื่อง .docx ---------- */
 async function readDocxXml(file){const buf=new Uint8Array(await file.arrayBuffer()),dv=new DataView(buf.buffer),td=new TextDecoder();let e=-1;for(let i=buf.length-22;i>=Math.max(0,buf.length-70000);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break;}}if(e<0)throw new Error('ไฟล์ไม่ใช่ .docx');const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);for(let k=0;k<n;k++){if(dv.getUint32(p,true)!==0x02014b50)break;const meth=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true),nm=td.decode(buf.subarray(p+46,p+46+nl));p+=46+nl+xl+cl;if(nm!=='word/document.xml')continue;const ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),raw=buf.subarray(ds,ds+cs);if(meth===0)return td.decode(raw);if(typeof DecompressionStream==='undefined')throw new Error('เบราว์เซอร์นี้อ่าน .docx ไม่ได้ ลองอัปเดต iOS/เบราว์เซอร์');return td.decode(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());}throw new Error('ไม่พบเนื้อหาในไฟล์');}
 function docxBlocks(xml){const d=new DOMParser().parseFromString(xml,'application/xml'),W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',T=el=>[...el.getElementsByTagNameNS(W,'t')].map(x=>x.textContent).join('').trim(),body=d.getElementsByTagNameNS(W,'body')[0],out=[];if(!body)return out;for(const ch of body.children){if(ch.localName==='p'){const t=T(ch);if(t)out.push({t:'p',text:t});}else if(ch.localName==='tbl'){out.push({t:'tbl',rows:[...ch.children].filter(x=>x.localName==='tr').map(tr=>[...tr.children].filter(x=>x.localName==='tc').map(tc=>[...tc.getElementsByTagNameNS(W,'p')].map(T).filter(Boolean).join(' ')))});}}return out;}
@@ -49,7 +60,7 @@ function parsePlan(blocks){
   eps.forEach(E=>{const tx=E.title+' '+Object.values(E.f).join(' ');E.cast=roles.filter(r=>/คู่หลัก/.test(r.kind)||tx.includes(r.key)||tx.includes(r.name)||(/^พ่อของ/.test(r.kind)&&/พ่อ(?!ค้า)/.test(tx))).map(r=>r.key);});
   return{title,overview:ov,rule:(P.find(x=>/^ทุกตอน/.test(x))||'').slice(0,400),roles,eps:eps.sort((a,b)=>a.no-b.no),locs};}
 /* ---------- สถานะ ---------- */
-const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',editBot:false,lib:[],onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
+const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',editBot:false,lib:[],train:[],weights:{},testMsg:'',onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
 const STY=[['rom','💗 รอมคอมใส','bright soft anime style, pastel colors, high-key lighting, delicate fine line art, expressive cute faces, soft blush, detailed hair strands, clean cel shading, romantic comedy mood'],
 ['dark','🌑 ดราม่ามืดหนัก','dark gritty anime style, desaturated cold palette, heavy shadows, strong rim light, detailed fine line art, cinematic dramatic lighting, grim tense atmosphere'],
 ['act','⚔️ แอ็กชันคมเข้ม','dynamic action anime style, bold sharp line art, high contrast, vivid saturated accents, dramatic low angle, motion energy, cinematic lighting'],
@@ -65,9 +76,11 @@ async function load(){
   try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;ST.err='';}catch(e){ST.err=botErr(e);}
   const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
   if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
-  try{const r=await api('lib');ST.lib=r.loras||[];}catch(e){ST.lib=[];}
+  try{const r=await api('lib');ST.lib=r.loras||[];ST.weights=r.weights||{};}catch(e){ST.lib=[];}
+  try{const r=await api('training');ST.train=r.items||[];}catch(e){ST.train=[];}
   await autoLora();render();
-  if(Object.values(ST.epst).some(v=>v&&(v.status==='running'||v.status==='waiting')))POLL=setTimeout(load,30000);}
+  if(Object.values(ST.epst).some(v=>v&&(v.status==='running'||v.status==='waiting')))POLL=setTimeout(load,30000);
+  else if(ST.train.some(x=>x.status!=='failed')||ST.lib.some(x=>x.testing))POLL=setTimeout(load,20000);}
 /* ตัวหลักที่ยังไม่มีตัวละคร/LoRA: ส่งสร้างให้ (บอทฝึก LoRA ต่อเองเมื่อภาพชุดฝึกครบ) */
 const LG=new Set(); // กันสั่งสร้างตัวละครซ้ำคนเดิม
 async function autoLora(){const pl=ST.plan;if(!pl||ST.onlyReady)return;
@@ -119,11 +132,12 @@ async function dl(id,name){try{toast('กำลังโหลดไฟล์…
 function bestEp(){const q=ST.qc;if(!q||!q.eps)return 0;const c=q.eps.filter(E=>E.final&&!E.fixing&&!E.bad);if(!c.length)return 0;c.sort((a,b)=>(b.avg==null?50:b.avg)-(a.avg==null?50:a.avg));return c[0].no;}
 /* ---------- หน้าจอ ---------- */
 function render(){const A=$('#app');
-  if(!botCfg().url||ST.editBot){A.innerHTML=`<div class="c"><h2>🔌 เชื่อมบอท${botCfg().url?'ใหม่':''}</h2><div class="mu">ใส่ลิงก์บอท (Worker ที่ deploy ล่าสุด) กับรหัสผ่าน เก็บในเครื่องนี้</div><input type="text" id="bu" placeholder="https://...workers.dev" value="${esc(botCfg().url||'')}"><input type="password" id="bk" placeholder="รหัสผ่านบอท"><button class="on" id="bs">บันทึกและเชื่อม</button>${botCfg().url?'<button id="bc">ยกเลิก</button>':''}</div>`;
+  if(!botCfg().url||ST.editBot){A.innerHTML=`<div class="c"><h2>🔌 เชื่อมบอท${botCfg().url?'ใหม่':''}</h2><div class="mu">ใส่ลิงก์บอท (Worker ที่ deploy ล่าสุด) กับรหัสผ่าน เก็บในเครื่องนี้</div><input type="text" id="bu" placeholder="https://...workers.dev" value="${esc(botCfg().url||'')}"><input type="password" id="bk" placeholder="รหัสผ่านบอท"><button class="on" id="bs">บันทึกและเชื่อม</button><button id="bt0">🧪 ทดสอบ</button>${botCfg().url?'<button id="bc">ยกเลิก</button>':''}<div id="bt" class="mu" style="margin-top:6px;white-space:pre-wrap"></div></div>`;
+    $('#bt0').onclick=async()=>{const o=$('#bt');o.textContent='⏳ กำลังทดสอบ…';const r=await testBot($('#bu').value,$('#bk').value);o.textContent=r.m;};
     $('#bs').onclick=()=>{localStorage.setItem('ss_imgbot',JSON.stringify({url:$('#bu').value.trim(),key:$('#bk').value}));ST.editBot=false;ST.err='';load();};
     const bc=$('#bc');if(bc)bc.onclick=()=>{ST.editBot=false;render();};return;}
   const pl=ST.plan&&ST.plan.roles&&ST.plan.roles.length?ST.plan:null;let h='';
-  if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button></div></div>`;
+  if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button><button data-test="1">🧪 ทดสอบ</button></div>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
   if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
   if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
   if(!pl){h+=`<div class="c"><label class="drop" id="dz"><div style="font-size:40px">📄</div>แตะเพื่อเลือก หรือลากไฟล์บท (.docx) มาวาง<input type="file" id="pf" accept=".docx" hidden></label></div>`;}
@@ -167,7 +181,8 @@ function render(){const A=$('#app');
 /* ---------- แถบ LoRA: เลือกเฉพาะ LoRA ที่เทรนเสร็จแล้วมาใช้ในบท ---------- */
 function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ST.tab=b.dataset.tab;render();window.scrollTo(0,0);});
   A.querySelectorAll('[data-bot]').forEach(b=>b.onclick=()=>{ST.editBot=true;render();window.scrollTo(0,0);});
-  A.querySelectorAll('[data-wipe]').forEach(b=>b.onclick=wipeRebuild);}
+  A.querySelectorAll('[data-wipe]').forEach(b=>b.onclick=wipeRebuild);
+  A.querySelectorAll('[data-test]').forEach(b=>b.onclick=async()=>{ST.testMsg='⏳ กำลังทดสอบ…';render();const c=botCfg(),r=await testBot(c.url,c.key);ST.testMsg=r.m;render();});}
 async function wipeRebuild(){
   const t=prompt('จะลบคลังนักแสดงเก่าทั้งหมด (ผู้สมัคร ตัวละคร LoRA ภาพ) กู้คืนไม่ได้\nพิมพ์ ลบทั้งหมด เพื่อยืนยัน');if(t!=='ลบทั้งหมด'){if(t!==null)toast('ยกเลิก: พิมพ์ไม่ตรง');return;}
   ST.busy='กำลังลบคลังเก่า…';ST.msg='';ST.tab='story';render();
@@ -177,20 +192,34 @@ async function wipeRebuild(){
     toast('ลบแล้ว '+(r.removed||0)+' คน เริ่มเรียกนักแสดงใหม่');ST.busy='';await load();await startAll();
   }catch(e){ST.busy='';ST.msg='⚠️ '+botErr(e);await load();}}
 function loraTab(pl){
-  const roles=pl.roles.filter(r=>live(r)),lib=ST.lib,mb=x=>x.size?Math.round(x.size/1048576)+' MB':'';
+  const roles=pl.roles.filter(r=>live(r)),lib=ST.lib,tr=ST.train||[],mb=x=>x.size?Math.round(x.size/1048576)+' MB':'';
   const usedBy=x=>x.cast_role?(x.cast_story===ST.story?'ใช้เป็นบท: <b>'+esc(x.cast_role)+'</b>':'ใช้อยู่ในเรื่อง “'+esc(x.cast_story)+'”'):'ยังว่าง';
-  let h=`<div class=\"c\"><h2>🧬 LoRA ที่เสร็จแล้ว (${lib.length})</h2><div class=\"mu\">แสดงเฉพาะ LoRA ที่เทรนเสร็จพร้อมใช้ — ตัวที่กำลังเทรนหรือเทรนพังจะไม่ขึ้นที่นี่และเลือกไม่ได้</div>
-    <label class=\"row\" style=\"margin-top:8px;cursor:pointer\"><input type=\"checkbox\" id=\"onlyr\" ${ST.onlyReady?'checked':''} style=\"width:auto\"> <span>ใช้เฉพาะ LoRA ที่เสร็จแล้ว (ไม่ให้บอทเทรนใหม่เอง)</span></label></div>`;
-  h+=`<div class=\"c\"><h2>📚 คลัง</h2>`+(lib.length?lib.map(x=>`<div class=\"it\"><div class=\"row\" style=\"flex-wrap:nowrap;gap:10px\">${x.face?`<img src=\"${esc(botU('/img/'+x.face))}\" loading=\"lazy\" style=\"width:56px;height:56px;border-radius:12px;object-fit:cover;object-position:top;border:1px solid var(--bd)\">`:''}<div><b>${esc(x.name)}</b> <span class=\"ok\">✅ พร้อมใช้</span> <span class=\"mu\">${mb(x)}</span><div class=\"mu\">${usedBy(x)}</div></div></div></div>`).join(''):'<div class=\"warn\">ยังไม่มี LoRA ที่เทรนเสร็จ — เมื่อบอทเทรนเสร็จจะมาโผล่ที่นี่เอง</div>')+'</div>';
-  h+=`<div class=\"c\"><h2>🎭 เลือก LoRA ให้แต่ละบท</h2>`+roles.map(r=>{const c=castOf(r.key),cur=c?(lib.find(x=>x.cand===c.id)||{}).lid||0:0,t=tierOf(r);
-    return `<div class=\"it\"><div class=\"row sp\"><b>${esc(r.key)}</b><span class=\"mu\">${esc(r.kind)}${t==='main'?' · ตัวหลัก':''}</span></div>
-      <select data-lp=\"${esc(r.key)}\" style=\"width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin-top:4px\"><option value=\"0\">— ไม่เลือก —</option>${lib.map(x=>{const other=x.cast_role&&x.cast_story&&x.cast_story!==ST.story,took=x.cast_role&&x.cast_story===ST.story&&x.cast_role!==r.key;return `<option value=\"${x.lid}\" ${+cur===+x.lid?'selected':''} ${other?'disabled':''}>${esc(x.name)}${other?' (ใช้เรื่องอื่นอยู่)':took?' (ย้ายจากบท '+esc(x.cast_role)+')':''}</option>`;}).join('')}</select>
-      ${t==='main'&&!cur?'<div class=\"warn\" style=\"font-size:13px\">ตัวหลักต้องเลือก LoRA ที่เสร็จแล้วก่อนเริ่มสร้าง</div>':''}</div>`;}).join('')+'</div>';
-  h+=`<div class="c"><h2>♻️ เริ่มใหม่ทั้งหมด</h2><div class="mu">ลบคลังนักแสดงเก่า (ผู้สมัคร ตัวละคร LoRA และภาพทั้งหมด) แล้วเรียกนักแสดงใหม่ เทรน LoRA ใหม่ให้ตัวหลัก ลบแล้วกู้คืนไม่ได้</div><button data-wipe="1" style="margin-top:8px;border-color:var(--bad);color:var(--bad)">🗑 ลบคลังเก่า + สร้าง LoRA ใหม่</button><button data-bot="1">🔌 เชื่อมบอทใหม่</button></div>`;
+  let h=`<div class="c"><h2>🧬 LoRA ที่เสร็จแล้ว (${lib.length})</h2><div class="mu">เลือกใช้ในบทได้เฉพาะ LoRA ที่เทรนเสร็จพร้อมใช้ — ตัวที่รอคิว/กำลังเทรน/เทรนพังแสดงแยกด้านล่าง และเลือกไม่ได้</div>
+    <label class="row" style="margin-top:8px;cursor:pointer"><input type="checkbox" id="onlyr" ${ST.onlyReady?'checked':''} style="width:auto"> <span>ใช้เฉพาะ LoRA ที่เสร็จแล้ว (ไม่ให้บอทเทรนใหม่เอง)</span></label></div>`;
+  if(tr.length){h+=`<div class="c"><h2>⏳ รอคิว / กำลังเทรน (${tr.filter(x=>x.status!=='failed').length})</h2><div class="mu">เทรนทีละตัว ตัวหลักได้เข้าก่อน</div>`+tr.map(x=>{
+    const pct=x.total?Math.min(100,Math.round(x.step/x.total*100)):0,age=x.at?Math.round((Date.now()-x.at)/60000):null;
+    const st=x.status==='failed'?'<span class="bad">❌ เทรนพัง</span>':x.status==='training'?`<span class="warn">🔧 กำลังเทรน${x.total?' '+pct+'%':''}</span>`:`<span class="mu">⏳ รอคิว${x.pos?' ลำดับ '+x.pos:''}${x.pri===0?' · ตัวหลัก':''}</span>`;
+    const hint=/pip|venv|not found/i.test(x.error)?'<div class="warn" style="font-size:12px">ดูเหมือนสคริปต์ Kaggle เก่า — deploy worker.js ใหม่ ให้ Kaggle ดึงสคริปต์ล่าสุด แล้วกดเทรนใหม่</div>':'';
+    return `<div class="it"><div class="row sp"><b>${esc(x.name)}</b>${st}</div>${x.cast_role?`<div class="mu">บท: ${esc(x.cast_role)}</div>`:''}
+      ${x.status==='training'?`${x.total?`<div class="mu">สเต็ป ${x.step}/${x.total}</div><div class="bar"><i style="width:${pct}%"></i></div>`:''}${x.tail?`<div class="mu" style="font-size:12px;word-break:break-all">${esc(x.tail)}</div>`:''}${age!=null&&age>=10?`<div class="warn" style="font-size:12px">⚠️ ไม่มีความคืบหน้ามา ${age} นาที อาจค้าง</div>`:''}`:''}
+      ${x.status==='failed'?`${x.error?`<div class="bad" style="font-size:12px;word-break:break-all;white-space:pre-wrap">${esc(x.error)}</div>`:''}${hint}${x.cand?`<button class="sm" data-retry="${x.cand}">🔁 เทรนใหม่</button>`:''}`:''}</div>`;}).join('')+'</div>';}
+  h+=`<div class="c"><h2>📚 คลัง</h2>`+(lib.length?lib.map(x=>`<div class="it"><div class="row" style="flex-wrap:nowrap;gap:10px">${x.face?`<img src="${esc(botU('/img/'+x.face))}" loading="lazy" style="width:56px;height:56px;border-radius:12px;object-fit:cover;object-position:top;border:1px solid var(--bd)">`:''}<div style="flex:1"><b>${esc(x.name)}</b> <span class="ok">✅ พร้อมใช้</span> <span class="mu">${mb(x)}</span><div class="mu">${usedBy(x)}</div></div></div>
+      <div class="row" style="margin-top:6px"><button class="sm" data-lt="${x.lid}" ${x.testing?'disabled':''}>${x.testing?'⏳ กำลังวาดภาพทดสอบ…':'🖼 ทดสอบหน้า'}</button></div>
+      ${x.test?`<a href="${esc(botU('/img/'+x.test))}" target="_blank"><img src="${esc(botU('/img/'+x.test))}" loading="lazy" style="width:130px;border-radius:12px;margin-top:6px;border:1px solid var(--bd)"></a><div class="mu" style="font-size:12px">ภาพทดสอบ (แตะเพื่อขยาย) — ถ้าหน้าไม่ตรงตัวละคร ให้เทรนใหม่</div>`:''}</div>`).join(''):'<div class="warn">ยังไม่มี LoRA ที่เทรนเสร็จ — เมื่อบอทเทรนเสร็จจะมาโผล่ที่นี่เอง</div>')+'</div>';
+  h+=`<div class="c"><h2>🎭 เลือก LoRA ให้แต่ละบท</h2>`+roles.map(r=>{const c=castOf(r.key),cur=c?(lib.find(x=>x.cand===c.id)||{}).lid||0:0,t=tierOf(r),w=Math.round((+(ST.weights||{})[r.key]||0.8)*100);
+    return `<div class="it"><div class="row sp"><b>${esc(r.key)}</b><span class="mu">${esc(r.kind)}${t==='main'?' · ตัวหลัก':''}</span></div>
+      <select data-lp="${esc(r.key)}" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin-top:4px"><option value="0">— ไม่เลือก —</option>${lib.map(x=>{const other=x.cast_role&&x.cast_story&&x.cast_story!==ST.story,took=x.cast_role&&x.cast_story===ST.story&&x.cast_role!==r.key;return `<option value="${x.lid}" ${+cur===+x.lid?'selected':''} ${other?'disabled':''}>${esc(x.name)}${other?' (ใช้เรื่องอื่นอยู่)':took?' (ย้ายจากบท '+esc(x.cast_role)+')':''}</option>`;}).join('')}</select>
+      ${cur?`<div class="row" style="margin-top:6px;flex-wrap:nowrap"><span class="mu" style="white-space:nowrap">น้ำหนัก <b data-lwv="${esc(r.key)}">${(w/100).toFixed(2)}</b></span><input type="range" min="30" max="120" step="5" value="${w}" data-lw="${esc(r.key)}" style="flex:1"></div><div class="mu" style="font-size:12px">ต่ำ = หน้านุ่ม/อิสระ · สูง = ล็อกหน้าแน่นแต่อาจแข็ง (แนะนำ 0.8)</div>`:''}
+      ${t==='main'&&!cur?'<div class="warn" style="font-size:13px">ตัวหลักต้องเลือก LoRA ที่เสร็จแล้วก่อนเริ่มสร้าง</div>':''}</div>`;}).join('')+'</div>';
+  h+=`<div class="c"><h2>🔌 การเชื่อมบอท</h2><button data-test="1">🧪 ทดสอบการเชื่อมต่อ</button><button data-bot="1">เชื่อมบอทใหม่</button>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
+  h+=`<div class="c"><h2>♻️ เริ่มใหม่ทั้งหมด</h2><div class="mu">ลบคลังนักแสดงเก่า (ผู้สมัคร ตัวละคร LoRA และภาพทั้งหมด) แล้วเรียกนักแสดงใหม่ เทรน LoRA ใหม่ให้ตัวหลัก ลบแล้วกู้คืนไม่ได้</div><button data-wipe="1" style="margin-top:8px;border-color:var(--bad);color:var(--bad)">🗑 ลบคลังเก่า + สร้าง LoRA ใหม่</button></div>`;
   return h;}
 function bindLora(A){
   const o=A.querySelector('#onlyr');if(o)o.onchange=async()=>{ST.onlyReady=o.checked;localStorage.setItem('ss_onlyready',o.checked?'1':'0');try{await botApi('/api/settings',{auto_lora:o.checked?'0':'1'});}catch(e){toast(botErr(e));}toast(o.checked?'ใช้เฉพาะ LoRA ที่เสร็จแล้ว':'เปิดให้บอทเทรนเองแล้ว');render();};
-  A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});}
+  A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-lt]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('lora_test',{lora:+b.dataset.lt});toast('สั่งวาดภาพทดสอบแล้ว รอสักครู่');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-lw]').forEach(r=>{const k=r.dataset.lw,lab=[...A.querySelectorAll('[data-lwv]')].find(x=>x.dataset.lwv===k);r.oninput=()=>{if(lab)lab.textContent=(r.value/100).toFixed(2);};r.onchange=async()=>{try{await api('lorawt',{key:k,w:r.value/100});(ST.weights=ST.weights||{})[k]=r.value/100;toast('บันทึกน้ำหนักแล้ว (มีผลกับภาพที่สร้างใหม่)');}catch(e){toast(botErr(e));}};});
+  A.querySelectorAll('[data-retry]').forEach(b=>b.onclick=async()=>{b.disabled=true;LG.delete(b.dataset.retry);try{await api('lorago',{cand:b.dataset.retry});toast('สั่งเทรนใหม่แล้ว');}catch(e){toast(botErr(e));}await load();});}
 function epList(pl){return pl.eps.map(E=>{const s=ST.epst[E.no],sc=ST.scn.filter(x=>+x.ep===E.no),fin=ST.fin[E.no],tot=sc.reduce((n,x)=>n+(+x.tot||0),0),vid=sc.reduce((n,x)=>n+(+x.vid||0),0),img=sc.reduce((n,x)=>n+(+x.img||0),0),done=sc.filter(x=>+x.fin).length;
     const st=fin?'<span class="ok">✅ เสร็จ</span>':!s?`<span class="mu">ยังไม่เริ่ม</span> <button class="sm" data-ep="${E.no}">▶ ทำตอนนี้</button>`:s.status==='waiting'?`<span class="warn">⏳ รอ LoRA ${esc((s.need||[]).join(', '))}</span>`:`<span class="warn">🎬 กำลังทำ</span>`;
     const pct=tot?Math.round((img+vid)/(tot*2)*100):0;
