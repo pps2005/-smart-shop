@@ -107,6 +107,7 @@ async function startSb(no,nolora){ST.busy='กำลังเริ่มสต�
 async function sbRedo(id){const c=prompt('อยากแก้อะไรในช็อตนี้? (เว้นว่าง = วาดใหม่ตามเดิม)','');if(c===null)return;
   try{const r=await api('sb_redo',{ep:sbCur(),shot:id,command:c});toast(r.pending?'ช็อตนี้กำลังวาดอยู่แล้ว':'สั่งวาดใหม่แล้ว รอสักครู่');}catch(e){toast(botErr(e));}await load();}
 async function sbOk(){if(!confirm('อนุมัติสตอรีบอร์ดนี้ แล้วให้ระบบทำคลิปทั้งตอน?'))return;try{await api('sb_ok',{ep:sbCur()});toast('อนุมัติแล้ว ระบบเริ่มทำทั้งตอน');}catch(e){toast(botErr(e));}await load();}
+async function sbLora(){try{const r=await api('sb_lora',{ep:sbCur()});toast('สั่งวาดใหม่ '+(r.redo||0)+' ช็อตด้วย LoRA แล้ว');}catch(e){toast(botErr(e));}await load();}
 async function sbStop(){if(!confirm('ยกเลิกตอนนี้? (ภาพที่วาดไปแล้วยังอยู่)'))return;try{await api('stop',{ep:sbCur()});toast('ยกเลิกแล้ว');}catch(e){toast(botErr(e));}await load();}
 function ep_status(no){const s=ST.epst[no];return s?s.status:'';}
 /* ---------- เริ่มทำทั้งเรื่อง ---------- */
@@ -195,10 +196,12 @@ function render(){const A=$('#app');
       else{
         const wr=sb.scenes.some(x=>x.writing)||!sb.scenes.length,pct=sb.tot?Math.round(sb.img/sb.tot*100):0;
         if(ok)h+=`<div class="ok">✅ อนุมัติแล้ว — กำลังทำคลิปและรวมเป็นตอน</div><div class="mu">ซีนเสร็จ ${sc.filter(x=>+x.fin).length}/${sc.length||sb.scenes.length} · คลิป ${vid} ช็อต (ช็อตที่เหลือใช้ภาพนิ่งซูมช้า) · ปิดหน้านี้ได้ ระบบทำต่อเอง</div>`;
+        else if(sb.ready&&(sb.need||[]).length)h+=`<div class="ok">ภาพครบ ${sb.tot} ช็อตแล้ว ช็อตไหนไม่ชอบกด 🔄</div><div class="warn" style="margin-top:6px">จะทำเป็นคลิปได้เมื่อเลือก LoRA ให้ตัวหลักครบ — ยังขาด: ${esc(sb.need.join(', '))} (เลือกที่ข้อ 2)</div>`;
+        else if(sb.ready&&sb.stale)h+=`<div class="warn">LoRA ครบแล้ว แต่มี ${sb.stale} ช็อตที่วาดไว้ก่อนมี LoRA หน้าตัวละครจะยังไม่ตรง</div><button class="go" data-a="sblora" style="margin:8px 0">🧬 วาดใหม่ด้วย LoRA (${sb.stale} ช็อต)</button>`;
         else if(sb.ready)h+=`<div class="ok">ภาพครบ ${sb.tot} ช็อตแล้ว ดูด้านล่าง ช็อตไหนไม่ชอบกด 🔄</div><button class="go" data-a="sbok" style="margin:8px 0">✅ อนุมัติ ทำทั้งตอน</button>`;
         else h+=`<div class="mu">${wr?'✍️ กำลังเขียนบทและแตกช็อต':'🎨 กำลังวาด'} · ภาพ ${sb.img}/${sb.tot||'?'} · ปิดหน้านี้ได้ ระบบทำต่อเอง</div><div class="bar"><i style="width:${pct}%"></i></div>`;
         h+=sb.scenes.map(S=>`<div class="mu" style="margin-top:12px"><b>ซีน ${S.sc}</b> · ${esc(S.title||'')}${S.writing?' · กำลังเขียน…':''}</div><div class="sbg">${S.shots.map(v=>`<div>${v.img?`<a href="${esc(botU('/img/'+v.img))}" target="_blank"><img src="${esc(botU('/img/'+v.img))}" loading="lazy"></a>`:`<div class="ph">⏳</div>`}<div class="tx"><b>${v.idx+1}</b> ${esc(v.th||v.beat||'')}</div>${ok?'':`<button data-redo="${v.id}"${v.pending?' disabled':''}>${v.pending?'⏳ กำลังวาด':'🔄 วาดใหม่'}</button>`}</div>`).join('')}</div>`).join('');
-        if(!ok&&sb.ready&&sb.tot>9)h+=`<button class="go" data-a="sbok" style="margin-top:12px">✅ อนุมัติ ทำทั้งตอน</button>`;
+        if(!ok&&sb.ready&&sb.tot>9&&!sb.stale&&!(sb.need||[]).length)h+=`<button class="go" data-a="sbok" style="margin-top:12px">✅ อนุมัติ ทำทั้งตอน</button>`;
       }
       h+=`<div style="margin-top:10px"><button data-a="sbstop">⏹ ${ok?'หยุดตอนนี้':'ยกเลิกตอนนี้'}</button></div>`;
     }
@@ -237,7 +240,7 @@ function render(){const A=$('#app');
   A.querySelectorAll('[data-redo]').forEach(b=>b.onclick=()=>sbRedo(+b.dataset.redo));
   const se=$('#sbep');if(se)se.onchange=()=>{ST.selEp=+se.value;render();};
   A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});
-  A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='more'){ST.more=!ST.more;render();}else if(a==='sbok')sbOk();else if(a==='sbstop')sbStop();else if(a==='stop')stopAll();else if(a==='qc')runQc();else startAll();});}
+  A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='more'){ST.more=!ST.more;render();}else if(a==='sbok')sbOk();else if(a==='sblora')sbLora();else if(a==='sbstop')sbStop();else if(a==='stop')stopAll();else if(a==='qc')runQc();else startAll();});}
 /* ---------- แถบ LoRA: เลือกเฉพาะ LoRA ที่เทรนเสร็จแล้วมาใช้ในบท ---------- */
 function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ST.tab=b.dataset.tab;render();window.scrollTo(0,0);});
   A.querySelectorAll('[data-bot]').forEach(b=>b.onclick=()=>{ST.editBot=true;render();window.scrollTo(0,0);});
