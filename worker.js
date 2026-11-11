@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'lora-store-2';
+const BOT_VER = 'webtoon-1';
 
 export default {
   async fetch(req, env, ctx) {
@@ -469,6 +469,7 @@ async function animeSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS lchunks (lid INTEGER, idx INTEGER, data TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS shots (id INTEGER PRIMARY KEY AUTOINCREMENT, script_id INTEGER, idx INTEGER, beat INTEGER, th TEXT, en TEXT, chars TEXT, loras TEXT, kproj TEXT, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS scenes (id INTEGER PRIMARY KEY AUTOINCREMENT, series_id INTEGER, ep INTEGER DEFAULT 1, sc INTEGER DEFAULT 1, no INTEGER, title TEXT, logline TEXT, script_id INTEGER DEFAULT 0, sb INTEGER DEFAULT 0, auto INTEGER DEFAULT 0, fin INTEGER DEFAULT 0, created INTEGER)')]);
+  await env.DB.prepare('ALTER TABLE shots ADD COLUMN say TEXT').run().catch(() => { });
   animeReady = true;
 }
 // เทรน LoRA ตัวละครอัตโนมัติ: ภาพอ้างอิงครบและไม่มีงานค้าง → เข้าคิวเทรนบน Kaggle (ใช้ภาพที่ติดดาว ถ้าเลือกไว้ ≥8 ภาพ ไม่งั้นใช้ทุกภาพ) · ปิดได้ที่ settings.auto_lora = 0
@@ -608,6 +609,16 @@ async function sbTighten(env, s, sid) {
   for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20));
   return { cut: dropN.length, fix: fixes.length };
 }
+// เขียนบทพูดไทยรายช็อต (ใช้อ่านแบบเว็บตูน · ต่อไปใช้ทำซับและเสียงพากย์) — ทำครั้งเดียวต่อซีนหลังตัดช็อตแล้ว
+async function sbSay(env, s, sid) {
+  const rows = (await env.DB.prepare('SELECT id,th,chars FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results; if (!rows.length) return 0;
+  const sc = await env.DB.prepare('SELECT body FROM scripts WHERE id=?').bind(sid).first();
+  const o = await llmJson(env, s, `บทของซีนนี้: ${String((sc && sc.body) || '').slice(0, 3000)}\n\nสตอรีบอร์ดเรียงตามลำดับ (เลข: เหตุการณ์ [ตัวละครในช็อต])\n${rows.map((r, i) => `${i + 1}: ${r.th} ${r.chars || '[]'}`).join('\n')}\n\nเขียนบทพูดภาษาไทยสำหรับอ่านแบบมังงะ ช็อตละไม่เกิน 1 ประโยคสั้นๆ (ไม่เกิน 60 ตัวอักษร) เป็นธรรมชาติ ต่อเนื่องกันทั้งซีน คนพูดต้องเป็นตัวละครที่อยู่ในช็อตนั้น ช็อตที่ไม่มีใครพูด (ภาพบรรยากาศ แอ็กชัน) ให้ who เป็น "" และ say เป็นคำบรรยายสั้นๆ หรือ "" ก็ได้\nตอบเป็น JSON array: [{"n":เลขช็อต,"who":"ชื่อคนพูด หรือ \"\"","say":"บทพูด"}]`);
+  const arr = Array.isArray(o) ? o : (o && Array.isArray(o.lines) ? o.lines : []), st = [];
+  for (const x of arr) { const r = rows[+x.n - 1]; if (!r || typeof x.say !== 'string' || !x.say.trim()) continue; st.push(env.DB.prepare('UPDATE shots SET say=? WHERE id=?').bind(JSON.stringify({ who: String(x.who || '').slice(0, 40), say: x.say.trim().slice(0, 160) }), r.id)); }
+  for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20));
+  return st.length;
+}
 async function epStart(env, story, plan, E) { // สร้างซีรีส์ + 3 ซีนของตอนนี้ แล้วเปิดให้ animeAdvance (cron ทุกนาที) ทำต่อเองจนครบ
   await animeSchema(env);
   const brief = [`เรื่อง: ${plan.title || story}`, plan.overview || '', plan.rule ? 'กติกาทุกตอน: ' + plan.rule : '', 'ตัวละคร: ' + plan.roles.map(r => `${r.key} (${r.kind}${r.age ? ', ' + r.age + ' ปี' : ''}) ${r.look}`).join(' | ')].filter(Boolean).join('\n').slice(0, 14000);
@@ -673,6 +684,7 @@ async function animeAdvance(env, s) {
     if (e.sb >= 0) { const r = await animeApi(env, { act: 'sb_beat', script_id: sid, beat: e.sb, shots: m.W.shots }); await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
     const gsb = ((m.st[e.ep] || {}).gate) === 'sb';
     if (gsb && s['sbfix:' + sid] == null) { let r = { cut: 0, fix: 0 }; try { r = await sbTighten(env, s, sid); } catch (x) { } await setSetting(env, 'sbfix:' + sid, r.cut + ',' + r.fix); return; } // แตกช็อตครบ → ให้ AI ตรวจตัดช็อตซ้ำ/แก้มุมกล้องก่อนวาด
+    if (gsb && s['sbsay:' + sid] == null) { let n = 0; try { n = await sbSay(env, s, sid); } catch (x) { } await setSetting(env, 'sbsay:' + sid, String(n)); return; } // บทพูดรายช็อต
     const rows = (await env.DB.prepare('SELECT id,en,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
     const hasImg = (await env.DB.prepare('SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj)').bind(sid).first()).n;
     if (hasImg < rows.length) { const r = await animeApi(env, { act: 'kf', script_id: sid }); if (r.queued) return; continue; } // ภาพคีย์เข้าคิวครบแล้ว → ไปเตรียมซีนถัดไประหว่างรอวาด
@@ -788,7 +800,7 @@ async function animeApi(env, b) {
   }
   if (act === 'shots') {
     const like = `ฉาก${+b.script_id}·%`;
-    const rows = (await env.DB.prepare('SELECT id,idx,beat,th,chars FROM shots WHERE script_id=? ORDER BY idx').bind(+b.script_id).all()).results;
+    const rows = (await env.DB.prepare('SELECT id,idx,beat,th,chars,say FROM shots WHERE script_id=? ORDER BY idx').bind(+b.script_id).all()).results;
     const im = {}, pd = {};
     for (const x of (await env.DB.prepare('SELECT project, MAX(id) id FROM images WHERE project LIKE ? GROUP BY project').bind(like).all()).results) im[x.project] = x.id;
     for (const x of (await env.DB.prepare("SELECT project, COUNT(*) n FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle') GROUP BY project").bind(like).all()).results) pd[x.project] = x.n;
@@ -2969,18 +2981,23 @@ async function castApi(req, env, url, body) {
         }
         return json({ ok: true, cast: done, left: plan.roles.filter(r => r.g && r.g !== 'x' && r.tier !== 'none' && !have.has(r.key) && !done.includes(r.key)).map(r => r.key), nog: plan.roles.filter(r => !r.g).map(r => r.key) });
       }
-      if (act === 'make') { // เริ่มทำตอนนี้ · sb=1: ทำถึงสตอรีบอร์ดแล้วหยุดรออนุมัติ · nolora=1: ไม่รอ/ไม่ใช้ LoRA (หน้าตัวละครจะไม่คงที่)
-        const E = plan.eps.find(x => x.no === +b.ep); if (!E) return json({ error: 'ไม่มีตอนนี้' }, 404);
-        const ck = b.nolora ? { miss: [], nol: [] } : await epCheck(env, story, plan, E);
-        if (b.sb) ck.miss = []; // โหมดสตอรีบอร์ด: บังคับเฉพาะตัวหลักต้องมี LoRA ที่เสร็จแล้ว ตัวรองไม่ต้องมีนักแสดง
-        if (ck.miss.length) return json({ error: 'ยังไม่ได้ใส่บท: ' + ck.miss.join(', '), missing: ck.miss }, 400);
-        const st = (await rd('epst:' + story)) || {}, gate = b.sb ? { gate: 'sb' } : {};
-        if (b.sb) for (const k of Object.keys(st)) if (+k !== E.no && st[k] && st[k].status === 'waiting') delete st[k]; // ทำทีละตอน: ยกเลิกตอนอื่นที่ค้างรอจากระบบเดิม
-        if (ck.nol.length) { st[E.no] = { status: 'waiting', need: ck.nol, at: Date.now(), all: !!b.all, ...gate }; await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true, waiting: ck.nol }); }
-        const sid = await epStart(env, story, plan, E); st[E.no] = { status: 'running', series: sid, at: Date.now(), all: !!b.all, ...gate };
-        if (b.all) await setSetting(env, 'anime_ok_' + sid, '99'); // ทำต่อเนื่องทุกตอน ไม่ต้องรอผู้ใช้กดผ่านตอนก่อน
-        else if (b.sb) await setSetting(env, 'anime_ok_' + sid, String(E.no - 1)); // ทำเฉพาะตอนนี้
-        await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true, started: true });
+      if (act === 'make') { // เริ่มทำตอนนี้ · sb=1: ทำถึงสตอรีบอร์ดแล้วหยุดรออนุมัติ (count=1-3 ตอนรวด) · nolora=1: ไม่รอ/ไม่ใช้ LoRA (หน้าตัวละครจะไม่คงที่)
+        const E0 = plan.eps.find(x => x.no === +b.ep); if (!E0) return json({ error: 'ไม่มีตอนนี้' }, 404);
+        const Es = b.sb ? plan.eps.filter(x => x.no >= E0.no).sort((x, y) => x.no - y.no).slice(0, Math.min(3, Math.max(1, +b.count || 1))) : [E0];
+        const st = (await rd('epst:' + story)) || {}, gate = b.sb ? { gate: 'sb' } : {}, nos = new Set(Es.map(x => x.no)), waiting = new Set(); let sid = 0;
+        if (b.sb) for (const k of Object.keys(st)) if (!nos.has(+k) && st[k] && st[k].status === 'waiting' && !st[k].gate) delete st[k]; // ยกเลิกตอนอื่นที่ค้างรอจากระบบเดิม
+        for (const E of Es) {
+          if (st[E.no] && st[E.no].status === 'running' && st[E.no].gate === 'ok') continue; // ตอนที่อนุมัติแล้วไม่แตะ
+          const ck = b.nolora ? { miss: [], nol: [] } : await epCheck(env, story, plan, E);
+          if (b.sb) ck.miss = []; // โหมดสตอรีบอร์ด: บังคับเฉพาะตัวหลักต้องมี LoRA ที่เสร็จแล้ว ตัวรองไม่ต้องมีนักแสดง
+          if (ck.miss.length) return json({ error: 'ยังไม่ได้ใส่บท: ' + ck.miss.join(', '), missing: ck.miss }, 400);
+          if (ck.nol.length) { st[E.no] = { status: 'waiting', need: ck.nol, at: Date.now(), all: !!b.all, ...gate }; ck.nol.forEach(x => waiting.add(x)); continue; }
+          sid = await epStart(env, story, plan, E); st[E.no] = { status: 'running', series: sid, at: Date.now(), all: !!b.all, ...gate };
+        }
+        if (sid && b.all) await setSetting(env, 'anime_ok_' + sid, '99'); // ทำต่อเนื่องทุกตอน ไม่ต้องรอผู้ใช้กดผ่านตอนก่อน
+        else if (sid && b.sb) { const cur = +((await getSettings(env))['anime_ok_' + sid]) || 0, want = Es[Es.length - 1].no - 1; if (cur !== 99 && cur < want) await setSetting(env, 'anime_ok_' + sid, String(want)); } // เปิดให้ทำถึงตอนสุดท้ายของชุดนี้
+        await setSetting(env, 'epst:' + story, JSON.stringify(st));
+        return json(waiting.size ? { ok: true, waiting: [...waiting] } : { ok: true, started: true });
       }
       if (act === 'stop') { // หยุดตอนนี้ (ของที่ทำไปแล้วยังอยู่)
         const st = (await rd('epst:' + story)) || {}, sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first();
