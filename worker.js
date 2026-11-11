@@ -43,7 +43,7 @@ export default {
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/fluxkeys') return json(await fluxKeysApi(env, body));
       if (p === '/api/settings') {
-        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill', 'script_model', 'img_engine', 'auto_char_engine', 'auto_obj_engine', 'img_model', 'img_quant', 'img_w', 'img_h', 'img_cap', 'auto_lora'])
+        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill', 'script_model', 'img_engine', 'auto_char_engine', 'auto_obj_engine', 'img_model', 'img_quant', 'img_w', 'img_h', 'img_cap', 'auto_lora', 'cast_on', 'aud_auto'])
           if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
         return json({ ok: true });
       }
@@ -194,7 +194,7 @@ function audIntro(name, tr) {
 // ออดิชันรายวัน: หลัง 07:00 น. เวลาไทย เรียกผู้สมัครใหม่รวม aud_daily คน (ค่าเริ่ม 6, 4–8) เฉพาะบทที่ยังไม่ได้เลือก
 async function audDaily(env) {
   const s = await getSettings(env), b = new Date(Date.now() + 7 * 3600000), day = b.toISOString().slice(0, 10);
-  if (b.getUTCHours() < 7 || s.aud_day === day) return;
+  if (s.aud_auto === '0' || b.getUTCHours() < 7 || s.aud_day === day) return;
   await setSetting(env, 'aud_day', day);
   const first = await env.DB.prepare('SELECT COUNT(*) n FROM aud_cands').first();
   if (!first || !+first.n) return; // วันแรกเรียกครบทุกบทตอนเปิดห้องออดิชันอยู่แล้ว
@@ -2619,7 +2619,18 @@ async function castApi(req, env, url, body) {
           if (st === 'training') { const pg = await rd('lprog:' + x.vjob); if (pg) { it.step = pg.step || 0; it.total = pg.total || 0; it.tail = pg.tail || ''; it.at = pg.at || 0; } }
           items.push(it);
         }
-        return json({ ok: true, items });
+        const s2 = await getSettings(env);
+        return json({ ok: true, items, autos: { fill: s2.auto_fill === '1', lora: s2.auto_lora !== '0', cast: s2.cast_on !== '0', aud: s2.aud_auto !== '0' } });
+      }
+      if (act === 'autos_off') { // ปิดระบบอัตโนมัติตัวเก่าทั้งหมด (เติมคิวภาพเอง · เทรน LoRA เอง · แคสติ้งรายวัน · ออดิชันรายวัน) + ล้างคิวงานเทรน/ภาพที่ค้าง
+        for (const [k, v] of [['auto_fill', '0'], ['auto_lora', '0'], ['cast_on', '0'], ['aud_auto', '0']]) await setSetting(env, k, v);
+        await animeSchema(env);
+        const r1 = await env.DB.prepare("UPDATE loras SET status='old' WHERE status IN ('queued','failed') AND COALESCE(vjob,0) NOT IN (SELECT id FROM vjobs WHERE status='running')").run();
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed')"),
+          env.DB.prepare("DELETE FROM vjobs WHERE kind='img' AND status='queued'"),
+          env.DB.prepare("DELETE FROM jobs WHERE status IN ('queued','failed','kaggle')")]);
+        return json({ ok: true, loras_cleared: (r1.meta && r1.meta.changes) || 0 });
       }
       if (act === 'lora_test') { // วาดภาพทดสอบหน้าด้วย LoRA ที่เสร็จแล้ว (เห็นผลในคลัง LoRA)
         const l = await env.DB.prepare('SELECT id,char_id,status FROM loras WHERE id=?').bind(+b.lora).first();

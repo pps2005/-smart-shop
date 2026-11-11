@@ -60,7 +60,7 @@ function parsePlan(blocks){
   eps.forEach(E=>{const tx=E.title+' '+Object.values(E.f).join(' ');E.cast=roles.filter(r=>/คู่หลัก/.test(r.kind)||tx.includes(r.key)||tx.includes(r.name)||(/^พ่อของ/.test(r.kind)&&/พ่อ(?!ค้า)/.test(tx))).map(r=>r.key);});
   return{title,overview:ov,rule:(P.find(x=>/^ทุกตอน/.test(x))||'').slice(0,400),roles,eps:eps.sort((a,b)=>a.no-b.no),locs};}
 /* ---------- สถานะ ---------- */
-const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',editBot:false,lib:[],train:[],weights:{},testMsg:'',onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
+const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',editBot:false,lib:[],train:[],autos:null,weights:{},testMsg:'',onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
 const STY=[['rom','💗 รอมคอมใส','bright soft anime style, pastel colors, high-key lighting, delicate fine line art, expressive cute faces, soft blush, detailed hair strands, clean cel shading, romantic comedy mood'],
 ['dark','🌑 ดราม่ามืดหนัก','dark gritty anime style, desaturated cold palette, heavy shadows, strong rim light, detailed fine line art, cinematic dramatic lighting, grim tense atmosphere'],
 ['act','⚔️ แอ็กชันคมเข้ม','dynamic action anime style, bold sharp line art, high contrast, vivid saturated accents, dramatic low angle, motion energy, cinematic lighting'],
@@ -77,15 +77,17 @@ async function load(){
   const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
   if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
   try{const r=await api('lib');ST.lib=r.loras||[];ST.weights=r.weights||{};}catch(e){ST.lib=[];}
-  try{const r=await api('training');ST.train=r.items||[];}catch(e){ST.train=[];}
+  try{const r=await api('training');ST.train=r.items||[];ST.autos=r.autos||null;}catch(e){ST.train=[];}
   await autoLora();render();
   if(Object.values(ST.epst).some(v=>v&&(v.status==='running'||v.status==='waiting')))POLL=setTimeout(load,30000);
-  else if(ST.train.some(x=>x.status!=='failed')||ST.lib.some(x=>x.testing))POLL=setTimeout(load,20000);}
+  else if(ST.train.some(x=>x.status!=='failed')||ST.lib.some(x=>x.testing)||(!ST.onlyReady&&ST.plan&&ST.plan.roles.some(r=>live(r)&&tierOf(r)==='main'&&(!castOf(r.key)||(castOf(r.key).lora!=='ready'&&castOf(r.key).lora!=='failed')))))POLL=setTimeout(load,20000);}
 /* ตัวหลักที่ยังไม่มีตัวละคร/LoRA: ส่งสร้างให้ (บอทฝึก LoRA ต่อเองเมื่อภาพชุดฝึกครบ) */
 const LG=new Set(); // กันสั่งสร้างตัวละครซ้ำคนเดิม
+const LT={}; // เวลาที่สั่งเทรนล่าสุดต่อคน กันสั่งรัวๆ
 async function autoLora(){const pl=ST.plan;if(!pl||ST.onlyReady)return;
-  for(const r of pl.roles){if(!live(r)||tierOf(r)!=='main')continue;const c=castOf(r.key);
-    if(c&&!+c.char_id&&c.lora!=='queued'&&c.lora!=='ready'&&!LG.has(c.id)){LG.add(c.id);try{await api('lorago',{cand:c.id});}catch(e){LG.delete(c.id);}}}}
+  for(const r of pl.roles){if(!live(r)||tierOf(r)!=='main')continue;const c=castOf(r.key);if(!c)continue;
+    if(!+c.char_id&&c.lora!=='queued'&&c.lora!=='ready'&&!LG.has(c.id)){LG.add(c.id);try{await api('lorago',{cand:c.id});}catch(e){LG.delete(c.id);}}
+    else if(+c.char_id&&c.lora==='none'&&Date.now()-(LT[c.id]||0)>60000){LT[c.id]=Date.now();try{await api('lorago',{cand:c.id});}catch(e){}}}} /* ภาพชุดฝึกพร้อมเมื่อไหร่ สตูดิโอสั่งเทรนเอง · ตัวที่เทรนพังไม่ลองเองซ้ำ ต้องกดเทรนใหม่ */
 function ep_status(no){const s=ST.epst[no];return s?s.status:'';}
 /* ---------- เริ่มทำทั้งเรื่อง ---------- */
 async function startAll(){
@@ -182,20 +184,21 @@ function render(){const A=$('#app');
 function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ST.tab=b.dataset.tab;render();window.scrollTo(0,0);});
   A.querySelectorAll('[data-bot]').forEach(b=>b.onclick=()=>{ST.editBot=true;render();window.scrollTo(0,0);});
   A.querySelectorAll('[data-wipe]').forEach(b=>b.onclick=wipeRebuild);
+  A.querySelectorAll('[data-autoff]').forEach(b=>b.onclick=async()=>{if(!confirm('ปิดระบบอัตโนมัติเก่าทั้งหมด และล้างคิวงานเทรน LoRA/ภาพที่ค้างอยู่?'))return;b.disabled=true;try{const r=await api('autos_off');toast('ปิดแล้ว · ล้างงานเทรนค้าง '+(r.loras_cleared||0)+' รายการ');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-test]').forEach(b=>b.onclick=async()=>{ST.testMsg='⏳ กำลังทดสอบ…';render();const c=botCfg(),r=await testBot(c.url,c.key);ST.testMsg=r.m;render();});}
 async function wipeRebuild(){
   const t=prompt('จะลบคลังนักแสดงเก่าทั้งหมด (ผู้สมัคร ตัวละคร LoRA ภาพ) กู้คืนไม่ได้\nพิมพ์ ลบทั้งหมด เพื่อยืนยัน');if(t!=='ลบทั้งหมด'){if(t!==null)toast('ยกเลิก: พิมพ์ไม่ตรง');return;}
   ST.busy='กำลังลบคลังเก่า…';ST.msg='';ST.tab='story';render();
   try{const r=await botApi('/api/vcastaud',{act:'wipe_all',confirm:'ลบทั้งหมด'});
     if(ST.plan)for(const E of ST.plan.eps){if(ST.epst[E.no])await api('stop',{ep:E.no});}
-    ST.onlyReady=false;localStorage.setItem('ss_onlyready','0');await botApi('/api/settings',{auto_lora:'1'});LG.clear();ST.lib=[];
+    await api('autos_off');ST.onlyReady=false;localStorage.setItem('ss_onlyready','0');LG.clear();for(const k in LT)delete LT[k];ST.lib=[];
     toast('ลบแล้ว '+(r.removed||0)+' คน เริ่มเรียกนักแสดงใหม่');ST.busy='';await load();await startAll();
   }catch(e){ST.busy='';ST.msg='⚠️ '+botErr(e);await load();}}
 function loraTab(pl){
   const roles=pl.roles.filter(r=>live(r)),lib=ST.lib,tr=ST.train||[],mb=x=>x.size?Math.round(x.size/1048576)+' MB':'';
   const usedBy=x=>x.cast_role?(x.cast_story===ST.story?'ใช้เป็นบท: <b>'+esc(x.cast_role)+'</b>':'ใช้อยู่ในเรื่อง “'+esc(x.cast_story)+'”'):'ยังว่าง';
   let h=`<div class="c"><h2>🧬 LoRA ที่เสร็จแล้ว (${lib.length})</h2><div class="mu">เลือกใช้ในบทได้เฉพาะ LoRA ที่เทรนเสร็จพร้อมใช้ — ตัวที่รอคิว/กำลังเทรน/เทรนพังแสดงแยกด้านล่าง และเลือกไม่ได้</div>
-    <label class="row" style="margin-top:8px;cursor:pointer"><input type="checkbox" id="onlyr" ${ST.onlyReady?'checked':''} style="width:auto"> <span>ใช้เฉพาะ LoRA ที่เสร็จแล้ว (ไม่ให้บอทเทรนใหม่เอง)</span></label></div>`;
+    <label class="row" style="margin-top:8px;cursor:pointer"><input type="checkbox" id="onlyr" ${ST.onlyReady?'checked':''} style="width:auto"> <span>ใช้เฉพาะ LoRA ที่เสร็จแล้ว (ไม่สั่งเทรนใหม่เอง)</span></label></div>`;
   if(tr.length){h+=`<div class="c"><h2>⏳ รอคิว / กำลังเทรน (${tr.filter(x=>x.status!=='failed').length})</h2><div class="mu">เทรนทีละตัว ตัวหลักได้เข้าก่อน</div>`+tr.map(x=>{
     const pct=x.total?Math.min(100,Math.round(x.step/x.total*100)):0,age=x.at?Math.round((Date.now()-x.at)/60000):null;
     const st=x.status==='failed'?'<span class="bad">❌ เทรนพัง</span>':x.status==='training'?`<span class="warn">🔧 กำลังเทรน${x.total?' '+pct+'%':''}</span>`:`<span class="mu">⏳ รอคิว${x.pos?' ลำดับ '+x.pos:''}${x.pri===0?' · ตัวหลัก':''}</span>`;
@@ -211,11 +214,13 @@ function loraTab(pl){
       <select data-lp="${esc(r.key)}" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin-top:4px"><option value="0">— ไม่เลือก —</option>${lib.map(x=>{const other=x.cast_role&&x.cast_story&&x.cast_story!==ST.story,took=x.cast_role&&x.cast_story===ST.story&&x.cast_role!==r.key;return `<option value="${x.lid}" ${+cur===+x.lid?'selected':''} ${other?'disabled':''}>${esc(x.name)}${other?' (ใช้เรื่องอื่นอยู่)':took?' (ย้ายจากบท '+esc(x.cast_role)+')':''}</option>`;}).join('')}</select>
       ${cur?`<div class="row" style="margin-top:6px;flex-wrap:nowrap"><span class="mu" style="white-space:nowrap">น้ำหนัก <b data-lwv="${esc(r.key)}">${(w/100).toFixed(2)}</b></span><input type="range" min="30" max="120" step="5" value="${w}" data-lw="${esc(r.key)}" style="flex:1"></div><div class="mu" style="font-size:12px">ต่ำ = หน้านุ่ม/อิสระ · สูง = ล็อกหน้าแน่นแต่อาจแข็ง (แนะนำ 0.8)</div>`:''}
       ${t==='main'&&!cur?'<div class="warn" style="font-size:13px">ตัวหลักต้องเลือก LoRA ที่เสร็จแล้วก่อนเริ่มสร้าง</div>':''}</div>`;}).join('')+'</div>';
+  {const a=ST.autos,on=a?[a.fill&&'เติมคิวภาพเอง',a.lora&&'เทรน LoRA เอง (ฝั่งบอท)',a.cast&&'แคสติ้งรายวัน',a.aud&&'ออดิชันรายวัน'].filter(Boolean):[];
+   h+=`<div class="c"><h2>⛔ ระบบอัตโนมัติเก่า</h2>${a?(on.length?`<div class="warn">ยังเปิดอยู่: ${esc(on.join(' · '))}</div>`:'<div class="ok">ปิดครบแล้ว — ตอนนี้ทำงานเฉพาะที่สตูดิโอสั่งเท่านั้น</div>'):'<div class="mu">อ่านสถานะไม่ได้ (บอทอาจเป็นเวอร์ชันเก่า)</div>'}<div class="mu" style="margin-top:4px">ปิด: เติมคิวภาพเอง · เทรน LoRA เองฝั่งบอท · แคสติ้ง/ออดิชันรายวัน และล้างคิวงานเทรน/ภาพที่ค้าง (ตอนที่สร้างอยู่ใน 🎬 เรื่องไม่ถูกแตะ)</div><button data-autoff="1" style="margin-top:8px">⛔ ปิดทั้งหมด + ล้างคิวค้าง</button></div>`;}
   h+=`<div class="c"><h2>🔌 การเชื่อมบอท</h2><button data-test="1">🧪 ทดสอบการเชื่อมต่อ</button><button data-bot="1">เชื่อมบอทใหม่</button>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
   h+=`<div class="c"><h2>♻️ เริ่มใหม่ทั้งหมด</h2><div class="mu">ลบคลังนักแสดงเก่า (ผู้สมัคร ตัวละคร LoRA และภาพทั้งหมด) แล้วเรียกนักแสดงใหม่ เทรน LoRA ใหม่ให้ตัวหลัก ลบแล้วกู้คืนไม่ได้</div><button data-wipe="1" style="margin-top:8px;border-color:var(--bad);color:var(--bad)">🗑 ลบคลังเก่า + สร้าง LoRA ใหม่</button></div>`;
   return h;}
 function bindLora(A){
-  const o=A.querySelector('#onlyr');if(o)o.onchange=async()=>{ST.onlyReady=o.checked;localStorage.setItem('ss_onlyready',o.checked?'1':'0');try{await botApi('/api/settings',{auto_lora:o.checked?'0':'1'});}catch(e){toast(botErr(e));}toast(o.checked?'ใช้เฉพาะ LoRA ที่เสร็จแล้ว':'เปิดให้บอทเทรนเองแล้ว');render();};
+  const o=A.querySelector('#onlyr');if(o)o.onchange=async()=>{ST.onlyReady=o.checked;localStorage.setItem('ss_onlyready',o.checked?'1':'0');toast(o.checked?'ใช้เฉพาะ LoRA ที่เสร็จแล้ว':'สตูดิโอจะสั่งเทรนตัวหลักให้เมื่อภาพชุดฝึกพร้อม');render();if(!o.checked)load();};
   A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-lt]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('lora_test',{lora:+b.dataset.lt});toast('สั่งวาดภาพทดสอบแล้ว รอสักครู่');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-lw]').forEach(r=>{const k=r.dataset.lw,lab=[...A.querySelectorAll('[data-lwv]')].find(x=>x.dataset.lwv===k);r.oninput=()=>{if(lab)lab.textContent=(r.value/100).toFixed(2);};r.onchange=async()=>{try{await api('lorawt',{key:k,w:r.value/100});(ST.weights=ST.weights||{})[k]=r.value/100;toast('บันทึกน้ำหนักแล้ว (มีผลกับภาพที่สร้างใหม่)');}catch(e){toast(botErr(e));}};});
