@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'lora-tab-3';
+const BOT_VER = 'lora-tab-4';
 
 export default {
   async fetch(req, env, ctx) {
@@ -1050,8 +1050,10 @@ async function vRoutes(req, env, url, ctx) {
       if (!own || own.helper !== hid) return json({ error: 'not your job' }, 403);
     }
     if (p === '/k/claim') {
+      // เครื่องที่ถือสคริปต์รุ่นเก่า (ไม่ส่ง v หรือ v<2) หรือเครื่องที่ติดตั้งตัวเทรนไม่ผ่านในรอบนี้ → ไม่จ่ายงานเทรน LoRA ให้ (รอเครื่องรอบใหม่)
+      const noLora = (+url.searchParams.get('v') || 0) < 2 || url.searchParams.get('nolora') === '1' ? 1 : 0;
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -1131,7 +1133,7 @@ async function vRoutes(req, env, url, ctx) {
       const b = await req.json().catch(() => ({}));
       const j = await env.DB.prepare('SELECT tries,shot,project,kind,opt FROM vjobs WHERE id=?').bind(id).first();
       if (!j) return json({ ok: true });
-      const again = b.requeue || j.tries < 2;
+      const again = j.kind === 'lora' ? j.tries < 4 : (b.requeue || j.tries < 2);
       await env.DB.prepare('UPDATE vjobs SET status=?, error=? WHERE id=?').bind(again ? 'queued' : 'failed', String(b.error || '').slice(0, 500), id).run();
       if (j.kind === 'lora' && !again) await env.DB.prepare("UPDATE loras SET status='failed', error=? WHERE vjob=?").bind(String(b.error || '').slice(0, 500), id).run().catch(() => {});
       if (j.kind === 'img' && !again) { // ภาพ Kaggle พังซ้ำ → ส่งให้ Flux ทำแทน และกันไม่ให้ซ่อมอัตโนมัติซ้ำจนได้ภาพซ้อน
@@ -2124,14 +2126,18 @@ def heal(port, err):
     log("🔧 ซ่อมอัตโนมัติ (การ์ด %d): ล้างหน่วยความจำแล้วลองงานเดิมอีกครั้ง" % (port - 8187))
 
 
+def claim_path():
+    return "/k/claim?v=2" + ("&nolora=1" if M.get("nolora") else "")
+
+
 def claim_wait(stat):
     # การ์ดว่าง: รองานใหม่ระหว่างที่การ์ดอื่นยังทำงานอยู่ (สูงสุด 15 นาที) แทนที่จะปิดทิ้ง ให้ใช้การ์ดคู่ได้เต็ม
-    job = J("/k/claim").get("job")
+    job = J(claim_path()).get("job")
     waited = 0
     while not job and waited < 900 and stat.get("busy", 0) > 0 and time.time() - T0 < MAXH * 3600:
         time.sleep(45)
         waited += 45
-        job = J("/k/claim").get("job")
+        job = J(claim_path()).get("job")
     return job
 
 
@@ -2152,7 +2158,11 @@ def worker(port, first, stat):
                 log("เจนภาพบน Kaggle แล้ว %d ภาพในรอบนี้ (ล่าสุด %d วินาที)" % (stat["done"], sec))
         except Exception as e:
             log("ช็อต %s พัง: %s" % (job.get("shot"), str(e)[:400]))
-            if port and healed != job["id"]:  # ซ่อมแล้วลองใหม่ในเครื่องก่อน 1 ครั้ง
+            if job.get("kind") == "lora" and not M.get("kohya"):
+                # ติดตั้งตัวเทรนไม่ผ่าน: ลองซ้ำในเครื่องเดิมไม่ช่วย → คืนงานเข้าคิว และเครื่องนี้ไม่รับงานเทรนอีกในรอบนี้
+                M["nolora"] = True
+                log("ติดตั้งตัวเทรน LoRA ไม่ผ่านในรอบนี้ จะลองใหม่ตอนเครื่องเริ่มรอบถัดไป (เครื่องนี้ทำงานอื่นต่อ)")
+            if port and healed != job["id"] and job.get("kind") != "lora":  # ซ่อมแล้วลองใหม่ในเครื่องก่อน 1 ครั้ง
                 healed = job["id"]
                 heal(port, str(e))
                 stat["busy"] -= 1
@@ -2171,18 +2181,18 @@ def worker(port, first, stat):
         if time.time() - T0 > MAXH * 3600:
             log("ใกล้หมดเวลารอบนี้ จะเริ่มรอบใหม่ให้เอง")
             return
-        job = claim_wait(stat) if port else J("/k/claim").get("job")
+        job = claim_wait(stat) if port else J(claim_path()).get("job")
 
 
 def main():
-    job = J("/k/claim").get("job")
+    job = J(claim_path()).get("job")
     if not job:
         log("ไม่มีงานวิดีโอในคิว ปิดเครื่องเพื่อประหยัดโควตา")
         return
     stat = {"done": 0}
     if job.get("kind") == "concat":  # งานรวมคลิปไม่ต้องใช้ GPU
         worker(0, job, stat)
-        job = J("/k/claim").get("job")
+        job = J(claim_path()).get("job")
         if not job:
             log("จบรอบ ทำเสร็จ %d คลิป" % stat["done"])
             return
