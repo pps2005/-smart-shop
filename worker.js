@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'lora-store-1';
+const BOT_VER = 'lora-store-2';
 
 export default {
   async fetch(req, env, ctx) {
@@ -594,8 +594,8 @@ async function qcRun(env, story, budget) {
 async function sbTighten(env, s, sid) {
   const rows = (await env.DB.prepare('SELECT id,idx,th,en,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
   if (rows.length < 6) return { cut: 0, fix: 0 };
-  const o = await llmJson(env, s, `นี่คือสตอรีบอร์ดของ 1 ซีน เรียงตามลำดับ (เลข: คำอธิบาย | prompt ภาพ)\n${rows.map((r, i) => `${i + 1}: ${r.th} | ${String(r.en).slice(0, 160)}`).join('\n')}\n\nตรวจแล้วแก้ให้เป็นสตอรีบอร์ดที่กระชับและดูดี:\n1) drop = เลขช็อตที่ควรตัดทิ้ง เพราะซ้ำกับช็อตก่อนหน้า (เหตุการณ์เดิม ท่าเดิม) หรือไม่ช่วยเล่าเรื่อง ห้ามตัดช็อตแรกและช็อตสุดท้าย ห้ามตัดเกิน 1 ใน 3 ของทั้งหมด ห้ามตัดช็อตที่มีเหตุการณ์สำคัญ\n2) fix = ช็อตที่เหลือซึ่งมุมกล้องซ้ำกับช็อตติดกัน ให้เขียน prompt ภาพใหม่เป็นภาษาอังกฤษ เปลี่ยนมุมกล้อง/ขนาดภาพให้หลากหลาย (wide shot, close-up, low angle, over-the-shoulder ฯลฯ) โดยคงฉากและการกระทำเดิม ห้ามใส่ชื่อตัวละคร\nตอบเป็น JSON: {"drop":[เลข],"fix":[{"n":เลข,"en":"new English image prompt"}]}`);
-  const N = rows.length, dropN = [...new Set((Array.isArray(o.drop) ? o.drop : []).map(Number).filter(n => n > 1 && n < N))].slice(0, Math.floor(N / 3));
+  const o = await llmJson(env, s, `นี่คือสตอรีบอร์ดของ 1 ซีน เรียงตามลำดับ (เลข: คำอธิบาย | prompt ภาพ)\n${rows.map((r, i) => `${i + 1}: ${r.th} | ${String(r.en).slice(0, 160)}`).join('\n')}\n\nตรวจแล้วแก้ให้เป็นสตอรีบอร์ดที่กระชับและดูดี:\n1) drop = เลขช็อตที่ควรตัดทิ้ง เพราะซ้ำกับช็อตก่อนหน้า (เหตุการณ์เดิม ท่าเดิม) หรือไม่ช่วยเล่าเรื่อง ช็อตติดกันที่เป็นการกระทำต่อเนื่องเดียวกัน (เช่น เดินเข้าไป → หยุด → มองรอบๆ หรือ ยืนฟัง → ยืนเงียบ) ให้เหลือช็อตเดียวที่ดีที่สุด ตัดให้เด็ดขาด ไม่ต้องเกรงใจ ห้ามตัดช็อตแรกและช็อตสุดท้าย ห้ามตัดเกินครึ่งของทั้งหมด ห้ามตัดช็อตที่มีเหตุการณ์สำคัญหรือตัวละครใหม่เข้าฉาก\n2) fix = ช็อตที่เหลือซึ่งมุมกล้องซ้ำกับช็อตติดกัน ให้เขียน prompt ภาพใหม่เป็นภาษาอังกฤษ เปลี่ยนมุมกล้อง/ขนาดภาพให้หลากหลาย (wide shot, close-up, low angle, over-the-shoulder ฯลฯ) โดยคงฉากและการกระทำเดิม ห้ามใส่ชื่อตัวละคร\nตอบเป็น JSON: {"drop":[เลข],"fix":[{"n":เลข,"en":"new English image prompt"}]}`);
+  const N = rows.length, dropN = [...new Set((Array.isArray(o.drop) ? o.drop : []).map(Number).filter(n => n > 1 && n < N))].slice(0, Math.floor(N / 2));
   const dropSet = new Set(dropN), fixes = (Array.isArray(o.fix) ? o.fix : []).filter(f => f && +f.n >= 1 && +f.n <= N && !dropSet.has(+f.n) && typeof f.en === 'string' && f.en.trim().length >= 20).slice(0, Math.ceil(N / 2));
   const st = [], touch = [];
   for (const n of dropN) { const r = rows[n - 1]; touch.push(r); st.push(env.DB.prepare('DELETE FROM shots WHERE id=?').bind(r.id)); }
@@ -2208,32 +2208,38 @@ def train_lora(job, port):
     out = os.path.join(d, "out")
     os.makedirs(data, exist_ok=True)
     os.makedirs(out, exist_ok=True)
-    for i, it in enumerate(imgs):
-        open(os.path.join(data, "%03d.jpg" % i), "wb").write(call("/k/limg/%s/%s" % (job["id"], it["id"])))
-        open(os.path.join(data, "%03d.txt" % i), "w").write(it.get("cap") or trig)
-    if port:
-        try:
-            comfy("/free", {"unload_models": True, "free_memory": True}, port=port)
-        except Exception:
-            pass
-    steps = max(800, min(1800, len(imgs) * 80))
-    ckpt = os.path.join(COMFY, "models", "checkpoints", M["sdxl"])
-    vae = os.path.join(COMFY, "models", "vae", M["sdxlvae"]) if M.get("sdxlvae") else ""
-    cmd = ('CUDA_VISIBLE_DEVICES=%d %s "%s/sdxl_train_network.py" --pretrained_model_name_or_path "%s" %s'
-           ' --train_data_dir "%s" --output_dir "%s" --output_name lora --caption_extension .txt'
-           ' --network_module networks.lora --network_dim 8 --network_alpha 4 --network_train_unet_only'
-           ' --resolution 768,768 --enable_bucket --train_batch_size 1 --max_train_steps %d'
-           ' --learning_rate 1e-4 --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
-           ' --mixed_precision fp16 --save_precision fp16 --gradient_checkpointing --cache_latents --sdpa --no_half_vae --seed 1'
-           ' --shuffle_caption --keep_tokens 1 --min_snr_gamma 5 --noise_offset 0.05 --max_grad_norm 1.0'
-           % (max(0, (port or 8188) - 8188), M.get("kpy") or ('"%s/venv/bin/python"' % KV), KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, steps))
-    log("เริ่มเทรน LoRA %s (%d ภาพ · %d สเต็ป)" % (trig, len(imgs), steps))
+    mark = os.path.join(out, "trained.ok")
     t0 = time.time()
-    prog(job["id"], 0, steps, "เริ่มเทรน")
-    sh_prog(cmd, KV, job["id"], steps)
+    if os.path.exists(mark):
+        log("LoRA %s เทรนเสร็จไว้แล้ว ส่งไฟล์ซ้ำอย่างเดียว" % trig)
+    else:
+        for i, it in enumerate(imgs):
+            open(os.path.join(data, "%03d.jpg" % i), "wb").write(call("/k/limg/%s/%s" % (job["id"], it["id"])))
+            open(os.path.join(data, "%03d.txt" % i), "w").write(it.get("cap") or trig)
+        if port:
+            try:
+                comfy("/free", {"unload_models": True, "free_memory": True}, port=port)
+            except Exception:
+                pass
+        steps = max(800, min(1800, len(imgs) * 80))
+        ckpt = os.path.join(COMFY, "models", "checkpoints", M["sdxl"])
+        vae = os.path.join(COMFY, "models", "vae", M["sdxlvae"]) if M.get("sdxlvae") else ""
+        cmd = ('CUDA_VISIBLE_DEVICES=%d %s "%s/sdxl_train_network.py" --pretrained_model_name_or_path "%s" %s'
+               ' --train_data_dir "%s" --output_dir "%s" --output_name lora --caption_extension .txt'
+               ' --network_module networks.lora --network_dim 8 --network_alpha 4 --network_train_unet_only'
+               ' --resolution 768,768 --enable_bucket --train_batch_size 1 --max_train_steps %d'
+               ' --learning_rate 1e-4 --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
+               ' --mixed_precision fp16 --save_precision fp16 --gradient_checkpointing --cache_latents --sdpa --no_half_vae --seed 1'
+               ' --shuffle_caption --keep_tokens 1 --min_snr_gamma 5 --noise_offset 0.05 --max_grad_norm 1.0'
+               % (max(0, (port or 8188) - 8188), M.get("kpy") or ('"%s/venv/bin/python"' % KV), KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, steps))
+        log("เริ่มเทรน LoRA %s (%d ภาพ · %d สเต็ป)" % (trig, len(imgs), steps))
+        t0 = time.time()
+        prog(job["id"], 0, steps, "เริ่มเทรน")
+        sh_prog(cmd, KV, job["id"], steps)
     f = os.path.join(out, "lora.safetensors")
     if not os.path.exists(f):
         raise RuntimeError("เทรนจบแต่ไม่พบไฟล์ LoRA")
+    open(mark, "w").write("1")
     data = open(f, "rb").read()
     PART = 20 * 1024 * 1024
     n = max(1, (len(data) + PART - 1) // PART)
@@ -2334,7 +2340,7 @@ def claim_wait(stat):
     # การ์ดว่าง: รองานใหม่ระหว่างที่การ์ดอื่นยังทำงานอยู่ (สูงสุด 15 นาที) แทนที่จะปิดทิ้ง ให้ใช้การ์ดคู่ได้เต็ม
     job = J(claim_path()).get("job")
     waited = 0
-    while not job and waited < 900 and stat.get("busy", 0) > 0 and time.time() - T0 < MAXH * 3600:
+    while not job and stat.get("busy", 0) > 0 and time.time() - T0 < MAXH * 3600:
         time.sleep(45)
         waited += 45
         job = J(claim_path()).get("job")
@@ -2859,10 +2865,17 @@ async function castApi(req, env, url, body) {
         if (!WORK[b.kind]) return json({ error: 'ไม่รู้จักประเภทงานนี้' }, 400);
         await setSetting(env, 'wk:' + story, String(b.kind)); return json({ ok: true, kind: b.kind, scenes: WORK[b.kind].scenes, shots: WORK[b.kind].shots });
       }
-      if (act === 'sb' || act === 'sb_redo' || act === 'sb_ok' || act === 'sb_lora') { // สตอรีบอร์ดของตอน: ดูทุกช็อต · วาดใหม่รายช็อต · อนุมัติแล้วค่อยทำคลิปทั้งตอน
+      if (act === 'sb' || act === 'sb_redo' || act === 'sb_ok' || act === 'sb_lora' || act === 'sb_del') { // สตอรีบอร์ดของตอน: ดูทุกช็อต · วาดใหม่รายช็อต · อนุมัติแล้วค่อยทำคลิปทั้งตอน
         await animeSchema(env);
         const st = (await rd('epst:' + story)) || {}, cur = st[+b.ep], sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first();
         const scs = sr ? (await env.DB.prepare('SELECT id,sc,title,script_id,sb,fin FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +b.ep).all()).results : [];
+        if (act === 'sb_del') { // ลบช็อตออกจากสตอรีบอร์ด (ภาพ/งานของช็อตนั้นลบด้วย)
+          const sh = await env.DB.prepare('SELECT id,script_id,kproj FROM shots WHERE id=?').bind(+b.shot).first();
+          if (!sh || !scs.some(x => +x.script_id === +sh.script_id)) return json({ error: 'ไม่พบช็อตนี้ในตอนนี้' }, 404);
+          if (cur && cur.gate === 'ok') return json({ error: 'อนุมัติไปแล้ว ลบช็อตไม่ได้' }, 400);
+          await env.DB.batch([env.DB.prepare('DELETE FROM shots WHERE id=?').bind(sh.id), env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj), env.DB.prepare("DELETE FROM jobs WHERE project=? AND status IN ('queued','kaggle')").bind(sh.kproj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'").bind(sh.kproj), env.DB.prepare('DELETE FROM videos WHERE ep=? AND shot=?').bind('a' + sh.script_id, String(sh.id))]);
+          return json({ ok: true });
+        }
         if (act === 'sb_redo') {
           const sh = await env.DB.prepare('SELECT id,script_id,kproj FROM shots WHERE id=?').bind(+b.shot).first();
           if (!sh || !scs.some(x => +x.script_id === +sh.script_id)) return json({ error: 'ไม่พบช็อตนี้ในตอนนี้' }, 404);

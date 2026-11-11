@@ -18,6 +18,7 @@ input[type=text],input[type=password]{width:100%;padding:11px;border-radius:10px
 .kd{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.kd button{margin:0;padding:12px 2px;text-align:center}.kd button b{display:block;font-size:26px;line-height:1.2}
 .sbg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.sbg>div{border:1px solid var(--bd);border-radius:10px;overflow:hidden;background:#fff;display:flex;flex-direction:column}.sbg img,.sbg .ph{width:100%;display:block;background:#eeeaf8}.sbg .ph{aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;font-size:22px}
 .sbg .tx{font-size:11px;line-height:1.35;padding:4px 6px;color:var(--mu);flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.sbg button{margin:0;border:0;border-top:1px solid var(--bd);border-radius:0;font-size:13px;padding:7px 0;width:100%}
+.sbb{display:flex}.sbb button:last-child{flex:0 0 38px;border-left:1px solid var(--bd)}
 .stp{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--ac);color:#fff;font-size:14px;margin-right:6px}
 a.btn{display:inline-block;text-decoration:none;border:1px solid var(--bd);color:var(--fg);padding:9px 13px;border-radius:10px;margin:3px 4px 3px 0}
 </style></head><body>
@@ -201,7 +202,7 @@ function render(){const A=$('#app');
         else if(sb.ready)h+=`<div class="ok">ภาพครบ ${sb.tot} ช็อตแล้ว ดูด้านล่าง ช็อตไหนไม่ชอบกด 🔄</div><button class="go" data-a="sbok" style="margin:8px 0">✅ อนุมัติ ทำทั้งตอน</button>`;
         else h+=`<div class="mu">${wr?'✍️ กำลังเขียนบทและแตกช็อต':'🎨 กำลังวาด'} · ภาพ ${sb.img}/${sb.tot||'?'} · ปิดหน้านี้ได้ ระบบทำต่อเอง</div><div class="bar"><i style="width:${pct}%"></i></div>`;
         if(!ok&&(sb.cut||sb.fix||sb.qn))h+=`<div class="mu" style="margin-top:6px">🤖 ระบบตรวจเอง: ${sb.cut?'ตัดช็อตซ้ำ '+sb.cut+' ช็อต · ':''}${sb.fix?'ปรับมุมกล้อง '+sb.fix+' ช็อต · ':''}ตรวจภาพแล้ว ${sb.qn}/${sb.tot}${sb.bad?' · <span class="bad">ยังเสีย '+sb.bad+' (ลองวาดใหม่ครบ 2 รอบแล้ว)</span>':''}</div>`;
-        h+=sb.scenes.map(S=>`<div class="mu" style="margin-top:12px"><b>ซีน ${S.sc}</b> · ${esc(S.title||'')}${S.writing?' · กำลังเขียน…':''}</div><div class="sbg">${S.shots.map((v,i)=>`<div${v.bad?' style="border-color:var(--bad)"':''}>${v.img?`<a href="${esc(botU('/img/'+v.img))}" target="_blank"><img src="${esc(botU('/img/'+v.img))}" loading="lazy"></a>`:`<div class="ph">⏳</div>`}<div class="tx"><b>${i+1}</b> ${esc(v.th||v.beat||'')}</div>${ok?'':`<button data-redo="${v.id}"${v.pending?' disabled':''}>${v.pending?'⏳ กำลังวาด':'🔄 วาดใหม่'}</button>`}</div>`).join('')}</div>`).join('');
+        h+=sb.scenes.map(S=>`<div class="mu" style="margin-top:12px"><b>ซีน ${S.sc}</b> · ${esc(S.title||'')}${S.writing?' · กำลังเขียน…':''}</div><div class="sbg">${S.shots.map((v,i)=>`<div${v.bad?' style="border-color:var(--bad)"':''}>${v.img?`<a href="${esc(botU('/img/'+v.img))}" target="_blank"><img src="${esc(botU('/img/'+v.img))}" loading="lazy"></a>`:`<div class="ph">⏳</div>`}<div class="tx"><b>${i+1}</b> ${esc(v.th||v.beat||'')}</div>${ok?'':`<div class="sbb"><button data-redo="${v.id}"${v.pending?' disabled':''}>${v.pending?'⏳':'🔄 วาดใหม่'}</button><button data-del="${v.id}" title="ลบช็อต">🗑</button></div>`}</div>`).join('')}</div>`).join('');
         if(!ok&&sb.ready&&sb.tot>9&&!sb.stale&&!(sb.need||[]).length)h+=`<button class="go" data-a="sbok" style="margin-top:12px">✅ อนุมัติ ทำทั้งตอน</button>`;
       }
       h+=`<div style="margin-top:10px"><button data-a="sbstop">⏹ ${ok?'หยุดตอนนี้':'ยกเลิกตอนนี้'}</button></div>`;
@@ -239,6 +240,7 @@ function render(){const A=$('#app');
   A.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>setKind(b.dataset.kind));
   A.querySelectorAll('[data-sb]').forEach(b=>b.onclick=()=>{const [n,nl]=b.dataset.sb.split('|');startSb(+n,nl==='1');});
   A.querySelectorAll('[data-redo]').forEach(b=>b.onclick=()=>sbRedo(+b.dataset.redo));
+  A.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('ลบช็อตนี้ออกจากสตอรีบอร์ด?'))return;try{await api('sb_del',{ep:sbCur(),shot:+b.dataset.del});toast('ลบช็อตแล้ว');}catch(e){toast(botErr(e));}await load();});
   const se=$('#sbep');if(se)se.onchange=()=>{ST.selEp=+se.value;render();};
   A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='more'){ST.more=!ST.more;render();}else if(a==='sbok')sbOk();else if(a==='sblora')sbLora();else if(a==='sbstop')sbStop();else if(a==='stop')stopAll();else if(a==='qc')runQc();else startAll();});}
