@@ -1850,9 +1850,9 @@ function imgCat(p){p=String(p||'');let m=p.match(/^คลัง·([^·]+)·/);if
 function keepHtml(){
   if(!botCfg().url)return '<div class="card"><p class="muted" style="margin:0">เชื่อมบอทในแท็บเจนภาพก่อน</p></div>';
   if(!STY){styLoad();return '<div class="card"><p class="muted" style="margin:0">กำลังเปิดคลัง…</p></div>';}
-  if(!AUDS)audLoad();
+  if(!AUDS)audLoad();if(!PLAN||PLAN.story!==STCUR)planLoad();
   const S=BOT.s||{images:[]},st=STCUR,A=(STY.assets||[]).filter(a=>a.story===st),used=new Set(A.map(a=>+a.image_id));
-  const roles=(AUDS&&AUDS.roles)||[],kept=((AUDS&&AUDS.cands)||[]).filter(c=>+c.kept),thumb=(id,h)=>id?`<img src="${esc(botU('/img/'+id))}" alt="" loading="lazy" data-bot="view" style="width:100%;height:${h||150}px;object-fit:cover;object-position:top;border-radius:8px">`:'<div style="height:120px;border-radius:8px;background:#f1eef9"></div>';
+  const roles=(PLAN&&PLAN.story===st&&PLAN.roles.length)?PLAN.roles.map(r=>({key:r.key,role:r.kind+(r.age?' · '+r.age+' ปี':'')+(r.g==='x'?' · ไม่ต้องใช้ LoRA':'')})):((AUDS&&AUDS.roles)||[]),kept=((AUDS&&AUDS.cands)||[]).filter(c=>+c.kept),thumb=(id,h)=>id?`<img src="${esc(botU('/img/'+id))}" alt="" loading="lazy" data-bot="view" style="width:100%;height:${h||150}px;object-fit:cover;object-position:top;border-radius:8px">`:'<div style="height:120px;border-radius:8px;background:#f1eef9"></div>';
   const head=`<div class="card"><h3>📚 คลังของเรา</h3><span class="muted small">เก็บของที่ชอบไว้ก่อน (เก็บนักแสดงในแท็บ 🧬 ตัวละคร LoRA หรือกด ⭐ ที่ภาพ) แล้วค่อยหยิบมาใส่แต่ละเรื่อง ของชิ้นเดียวใช้ได้หลายเรื่อง</span>
    <div class="row" style="margin-top:6px"><label class="muted">เรื่อง <select id="stSel" style="width:auto">${STY.stories.map(x=>`<option${x===st?' selected':''}>${esc(x)}</option>`).join('')}</select></label><button class="btn sm" data-keep="newstory|0">➕ เรื่องใหม่</button></div>${STY.err?`<div class="errl">⚠️ ${esc(STY.err)}</div>`:''}</div>`;
   // นักแสดงในเรื่องนี้
@@ -1867,7 +1867,74 @@ function keepHtml(){
   const itemSecs=Object.entries(cats).map(([c,L])=>det('kp|c|'+c,`⭐ ${esc(c)} <span class="dn">${L.length}</span><small>ใช้ในเรื่องนี้ ${L.filter(i=>used.has(i.id)).length}</small>`,`<div class="wgrid">${L.map(i=>{const a=A.find(x=>+x.image_id===i.id);const nm=String(i.project).replace(/^คลัง·[^·]+·/,'').replace(/^✋·/,'');
       return `<div class="witem">${thumb(i.id)}<b class="small">${esc(nm)}</b>${a?`<button class="btn sm" data-keep="del|${a.id}">✓ ใช้แล้ว · เอาออก</button>`:`<button class="btn sm main" data-keep="add|${i.id}|${esc(c)}|${esc(nm.slice(0,50))}">➕ ใช้ในเรื่อง</button>`}<button class="btn sm" data-keep="rmimg|${i.id}" aria-label="ลบ">🗑 ลบ</button></div>`;}).join('')}</div>`)).join('');
   const none=starred.length?'':'<div class="card"><p class="muted" style="margin:0">ยังไม่มีของที่ติดดาว กด ⭐ ที่ภาพ แล้วจะมาแสดงที่นี่</p></div>';
-  return head+`<div class="card">${castSec}${actorSec}</div>`+(starred.length?`<div class="card"><h3>⭐ ของที่เก็บไว้</h3>${itemSecs}</div>`:none);}
+  return head+planHtml(st)+`<div class="card">${castSec}${actorSec}</div>`+(starred.length?`<div class="card"><h3>⭐ ของที่เก็บไว้</h3>${itemSecs}</div>`:none);}
+
+/* ===== สร้างตอน: อ่านโครงเรื่อง .docx → บท → ใส่นักแสดง → ล็อกทีละตอน ===== */
+let PLAN=null,PLANBUSY=false,PLANT=0;
+async function planLoad(){if(PLANBUSY)return;PLANBUSY=true;const st=STCUR;try{const r=await botApi('/api/vcastep',{act:'get',story:st});PLAN={roles:[],eps:[],locs:[],...(r.plan||{}),story:st,epst:r.epst||{}};}catch(e){PLAN={roles:[],eps:[],locs:[],story:st,epst:{}};}PLANBUSY=false;clearTimeout(PLANT);if(Object.values(PLAN.epst||{}).some(v=>v&&(v.status==='running'||v.status==='waiting')))PLANT=setTimeout(planLoad,30000);if(view==='lib'&&SV.lib==='keep'){const y=window.scrollY;renderLib(true);window.scrollTo(0,y);}}
+async function readDocxXml(file){const buf=new Uint8Array(await file.arrayBuffer()),dv=new DataView(buf.buffer),td=new TextDecoder();let e=-1;for(let i=buf.length-22;i>=Math.max(0,buf.length-70000);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break;}}if(e<0)throw new Error('ไฟล์ไม่ใช่ .docx');const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);for(let k=0;k<n;k++){if(dv.getUint32(p,true)!==0x02014b50)break;const meth=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true),nm=td.decode(buf.subarray(p+46,p+46+nl));p+=46+nl+xl+cl;if(nm!=='word/document.xml')continue;const ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),raw=buf.subarray(ds,ds+cs);if(meth===0)return td.decode(raw);if(typeof DecompressionStream==='undefined')throw new Error('เบราว์เซอร์นี้อ่าน .docx ไม่ได้ ลองอัปเดต iOS/เบราว์เซอร์');return td.decode(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());}throw new Error('ไม่พบเนื้อหาในไฟล์');}
+function docxBlocks(xml){const d=new DOMParser().parseFromString(xml,'application/xml'),W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',T=el=>[...el.getElementsByTagNameNS(W,'t')].map(x=>x.textContent).join('').trim(),body=d.getElementsByTagNameNS(W,'body')[0],out=[];if(!body)return out;for(const ch of body.children){if(ch.localName==='p'){const t=T(ch);if(t)out.push({t:'p',text:t});}else if(ch.localName==='tbl'){out.push({t:'tbl',rows:[...ch.children].filter(x=>x.localName==='tr').map(tr=>[...tr.children].filter(x=>x.localName==='tc').map(tc=>[...tc.getElementsByTagNameNS(W,'p')].map(T).filter(Boolean).join(' ')))});}}return out;}
+function epRange(s){if(/ทุก/.test(s))return[0];const o=[];String(s).split(/[,，]/).forEach(t=>{const m=t.match(/(\d+)\s*[–—-]\s*(\d+)/);if(m){for(let i=+m[1];i<=+m[2];i++)o.push(i);}else{const n=t.match(/\d+/);if(n)o.push(+n[0]);}});return o;}
+function parsePlan(blocks){
+  const P=blocks.filter(b=>b.t==='p').map(b=>b.text),all=P.join('\n'),roles=[],locs=[],eps=[];
+  const title=(P[0]||'').split('—')[0].replace(/[“”"]/g,'').trim(),ov=(P.find(x=>/^เรื่องย่อ\s*[:：]/.test(x))||'').replace(/^เรื่องย่อ\s*[:：]\s*/,'');
+  for(const b of blocks){if(b.t!=='tbl'||b.rows.length<2)continue;const hd=b.rows[0],hs=hd.join('|'),ix=re=>hd.findIndex(c=>re.test(c));
+    if(/ชื่อ/.test(hs)&&/ความลับ/.test(hs)){const iK=ix(/บทบาท/),iN=ix(/ชื่อ/),iL=ix(/ตัวตน/),iS=ix(/ความลับ/),iT=ix(/นิสัย/);
+      for(const r of b.rows.slice(1)){const nm=r[iN]||'',full=nm.replace(/\(.*?\)|（.*?）/g,'').trim();if(!full)continue;const am=nm.match(/\([^)\d]*(\d+)\)/);roles.push({key:full.split(/\s+/)[0],name:full,kind:(r[iK]||'').trim(),age:am?+am[1]:0,look:r[iL]||'',secret:r[iS]||'',traits:r[iT]||''});}}
+    else if(/สถานที่/.test(hs)&&/ตอน/.test(hs)){for(const r of b.rows.slice(1)){if(r[0])locs.push({name:r[0],eps:epRange(r[1]||''),note:r[2]||''});}}}
+  for(const x of P){const m=x.match(/^((?:พ่อ|แม่)ของ\S+)\s*\(([^)]+)\)\s*[:：]\s*(.+)$/);if(m&&!roles.some(r=>r.key===m[2]))roles.push({key:m[2],name:m[2],kind:m[1],age:40,look:m[3],secret:'',traits:'',g:m[1].startsWith('แม่')?'f':'m'});}
+  const cue=n=>{let f=0,m=0,i=-1;while((i=all.indexOf(n,i+1))>=0){const l=all.slice(i+n.length,i+n.length+30);if(/หญิง|สาว/.test(l))f++;else if(/ชาย|หนุ่ม/.test(l))m++;}return f>m?'f':m>f?'m':'';};
+  roles.forEach(r=>{if(r.g)return;r.g=!r.age?'x':/ป้า|หญิง|สาว|แม่/.test(r.name+r.kind)?'f':/ลุง|ชาย|หนุ่ม/.test(r.name+r.kind)?'m':cue(r.key);});
+  roles.forEach(r=>{r.tier=r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'main':'support';});
+  let cur=null;
+  for(const x of P){const m=x.match(/^ตอน\s*(\d+)\s*[—–-]\s*(.+)$/);if(m){const no=+m[1];if(eps.some(e=>e.no===no))cur=null;else{cur={no,title:m[2].trim(),f:{}};eps.push(cur);}continue;}
+    if(cur){const k=x.match(/^(คดี|เรื่อง|ฉากสู้|อารมณ์|จบตอน)\s*[:：]\s*(.+)$/);if(k)cur.f[k[1]]=k[2];else if(/^(เรื่องย่อ|โลกและ|ตัวละคร|สถานที่|สิ่งที่)/.test(x))cur=null;}}
+  eps.forEach(E=>{const tx=E.title+' '+Object.values(E.f).join(' ');E.cast=roles.filter(r=>/คู่หลัก/.test(r.kind)||tx.includes(r.key)||tx.includes(r.name)||(/^พ่อของ/.test(r.kind)&&/พ่อ(?!ค้า)/.test(tx))).map(r=>r.key);});
+  return{title,overview:ov,rule:(P.find(x=>/^ทุกตอน/.test(x))||'').slice(0,400),roles,eps:eps.sort((a,b)=>a.no-b.no),locs};}
+let PICKROLE='';const LORA_T={ready:'🧬 LoRA พร้อม',queued:'⏳ กำลังฝึก LoRA',failed:'❌ LoRA ล้มเหลว',none:'ยังไม่มี LoRA','':'ยังไม่มี LoRA'};
+function planHtml(st){
+  const pl=PLAN&&PLAN.story===st?PLAN:null,up=`<input type="file" id="planFile" accept=".docx" hidden><button class="btn sm main" data-ep="pick">📄 ${pl&&pl.roles.length?'อัปโหลดโครงเรื่องใหม่':'อัปโหลดโครงเรื่อง (.docx)'}</button>`;
+  if(!pl||!pl.roles.length)return `<div class="card"><h3>🎞️ สร้างตอน</h3><span class="muted small">โยนไฟล์โครงเรื่อง (.docx) ให้ระบบอ่านบทกับทุกตอน แล้วเลือกนักแสดงจากคลังให้ครบ จากนั้นกดสร้างทีละตอน</span><div class="row" style="margin-top:8px">${up}</div></div>`;
+  const cands=pl.cands||[],castOf=k=>cands.find(c=>c.cast_role===k&&c.cast_story===st),tierOf=r=>r.tier||(r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'main':'support'),
+    live=r=>r.g!=='x'&&tierOf(r)!=='none',need=pl.roles.filter(live),mains=need.filter(r=>tierOf(r)==='main'),
+    okMain=mains.filter(r=>{const c=castOf(r.key);return c&&c.lora==='ready';}).length,done=need.filter(r=>castOf(r.key)).length,nog=pl.roles.filter(r=>!r.g&&tierOf(r)!=='none');
+  const eps=pl.eps.map(E=>{const rs=(E.cast||[]).map(k=>pl.roles.find(r=>r.key===k)).filter(r=>r&&live(r)),miss=rs.filter(r=>!castOf(r.key)),nol=rs.filter(r=>tierOf(r)==='main'&&castOf(r.key)&&castOf(r.key).lora!=='ready'),s=(pl.epst||{})[E.no];
+    const pg=s&&s.prog,act=s&&s.status==='running'?`<span class="muted small">🎬 กำลังทำให้อัตโนมัติ · 📝 บท ${pg?pg.wr:0}/${pg?pg.sc:3} ซีน · 🖼 ภาพ ${pg?pg.img:0}/${pg?pg.tot:0} · 🎞 วิดีโอ ${pg?pg.vid:0}${pg&&pg.fin>=pg.sc&&pg.sc?' · ✅ ช็อตครบแล้ว':''}</span><button class="btn sm" data-ep="stop|${E.no}">⏹ หยุด</button>`:s&&s.status==='waiting'?`<span class="muted small">⏳ รอ LoRA ของ ${(s.need||[]).map(esc).join(', ')} แล้วจะเริ่มทำให้เอง</span><button class="btn sm" data-ep="stop|${E.no}">ยกเลิก</button>`:miss.length?`<span class="muted small">ขาดบท: ${miss.map(r=>esc(r.key)).join(', ')}</span>`:nol.length?`<button class="btn sm main" data-ep="make|${E.no}">⏳ รอ LoRA พร้อมแล้วทำให้เอง</button><span class="muted small">ตัวหลักยังไม่พร้อม: ${nol.map(r=>esc(r.key)).join(', ')}</span>`:`<button class="btn sm main" data-ep="make|${E.no}">▶ สร้างตอนที่ ${E.no} ทั้งตอนเลย</button>`;
+    return `<div class="arow"><b>ตอน ${E.no} · ${esc(E.title)}</b>${E.f['ฉากสู้']?`<span class="muted small">⚔️ ${esc(E.f['ฉากสู้'].slice(0,70))}</span>`:''}<div class="row" style="margin-top:4px">${act}</div></div>`;}).join('');
+  const bt=(a,k,v,cur,n)=>`<button class="btn sm${cur===v?' main':''}" data-ep="${a}|${esc(k)}|${v}">${n}</button>`;
+  const rl=pl.roles.map(r=>{const t=tierOf(r),c=castOf(r.key),open=PICKROLE===r.key;let actor='',pick='';
+    if(!live(r))actor=`<span class="muted small">ไม่ต้องใช้นักแสดง</span>`;
+    else{actor=(c?`<span><b>${esc(c.name)}</b> <span class="muted small">${c.lora==='ready'||t==='main'?(LORA_T[c.lora]||''):'ไม่มี LoRA'}</span></span>`:`<span class="muted small">ยังไม่มีนักแสดง</span>`)+`<button class="btn sm" data-ep="open|${esc(r.key)}">${open?'ปิด':c?'เปลี่ยน':'เลือกนักแสดง'}</button>`;
+      if(t==='main'&&c&&c.lora!=='ready'&&c.lora!=='queued')actor+=`<button class="btn sm main" data-ep="lorago|${c.id}">🧬 ${c.lora===''?'สร้างตัวละคร LoRA':c.lora==='failed'?'ฝึก LoRA ใหม่':'ฝึก LoRA'}</button>`;
+      if(open){const L=cands.filter(x=>!r.g||!x.g||x.g===r.g).sort((a,b)=>(t==='main'?(b.lora==='ready')-(a.lora==='ready'):0)||Math.abs((+a.age||0)-(+r.age||0))-Math.abs((+b.age||0)-(+r.age||0)));
+        pick=`<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${L.length?L.map(x=>`<button class="btn sm${c&&c.id===x.id?' main':''}" data-ep="cast|${esc(r.key)}|${x.id}">${esc(x.name)} · ${x.age||'?'}${x.lora==='ready'?' 🧬':''}${x.cast_role&&!(c&&c.id===x.id)?' (ใช้อยู่)':''}</button>`).join(''):'<span class="muted small">ไม่มีนักแสดงในคลังที่ตรงเพศ ไปเก็บเพิ่มในแท็บ 🧬 ตัวละคร LoRA</span>'}${c?`<button class="btn sm" data-ep="cast|${esc(r.key)}|0">ถอดออก</button>`:''}</div>`;}}
+    return `<div class="arow"${(!r.g&&t!=='none')?' style="border-color:#f59e0b"':''}><div class="row" style="justify-content:space-between"><b>${esc(r.key)}</b><span class="muted small">${esc(r.kind)}${r.age?' · '+r.age+' ปี':''}</span></div>
+      <div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap">${bt('g',r.key,'f',r.g,'👩 หญิง')}${bt('g',r.key,'m',r.g,'👨 ชาย')}${bt('g',r.key,'x',r.g,'🐾 ไม่ใช่คน')}</div>
+      <div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap">${bt('t',r.key,'main',t,'🧬 ตัวหลัก')}${bt('t',r.key,'support',t,'👤 ตัวรอง')}${bt('t',r.key,'none',t,'⛔ ไม่ใช้')}</div>
+      <div class="row" style="gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap">${actor}</div>${pick}</div>`;}).join('');
+  return `<div class="card"><h3>🎞️ สร้างตอน · ${esc(pl.title||st)}</h3><span class="muted small">${pl.roles.length} บท · ${pl.eps.length} ตอน · ${pl.locs.length} สถานที่ · ใส่บทแล้ว ${done}/${need.length} · ตัวหลัก LoRA พร้อม ${okMain}/${mains.length}</span>
+    <p class="muted small" style="margin:6px 0 0">🧬 ตัวหลักต้องมี LoRA พร้อมก่อนเริ่มทำตอน (ล็อกหน้าให้เหมือนเดิมทุกตอน) · 👤 ตัวรองใช้ LoRA ถ้ามี ไม่มีก็วาดตามคำอธิบาย</p>
+    ${nog.length?`<p class="muted small" style="margin:6px 0 0">⚠️ กดเลือกเพศให้ ${nog.length} ตัวละครที่ยังไม่ระบุ (ขอบสีส้ม) ระบบจะได้จับคู่นักแสดงถูกคน</p>`:''}
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">${up}<button class="btn sm" data-ep="auto"${nog.length?' disabled':''}>✨ เลือกนักแสดงให้ครบอัตโนมัติ</button></div>
+    ${det('kp|planroles',`👥 บทจากไฟล์ <span class="dn">${pl.roles.length}</span><small>เพศ · ระดับบท · นักแสดง</small>`,rl,true)}
+    ${det('kp|planeps',`🎬 ตอนทั้งหมด <span class="dn">${pl.eps.length}</span>`,eps,true)}</div>`;}
+document.addEventListener('change',async e=>{
+  if(e.target.id!=='planFile')return;const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{toast('กำลังอ่านไฟล์…');const pl=parsePlan(docxBlocks(await readDocxXml(f)));if(!pl.roles.length||!pl.eps.length)throw new Error('อ่านโครงเรื่องไม่ออก ต้องมีตารางตัวละคร และหัวข้อแบบ "ตอน 1 — ชื่อตอน"');
+    const name=(pl.title||f.name.replace(/\.\w+$/,'')).slice(0,60);await botApi('/api/vcastep',{act:'save',story:name,plan:pl});STCUR=name;localStorage.setItem('ss_story',name);PLAN=null;await Promise.all([styLoad(),audLoad()]);toast(`อ่านแล้ว ${pl.roles.length} บท · ${pl.eps.length} ตอน`);}catch(err){toast(botErr(err));}});
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-ep]');if(!b)return;const [a,v,v2]=b.dataset.ep.split('|');
+  if(a==='pick'){document.getElementById('planFile').click();return;}
+  if(a==='open'){PICKROLE=PICKROLE===v?'':v;const y=window.scrollY;renderLib(true);window.scrollTo(0,y);return;}
+  const call=async o=>{const r=await botApi('/api/vcastep',{story:STCUR,...o});if(r&&r.error)throw new Error(r.error);return r;};
+  try{b.disabled=true;
+    if(a==='g'||a==='t')await call({act:'setr',key:v,field:a==='g'?'g':'tier',value:v2});
+    if(a==='cast'){await call({act:'cast',key:v,cand:+v2});PICKROLE='';}
+    if(a==='lorago'){const r=await call({act:'lorago',cand:+v});toast(r.msg||'ส่งงานแล้ว');}
+    if(a==='auto'){const r=await call({act:'autocast'});toast(r.cast.length?`ใส่บทให้ ${r.cast.length} ตัว${r.left.length?` · ยังขาด ${r.left.join(', ')} (นักแสดงในคลังไม่พอ)`:''}`:(r.left.length?'ไม่มีนักแสดงว่างที่ตรงเพศ/อายุ ไปเก็บนักแสดงเพิ่มในแท็บ 🧬':'บทครบแล้ว'));}
+    if(a==='make'){const r=await call({act:'make',ep:+v});toast(r.waiting?`ตอน ${v}: รอ LoRA ของ ${r.waiting.join(', ')} แล้วจะเริ่มให้เอง`:`เริ่มทำตอน ${v} แล้ว ระบบทำต่อเองทีละขั้น`);}
+    if(a==='stop'){await call({act:'stop',ep:+v});toast(`หยุดตอน ${v} แล้ว`);}
+    PLAN=null;await Promise.all([styLoad(),audLoad()]);}catch(err){toast(botErr(err));b.disabled=false;}});
+
 document.addEventListener('change',e=>{if(e.target.id==='stSel'){STCUR=e.target.value;localStorage.setItem('ss_story',STCUR);renderLib(true);}});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-keep]');if(!b)return;const [a,v,c,l]=b.dataset.keep.split('|');
   try{b.disabled=true;
