@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'restyle-1';
+const BOT_VER = 'fight-1';
 
 export default {
   async fetch(req, env, ctx) {
@@ -501,6 +501,7 @@ async function animeSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS shots (id INTEGER PRIMARY KEY AUTOINCREMENT, script_id INTEGER, idx INTEGER, beat INTEGER, th TEXT, en TEXT, chars TEXT, loras TEXT, kproj TEXT, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS scenes (id INTEGER PRIMARY KEY AUTOINCREMENT, series_id INTEGER, ep INTEGER DEFAULT 1, sc INTEGER DEFAULT 1, no INTEGER, title TEXT, logline TEXT, script_id INTEGER DEFAULT 0, sb INTEGER DEFAULT 0, auto INTEGER DEFAULT 0, fin INTEGER DEFAULT 0, created INTEGER)')]);
   await env.DB.prepare('ALTER TABLE shots ADD COLUMN say TEXT').run().catch(() => { });
+  await env.DB.prepare('ALTER TABLE shots ADD COLUMN chain INTEGER DEFAULT 0').run().catch(() => { });
   await env.DB.batch(['shots(script_id)', 'shots(kproj)', 'scenes(series_id)', 'lchunks(lid)'].map((x, i) => env.DB.prepare(`CREATE INDEX IF NOT EXISTS ix_b${i} ON ${x}`))).catch(() => { });
   animeReady = true;
 }
@@ -625,11 +626,12 @@ async function qcRun(env, story, budget, onlySid) {
 }
 // ตรวจสตอรีบอร์ดเองก่อนวาด: ตัดช็อตที่ซ้ำ/ไม่เดินเรื่อง และเปลี่ยนมุมกล้องช็อตที่ซ้ำมุมติดกัน (ทำครั้งเดียวต่อซีน)
 async function sbTighten(env, s, sid) {
-  const rows = (await env.DB.prepare('SELECT id,idx,th,en,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
+  const rows = (await env.DB.prepare('SELECT id,idx,th,en,kproj,chain FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
   if (rows.length < 6) return { cut: 0, fix: 0 };
+  const keep = new Set(); rows.forEach((r, i) => { if (+r.chain || +((rows[i + 1] || {}).chain)) keep.add(i + 1); }); // ชุดท่าต่อเนื่องของฉากสู้: ห้ามตัด/ห้ามแก้ prompt (ต้องคงมุมกล้องและฉากเดิม)
   const o = await llmJson(env, s, `นี่คือสตอรีบอร์ดของ 1 ซีน เรียงตามลำดับ (เลข: คำอธิบาย | prompt ภาพ)\n${rows.map((r, i) => `${i + 1}: ${r.th} | ${String(r.en).slice(0, 160)}`).join('\n')}\n\nตรวจแล้วแก้ให้เป็นสตอรีบอร์ดที่กระชับและดูดี:\n1) drop = เลขช็อตที่ควรตัดทิ้ง เพราะซ้ำกับช็อตก่อนหน้า (เหตุการณ์เดิม ท่าเดิม) หรือไม่ช่วยเล่าเรื่อง ช็อตติดกันที่เป็นการกระทำต่อเนื่องเดียวกัน (เช่น เดินเข้าไป → หยุด → มองรอบๆ หรือ ยืนฟัง → ยืนเงียบ) ให้เหลือช็อตเดียวที่ดีที่สุด ตัดให้เด็ดขาด ไม่ต้องเกรงใจ ห้ามตัดช็อตแรกและช็อตสุดท้าย ห้ามตัดเกินครึ่งของทั้งหมด ห้ามตัดช็อตที่มีเหตุการณ์สำคัญหรือตัวละครใหม่เข้าฉาก\n2) fix = ช็อตที่เหลือซึ่งมุมกล้องซ้ำกับช็อตติดกัน ให้เขียน prompt ภาพใหม่เป็นภาษาอังกฤษ เปลี่ยนมุมกล้อง/ขนาดภาพให้หลากหลาย (wide shot, close-up, low angle, over-the-shoulder ฯลฯ) โดยคงฉากและการกระทำเดิม ห้ามใส่ชื่อตัวละคร\nตอบเป็น JSON: {"drop":[เลข],"fix":[{"n":เลข,"en":"new English image prompt"}]}`);
-  const N = rows.length, dropN = [...new Set((Array.isArray(o.drop) ? o.drop : []).map(Number).filter(n => n > 1 && n < N))].slice(0, Math.floor(N / 2));
-  const dropSet = new Set(dropN), fixes = (Array.isArray(o.fix) ? o.fix : []).filter(f => f && +f.n >= 1 && +f.n <= N && !dropSet.has(+f.n) && typeof f.en === 'string' && f.en.trim().length >= 20).slice(0, Math.ceil(N / 2));
+  const N = rows.length, dropN = [...new Set((Array.isArray(o.drop) ? o.drop : []).map(Number).filter(n => n > 1 && n < N && !keep.has(n)))].slice(0, Math.floor(N / 2));
+  const dropSet = new Set(dropN), fixes = (Array.isArray(o.fix) ? o.fix : []).filter(f => f && +f.n >= 1 && +f.n <= N && !dropSet.has(+f.n) && !keep.has(+f.n) && typeof f.en === 'string' && f.en.trim().length >= 20).slice(0, Math.ceil(N / 2));
   const st = [], touch = [];
   for (const n of dropN) { const r = rows[n - 1]; touch.push(r); st.push(env.DB.prepare('DELETE FROM shots WHERE id=?').bind(r.id)); }
   for (const f of fixes) { const r = rows[+f.n - 1]; touch.push(r); st.push(env.DB.prepare('UPDATE shots SET en=? WHERE id=?').bind(f.en.trim().slice(0, 600), r.id)); }
@@ -708,7 +710,7 @@ async function epWrite(env, s, e) {
 // ช็อตสำคัญ (ฉากสู้/เคลื่อนไหว/ช็อตเปิดทุก 5 ช็อต) ทำเป็นวิดีโอ ที่เหลือใช้ภาพนิ่งซูมเลื่อน
 // ช็อตที่ทำเป็นคลิปขยับ: ทุกช็อตที่ 5 · ช็อตแอ็กชัน · ช็อตที่ตัวละครในภาพเป็นคนพูด (ปากขยับ) — ช็อตบรรยาย/เล่าสถานการณ์ใช้ภาพนิ่งซูมช้า
 const speakShot = sh => { try { const y = JSON.parse(sh.say || '{}') || {}, c = JSON.parse(sh.chars || '[]'), ls = Array.isArray(y.lines) ? y.lines : [y]; return Array.isArray(c) && ls.some(l => l && l.who && l.say && c.includes(l.who)); } catch (e) { return false; } };
-const keyShot = (sh, i) => i % 5 === 0 || /fight|battle|chase|run|jump|attack|talisman|glow|explo|seal|spell|leap|punch/i.test(sh.en || '') || speakShot(sh);
+const keyShot = (sh, i) => i % 5 === 0 || /fight|battle|chase|run|jump|attack|talisman|glow|explo|seal|spell|leap|punch/i.test(sh.en || '') || speakShot(sh) || !!+sh.chain;
 // ทำงานต่อเองทีละขั้นต่อรอบ cron: บท → ช็อต → ภาพคีย์ → วิดีโอ → รวมตอน (ทีละตอน เรียงตามลำดับ เพราะ GPU ฟรีมีจำกัด)
 async function animeAdvance(env, s) {
   if (s.auto_anime === '0') return;
@@ -726,7 +728,7 @@ async function animeAdvance(env, s) {
     if (gsb && s['sbfix:' + sid] == null) { let r = { cut: 0, fix: 0 }; try { r = await sbTighten(env, s, sid); } catch (x) { } await setSetting(env, 'sbfix:' + sid, r.cut + ',' + r.fix); return; } // แตกช็อตครบ → ให้ AI ตรวจตัดช็อตซ้ำ/แก้มุมกล้องก่อนวาด
     if (gsb && s['sbsay:' + sid] == null) { let n = 0; try { n = await sbSay(env, s, sid); } catch (x) { } await setSetting(env, 'sbsay:' + sid, String(n)); return; } // บทพูดรายช็อต
     if (gsb && s['sbdone:' + sid] === '1') continue; // ซีนนี้ภาพครบและตรวจแล้ว รออนุมัติ: ไม่ต้องอ่านอะไรอีก
-    const rows = (await env.DB.prepare('SELECT id,en,kproj,say,chars FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
+    const rows = (await env.DB.prepare('SELECT id,en,kproj,say,chars,chain FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
     const hasImg = (await env.DB.prepare('SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj)').bind(sid).first()).n;
     if (hasImg < rows.length) {
       const need = (await env.DB.prepare("SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND NOT EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj) AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.project=s.kproj AND j.status IN ('queued','running','kaggle'))").bind(sid).first()).n;
@@ -753,9 +755,9 @@ async function epAssemble(env, s) {
     const st = await epstOf(env, sr.title); if (!st[d.ep] || st[d.ep].status !== 'running') continue;
     const urls = []; // แต่ละช็อต: ไฟล์ภาพ/คลิป + บทพูด (ทำซับ) · เสียงพากย์จะเติมช่อง vo เมื่อระบบเสียงพร้อม
     for (const sc of (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(d.sid, d.ep).all()).results) {
-      for (const sh of (await env.DB.prepare('SELECT id,kproj,say,en FROM shots WHERE script_id=? ORDER BY idx').bind(sc.script_id).all()).results) {
+      for (const sh of (await env.DB.prepare('SELECT id,kproj,say,en,chain FROM shots WHERE script_id=? ORDER BY idx').bind(sc.script_id).all()).results) {
         let sy = {}; try { sy = JSON.parse(sh.say || '{}') || {}; } catch (x) { sy = {}; }
-        const it = { lines: Array.isArray(sy.lines) ? sy.lines : (sy.say ? [{ who: String(sy.who || ''), say: String(sy.say) }] : []), think: String(sy.think || ''), ono: String(sy.ono || ''), en: String(sh.en || '').slice(0, 220) }; // en: ใช้เลือกวิธีขยับกล้องและเอฟเฟกต์ฉากสู้ตอนรวมตอน
+        const it = { lines: Array.isArray(sy.lines) ? sy.lines : (sy.say ? [{ who: String(sy.who || ''), say: String(sy.say) }] : []), think: String(sy.think || ''), ono: String(sy.ono || ''), en: String(sh.en || '').slice(0, 220), ...(+sh.chain ? { chain: 1 } : {}) }; // en: ใช้เลือกวิธีขยับกล้องและเอฟเฟกต์ฉากสู้ตอนรวมตอน
         const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind('a' + sc.script_id, String(sh.id)).first();
         if (v && v.id) { urls.push({ u: og + '/vv/' + v.id + '?s=' + await vvSig(env, v.id), ...it }); continue; }
         const im = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(sh.kproj).first();
@@ -814,10 +816,10 @@ async function animeApi(env, b) {
     const sr = await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(sc.series_id).first();
     const cs = (await env.DB.prepare('SELECT name,desc FROM chars WHERE series_id=?').bind(sc.series_id).all()).results.concat(await castList(env, sr));
     const total = +b.shots > 0 ? Math.min(180, +b.shots) : 12 * Math.min(15, Math.max(1, +b.minutes || 5)), N = Math.min(10, Math.max(2, Math.ceil(total / beats.length)));
-    const arr = await llmJson(env, s, `ซีรีส์: ${sr ? sr.brief : ''}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nชื่อซีน: ${o.title || ''}\nเหตุการณ์ที่ ${bi + 1}/${beats.length}: ${beats[bi]}\nเขียน ${N} ช็อตต่อเนื่องของเหตุการณ์นี้ (ช็อตละราว 2-4 วินาที ระบุมุมกล้องและการกระทำ · ฉากสนทนาให้สลับช็อตระหว่างคนพูดกับคนฟัง (shot / reverse shot) ใช้โคลสอัพหน้าคนพูดสลับกับภาพสองคน ช็อตหนึ่งมีคนพูดหลักคนเดียว แต่ละช็อตต้องบอกสีหน้าอารมณ์ให้ชัดใน prompt ภาพ (เช่น bright smile with closed eyes, blushing, pouting, wide-eyed surprise, teary eyes) และเปลี่ยนสีหน้าไปตามบทสนทนา ช็อตจังหวะอารมณ์/ตลก/เขิน ใช้พื้นหลังเรียบแบบอนิเมะได้ (เช่น simple pastel background with soft sparkles, pink background with floating hearts, dark gradient background with gloomy lines) ภาพหนึ่งค้างได้นานพอให้ซับขึ้น 2-3 บรรทัด จึงไม่ต้องแตกช็อตถี่ในฉากคุย · จังหวะตลก/เหวอ/เขินจัด/โมโห ให้ใส่ "หน้ามีม" ของตัวละครเราเองได้ 1-3 ช็อตต่อซีน (เฉพาะจังหวะที่เข้ากับเรื่อง ไม่ใส่ในฉากเครียดหรือฉากสู้จริงจัง): เขียน prompt เป็นหน้ารีแอ็กชันเกินจริงแบบการ์ตูน เช่น chibi super-deformed reaction face, blank white eyes with a shocked open mouth, tiny dot eyes with a sweat drop, sparkling star eyes, deadpan half-lidded stare, smug cat-like grin, comical angry vein mark, gloomy blue lines over the face, simplified comedic drawing with squinting eyes and a huge open-mouth laugh with both hands raised, on a simple flat color background or a radial burst background คงทรงผมและสีผมของตัวละครนั้นไว้ · ฉากต่อสู้ให้แตกเป็นช็อตสั้นๆ หลายมุม: ตั้งท่า → พุ่งเข้า → ปะทะ → ผลลัพธ์) ตอบเป็น JSON array ของ {"th":"คำอธิบายช็อตภาษาไทยสั้นๆ","en":"English image prompt: setting, action, camera angle (no character names, no hair/clothes details)","chars":["ชื่อตัวละครที่อยู่ในช็อต"]}`);
+    const arr = await llmJson(env, s, `ซีรีส์: ${sr ? sr.brief : ''}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nชื่อซีน: ${o.title || ''}\nเหตุการณ์ที่ ${bi + 1}/${beats.length}: ${beats[bi]}\nเขียน ${N} ช็อตต่อเนื่องของเหตุการณ์นี้ (ช็อตละราว 2-4 วินาที ระบุมุมกล้องและการกระทำ · ฉากสนทนาให้สลับช็อตระหว่างคนพูดกับคนฟัง (shot / reverse shot) ใช้โคลสอัพหน้าคนพูดสลับกับภาพสองคน ช็อตหนึ่งมีคนพูดหลักคนเดียว แต่ละช็อตต้องบอกสีหน้าอารมณ์ให้ชัดใน prompt ภาพ (เช่น bright smile with closed eyes, blushing, pouting, wide-eyed surprise, teary eyes) และเปลี่ยนสีหน้าไปตามบทสนทนา ช็อตจังหวะอารมณ์/ตลก/เขิน ใช้พื้นหลังเรียบแบบอนิเมะได้ (เช่น simple pastel background with soft sparkles, pink background with floating hearts, dark gradient background with gloomy lines) ภาพหนึ่งค้างได้นานพอให้ซับขึ้น 2-3 บรรทัด จึงไม่ต้องแตกช็อตถี่ในฉากคุย · จังหวะตลก/เหวอ/เขินจัด/โมโห ให้ใส่ "หน้ามีม" ของตัวละครเราเองได้ 1-3 ช็อตต่อซีน (เฉพาะจังหวะที่เข้ากับเรื่อง ไม่ใส่ในฉากเครียดหรือฉากสู้จริงจัง): เขียน prompt เป็นหน้ารีแอ็กชันเกินจริงแบบการ์ตูน เช่น chibi super-deformed reaction face, blank white eyes with a shocked open mouth, tiny dot eyes with a sweat drop, sparkling star eyes, deadpan half-lidded stare, smug cat-like grin, comical angry vein mark, gloomy blue lines over the face, simplified comedic drawing with squinting eyes and a huge open-mouth laugh with both hands raised, on a simple flat color background or a radial burst background คงทรงผมและสีผมของตัวละครนั้นไว้ · ฉากต่อสู้ให้เล่าเป็นลำดับ: ศัตรูปรากฏ/ตั้งท่า → พุ่งเข้าโจมตี → ป้องกันหรือหลบ → ปะทะ (ช็อต impact) → ผลลัพธ์ → ช็อตพักภาพกว้างนิ่งๆ (ท้องฟ้า ฝุ่นจาง) → โคลสอัพหน้านิ่งของผู้ชนะพร้อมบทพูดสั้น ใช้ช็อตสั้นหลายมุม (wide, low angle, close-up, over-the-shoulder) บอกเอฟเฟกต์เวท/แรงปะทะใน prompt ให้ชัด (glowing talisman barrier, energy slash, shockwave, debris, sparks) · ท่าที่ต้องเห็นการเคลื่อนไหวต่อเนื่อง (เช่น เงื้อ → ฟันลง → ศัตรูกระเด็น) ให้เขียนเป็นช็อตติดกัน 2-4 ช็อตที่ "มุมกล้องเดียวกัน ฉากหลังเดียวกัน ตัวละครชุดเดียวกัน เปลี่ยนแค่ท่า" โดย prompt ต้องขึ้นต้นด้วยคำบรรยายฉากและมุมกล้องที่เหมือนกันทุกตัวอักษร แล้วตามด้วยท่าที่ต่างกัน และใส่ "chain":true ในช็อตที่ต่อจากช็อตก่อนหน้า) ตอบเป็น JSON array ของ {"th":"คำอธิบายช็อตภาษาไทยสั้นๆ","en":"English image prompt: setting, action, camera angle (no character names, no hair/clothes details)","chars":["ชื่อตัวละครที่อยู่ในช็อต"],"chain":false}`);
     const list = (Array.isArray(arr) ? arr : [arr]).slice(0, N);
     const base = (await env.DB.prepare('SELECT COUNT(*) n FROM shots WHERE script_id=?').bind(sc.id).first()).n;
-    await env.DB.batch(list.map((x, i) => env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created) VALUES (?,?,?,?,?,?,?,?)').bind(sc.id, base + i + 1, bi, String(x.th || '').slice(0, 300), String(x.en || '').slice(0, 600), JSON.stringify(Array.isArray(x.chars) ? x.chars : []), `ฉาก${sc.id}·${base + i + 1}`, Date.now())));
+    await env.DB.batch(list.map((x, i) => env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,chain) VALUES (?,?,?,?,?,?,?,?,?)').bind(sc.id, base + i + 1, bi, String(x.th || '').slice(0, 300), String(x.en || '').slice(0, 600), JSON.stringify(Array.isArray(x.chars) ? x.chars : []), `ฉาก${sc.id}·${base + i + 1}`, Date.now(), i > 0 && x.chain ? 1 : 0)));
     return { next: bi + 1 < beats.length ? bi + 1 : -1, added: list.length };
   }
   if (act === 'sb_edit') {
@@ -835,12 +837,13 @@ async function animeApi(env, b) {
     const hv = new Set((await env.DB.prepare('SELECT DISTINCT project FROM images WHERE project LIKE ?').bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
     const pd = new Set((await env.DB.prepare("SELECT DISTINCT project FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle')").bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
     const st = []; let n = 0;
+    const seedOf = {}; { let head = null; for (const [i, sh] of rows.entries()) { if (!(+sh.chain && head)) head = sh; if (+sh.chain || +((rows[i + 1] || {}).chain)) seedOf[sh.id] = 100000 + head.id * 7; } } // ชุดท่าต่อเนื่อง: ใช้ seed เดียวกัน ให้ฉากหลัง/มุมกล้องออกมาใกล้กันที่สุด
     for (const sh of rows) {
       if (only ? !only.has(sh.id) : (hv.has(sh.kproj) || pd.has(sh.kproj))) continue;
       let names = []; try { names = JSON.parse(sh.chars || '[]'); } catch { names = []; }
       const m = lc.filter(c => names.includes(c.name));
       st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: +wm[c.name] || 0.8 }))), sh.id));
-      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng) VALUES (?,1,?,'queued',?,?,?)").bind(sh.kproj, `${m.map(c => 'chr' + c.cid + 'x').join(', ')}${m.length ? ', ' : ''}${sh.en}, [[STYLE]]`.slice(0, 1800), Date.now(), m.length ? 8 : 4, names.length && !m.length ? 'sdxl' : null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
+      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${m.map(c => 'chr' + c.cid + 'x').join(', ')}${m.length ? ', ' : ''}${sh.en}, [[STYLE]]`.slice(0, 1800), Date.now(), m.length ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
       n++;
     }
     if (st.length) await env.DB.batch(st);
@@ -906,13 +909,15 @@ async function animeApi(env, b) {
   }
   if (act === 'vid') { // ภาพคีย์ → วิดีโอช็อตละ ~5 วิ (ลุคอนิเมะ 12fps) ครั้งละไม่เกิน 6 ช็อต ที่เหลือทำรอบถัดไป
     const sid = +b.script_id, ep = 'a' + sid;
-    const rows = (await env.DB.prepare('SELECT id,en,kproj,say,chars FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
+    const rows = (await env.DB.prepare('SELECT id,en,kproj,say,chars,chain FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
     const have = new Set([...(await env.DB.prepare("SELECT DISTINCT shot FROM videos WHERE ep=?").bind(ep).all()).results, ...(await env.DB.prepare("SELECT shot FROM vjobs WHERE ep=? AND status IN ('queued','running')").bind(ep).all()).results].map(x => String(x.shot)));
     let n = 0;
     for (const [i, sh] of rows.entries()) {
       if (n >= 6) break; if (!keyShot(sh, i) || have.has(String(sh.id))) continue;
       const im = await env.DB.prepare('SELECT data FROM images WHERE project=? ORDER BY id DESC LIMIT 1').bind(sh.kproj).first(); if (!im || !im.data) continue;
-      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, ${speakShot(sh) ? 'the character is talking, mouth opening and closing naturally while speaking, subtle head movement, ' : ''}smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(speakShot(sh) && !/fight|battle|chase|attack|explo|leap|punch|slash/i.test(sh.en || '') ? 3 : 5), Date.now(), JSON.stringify({ hq: 0, fps: 12 })).run();
+      const isAct = /fight|battle|chase|attack|talisman|explo|seal|spell|leap|punch|slash|strike|clash|kick|dodge|charge|impact|burst/i.test(sh.en || ''), nx = rows[i + 1], vo = isAct ? { hq: 1 } : { hq: 0, fps: 12 }; // ช็อตแอ็กชัน: คุณภาพสูง + เติมเฟรมให้ลื่น · ช็อตทั่วไป: ลุคอนิเมะ 12fps
+      if (nx && +nx.chain && s.self_url) { const ni = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(nx.kproj).first(); if (ni && ni.id) vo.end = s.self_url + '/vi/' + ni.id + '?s=' + await vvSig(env, 'i' + ni.id); } // ท่าถัดไปของชุดต่อเนื่อง = เฟรมสุดท้ายของคลิปนี้
+      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, ${speakShot(sh) ? 'the character is talking, mouth opening and closing naturally while speaking, subtle head movement, ' : ''}${isAct ? 'fast dynamic action, strong motion, impact, ' : ''}smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(vo.end ? 3 : (speakShot(sh) && !isAct ? 3 : 5)), Date.now(), JSON.stringify(vo)).run();
       n++;
     }
     return { queued: n };
@@ -1814,6 +1819,19 @@ def gen_pass(j, im, k, port=8188, F=81, opt=None):
     seed = random.randint(1, 2 ** 31)
     pos = j.get("prompt") or "subtle natural motion"
     neg = j.get("neg") or "blurry, distorted face, deformed hands, extra fingers, morphing, flickering, text, watermark"
+    end_name = ""
+    if opt.get("end") and k == 0:
+        # ท่าต่อเนื่อง: กำหนดภาพเฟรมสุดท้าย (ท่าถัดไป) ให้ตัวทำคลิปเติมการเคลื่อนไหวระหว่างสองท่า
+        try:
+            import io
+            from PIL import Image
+            with urllib.request.urlopen(urllib.request.Request(opt["end"], headers=UA), timeout=120) as r:
+                eim = Image.open(io.BytesIO(r.read())).convert("RGB").resize(im.size)
+            end_name = "job%s_end.jpg" % jid
+            eim.save(os.path.join(COMFY, "input", end_name), quality=95)
+        except Exception as e:
+            log("ดึงภาพท่าปลายทางไม่ได้ ใช้โหมดภาพเดียว: %s" % str(e)[:120])
+            end_name = ""
     wf = {
         "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["high"]}},
         "2": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["low"]}},
@@ -1853,17 +1871,28 @@ def gen_pass(j, im, k, port=8188, F=81, opt=None):
                 return
             if time.time() - t > 7200:
                 raise RuntimeError("เจนนานเกิน 120 นาที")
-    try:
-        run(wf)
-    except Exception as e:
-        if fps == 16:
-            raise
-        log("เติมเฟรมไม่สำเร็จ ใช้ 16fps แทน: " + str(e)[:200])
-        M["rife"] = False
-        wf.pop("17", None)
-        wf["16"]["inputs"]["images"] = ["15", 0]
-        fps = 16
-        run(wf)
+    base12 = dict(wf["12"])
+    if end_name:
+        wf["18"] = {"class_type": "LoadImage", "inputs": {"image": end_name}}
+        wf["12"] = {"class_type": "WanFirstLastFrameToVideo", "inputs": {"positive": ["8", 0], "negative": ["9", 0], "vae": ["10", 0], "width": W, "height": H, "length": F, "batch_size": 1, "start_image": ["11", 0], "end_image": ["18", 0]}}
+    while True:
+        try:
+            run(wf)
+            break
+        except Exception as e:
+            if end_name:
+                log("โหมดเฟรมแรก-เฟรมท้ายใช้ไม่ได้ ใช้โหมดภาพเดียวแทน: " + str(e)[:200])
+                wf["12"] = base12
+                wf.pop("18", None)
+                end_name = ""
+            elif fps != 16:
+                log("เติมเฟรมไม่สำเร็จ ใช้ 16fps แทน: " + str(e)[:200])
+                M["rife"] = False
+                wf.pop("17", None)
+                wf["16"]["inputs"]["images"] = ["15", 0]
+                fps = 16
+            else:
+                raise
     out = os.path.join(COMFY, "output")
     frames = sorted(glob.glob(os.path.join(out, "job%s_*.png" % jid)))
     if not frames:
@@ -2393,7 +2422,7 @@ def epcat(j):
         lines = [(str(l.get("who") or ""), " ".join(str(l.get("say") or "").split())) for l in (it.get("lines") or []) if isinstance(l, dict) and str(l.get("say") or "").strip()][:4]
         if not lines and str(it.get("say") or "").strip():
             lines = [(str(it.get("who") or ""), " ".join(str(it.get("say")).split()))]
-        src.append({"f": f, "img": isimg, "vo": vo, "sfx": sfx, "en": en, "act": bool(re.search(ACT_RE, en.lower())), "lines": lines, "say": " ".join(l[1] for l in lines), "think": " ".join(str(it.get("think") or "").split())[:40], "ono": " ".join(str(it.get("ono") or "").split())[:14]})
+        src.append({"f": f, "img": isimg, "vo": vo, "sfx": sfx, "en": en, "act": bool(re.search(ACT_RE, en.lower())), "hit": bool(re.search("impact|strike|slash|clash|explo|punch|smash|burst|collid|shatter", en.lower())), "chain": bool(it.get("chain")), "lines": lines, "say": " ".join(l[1] for l in lines), "think": " ".join(str(it.get("think") or "").split())[:40], "ono": " ".join(str(it.get("ono") or "").split())[:14]})
     if not src:
         raise RuntimeError("ไม่มีไฟล์ให้รวม")
     W = H = 0
@@ -2420,12 +2449,18 @@ def epcat(j):
         fx = ""
         ins = ""
         if x["act"]:
-            fx = ",scale=%d:%d,crop=%d:%d:x='(iw-%d)/2*(1+sin(n*2.3))':y='(ih-%d)/2*(1+cos(n*3.1))',fade=t=in:st=0:d=0.14:color=white" % (int(W * 1.06) // 2 * 2, int(H * 1.06) // 2 * 2, W, H, W, H)
+            fx = ",scale=%d:%d,crop=%d:%d:x='(iw-%d)/2*(1+sin(n*2.3))':y='(ih-%d)/2*(1+cos(n*3.1))'" % (int(W * 1.06) // 2 * 2, int(H * 1.06) // 2 * 2, W, H, W, H)
+            if x["chain"]:
+                pass  # ท่าต่อเนื่องจากช็อตก่อน: ไม่ใส่แฟลชคั่น ให้ภาพไหลต่อกัน
+            elif x["hit"]:
+                fx += ",eq=contrast=2.4:saturation=0:brightness=0.06:enable='lt(n,3)',negate=enable='lt(n,3)'"  # เฟรมปะทะ: เงาดำขาวกลับสี 3 เฟรม
+            else:
+                fx += ",fade=t=in:st=0:d=0.14:color=white"
         try:
             if x["img"]:
                 # ภาพนิ่ง: ยาวพอให้อ่านซับ/ฟังเสียงจบ ไม่ค้างนาน · กล้องขยับหลายแบบ
-                dur = (vlen + 0.35) if vlen else (read or (1.6 if x["act"] else still))
-                dur = max(1.4, dur)
+                dur = (vlen + 0.35) if vlen else (read or (1.1 if x["act"] else still))
+                dur = max(1.0 if x["act"] else 1.4, dur)
                 n = max(2, int(round(dur * fps)))
                 z, zx, zy = cam_expr(pick_cam(x["en"], i, dur), n)
                 vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,zoompan=z='%s':d=%d:x='%s':y='%s':s=%dx%d:fps=%d,setsar=1%s" % (W * 2, H * 2, W * 2, H * 2, z, n, zx, zy, W, H, fps, fx)
