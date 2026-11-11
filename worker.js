@@ -1040,7 +1040,7 @@ async function vRoutes(req, env, url, ctx) {
       if (!j) return json({ ok: true });
       const again = b.requeue || j.tries < 2;
       await env.DB.prepare('UPDATE vjobs SET status=?, error=? WHERE id=?').bind(again ? 'queued' : 'failed', String(b.error || '').slice(0, 500), id).run();
-      if (j.kind === 'lora' && !again) await env.DB.prepare("UPDATE loras SET status='failed', error=? WHERE vjob=?").bind(String(b.error || '').slice(0, 300), id).run().catch(() => {});
+      if (j.kind === 'lora' && !again) await env.DB.prepare("UPDATE loras SET status='failed', error=? WHERE vjob=?").bind(String(b.error || '').slice(0, 500), id).run().catch(() => {});
       if (j.kind === 'img' && !again) { // ภาพ Kaggle พังซ้ำ → ส่งให้ Flux ทำแทน และกันไม่ให้ซ่อมอัตโนมัติซ้ำจนได้ภาพซ้อน
         let o = {}; try { o = JSON.parse(j.opt || '{}'); } catch { o = {}; }
         if (o.jobId) await env.DB.prepare("UPDATE jobs SET status='queued', eng='flux' WHERE id=?").bind(+o.jobId).run();
@@ -1879,10 +1879,26 @@ def ensure_kohya():
         keep = []
         for ln in open(KV + "/requirements.txt").read().splitlines():
             t = ln.strip()
-            if t and not t.startswith(("#", "-e", "torch", "xformers")):
+            if t and not t.startswith(("#", "-", ".", "torch", "xformers")):
                 keep.append(t)
-        open("/tmp/kreq.txt", "w").write("\n".join(keep) + "\naccelerate\nbitsandbytes\n")
-        sh(KV + "/venv/bin/pip install -q -r /tmp/kreq.txt")
+        keep += ["accelerate", "bitsandbytes"]
+        pip = KV + "/venv/bin/pip"
+        py = KV + "/venv/bin/python"
+        open("/tmp/kreq.txt", "w").write("\n".join(keep) + "\n")
+        r = subprocess.run('"%s" install -q -r /tmp/kreq.txt' % pip, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        if r.returncode != 0:
+            log("ติดตั้งรวดเดียวไม่ผ่าน ลองทีละแพ็กเกจ: " + r.stdout[-300:])
+            for t in keep:
+                q = subprocess.run('"%s" install -q "%s"' % (pip, t), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                if q.returncode != 0:
+                    nm = t
+                    for ch in "=<>~! ;[":
+                        nm = nm.split(ch)[0]
+                    log("แพ็กเกจ %s ติดตั้งแบบล็อกเวอร์ชันไม่ผ่าน ลองเวอร์ชันล่าสุด" % nm)
+                    sh('"%s" install -q "%s"' % (pip, nm), check=False)
+        chk = subprocess.run('"%s" -c "import accelerate, diffusers, transformers, safetensors, bitsandbytes, library.train_util"' % py, shell=True, cwd=KV, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        if chk.returncode != 0:
+            raise RuntimeError("ตัวเทรน LoRA ใช้ไม่ได้ (import ไม่ผ่าน): " + chk.stdout[-380:])
         M["kohya"] = True
 
 
@@ -1907,19 +1923,20 @@ def train_lora(job, port):
             comfy("/free", {"unload_models": True, "free_memory": True}, port=port)
         except Exception:
             pass
-    steps = max(600, min(1500, len(imgs) * 60))
+    steps = max(800, min(1800, len(imgs) * 80))
     ckpt = os.path.join(COMFY, "models", "checkpoints", M["sdxl"])
     vae = os.path.join(COMFY, "models", "vae", M["sdxlvae"]) if M.get("sdxlvae") else ""
     cmd = ('CUDA_VISIBLE_DEVICES=%d "%s/venv/bin/python" "%s/sdxl_train_network.py" --pretrained_model_name_or_path "%s" %s'
            ' --train_data_dir "%s" --output_dir "%s" --output_name lora --caption_extension .txt'
-           ' --network_module networks.lora --network_dim 8 --network_alpha 4 --network_train_unet_only'
+           ' --network_module networks.lora --network_dim 16 --network_alpha 8 --network_train_unet_only'
            ' --resolution 768,768 --enable_bucket --train_batch_size 1 --max_train_steps %d'
            ' --learning_rate 1e-4 --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
            ' --mixed_precision fp16 --save_precision fp16 --gradient_checkpointing --cache_latents --sdpa --no_half_vae --seed 1'
+           ' --shuffle_caption --keep_tokens 1 --min_snr_gamma 5 --noise_offset 0.05 --max_grad_norm 1.0'
            % (max(0, (port or 8188) - 8188), KV, KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, steps))
     log("เริ่มเทรน LoRA %s (%d ภาพ · %d สเต็ป)" % (trig, len(imgs), steps))
     t0 = time.time()
-    sh(cmd)
+    sh(cmd, cwd=KV)
     f = os.path.join(out, "lora.safetensors")
     if not os.path.exists(f):
         raise RuntimeError("เทรนจบแต่ไม่พบไฟล์ LoRA")
@@ -1998,7 +2015,7 @@ def worker(port, first, stat):
                 stat["busy"] -= 1
                 continue
             try:
-                J("/k/fail/%s" % job["id"], {"error": str(e)[:500]})
+                J("/k/fail/%s" % job["id"], {"error": (str(e)[-500:] if job.get("kind") == "lora" else str(e)[:500])})
             except Exception:
                 pass
             try:  # ComfyUI การ์ดนี้ตายแล้ว → หยุดเฉพาะการ์ดนี้ อีกการ์ดทำต่อ
@@ -2407,7 +2424,7 @@ async function castApi(req, env, url, body) {
         const cs = (await env.DB.prepare('SELECT id,name,age,role,cast_role,cast_story,char_id FROM aud_cands WHERE COALESCE(kept,0)=1 ORDER BY id DESC').all()).results;
         for (const c of cs) {
           const R = AUD_ROLES.find(x => x.key === c.role); c.g = R ? (/woman/.test(R.g) ? 'f' : 'm') : ''; c.lora = '';
-          if (+c.char_id) { const l = await env.DB.prepare("SELECT status FROM loras WHERE char_id=? AND status<>'old' ORDER BY id DESC LIMIT 1").bind(c.char_id).first(); c.lora = l ? l.status : 'none'; }
+          if (+c.char_id) { const l = await env.DB.prepare("SELECT status,error FROM loras WHERE char_id=? AND status<>'old' ORDER BY id DESC LIMIT 1").bind(c.char_id).first(); c.lora = l ? l.status : 'none'; c.lora_err = l && l.status === 'failed' ? String(l.error || '').slice(-400) : ''; }
         }
         const epst = (await rd('epst:' + story)) || {}, sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first();
         if (sr) for (const [no, v] of Object.entries(epst)) {
