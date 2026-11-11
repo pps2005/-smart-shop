@@ -49,7 +49,7 @@ function parsePlan(blocks){
   eps.forEach(E=>{const tx=E.title+' '+Object.values(E.f).join(' ');E.cast=roles.filter(r=>/คู่หลัก/.test(r.kind)||tx.includes(r.key)||tx.includes(r.name)||(/^พ่อของ/.test(r.kind)&&/พ่อ(?!ค้า)/.test(tx))).map(r=>r.key);});
   return{title,overview:ov,rule:(P.find(x=>/^ทุกตอน/.test(x))||'').slice(0,400),roles,eps:eps.sort((a,b)=>a.no-b.no),locs};}
 /* ---------- สถานะ ---------- */
-const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',lib:[],onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
+const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',editBot:false,lib:[],onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
 const STY=[['rom','💗 รอมคอมใส','bright soft anime style, pastel colors, high-key lighting, delicate fine line art, expressive cute faces, soft blush, detailed hair strands, clean cel shading, romantic comedy mood'],
 ['dark','🌑 ดราม่ามืดหนัก','dark gritty anime style, desaturated cold palette, heavy shadows, strong rim light, detailed fine line art, cinematic dramatic lighting, grim tense atmosphere'],
 ['act','⚔️ แอ็กชันคมเข้ม','dynamic action anime style, bold sharp line art, high contrast, vivid saturated accents, dramatic low angle, motion energy, cinematic lighting'],
@@ -119,10 +119,11 @@ async function dl(id,name){try{toast('กำลังโหลดไฟล์…
 function bestEp(){const q=ST.qc;if(!q||!q.eps)return 0;const c=q.eps.filter(E=>E.final&&!E.fixing&&!E.bad);if(!c.length)return 0;c.sort((a,b)=>(b.avg==null?50:b.avg)-(a.avg==null?50:a.avg));return c[0].no;}
 /* ---------- หน้าจอ ---------- */
 function render(){const A=$('#app');
-  if(!botCfg().url){A.innerHTML=`<div class="c"><h2>เชื่อมบอท</h2><div class="mu">ใส่ลิงก์บอทกับรหัสผ่านครั้งเดียว (เก็บในเครื่องนี้)</div><input type="text" id="bu" placeholder="https://...workers.dev"><input type="password" id="bk" placeholder="รหัสผ่านบอท"><button class="on" id="bs">บันทึก</button></div>`;
-    $('#bs').onclick=()=>{localStorage.setItem('ss_imgbot',JSON.stringify({url:$('#bu').value.trim(),key:$('#bk').value}));load();};return;}
+  if(!botCfg().url||ST.editBot){A.innerHTML=`<div class="c"><h2>🔌 เชื่อมบอท${botCfg().url?'ใหม่':''}</h2><div class="mu">ใส่ลิงก์บอท (Worker ที่ deploy ล่าสุด) กับรหัสผ่าน เก็บในเครื่องนี้</div><input type="text" id="bu" placeholder="https://...workers.dev" value="${esc(botCfg().url||'')}"><input type="password" id="bk" placeholder="รหัสผ่านบอท"><button class="on" id="bs">บันทึกและเชื่อม</button>${botCfg().url?'<button id="bc">ยกเลิก</button>':''}</div>`;
+    $('#bs').onclick=()=>{localStorage.setItem('ss_imgbot',JSON.stringify({url:$('#bu').value.trim(),key:$('#bk').value}));ST.editBot=false;ST.err='';load();};
+    const bc=$('#bc');if(bc)bc.onclick=()=>{ST.editBot=false;render();};return;}
   const pl=ST.plan&&ST.plan.roles&&ST.plan.roles.length?ST.plan:null;let h='';
-  if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}</div>`;
+  if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button></div></div>`;
   if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
   if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
   if(!pl){h+=`<div class="c"><label class="drop" id="dz"><div style="font-size:40px">📄</div>แตะเพื่อเลือก หรือลากไฟล์บท (.docx) มาวาง<input type="file" id="pf" accept=".docx" hidden></label></div>`;}
@@ -164,7 +165,17 @@ function render(){const A=$('#app');
   A.querySelectorAll('[data-ep]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('make',{ep:+b.dataset.ep,all:true});toast(r.waiting?'ตอนนี้รอ LoRA '+r.waiting.join(', '):'เริ่มทำตอน '+b.dataset.ep+' แล้ว');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>b.dataset.a==='stop'?stopAll():b.dataset.a==='qc'?runQc():startAll());}
 /* ---------- แถบ LoRA: เลือกเฉพาะ LoRA ที่เทรนเสร็จแล้วมาใช้ในบท ---------- */
-function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ST.tab=b.dataset.tab;render();window.scrollTo(0,0);});}
+function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ST.tab=b.dataset.tab;render();window.scrollTo(0,0);});
+  A.querySelectorAll('[data-bot]').forEach(b=>b.onclick=()=>{ST.editBot=true;render();window.scrollTo(0,0);});
+  A.querySelectorAll('[data-wipe]').forEach(b=>b.onclick=wipeRebuild);}
+async function wipeRebuild(){
+  const t=prompt('จะลบคลังนักแสดงเก่าทั้งหมด (ผู้สมัคร ตัวละคร LoRA ภาพ) กู้คืนไม่ได้\nพิมพ์ ลบทั้งหมด เพื่อยืนยัน');if(t!=='ลบทั้งหมด'){if(t!==null)toast('ยกเลิก: พิมพ์ไม่ตรง');return;}
+  ST.busy='กำลังลบคลังเก่า…';ST.msg='';ST.tab='story';render();
+  try{const r=await botApi('/api/vcastaud',{act:'wipe_all',confirm:'ลบทั้งหมด'});
+    if(ST.plan)for(const E of ST.plan.eps){if(ST.epst[E.no])await api('stop',{ep:E.no});}
+    ST.onlyReady=false;localStorage.setItem('ss_onlyready','0');await botApi('/api/settings',{auto_lora:'1'});LG.clear();ST.lib=[];
+    toast('ลบแล้ว '+(r.removed||0)+' คน เริ่มเรียกนักแสดงใหม่');ST.busy='';await load();await startAll();
+  }catch(e){ST.busy='';ST.msg='⚠️ '+botErr(e);await load();}}
 function loraTab(pl){
   const roles=pl.roles.filter(r=>live(r)),lib=ST.lib,mb=x=>x.size?Math.round(x.size/1048576)+' MB':'';
   const usedBy=x=>x.cast_role?(x.cast_story===ST.story?'ใช้เป็นบท: <b>'+esc(x.cast_role)+'</b>':'ใช้อยู่ในเรื่อง “'+esc(x.cast_story)+'”'):'ยังว่าง';
@@ -175,6 +186,7 @@ function loraTab(pl){
     return `<div class=\"it\"><div class=\"row sp\"><b>${esc(r.key)}</b><span class=\"mu\">${esc(r.kind)}${t==='main'?' · ตัวหลัก':''}</span></div>
       <select data-lp=\"${esc(r.key)}\" style=\"width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin-top:4px\"><option value=\"0\">— ไม่เลือก —</option>${lib.map(x=>{const other=x.cast_role&&x.cast_story&&x.cast_story!==ST.story,took=x.cast_role&&x.cast_story===ST.story&&x.cast_role!==r.key;return `<option value=\"${x.lid}\" ${+cur===+x.lid?'selected':''} ${other?'disabled':''}>${esc(x.name)}${other?' (ใช้เรื่องอื่นอยู่)':took?' (ย้ายจากบท '+esc(x.cast_role)+')':''}</option>`;}).join('')}</select>
       ${t==='main'&&!cur?'<div class=\"warn\" style=\"font-size:13px\">ตัวหลักต้องเลือก LoRA ที่เสร็จแล้วก่อนเริ่มสร้าง</div>':''}</div>`;}).join('')+'</div>';
+  h+=`<div class="c"><h2>♻️ เริ่มใหม่ทั้งหมด</h2><div class="mu">ลบคลังนักแสดงเก่า (ผู้สมัคร ตัวละคร LoRA และภาพทั้งหมด) แล้วเรียกนักแสดงใหม่ เทรน LoRA ใหม่ให้ตัวหลัก ลบแล้วกู้คืนไม่ได้</div><button data-wipe="1" style="margin-top:8px;border-color:var(--bad);color:var(--bad)">🗑 ลบคลังเก่า + สร้าง LoRA ใหม่</button><button data-bot="1">🔌 เชื่อมบอทใหม่</button></div>`;
   return h;}
 function bindLora(A){
   const o=A.querySelector('#onlyr');if(o)o.onchange=async()=>{ST.onlyReady=o.checked;localStorage.setItem('ss_onlyready',o.checked?'1':'0');try{await botApi('/api/settings',{auto_lora:o.checked?'0':'1'});}catch(e){toast(botErr(e));}toast(o.checked?'ใช้เฉพาะ LoRA ที่เสร็จแล้ว':'เปิดให้บอทเทรนเองแล้ว');render();};

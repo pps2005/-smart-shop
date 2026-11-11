@@ -289,6 +289,25 @@ async function audApi(env, b) {
   if (act === 'char_rename') return await charRename(env, b);
   if (act === 'char_more') { const ch = await env.DB.prepare('SELECT id FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!ch) return { error: 'ไม่พบตัวละคร' }; return await charRefs(env, ch.id, Math.min(8, Math.max(1, +b.n || 8))); }
   if (act === 'lora_use') { await env.DB.prepare('UPDATE loras SET use=? WHERE id=?').bind(b.on ? 1 : 0, +b.id).run(); return { ok: true }; }
+  if (act === 'wipe_all') { // ล้างคลังนักแสดงเก่าทั้งหมด: ผู้สมัคร + ตัวละคร + LoRA + ภาพออดิชัน/ภาพชุดฝึก + งานเทรนที่ค้าง (ต้องส่ง confirm='ลบทั้งหมด')
+    if (b.confirm !== 'ลบทั้งหมด') return { error: 'ต้องยืนยันก่อนลบ' };
+    await animeSchema(env);
+    const cs = (await env.DB.prepare('SELECT id,role,char_id FROM aud_cands').all()).results, st = [];
+    for (const c of cs) {
+      if (+c.char_id) {
+        const ch = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+c.char_id).first();
+        if (ch) {
+          const ls = (await env.DB.prepare('SELECT id FROM loras WHERE char_id=?').bind(ch.id).all()).results, pj = charProj(ch);
+          for (const l of ls) st.push(env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id));
+          st.push(env.DB.prepare('DELETE FROM loras WHERE char_id=?').bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND project=?").bind(pj), env.DB.prepare("DELETE FROM jobs WHERE project=? AND status<>'running'").bind(pj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(ch.id));
+        }
+      }
+      st.push(env.DB.prepare('DELETE FROM images WHERE project LIKE ?').bind(`ออดิชัน·${c.role}·${c.id}·%`));
+    }
+    st.push(env.DB.prepare("DELETE FROM jobs WHERE project LIKE 'ออดิชัน·%' AND status<>'running'"), env.DB.prepare('DELETE FROM aud_cands'));
+    for (let i = 0; i < st.length; i += 50) await env.DB.batch(st.slice(i, i + 50));
+    return { ok: true, removed: cs.length };
+  }
   if (act === 'char_del') {
     await animeSchema(env);
     const c = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!c) return { error: 'ไม่พบตัวละคร' };
