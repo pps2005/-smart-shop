@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'episode-av-6';
+const BOT_VER = 'restyle-1';
 
 export default {
   async fetch(req, env, ctx) {
@@ -277,6 +277,37 @@ async function charTrain(env, b) {
   const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs, pri: await loraPri(env, ch.id) })).run();
   await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(ch.id, r.meta.last_row_id, Date.now()).run();
   return { ok: true, images: imgs.length };
+}
+// เปลี่ยนสไตล์ทั้งเรื่อง: วาดภาพชุดฝึกของตัวละครที่ LoRA ยังไม่เสร็จใหม่ด้วยสไตล์ปัจจุบัน แล้วส่งเทรนเองเมื่อภาพครบ (สั่งด้วย settings restyle=start)
+async function restyleTick(env, s) {
+  if (!s.restyle) return;
+  await animeSchema(env);
+  if (s.restyle === 'start') {
+    const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE c.series_id=0 AND EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','failed')) AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status='ready') AND NOT EXISTS (SELECT 1 FROM vjobs v WHERE v.kind='lora' AND v.status='running' AND v.project='ซีรีส์0·'||c.name)").all()).results;
+    for (const c of cs) {
+      const pj = charProj(c);
+      await env.DB.batch([env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed','hold') AND project=?").bind(pj), env.DB.prepare("DELETE FROM loras WHERE char_id=? AND status IN ('queued','failed')").bind(c.id), env.DB.prepare("DELETE FROM jobs WHERE project=?").bind(pj), env.DB.prepare("DELETE FROM vjobs WHERE kind='img' AND status='queued' AND project=?").bind(pj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj)]);
+      await charRefs(env, c.id, 16);
+      await env.DB.prepare("UPDATE jobs SET steps=8 WHERE project=? AND status='queued'").bind(pj).run(); // ชุดฝึกวาดคุณภาพสูง
+    }
+    await setSetting(env, 'restyle', JSON.stringify({ ids: cs.map(c => c.id), done: [] }));
+    await setSetting(env, 'lora_go', '1');
+    return;
+  }
+  let o; try { o = JSON.parse(s.restyle); } catch (e) { o = null; }
+  if (!o || !Array.isArray(o.ids)) { await env.DB.prepare("DELETE FROM settings WHERE key='restyle'").run(); return; }
+  let ch = false;
+  for (const id of o.ids) {
+    if (o.done.includes(id)) continue;
+    const c = await env.DB.prepare('SELECT * FROM chars WHERE id=?').bind(id).first(); if (!c) { o.done.push(id); ch = true; continue; }
+    const pj = charProj(c);
+    const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n;
+    const have = (await env.DB.prepare('SELECT COUNT(*) n FROM images WHERE project=?').bind(pj).first()).n;
+    if (pend || have < 12) continue;
+    const r = await charTrain(env, { char_id: id }); if (r && r.ok) { o.done.push(id); ch = true; }
+  }
+  if (o.done.length >= o.ids.length) await env.DB.prepare("DELETE FROM settings WHERE key='restyle'").run();
+  else if (ch) await setSetting(env, 'restyle', JSON.stringify(o));
 }
 async function charRename(env, b) {
   await animeSchema(env);
@@ -932,6 +963,7 @@ async function tick(env, force) {
   const now = Date.now();
   await animeAuto(env, s).catch(() => {});
   if (s.supa_test === '1') await supaSelfTest(env, s);
+  await restyleTick(env, s).catch(() => { });
   await animeAdvance(env, s).catch(() => {});
   const useK = await kImgOn(env, s, now);
   if (useK) {
@@ -1171,7 +1203,7 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p === '/k/claim') {
       // เครื่องที่ถือสคริปต์รุ่นเก่า (ไม่ส่ง v หรือ v<2) หรือเครื่องที่ติดตั้งตัวเทรนไม่ผ่านในรอบนี้ → ไม่จ่ายงานเทรน LoRA ให้ (รอเครื่องรอบใหม่)
-      const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || url.searchParams.get('nolora') === '1' ? 1 : 0, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
+      const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
       const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
