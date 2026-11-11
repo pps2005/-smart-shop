@@ -49,14 +49,20 @@ function parsePlan(blocks){
   eps.forEach(E=>{const tx=E.title+' '+Object.values(E.f).join(' ');E.cast=roles.filter(r=>/คู่หลัก/.test(r.kind)||tx.includes(r.key)||tx.includes(r.name)||(/^พ่อของ/.test(r.kind)&&/พ่อ(?!ค้า)/.test(tx))).map(r=>r.key);});
   return{title,overview:ov,rule:(P.find(x=>/^ทุกตอน/.test(x))||'').slice(0,400),roles,eps:eps.sort((a,b)=>a.no-b.no),locs};}
 /* ---------- สถานะ ---------- */
-const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:''};
+const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||''};
+const STY=[['rom','💗 รอมคอมใส','bright soft anime style, pastel colors, high-key lighting, delicate fine line art, expressive cute faces, soft blush, detailed hair strands, clean cel shading, romantic comedy mood'],
+['dark','🌑 ดราม่ามืดหนัก','dark gritty anime style, desaturated cold palette, heavy shadows, strong rim light, detailed fine line art, cinematic dramatic lighting, grim tense atmosphere'],
+['act','⚔️ แอ็กชันคมเข้ม','dynamic action anime style, bold sharp line art, high contrast, vivid saturated accents, dramatic low angle, motion energy, cinematic lighting'],
+['cine','🎞 ซีเนม่าเหมือนจริง','cinematic semi-realistic anime style, shallow depth of field, natural lighting, detailed textures, subtle film grain'],
+['soft','🌸 นุ่มนวลมาตรฐาน','soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading']];
+const ASP=[['916','📱 TikTok 9:16',768,1344],['11','⬜ จัตุรัส 1:1',1024,1024],['169','🖥 จอกว้าง 16:9',1344,768]];
 let POLL=0;
 const api=(act,o)=>botApi('/api/vcastep',{story:ST.story,act,...(o||{})});
 const tierOf=r=>r.tier||(r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'main':'support'),live=r=>r.g!=='x'&&tierOf(r)!=='none';
 const castOf=k=>ST.cands.find(c=>c.cast_role===k&&c.cast_story===ST.story);
 async function load(){
   clearTimeout(POLL);if(!botCfg().url||!ST.story){render();return;}
-  try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.err='';}catch(e){ST.err=botErr(e);}
+  try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;ST.err='';}catch(e){ST.err=botErr(e);}
   const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
   if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
   await autoLora();render();
@@ -99,6 +105,14 @@ async function onFile(f){if(!f)return;
   }catch(e){toast(botErr(e));}}
 async function setR(key,field,val){try{await api('setr',{key,field,value:val});await load();
   const pl=ST.plan;if(pl&&!ST.busy&&!Object.keys(ST.epst).length&&!pl.roles.some(r=>!r.g&&tierOf(r)!=='none'))startAll();}catch(e){toast(botErr(e));}}
+async function setSty(k){const x=STY.find(v=>v[0]===k);if(!x)return;try{await botApi('/api/settings',{style:x[2],style_preset:k});ST.sty=k;localStorage.setItem('ss_sty',k);toast('ตั้งสไตล์แล้ว (มีผลกับภาพที่ทำใหม่)');render();}catch(e){toast(botErr(e));}}
+async function setAsp(k){const x=ASP.find(v=>v[0]===k);if(!x)return;try{await botApi('/api/settings',{img_w:x[2],img_h:x[3]});ST.asp=k;localStorage.setItem('ss_asp',k);toast('ตั้งสัดส่วนแล้ว (มีผลกับภาพที่ทำใหม่)');render();}catch(e){toast(botErr(e));}}
+async function runQc(){if(ST.qcBusy)return;ST.qcBusy=true;render();
+  try{for(let i=0;i<80;i++){const r=await api('qc');ST.qc=r;render();if(!r.left)break;await new Promise(x=>setTimeout(x,800));}}catch(e){toast(botErr(e));}
+  ST.qcBusy=false;render();}
+async function pickBest(no){try{await api('pick',{ep:no});ST.best=no;toast('เลือกตอน '+no+' สำหรับ TikTok แล้ว');render();}catch(e){toast(botErr(e));}}
+async function dl(id,name){try{toast('กำลังโหลดไฟล์…');const r=await fetch(botU('/vid/'+id));if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);}catch(e){window.open(botU('/vid/'+id),'_blank');}}
+function bestEp(){const q=ST.qc;if(!q||!q.eps)return 0;const c=q.eps.filter(E=>E.final&&!E.fixing&&!E.bad);if(!c.length)return 0;c.sort((a,b)=>(b.avg==null?50:b.avg)-(a.avg==null?50:a.avg));return c[0].no;}
 /* ---------- หน้าจอ ---------- */
 function render(){const A=$('#app');
   if(!botCfg().url){A.innerHTML=`<div class="c"><h2>เชื่อมบอท</h2><div class="mu">ใส่ลิงก์บอทกับรหัสผ่านครั้งเดียว (เก็บในเครื่องนี้)</div><input type="text" id="bu" placeholder="https://...workers.dev"><input type="password" id="bk" placeholder="รหัสผ่านบอท"><button class="on" id="bs">บันทึก</button></div>`;
@@ -112,22 +126,37 @@ function render(){const A=$('#app');
     h+=`<div class="c"><h2>ตัวละคร</h2>${nog.length?`<div class="warn" style="margin-bottom:6px">เลือกเพศให้ครบก่อน ระบบจะได้จับคู่นักแสดงถูกคน</div>`:''}`;
     h+=roles.map(r=>{const t=tierOf(r),c=castOf(r.key),b=(a,v,cur,n)=>`<button class="${cur===v?'on':''}" data-r="${esc(r.key)}|${a}|${v}">${n}</button>`;
       const lt=c?(c.lora==='ready'?'<span class="ok">🧬 LoRA พร้อม</span>':c.lora==='queued'?'<span class="warn">⏳ กำลังฝึก LoRA</span>':t==='main'?(c.lora==='failed'?'<span class="bad">❌ LoRA ล้มเหลว</span> <button class="sm" data-retry="'+c.id+'">🔁 ลองใหม่</button>'+(c.lora_err?'<div class="bad" style="font-size:12px;word-break:break-all;white-space:pre-wrap">'+esc(c.lora_err)+'</div>':''):'<span class="warn">รอสร้าง LoRA</span>'):'<span class="mu">ไม่ใช้ LoRA</span>'):'';
-      return `<div class="it"><div class="row sp"><b>${esc(r.key)}</b><span class="mu">${esc(r.kind)}${r.age?' · '+r.age+' ปี':''}</span></div>
+      return `<div class="it"><div class="row sp"><span class="row" style="flex-wrap:nowrap;gap:10px">${c&&c.face?`<img src="${esc(botU('/img/'+c.face))}" loading="lazy" style="width:56px;height:56px;border-radius:12px;object-fit:cover;object-position:top;border:1px solid var(--bd)">`:''}<b>${esc(r.key)}</b></span><span class="mu">${esc(r.kind)}${r.age?' · '+r.age+' ปี':''}</span></div>
         ${!r.g?`<div class="row">${b('g','f',r.g,'👩 หญิง')}${b('g','m',r.g,'👨 ชาย')}${b('g','x',r.g,'🐾 ไม่ใช่คน')}</div>`
         :`<div class="row">${b('t','main',t,'🧬 ตัวหลัก')}${b('t','support',t,'👤 ตัวรอง')}${b('t','none',t,'⛔ ไม่ใช้')}</div><div class="mu">${c?'นักแสดง: <b>'+esc(c.name)+'</b> '+lt:'ยังไม่มีนักแสดง (ระบบเลือกให้ตอนเริ่ม)'}</div>`}</div>`;}).join('')+'</div>';
+    h+=`<div class="c"><h2>🎨 สไตล์และสัดส่วนภาพ</h2><div class="mu">สไตล์</div><div class="row">${STY.map(x=>`<button class="${ST.sty===x[0]?'on':''}" data-sty="${x[0]}">${x[1]}</button>`).join('')}</div><div class="mu" style="margin-top:8px">สัดส่วนภาพ (ลง TikTok เลือก 9:16)</div><div class="row">${ASP.map(x=>`<button class="${ST.asp===x[0]?'on':''}" data-asp="${x[0]}">${x[1]}</button>`).join('')}</div><div class="mu" style="margin-top:6px">มีผลกับภาพที่สร้างใหม่หลังจากนี้ ภาพที่ทำไปแล้วไม่เปลี่ยน</div></div>`;
     if(pl.locs.length)h+=`<div class="c"><h2>📍 สถานที่ (${pl.locs.length})</h2>${pl.locs.map(L=>`<div class="it"><div class="row sp"><b>${esc(L.name)}</b><span class="mu">${L.eps[0]===0?'ทุกตอน':L.eps.length?'ตอน '+L.eps.join(', '):''}</span></div>${L.note?`<div class="mu">${esc(L.note)}</div>`:''}</div>`).join('')}</div>`;
     if(!started)h+=`<div class="c"><h2>🎞 เนื้อเรื่องรายตอน</h2>${pl.eps.map(E=>`<div class="it"><b>ตอน ${E.no} · ${esc(E.title)}</b><div class="mu">${esc(E.f['เรื่อง']||E.f['คดี']||'')}</div>${E.f['ฉากสู้']?`<div class="mu">⚔️ ${esc(E.f['ฉากสู้'])}</div>`:''}${E.cast.length?`<div class="mu">🎭 ${esc(E.cast.join(', '))}</div>`:''}</div>`).join('')}</div>`;
     if(ST.msg)h+=`<div class="c" style="white-space:pre-wrap">${esc(ST.msg)}</div>`;
     h+=`<div class="c">${ST.busy?`<div class="mu">⏳ ${esc(ST.busy)}</div>`:started
       ?`<h2>ความคืบหน้า</h2>${epList(pl)}<div style="margin-top:8px"><button data-a="stop">⏹ หยุดทั้งหมด</button><button data-a="go">🔁 สั่งเริ่มตอนที่ยังไม่ได้เริ่มอีกครั้ง</button></div>`
       :`<button class="go" data-a="go"${nog.length?' disabled':''}>🚀 สร้างอนิเมะทั้งเรื่อง (${pl.eps.length} ตอน)</button><div class="mu" style="margin-top:6px">ระบบเลือกนักแสดง → ฝึก LoRA ตัวหลัก → ทำทุกตอนต่อเนื่อง ไม่ต้องรอตรวจ</div>`}</div>`;}
+  if(pl&&Object.keys(ST.epst).length){const q=ST.qc,sug=bestEp(),pick=ST.best;
+    h+=`<div class="c"><h2>🔍 ตรวจและแก้ซีนอัตโนมัติ</h2><div class="mu">ระบบดูภาพทุกช็อต ถ้าเจอภาพเสีย (มือ/หน้าเพี้ยน ภาพว่าง) จะลบแล้ววาดใหม่เองสูงสุด 2 รอบ แล้วรวมซีนใหม่</div>
+      <button class="on" data-a="qc"${ST.qcBusy?' disabled':''} style="margin-top:8px">${ST.qcBusy?'⏳ กำลังตรวจ…':'🔍 ตรวจและแก้ตอนนี้'}</button>
+      ${q&&q.vision===false?'<div class="warn" style="margin-top:6px">AI ดูภาพไม่ได้ตอนนี้ ระบบตรวจแค่ภาพว่าง/เสีย ยังไม่ตรวจมือหรือหน้าเพี้ยน</div>':''}
+      ${q&&q.eps?q.eps.map(E=>`<div class="it"><div class="row sp"><b>ตอน ${E.no}${sug===E.no?' ⭐':''}${pick===E.no?' 🎯':''}</b><span class="mu">${E.avg==null?'ยังไม่มีคะแนน':'คะแนนภาพ '+E.avg+'/100'}</span></div><div class="mu">ซีนเสร็จ ${E.fin}/${E.scenes} · ตรวจแล้ว ${E.scored}/${E.shots} ช็อต${E.fixing?` · <span class="warn">กำลังแก้/รอวาด ${E.fixing}</span>`:''}${E.bad?` · <span class="bad">ยังเสีย ${E.bad}</span>`:''}</div>${E.issues&&E.issues.length?`<div class="mu" style="font-size:12px">${esc(E.issues.join(' · '))}</div>`:''}${E.final?`<button class="sm ${pick===E.no?'on':''}" data-pick="${E.no}">🎯 เลือกตอนนี้ลง TikTok</button>`:''}</div>`).join('')+(sug?`<div class="mu" style="margin-top:6px">⭐ = ตอนที่คะแนนสูงสุดและไม่มีภาพเสีย</div>`:''):''}</div>`;
+    if(pick){const f=ST.fin[pick],ss=ST.scn.filter(x=>+x.ep===pick&&+x.final);
+      h+=`<div class="c"><h2>🎵 ตอนที่เลือกลง TikTok: ตอน ${pick}</h2>${f?`<button class="go" data-dl="${f}|${esc((pl.title||'anime').slice(0,30))}-ep${pick}.mp4">⬇ ดาวน์โหลดทั้งตอน</button>`:'<div class="warn">ตอนนี้ยังรวมไม่เสร็จ ให้รอหรือกดตรวจแก้ก่อน</div>'}
+      ${ss.length?`<div class="mu" style="margin:8px 0 4px">หรือโหลดแยกซีน (TikTok แบ่งเป็นพาร์ตสั้นได้)</div>${ss.map(x=>`<button class="sm" data-dl="${x.final}|${esc((pl.title||'anime').slice(0,30))}-ep${pick}-sc${x.sc}.mp4">⬇ ซีน ${x.sc}</button>`).join('')}`:''}
+      <div class="mu" style="margin-top:8px">ตอนนี้วิดีโอยังไม่มีเสียงพากย์ ซับ และเพลง ต้องใส่ในแอปตัดต่อก่อนอัปโหลด</div></div>`;}
+  }
   A.innerHTML=h;
+  A.querySelectorAll('[data-sty]').forEach(b=>b.onclick=()=>setSty(b.dataset.sty));
+  A.querySelectorAll('[data-asp]').forEach(b=>b.onclick=()=>setAsp(b.dataset.asp));
+  A.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>pickBest(+b.dataset.pick));
+  A.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>{const [i,n]=b.dataset.dl.split('|');dl(i,n);});
   const pf=$('#pf');if(pf)pf.onchange=e=>{const f=e.target.files[0];e.target.value='';onFile(f);};
   const dz=$('#dz');if(dz){dz.ondragover=e=>{e.preventDefault();dz.classList.add('over');};dz.ondragleave=()=>dz.classList.remove('over');dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');onFile(e.dataTransfer.files[0]);};}
   A.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const [k,f,v]=b.dataset.r.split('|');setR(k,f==='g'?'g':'tier',v);});
   A.querySelectorAll('[data-retry]').forEach(b=>b.onclick=async()=>{b.disabled=true;LG.delete(b.dataset.retry);try{await api('lorago',{cand:b.dataset.retry});toast('สั่งสร้าง LoRA ใหม่แล้ว');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-ep]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('make',{ep:+b.dataset.ep,all:true});toast(r.waiting?'ตอนนี้รอ LoRA '+r.waiting.join(', '):'เริ่มทำตอน '+b.dataset.ep+' แล้ว');}catch(e){toast(botErr(e));}await load();});
-  A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>b.dataset.a==='stop'?stopAll():startAll());}
+  A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>b.dataset.a==='stop'?stopAll():b.dataset.a==='qc'?runQc():startAll());}
 function epList(pl){return pl.eps.map(E=>{const s=ST.epst[E.no],sc=ST.scn.filter(x=>+x.ep===E.no),fin=ST.fin[E.no],tot=sc.reduce((n,x)=>n+(+x.tot||0),0),vid=sc.reduce((n,x)=>n+(+x.vid||0),0),img=sc.reduce((n,x)=>n+(+x.img||0),0),done=sc.filter(x=>+x.fin).length;
     const st=fin?'<span class="ok">✅ เสร็จ</span>':!s?`<span class="mu">ยังไม่เริ่ม</span> <button class="sm" data-ep="${E.no}">▶ ทำตอนนี้</button>`:s.status==='waiting'?`<span class="warn">⏳ รอ LoRA ${esc((s.need||[]).join(', '))}</span>`:`<span class="warn">🎬 กำลังทำ</span>`;
     const pct=tot?Math.round((img+vid)/(tot*2)*100):0;

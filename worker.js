@@ -461,6 +461,66 @@ async function epCheck(env, story, plan, E) {
   const cast = new Map(rows.map(x => [x.k, x.ls])), rs = (E.cast || []).map(k => plan.roles.find(x => x.key === k)).filter(r => r && r.g !== 'x' && r.tier !== 'none');
   return { miss: rs.filter(r => !cast.has(r.key)).map(r => r.key), nol: rs.filter(r => r.tier === 'main' && cast.get(r.key) !== 'ready').map(r => r.key) };
 }
+async function qcCheck(env, imgId) { // ตรวจภาพ 1 ใบ: ภาพว่าง/เสีย (เช็กเอง) + ให้ AI ดูภาพให้คะแนน 1-10 (ถ้า AI ใช้ไม่ได้ จะข้ามส่วนนี้)
+  const r = await env.DB.prepare('SELECT data FROM images WHERE id=?').bind(imgId).first();
+  if (!r || !r.data) return { score: 0, issues: 'ไม่พบภาพ' };
+  const bytes = b64ToBytes(r.data);
+  if (bytes.length < 15000) return { score: 1, issues: 'ภาพว่างหรือเสีย' };
+  if (bytes.length > 1600000) return { score: null, issues: 'ภาพใหญ่เกินกว่าจะส่งให้ AI ตรวจ' };
+  try {
+    const out = await env.AI.run('@cf/llava-hf/llava-1.5-7b-hf', { image: Array.from(bytes), prompt: 'You are checking one anime key frame. Rate its quality from 1 to 10. Penalize heavily: deformed or extra fingers or hands, melted or distorted faces, duplicated limbs or bodies, garbled text, watermarks, broken or blurry image. Answer exactly in this format: SCORE=<number> ISSUES=<at most 8 words>', max_tokens: 60 });
+    const t = String((out && (out.description || out.response)) || '');
+    const m = t.match(/SCORE\s*[=:]\s*(\d+)/i);
+    if (!m) return { score: null, issues: '' };
+    const im = t.match(/ISSUES\s*[=:]\s*(.+)/i);
+    return { score: Math.max(0, Math.min(10, +m[1])), issues: im ? im[1].slice(0, 120) : '' };
+  } catch (e) { return { score: null, issues: 'AI ตรวจภาพไม่ได้: ' + String((e && e.message) || e).slice(0, 100) }; }
+}
+async function qcRun(env, story, budget) {
+  await animeSchema(env);
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS qc (shot_id INTEGER PRIMARY KEY, img INTEGER, score INTEGER, issues TEXT, tries INTEGER DEFAULT 0, created INTEGER)').run();
+  const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!sr) return { eps: [], left: 0, vision: false };
+  const scs = (await env.DB.prepare('SELECT * FROM scenes WHERE series_id=? AND script_id>0 ORDER BY no').bind(sr.id).all()).results;
+  const eps = {}; let left = 0, seen = 0, nul = 0;
+  for (const sc of scs) {
+    const E = eps[sc.ep] || (eps[sc.ep] = { no: sc.ep, shots: 0, scored: 0, sum: 0, bad: 0, fixing: 0, scenes: 0, fin: 0, final: 0, issues: [] });
+    E.scenes++; if (+sc.fin) E.fin++;
+    const rows = (await env.DB.prepare('SELECT id,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sc.script_id).all()).results;
+    for (const sh of rows) {
+      E.shots++;
+      const im = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(sh.kproj).first();
+      if (!im || !im.id) { E.fixing++; continue; }
+      let q = await env.DB.prepare('SELECT * FROM qc WHERE shot_id=?').bind(sh.id).first();
+      if (!q || +q.img !== +im.id) {
+        if (budget <= 0) { left++; continue; }
+        budget--;
+        const r = await qcCheck(env, im.id), tries = q ? +q.tries : 0;
+        await env.DB.prepare('INSERT OR REPLACE INTO qc (shot_id,img,score,issues,tries,created) VALUES (?,?,?,?,?,?)').bind(sh.id, im.id, r.score, r.issues || '', tries, Date.now()).run();
+        q = { score: r.score, issues: r.issues, tries, img: im.id };
+      }
+      seen++; if (q.score == null) nul++;
+      if (q.score != null) { E.scored++; E.sum += +q.score; }
+      if (q.score != null && +q.score <= 4) {
+        if (+q.tries < 2) { // ภาพเสีย: ลบภาพ+วิดีโอของช็อตนี้ แล้วให้ระบบวาดใหม่เอง (ใช้ LoRA ตัวละครเดิม) และรวมซีนใหม่เมื่อครบ
+          await env.DB.batch([
+            env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj),
+            env.DB.prepare('DELETE FROM videos WHERE ep=? AND shot=?').bind('a' + sc.script_id, String(sh.id)),
+            env.DB.prepare("DELETE FROM videos WHERE ep=? AND shot='final'").bind('a' + sc.script_id),
+            env.DB.prepare("DELETE FROM videos WHERE ep=? AND shot='final'").bind('E' + sr.id + 'x' + sc.ep),
+            env.DB.prepare('UPDATE scenes SET fin=0 WHERE id=?').bind(sc.id),
+            env.DB.prepare('INSERT OR REPLACE INTO qc (shot_id,img,score,issues,tries,created) VALUES (?,0,NULL,?,?,?)').bind(sh.id, q.issues || '', +q.tries + 1, Date.now())]);
+          E.fixing++; if (E.issues.length < 3 && q.issues) E.issues.push(q.issues);
+        } else { E.bad++; if (E.issues.length < 3 && q.issues) E.issues.push(q.issues); }
+      }
+    }
+  }
+  const out = [];
+  for (const E of Object.values(eps).sort((a, b) => a.no - b.no)) {
+    const v = await env.DB.prepare("SELECT MAX(id) id FROM videos WHERE ep=? AND shot='final'").bind('E' + sr.id + 'x' + E.no).first();
+    E.final = (v && v.id) || 0; E.avg = E.scored ? Math.round(E.sum / E.scored * 10) : null; delete E.sum; out.push(E);
+  }
+  return { ok: true, eps: out, left, vision: seen === 0 ? null : nul < seen };
+}
 async function epStart(env, story, plan, E) { // สร้างซีรีส์ + 3 ซีนของตอนนี้ แล้วเปิดให้ animeAdvance (cron ทุกนาที) ทำต่อเองจนครบ
   await animeSchema(env);
   const brief = [`เรื่อง: ${plan.title || story}`, plan.overview || '', plan.rule ? 'กติกาทุกตอน: ' + plan.rule : '', 'ตัวละคร: ' + plan.roles.map(r => `${r.key} (${r.kind}${r.age ? ', ' + r.age + ' ปี' : ''}) ${r.look}`).join(' | ')].filter(Boolean).join('\n').slice(0, 14000);
@@ -1876,29 +1936,40 @@ def ensure_kohya():
         if not os.path.exists(KV):
             sh("git clone --depth 1 https://github.com/kohya-ss/sd-scripts " + KV)
         sh("python3 -m venv --system-site-packages " + KV + "/venv", check=False)
+        if not os.path.exists(KV + "/venv/bin/pip"):
+            log("venv ไม่มี pip (Kaggle ตัด ensurepip) ลองสร้างด้วย virtualenv แทน")
+            sh("rm -rf " + KV + "/venv", check=False)
+            sh("python3 -m pip install -q virtualenv", check=False)
+            sh("python3 -m virtualenv --system-site-packages " + KV + "/venv", check=False)
+        if os.path.exists(KV + "/venv/bin/pip"):
+            pip = '"' + KV + '/venv/bin/pip"'
+            py = '"' + KV + '/venv/bin/python"'
+        else:
+            log("สร้าง venv ไม่ได้ ใช้ Python หลักของเครื่องแทน")
+            pip = "python3 -m pip"
+            py = "python3"
         keep = []
         for ln in open(KV + "/requirements.txt").read().splitlines():
             t = ln.strip()
             if t and not t.startswith(("#", "-", ".", "torch", "xformers")):
                 keep.append(t)
         keep += ["accelerate", "bitsandbytes"]
-        pip = KV + "/venv/bin/pip"
-        py = KV + "/venv/bin/python"
         open("/tmp/kreq.txt", "w").write("\n".join(keep) + "\n")
-        r = subprocess.run('"%s" install -q -r /tmp/kreq.txt' % pip, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        r = subprocess.run('%s install -q -r /tmp/kreq.txt' % pip, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         if r.returncode != 0:
             log("ติดตั้งรวดเดียวไม่ผ่าน ลองทีละแพ็กเกจ: " + r.stdout[-300:])
             for t in keep:
-                q = subprocess.run('"%s" install -q "%s"' % (pip, t), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                q = subprocess.run('%s install -q "%s"' % (pip, t), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 if q.returncode != 0:
                     nm = t
                     for ch in "=<>~! ;[":
                         nm = nm.split(ch)[0]
                     log("แพ็กเกจ %s ติดตั้งแบบล็อกเวอร์ชันไม่ผ่าน ลองเวอร์ชันล่าสุด" % nm)
-                    sh('"%s" install -q "%s"' % (pip, nm), check=False)
-        chk = subprocess.run('"%s" -c "import accelerate, diffusers, transformers, safetensors, bitsandbytes, library.train_util"' % py, shell=True, cwd=KV, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    sh('%s install -q "%s"' % (pip, nm), check=False)
+        chk = subprocess.run('%s -c "import accelerate, diffusers, transformers, safetensors, bitsandbytes, library.train_util"' % py, shell=True, cwd=KV, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         if chk.returncode != 0:
             raise RuntimeError("ตัวเทรน LoRA ใช้ไม่ได้ (import ไม่ผ่าน): " + chk.stdout[-380:])
+        M["kpy"] = py
         M["kohya"] = True
 
 
@@ -1926,14 +1997,14 @@ def train_lora(job, port):
     steps = max(800, min(1800, len(imgs) * 80))
     ckpt = os.path.join(COMFY, "models", "checkpoints", M["sdxl"])
     vae = os.path.join(COMFY, "models", "vae", M["sdxlvae"]) if M.get("sdxlvae") else ""
-    cmd = ('CUDA_VISIBLE_DEVICES=%d "%s/venv/bin/python" "%s/sdxl_train_network.py" --pretrained_model_name_or_path "%s" %s'
+    cmd = ('CUDA_VISIBLE_DEVICES=%d %s "%s/sdxl_train_network.py" --pretrained_model_name_or_path "%s" %s'
            ' --train_data_dir "%s" --output_dir "%s" --output_name lora --caption_extension .txt'
            ' --network_module networks.lora --network_dim 16 --network_alpha 8 --network_train_unet_only'
            ' --resolution 768,768 --enable_bucket --train_batch_size 1 --max_train_steps %d'
            ' --learning_rate 1e-4 --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
            ' --mixed_precision fp16 --save_precision fp16 --gradient_checkpointing --cache_latents --sdpa --no_half_vae --seed 1'
            ' --shuffle_caption --keep_tokens 1 --min_snr_gamma 5 --noise_offset 0.05 --max_grad_norm 1.0'
-           % (max(0, (port or 8188) - 8188), KV, KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, steps))
+           % (max(0, (port or 8188) - 8188), M.get("kpy") or ('"%s/venv/bin/python"' % KV), KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, steps))
     log("เริ่มเทรน LoRA %s (%d ภาพ · %d สเต็ป)" % (trig, len(imgs), steps))
     t0 = time.time()
     sh(cmd, cwd=KV)
@@ -2425,6 +2496,7 @@ async function castApi(req, env, url, body) {
         for (const c of cs) {
           const R = AUD_ROLES.find(x => x.key === c.role); c.g = R ? (/woman/.test(R.g) ? 'f' : 'm') : ''; c.lora = '';
           if (+c.char_id) { const l = await env.DB.prepare("SELECT status,error FROM loras WHERE char_id=? AND status<>'old' ORDER BY id DESC LIMIT 1").bind(c.char_id).first(); c.lora = l ? l.status : 'none'; c.lora_err = l && l.status === 'failed' ? String(l.error || '').slice(-400) : ''; }
+          const fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project LIKE ? AND scene=1').bind(`ออดิชัน·${c.role}·${c.id}·%`).first(); c.face = (fr && fr.id) || 0;
         }
         const epst = (await rd('epst:' + story)) || {}, sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first();
         if (sr) for (const [no, v] of Object.entries(epst)) {
@@ -2439,7 +2511,7 @@ async function castApi(req, env, url, body) {
           }
           v.prog = g;
         }
-        return json({ ok: true, plan: await rd('plan:' + story), epst, cands: cs });
+        return json({ ok: true, plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0 });
       }
       if (act === 'save') {
         const pl = b.plan || {}; if (!Array.isArray(pl.roles) || !Array.isArray(pl.eps) || !pl.roles.length || !pl.eps.length) return json({ error: 'โครงเรื่องไม่ครบ (ต้องมีบทและตอน)' }, 400);
@@ -2477,6 +2549,8 @@ async function castApi(req, env, url, body) {
         if (!+c.char_id) { const r = await charMake(env, { id: c.id }); if (r && r.error) return json(r, 400); return json({ ok: true, msg: 'สร้างตัวละครแล้ว กำลังวาดภาพชุดฝึก รอเสร็จแล้วกดฝึก LoRA อีกครั้ง' }); }
         const r = await charTrain(env, { char_id: +c.char_id }); if (r && r.error) return json(r, 400); return json({ ok: true, msg: 'ส่งฝึก LoRA ขึ้น Kaggle แล้ว' });
       }
+      if (act === 'qc') return json(await qcRun(env, story, 5)); // ตรวจภาพทุกช็อต (ครั้งละ 5 ภาพ หน้าเว็บเรียกวนจนครบ) + สั่งทำใหม่เองช็อตที่เสีย
+      if (act === 'pick') { await setSetting(env, 'best:' + story, String(+b.ep || 0)); return json({ ok: true }); }
       if (act === 'autocast') { // จับคู่นักแสดงในคลังที่ว่างอยู่ ตามเพศ + อายุใกล้สุด (ไม่แย่งคนที่ใส่บทเรื่องอื่นไว้แล้ว)
         const cs = (await env.DB.prepare("SELECT id,role,age,cast_role,cast_story,char_id FROM aud_cands WHERE COALESCE(kept,0)=1").all()).results, rdy = new Set((await env.DB.prepare("SELECT DISTINCT char_id FROM loras WHERE status='ready'").all()).results.map(x => +x.char_id));
         const have = new Set(cs.filter(c => c.cast_story === story && c.cast_role).map(c => c.cast_role)), taken = new Set(), done = [];
