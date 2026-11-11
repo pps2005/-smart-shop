@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'storyboard-4';
+const BOT_VER = 'storyboard-5';
 
 export default {
   async fetch(req, env, ctx) {
@@ -422,6 +422,7 @@ async function autoFill(env, s) {
 function imgEngineFor(j, s) {
   const e = String((s && s.img_engine) || 'auto');
   if (e === 'sdxl' || e === 'dev') return e;
+  if (j && j.eng === 'sdxl') return 'sdxl'; // ช็อตร่างที่มีตัวละครแต่ยังไม่มี LoRA: ใช้ SDXL อนิเมะ ให้ลายเส้นตรงกับของจริง
   const p = String((j && j.prompt) || ''), pr = String((j && j.project) || '');
   if (pr.startsWith('ฉาก') && !/chr\d+x/.test(p)) return 'dev'; // ช็อตฉาก/บรรยากาศไม่มีตัวละคร → FLUX.1-dev · ช็อตมีตัวละคร → SDXL + LoRA
   const obj = pr.startsWith('คลัง·') || p.includes('[[STYLE_OBJ]]') || p.includes('[[STYLE_ENV]]') ||
@@ -759,7 +760,7 @@ async function animeApi(env, b) {
       let names = []; try { names = JSON.parse(sh.chars || '[]'); } catch { names = []; }
       const m = lc.filter(c => names.includes(c.name));
       st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: +wm[c.name] || 0.8 }))), sh.id));
-      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,?)").bind(sh.kproj, `${m.map(c => 'chr' + c.cid + 'x').join(', ')}${m.length ? ', ' : ''}${sh.en}, [[STYLE]]`.slice(0, 1800), Date.now(), m.length ? 8 : 4)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
+      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng) VALUES (?,1,?,'queued',?,?,?)").bind(sh.kproj, `${m.map(c => 'chr' + c.cid + 'x').join(', ')}${m.length ? ', ' : ''}${sh.en}, [[STYLE]]`.slice(0, 1800), Date.now(), m.length ? 8 : 4, names.length && !m.length ? 'sdxl' : null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
       n++;
     }
     if (st.length) await env.DB.batch(st);
@@ -855,7 +856,7 @@ async function kImgOn(env, s, now) {
   return true;
 }
 async function bridgeImg(env, s) {
-  const rows = (await env.DB.prepare("SELECT id,project,scene,prompt,steps,seed FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux' ORDER BY id LIMIT 40").all()).results;
+  const rows = (await env.DB.prepare("SELECT id,project,scene,prompt,steps,seed,eng FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux' ORDER BY id LIMIT 40").all()).results;
   if (!rows.length) return 0;
   const st = [], now = Date.now();
   for (const j of rows) {
