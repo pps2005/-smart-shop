@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'webtoon-1';
+const BOT_VER = 'webtoon-2';
 
 export default {
   async fetch(req, env, ctx) {
@@ -470,6 +470,7 @@ async function animeSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS shots (id INTEGER PRIMARY KEY AUTOINCREMENT, script_id INTEGER, idx INTEGER, beat INTEGER, th TEXT, en TEXT, chars TEXT, loras TEXT, kproj TEXT, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS scenes (id INTEGER PRIMARY KEY AUTOINCREMENT, series_id INTEGER, ep INTEGER DEFAULT 1, sc INTEGER DEFAULT 1, no INTEGER, title TEXT, logline TEXT, script_id INTEGER DEFAULT 0, sb INTEGER DEFAULT 0, auto INTEGER DEFAULT 0, fin INTEGER DEFAULT 0, created INTEGER)')]);
   await env.DB.prepare('ALTER TABLE shots ADD COLUMN say TEXT').run().catch(() => { });
+  await env.DB.batch(['shots(script_id)', 'shots(kproj)', 'scenes(series_id)', 'lchunks(lid)'].map((x, i) => env.DB.prepare(`CREATE INDEX IF NOT EXISTS ix_b${i} ON ${x}`))).catch(() => { });
   animeReady = true;
 }
 // เทรน LoRA ตัวละครอัตโนมัติ: ภาพอ้างอิงครบและไม่มีงานค้าง → เข้าคิวเทรนบน Kaggle (ใช้ภาพที่ติดดาว ถ้าเลือกไว้ ≥8 ภาพ ไม่งั้นใช้ทุกภาพ) · ปิดได้ที่ settings.auto_lora = 0
@@ -546,11 +547,11 @@ async function qcCheck(env, imgId) { // ตรวจภาพ 1 ใบ: ภา�
     return { score: Math.max(0, Math.min(10, +m[1])), issues: im ? im[1].slice(0, 120) : '' };
   } catch (e) { return { score: null, issues: 'AI ตรวจภาพไม่ได้: ' + String((e && e.message) || e).slice(0, 100) }; }
 }
-async function qcRun(env, story, budget) {
+async function qcRun(env, story, budget, onlySid) {
   await animeSchema(env);
   await env.DB.prepare('CREATE TABLE IF NOT EXISTS qc (shot_id INTEGER PRIMARY KEY, img INTEGER, score INTEGER, issues TEXT, tries INTEGER DEFAULT 0, created INTEGER)').run();
   const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!sr) return { eps: [], left: 0, vision: false };
-  const scs = (await env.DB.prepare('SELECT * FROM scenes WHERE series_id=? AND script_id>0 ORDER BY no').bind(sr.id).all()).results;
+  const scs = (await env.DB.prepare('SELECT * FROM scenes WHERE series_id=? AND script_id>0 ORDER BY no').bind(sr.id).all()).results.filter(x => !onlySid || +x.script_id === +onlySid);
   const eps = {}; let left = 0, seen = 0, nul = 0;
   for (const sc of scs) {
     const E = eps[sc.ep] || (eps[sc.ep] = { no: sc.ep, shots: 0, scored: 0, sum: 0, bad: 0, fixing: 0, scenes: 0, fin: 0, final: 0, issues: [] });
@@ -685,10 +686,14 @@ async function animeAdvance(env, s) {
     const gsb = ((m.st[e.ep] || {}).gate) === 'sb';
     if (gsb && s['sbfix:' + sid] == null) { let r = { cut: 0, fix: 0 }; try { r = await sbTighten(env, s, sid); } catch (x) { } await setSetting(env, 'sbfix:' + sid, r.cut + ',' + r.fix); return; } // แตกช็อตครบ → ให้ AI ตรวจตัดช็อตซ้ำ/แก้มุมกล้องก่อนวาด
     if (gsb && s['sbsay:' + sid] == null) { let n = 0; try { n = await sbSay(env, s, sid); } catch (x) { } await setSetting(env, 'sbsay:' + sid, String(n)); return; } // บทพูดรายช็อต
+    if (gsb && s['sbdone:' + sid] === '1') continue; // ซีนนี้ภาพครบและตรวจแล้ว รออนุมัติ: ไม่ต้องอ่านอะไรอีก
     const rows = (await env.DB.prepare('SELECT id,en,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
     const hasImg = (await env.DB.prepare('SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj)').bind(sid).first()).n;
-    if (hasImg < rows.length) { const r = await animeApi(env, { act: 'kf', script_id: sid }); if (r.queued) return; continue; } // ภาพคีย์เข้าคิวครบแล้ว → ไปเตรียมซีนถัดไประหว่างรอวาด
-    if (gsb) { if (!m.qc) { m.qc = 1; await qcRun(env, m.title, 4).catch(() => { }); } continue; } // ระหว่างรอ: AI ตรวจภาพทีละ 4 ใบ ภาพเสียลบแล้ววาดใหม่เอง (สูงสุด 2 รอบต่อช็อต) · สตอรีบอร์ดซีนนี้ครบแล้ว: รอผู้ใช้กดอนุมัติก่อนทำคลิป (ระหว่างนี้ไปทำซีนถัดไปของตอนเดียวกัน)
+    if (hasImg < rows.length) {
+      const need = (await env.DB.prepare("SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND NOT EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj) AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.project=s.kproj AND j.status IN ('queued','running','kaggle'))").bind(sid).first()).n;
+      if (!need) continue; // ทุกช็อตที่ขาดภาพเข้าคิวแล้ว: รอวาด
+      const r = await animeApi(env, { act: 'kf', script_id: sid }); if (r.queued) return; continue; } // ภาพคีย์เข้าคิวครบแล้ว → ไปเตรียมซีนถัดไประหว่างรอวาด
+    if (gsb) { if (!m.qc) { m.qc = 1; const q = await qcRun(env, m.title, 4, sid).catch(() => null); if (q && !q.left && !(q.eps || []).some(E => E.fixing)) await setSetting(env, 'sbdone:' + sid, '1'); } continue; } // ระหว่างรอ: AI ตรวจภาพทีละ 4 ใบ ภาพเสียลบแล้ววาดใหม่เอง (สูงสุด 2 รอบต่อช็อต) · สตอรีบอร์ดซีนนี้ครบแล้ว: รอผู้ใช้กดอนุมัติก่อนทำคลิป (ระหว่างนี้ไปทำซีนถัดไปของตอนเดียวกัน)
     const q = await animeApi(env, { act: 'vid', script_id: sid });
     let miss = false;
     for (const [i, sh] of rows.entries()) { if (!keyShot(sh, i)) continue; const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind('a' + sid, String(sh.id)).first(); if (!v || !v.id) { miss = true; break; } }
@@ -799,15 +804,9 @@ async function animeApi(env, b) {
     return { queued: n };
   }
   if (act === 'shots') {
-    const like = `ฉาก${+b.script_id}·%`;
-    const rows = (await env.DB.prepare('SELECT id,idx,beat,th,chars,say FROM shots WHERE script_id=? ORDER BY idx').bind(+b.script_id).all()).results;
-    const im = {}, pd = {};
-    for (const x of (await env.DB.prepare('SELECT project, MAX(id) id FROM images WHERE project LIKE ? GROUP BY project').bind(like).all()).results) im[x.project] = x.id;
-    for (const x of (await env.DB.prepare("SELECT project, COUNT(*) n FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle') GROUP BY project").bind(like).all()).results) pd[x.project] = x.n;
-    const vv = {}, vj = {};
-    for (const x of (await env.DB.prepare('SELECT shot, MAX(id) id FROM videos WHERE ep=? GROUP BY shot').bind('a' + (+b.script_id)).all()).results) vv[x.shot] = x.id;
-    for (const x of (await env.DB.prepare("SELECT shot, COUNT(*) n FROM vjobs WHERE ep=? AND status IN ('queued','running') GROUP BY shot").bind('a' + (+b.script_id)).all()).results) vj[x.shot] = x.n;
-    return { shots: rows.map(r => ({ ...r, img: im[`ฉาก${+b.script_id}·${r.idx}`] || 0, pending: pd[`ฉาก${+b.script_id}·${r.idx}`] || 0, vid: vv[String(r.id)] || 0, vpend: vj[String(r.id)] || 0 })) };
+    const sid = +b.script_id, ep = 'a' + sid;
+    const rows = (await env.DB.prepare("SELECT s.id,s.idx,s.beat,s.th,s.chars,s.say, COALESCE((SELECT MAX(i.id) FROM images i WHERE i.project=s.kproj),0) img, (SELECT COUNT(*) FROM jobs j WHERE j.project=s.kproj AND j.status IN ('queued','running','kaggle')) pending, COALESCE((SELECT MAX(v.id) FROM videos v WHERE v.ep=?1 AND v.shot=CAST(s.id AS TEXT)),0) vid, (SELECT COUNT(*) FROM vjobs q WHERE q.ep=?1 AND q.shot=CAST(s.id AS TEXT) AND q.status IN ('queued','running')) vpend FROM shots s WHERE s.script_id=?2 ORDER BY s.idx").bind(ep, sid).all()).results;
+    return { shots: rows };
   }
   if (act === 'lora_use') { await env.DB.prepare('UPDATE loras SET use=? WHERE id=?').bind(b.on ? 1 : 0, +b.id).run(); return { ok: true }; }
   if (act === 'lora_retrain') { await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(+b.char_id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=(SELECT 'ซีรีส์'||series_id||'·'||name FROM chars WHERE id=?)").bind(+b.char_id)]); return { ok: true }; }
@@ -1119,6 +1118,7 @@ async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS casting (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, cat TEXT DEFAULT 'char', name TEXT, descr TEXT, prompt TEXT, status TEXT DEFAULT 'pending', created INTEGER)"),
   ]);
   for (const q of ['ALTER TABLE jobs ADD COLUMN seed INTEGER', 'ALTER TABLE jobs ADD COLUMN eng TEXT', 'ALTER TABLE aud_cands ADD COLUMN kept INTEGER DEFAULT 0', 'ALTER TABLE aud_cands ADD COLUMN cast_role TEXT', 'ALTER TABLE aud_cands ADD COLUMN cast_story TEXT', 'ALTER TABLE aud_cands ADD COLUMN char_id INTEGER DEFAULT 0']) await env.DB.prepare(q).run().catch(() => {});
+  await env.DB.batch(['images(project)', 'jobs(project)', 'jobs(status)', 'vjobs(status)', 'vjobs(project)', 'vjobs(ep,shot)', 'videos(ep,shot)'].map((x, i) => env.DB.prepare(`CREATE INDEX IF NOT EXISTS ix_a${i} ON ${x}`))).catch(() => { });
   schemaReady = true;
 }
 
@@ -2892,6 +2892,7 @@ async function castApi(req, env, url, body) {
           const sh = await env.DB.prepare('SELECT id,script_id,kproj FROM shots WHERE id=?').bind(+b.shot).first();
           if (!sh || !scs.some(x => +x.script_id === +sh.script_id)) return json({ error: 'ไม่พบช็อตนี้ในตอนนี้' }, 404);
           if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(sh.kproj).first()).n) return json({ ok: true, pending: true });
+          await env.DB.prepare('DELETE FROM settings WHERE key=?').bind('sbdone:' + sh.script_id).run();
           const cmd = String(b.command || '').trim(); if (cmd) await animeApi(env, { act: 'sb_edit', id: sh.id, command: cmd }); // สั่งแก้ภาพเป็นคำพูด (ไม่ใส่ = วาดใหม่ตามเดิม)
           await env.DB.batch([env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj), env.DB.prepare('DELETE FROM videos WHERE ep=? AND shot=?').bind('a' + sh.script_id, String(sh.id))]);
           await animeApi(env, { act: 'kf', script_id: sh.script_id, ids: [sh.id] });
@@ -2905,7 +2906,7 @@ async function castApi(req, env, url, body) {
             if (want !== has) stale.push(sh); } } }
         if (act === 'sb_lora') { // LoRA มาครบทีหลัง: วาดใหม่เฉพาะช็อตที่ตัวละครยังไม่ได้ใช้ LoRA ล่าสุด
           const by = {}; for (const sh of stale) (by[sh.script_id] = by[sh.script_id] || []).push(sh);
-          for (const [sid, l] of Object.entries(by)) { for (let i = 0; i < l.length; i += 20) await env.DB.batch(l.slice(i, i + 20).map(sh => env.DB.prepare("DELETE FROM jobs WHERE project=? AND status='queued'").bind(sh.kproj))); for (let i = 0; i < l.length; i += 20) await env.DB.batch(l.slice(i, i + 20).map(sh => env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj))); await animeApi(env, { act: 'kf', script_id: +sid, ids: l.map(x => x.id) }); }
+          for (const [sid, l] of Object.entries(by)) { await env.DB.prepare('DELETE FROM settings WHERE key=?').bind('sbdone:' + sid).run(); for (let i = 0; i < l.length; i += 20) await env.DB.batch(l.slice(i, i + 20).map(sh => env.DB.prepare("DELETE FROM jobs WHERE project=? AND status='queued'").bind(sh.kproj))); for (let i = 0; i < l.length; i += 20) await env.DB.batch(l.slice(i, i + 20).map(sh => env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj))); await animeApi(env, { act: 'kf', script_id: +sid, ids: l.map(x => x.id) }); }
           return json({ ok: true, redo: stale.length });
         }
         const out = []; let tot = 0, img = 0, wr = 0;

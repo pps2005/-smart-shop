@@ -90,7 +90,7 @@ async function load(){
   ST.sbs=sbs;ST.sb=sbs[g]||null;
   const idleOf=n=>sbs[n]&&sbs[n].ready&&ST.epst[n].gate==='sb'&&!sbs[n].scenes.some(x=>x.shots.some(v=>v.pending||!v.say)); /* สตอรีบอร์ดครบแล้ว รอคนกดอนุมัติ: ไม่ต้องรีเฟรชเอง */
   await autoLora();render();
-  if(Object.entries(ST.epst).some(([k,v])=>v&&(v.status==='running'||v.status==='waiting')&&!idleOf(+k)))POLL=setTimeout(load,g?25000:30000);
+  if(Object.entries(ST.epst).some(([k,v])=>v&&(v.status==='running'||v.status==='waiting')&&!idleOf(+k)))POLL=setTimeout(load,g?60000:45000);
   else if(ST.train.some(x=>x.status!=='failed')||ST.lib.some(x=>x.testing)||(!ST.onlyReady&&ST.plan&&ST.plan.roles.some(r=>live(r)&&tierOf(r)==='main'&&(!castOf(r.key)||(castOf(r.key).lora!=='ready'&&castOf(r.key).lora!=='failed')))))POLL=setTimeout(load,20000);}
 /* ตัวหลักที่ยังไม่มีตัวละคร/LoRA: ส่งสร้างให้ (บอทฝึก LoRA ต่อเองเมื่อภาพชุดฝึกครบ) */
 const LG=new Set(); // กันสั่งสร้างตัวละครซ้ำคนเดิม
