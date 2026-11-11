@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'lora-tab-4';
+const BOT_VER = 'storyboard-1';
 
 export default {
   async fetch(req, env, ctx) {
@@ -24,6 +24,12 @@ export default {
       const vid = +p.split('/')[2];
       if (!vid || url.searchParams.get('s') !== await vvSig(env, vid)) return new Response('forbidden', { status: 403 });
       return getVideo(req, env, vid);
+    }
+    if (p.startsWith('/vi/')) { // ภาพคีย์แบบมีลายเซ็น ให้เครื่อง Kaggle ดึงไปทำช็อตภาพนิ่งตอนรวมตอน
+      const iid = +p.split('/')[2];
+      if (!iid || url.searchParams.get('s') !== await vvSig(env, 'i' + iid)) return new Response('forbidden', { status: 403 });
+      const r = await env.DB.prepare('SELECT data FROM images WHERE id=?').bind(iid).first();
+      return r && r.data ? new Response(b64ToBytes(r.data), { headers: { 'content-type': 'image/jpeg' } }) : new Response('not found', { status: 404 });
     }
     if (!authOK(req, url, env)) return json({ error: 'รหัสผ่านไม่ถูกต้อง' }, 401);
     await ensureSchema(env);
@@ -482,6 +488,15 @@ async function castList(env, sr) { // บทในเรื่อง (ชื่�
   const m = new Map(rows.map(x => [x.k, x]));
   return plan.roles.map(r => { const c = m.get(r.key) || {}; return { name: r.key, desc: `${r.kind}${r.age ? ' อายุ ' + r.age : ''}: ${r.look}`.slice(0, 300), cid: c.cid || 0, lid: c.lid || 0 }; });
 }
+// ประเภทงาน: กำหนดจำนวนซีน/ช็อตต่อซีน และแนวการเล่าเรื่อง (สัดส่วนภาพ/สไตล์ตั้งจากหน้าเว็บตอนกดเลือก)
+const WORK = {
+  anime: { scenes: 3, shots: 20, beats: '5-7', note: 'งานนี้เป็นอนิเมะ: แอ็กชันและอารมณ์ชัดเจน มุมกล้องหลากหลาย มีช็อตเคลื่อนไหวเด่นๆ' },
+  film: { scenes: 3, shots: 16, beats: '5-6', note: 'งานนี้เป็นหนังสั้นโทนภาพยนตร์: จังหวะนิ่ง ช็อตกว้างสลับโคลสอัพ แสงเงาแบบหนัง เล่าด้วยภาพมากกว่าคำพูด' },
+  series: { scenes: 3, shots: 14, beats: '5-6', note: 'งานนี้เป็นซีรีส์ดราม่า: เน้นบทสนทนาและสีหน้าตัวละคร จบซีนด้วยปมให้อยากดูต่อ' },
+  ad: { scenes: 1, shots: 8, beats: '4', note: 'งานนี้เป็นโฆษณาสั้นราว 30 วินาที: เปิดด้วยภาพดึงสายตา → ปัญหาหรือความต้องการ → จุดขาย → ปิดด้วยคำชวน' }
+};
+async function workOf(env, title) { let k = ''; try { const r = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('wk:' + title).first(); k = r ? String(r.value) : ''; } catch (e) { } return { key: WORK[k] ? k : '', ...(WORK[k] || WORK.anime) }; }
+async function epstOf(env, title) { try { const r = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('epst:' + title).first(); return r ? JSON.parse(r.value) : {}; } catch (e) { return {}; } }
 async function epCheck(env, story, plan, E) {
   const rows = (await env.DB.prepare("SELECT c.cast_role k, (SELECT status FROM loras l WHERE l.char_id=c.char_id AND l.status<>'old' ORDER BY l.id DESC LIMIT 1) ls FROM aud_cands c WHERE c.cast_story=? AND c.cast_role IS NOT NULL").bind(story).all()).results;
   const cast = new Map(rows.map(x => [x.k, x.ls])), rs = (E.cast || []).map(k => plan.roles.find(x => x.key === k)).filter(r => r && r.g !== 'x' && r.tier !== 'none');
@@ -556,7 +571,8 @@ async function epStart(env, story, plan, E) { // สร้างซีรีส�
   const ex = (await env.DB.prepare('SELECT id FROM scenes WHERE series_id=? AND ep=?').bind(sr.id, E.no).all()).results;
   if (!ex.length) {
     const f = E.f || {}, mood = f['อารมณ์'] ? ` อารมณ์: ${f['อารมณ์']}` : '', rule = plan.rule ? ` (${plan.rule})` : '';
-    const sc = [
+    const W = await workOf(env, story);
+    const sc = W.scenes === 1 ? [{ title: E.title, logline: `${Object.entries(f).map(([k, v]) => k + ': ' + v).join(' · ') || E.title}${rule}` }] : [
       { title: `${E.title} · ซีน 1 เปิดเรื่อง`, logline: `${f['เรื่อง'] || f['คดี'] || E.title}${rule}${mood}` },
       { title: `${E.title} · ซีน 2 สืบสวน`, logline: `${f['คดี'] || f['เรื่อง'] || E.title}${mood}` },
       { title: `${E.title} · ซีน 3 ฉากสู้และจบตอน`, logline: `ฉากสู้: ${f['ฉากสู้'] || '-'} จบตอน: ${f['จบตอน'] || '-'}${mood}` }];
@@ -573,8 +589,8 @@ async function epWaiting(env) { // ตอนที่รอ LoRA ตัวหล
     for (const [no, v] of Object.entries(st)) {
       if (!v || v.status !== 'waiting') continue;
       const plan = await readPlan(env, story), E = plan && plan.eps.find(x => x.no === +no); if (!E) continue;
-      const ck = await epCheck(env, story, plan, E); if (ck.miss.length || ck.nol.length) continue;
-      const sid = await epStart(env, story, plan, E); st[no] = { status: 'running', series: sid, at: Date.now(), all: !!v.all }; if (v.all) await setSetting(env, 'anime_ok_' + sid, '99'); ch = true;
+      const ck = await epCheck(env, story, plan, E); if ((ck.miss.length && !v.gate) || ck.nol.length) continue; // โหมดสตอรีบอร์ด: ตัวรองไม่ต้องมีนักแสดง
+      const sid = await epStart(env, story, plan, E); st[no] = { status: 'running', series: sid, at: Date.now(), all: !!v.all, ...(v.gate ? { gate: v.gate } : {}) }; if (v.all) await setSetting(env, 'anime_ok_' + sid, '99'); ch = true;
     }
     if (ch) await setSetting(env, r.key, JSON.stringify(st));
   }
@@ -585,7 +601,8 @@ async function epWrite(env, s, e) {
   const cs = (await env.DB.prepare('SELECT name,desc FROM chars WHERE series_id=?').bind(e.series_id).all()).results.concat(await castList(env, sr));
   const pv = await env.DB.prepare('SELECT logline FROM scenes WHERE series_id=? AND no=?').bind(e.series_id, e.no - 1).first();
   const nx = await env.DB.prepare('SELECT logline FROM scenes WHERE series_id=? AND no=?').bind(e.series_id, e.no + 1).first();
-  const o0 = await llmJson(env, s, `ซีรีส์: ${sr ? sr.brief : ''}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nตอนที่ ${e.ep}/12 ซีนที่ ${e.sc}/3: ${e.title} — ${e.logline}\nซีนก่อนหน้า: ${pv ? pv.logline : '-'}\nซีนถัดไป: ${nx ? nx.logline : '-'}\nเขียนบทซีนนี้ (ยาวราว 5 นาที ตามโครงเรื่องของตอนนั้น ซีน 3 ซีนต่อเนื่องกันเป็น 1 ตอน 15 นาที) ตอบเป็น JSON object {"title":"ชื่อตอน","logline":"สรุป","beats":["เหตุการณ์ตามลำดับเวลา 6-10 ข้อ"]}`);
+  const W = await workOf(env, sr ? sr.title : '');
+  const o0 = await llmJson(env, s, `เรื่อง: ${sr ? sr.brief : ''}\n${W.note}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nตอนที่ ${e.ep} ซีนที่ ${e.sc}/${W.scenes}: ${e.title} — ${e.logline}\nซีนก่อนหน้า: ${pv ? pv.logline : '-'}\nซีนถัดไป: ${nx ? nx.logline : '-'}\nเขียนบทซีนนี้ตามโครงเรื่องของตอนนั้น (ซีนนี้จะแตกเป็นภาพราว ${W.shots} ช็อต${W.scenes > 1 ? ' และ ' + W.scenes + ' ซีนต่อเนื่องกันเป็น 1 ตอน' : ''}) ตอบเป็น JSON object {"title":"ชื่อตอน","logline":"สรุป","beats":["เหตุการณ์ตามลำดับเวลา ${W.beats} ข้อ"]}`);
   const o = Array.isArray(o0) ? o0[0] : o0;
   if (!o || !Array.isArray(o.beats) || !o.beats.length) throw new Error('เขียนบทไม่สำเร็จ ลองใหม่');
   o.title = o.title || e.title;
@@ -600,16 +617,48 @@ async function animeAdvance(env, s) {
   if (s.auto_anime === '0') return;
   await animeSchema(env);
   await epWaiting(env);
-  const e = (await env.DB.prepare('SELECT * FROM scenes WHERE auto=1 AND fin=0 ORDER BY series_id,no').all()).results.find(x => x.ep <= (+s['anime_ok_' + x.series_id] || 0) + 1); if (!e) return; // ทำทีละตอน: ตอนถัดไปเริ่มเมื่อผู้ใช้กดตรวจผ่านตอนก่อน
-  if (!e.script_id) { await epWrite(env, s, e); return; }
-  const sid = e.script_id;
-  if (e.sb >= 0) { const r = await animeApi(env, { act: 'sb_beat', script_id: sid, beat: e.sb, minutes: 5 }); await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
-  const rows = (await env.DB.prepare('SELECT id,en,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
-  const hasImg = (await env.DB.prepare('SELECT COUNT(DISTINCT project) n FROM images WHERE project LIKE ?').bind(`ฉาก${sid}·%`).first()).n;
-  if (hasImg < rows.length) { await animeApi(env, { act: 'kf', script_id: sid }); return; }
-  await animeApi(env, { act: 'vid', script_id: sid });
-  for (const [i, sh] of rows.entries()) { if (!keyShot(sh, i)) continue; const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind('a' + sid, String(sh.id)).first(); if (!v || !v.id) return; }
-  await env.DB.prepare('UPDATE scenes SET fin=1 WHERE id=?').bind(e.id).run();
+  await epAssemble(env, s).catch(() => {});
+  const list = (await env.DB.prepare('SELECT * FROM scenes WHERE auto=1 AND fin=0 ORDER BY series_id,no').all()).results.filter(x => x.ep <= (+s['anime_ok_' + x.series_id] || 0) + 1); // ทำทีละตอน: ตอนถัดไปเริ่มเมื่อผู้ใช้กดตรวจผ่านตอนก่อน
+  const meta = {};
+  for (const e of list) {
+    const m = meta[e.series_id] || (meta[e.series_id] = await (async () => { const sr = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(e.series_id).first(), t = sr ? sr.title : ''; return { W: await workOf(env, t), st: await epstOf(env, t) }; })());
+    if (!e.script_id) { await epWrite(env, s, e); return; }
+    const sid = e.script_id;
+    if (e.sb >= 0) { const r = await animeApi(env, { act: 'sb_beat', script_id: sid, beat: e.sb, shots: m.W.shots }); await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
+    const rows = (await env.DB.prepare('SELECT id,en,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
+    const hasImg = (await env.DB.prepare('SELECT COUNT(DISTINCT project) n FROM images WHERE project LIKE ?').bind(`ฉาก${sid}·%`).first()).n;
+    if (hasImg < rows.length) { const r = await animeApi(env, { act: 'kf', script_id: sid }); if (r.queued) return; continue; } // ภาพคีย์เข้าคิวครบแล้ว → ไปเตรียมซีนถัดไประหว่างรอวาด
+    if (((m.st[e.ep] || {}).gate) === 'sb') continue; // สตอรีบอร์ดซีนนี้ครบแล้ว: รอผู้ใช้กดอนุมัติก่อนทำคลิป (ระหว่างนี้ไปทำซีนถัดไปของตอนเดียวกัน)
+    const q = await animeApi(env, { act: 'vid', script_id: sid });
+    let miss = false;
+    for (const [i, sh] of rows.entries()) { if (!keyShot(sh, i)) continue; const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind('a' + sid, String(sh.id)).first(); if (!v || !v.id) { miss = true; break; } }
+    if (miss) { if (q.queued) return; continue; }
+    await env.DB.prepare('UPDATE scenes SET fin=1 WHERE id=?').bind(e.id).run(); return;
+  }
+}
+// ทุกซีนของตอนเสร็จ → เข้าคิวรวมเป็นไฟล์ตอนเดียว (ช็อตที่มีคลิปใช้คลิป ช็อตที่เหลือใช้ภาพนิ่งซูมช้า) · ทำเฉพาะตอนที่สั่งจากสตูดิโอ
+async function epAssemble(env, s) {
+  const og = s.self_url; if (!og) return;
+  const done = (await env.DB.prepare('SELECT series_id sid, ep, MIN(fin) mf FROM scenes WHERE auto=1 AND script_id>0 GROUP BY series_id, ep HAVING mf=1').all()).results;
+  for (const d of done) {
+    const key = 'E' + d.sid + 'x' + d.ep;
+    if ((await env.DB.prepare("SELECT COUNT(*) n FROM videos WHERE ep=? AND shot='final'").bind(key).first()).n) continue;
+    const vj = await env.DB.prepare("SELECT COUNT(*) n, COALESCE(SUM(status IN ('queued','running')),0) live FROM vjobs WHERE ep=? AND kind='epcat'").bind(key).first();
+    if (+vj.live || +vj.n >= 3) continue;
+    const sr = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(d.sid).first(); if (!sr) continue;
+    const st = await epstOf(env, sr.title); if (!st[d.ep] || st[d.ep].status !== 'running') continue;
+    const urls = [];
+    for (const sc of (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(d.sid, d.ep).all()).results) {
+      for (const sh of (await env.DB.prepare('SELECT id,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sc.script_id).all()).results) {
+        const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind('a' + sc.script_id, String(sh.id)).first();
+        if (v && v.id) { urls.push(og + '/vv/' + v.id + '?s=' + await vvSig(env, v.id)); continue; }
+        const im = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(sh.kproj).first();
+        if (im && im.id) urls.push(og + '/vi/' + im.id + '?s=' + await vvSig(env, 'i' + im.id));
+      }
+    }
+    if (!urls.length || urls.length > 400) continue;
+    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'final',?,'','',0,'queued',0,?,'epcat',?)").bind(('ตอน·' + sr.title + '·' + d.ep).slice(0, 60), key, JSON.stringify(urls), Date.now(), JSON.stringify({ still: 3, crf: 28, fps: 24 })).run();
+  }
 }
 async function animeApi(env, b) {
   await animeSchema(env);
@@ -656,7 +705,7 @@ async function animeApi(env, b) {
     if (bi === 0) await env.DB.batch([env.DB.prepare('DELETE FROM shots WHERE script_id=?').bind(sc.id), env.DB.prepare('DELETE FROM images WHERE project LIKE ?').bind(`ฉาก${sc.id}·%`)]);
     const sr = await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(sc.series_id).first();
     const cs = (await env.DB.prepare('SELECT name,desc FROM chars WHERE series_id=?').bind(sc.series_id).all()).results.concat(await castList(env, sr));
-    const total = 12 * Math.min(15, Math.max(1, +b.minutes || 5)), N = Math.min(10, Math.max(2, Math.ceil(total / beats.length)));
+    const total = +b.shots > 0 ? Math.min(180, +b.shots) : 12 * Math.min(15, Math.max(1, +b.minutes || 5)), N = Math.min(10, Math.max(2, Math.ceil(total / beats.length)));
     const arr = await llmJson(env, s, `ซีรีส์: ${sr ? sr.brief : ''}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nชื่อซีน: ${o.title || ''}\nเหตุการณ์ที่ ${bi + 1}/${beats.length}: ${beats[bi]}\nเขียน ${N} ช็อตต่อเนื่องของเหตุการณ์นี้ (ช็อตละราว 5 วินาที ระบุมุมกล้องและการกระทำ) ตอบเป็น JSON array ของ {"th":"คำอธิบายช็อตภาษาไทยสั้นๆ","en":"English image prompt: setting, action, camera angle (no character names, no hair/clothes details)","chars":["ชื่อตัวละครที่อยู่ในช็อต"]}`);
     const list = (Array.isArray(arr) ? arr : [arr]).slice(0, N);
     const base = (await env.DB.prepare('SELECT COUNT(*) n FROM shots WHERE script_id=?').bind(sc.id).first()).n;
@@ -1051,9 +1100,9 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p === '/k/claim') {
       // เครื่องที่ถือสคริปต์รุ่นเก่า (ไม่ส่ง v หรือ v<2) หรือเครื่องที่ติดตั้งตัวเทรนไม่ผ่านในรอบนี้ → ไม่จ่ายงานเทรน LoRA ให้ (รอเครื่องรอบใหม่)
-      const noLora = (+url.searchParams.get('v') || 0) < 2 || url.searchParams.get('nolora') === '1' ? 1 : 0;
+      const kv = +url.searchParams.get('v') || 0, noLora = kv < 2 || url.searchParams.get('nolora') === '1' ? 1 : 0, noCat = kv < 3 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -1122,7 +1171,7 @@ async function vRoutes(req, env, url, ctx) {
       const vid = v.meta.last_row_id, st = [];
       for (let i = 0, n = 0; i < buf.length; i += VCHUNK, n++)
         st.push(env.DB.prepare('INSERT INTO vchunks (vid,idx,data) VALUES (?,?,?)').bind(vid, n, bytesToB64(buf.subarray(i, i + VCHUNK))));
-      await env.DB.batch(st);
+      for (let i = 0; i < st.length; i += 8) await env.DB.batch(st.slice(i, i + 8)); // ไฟล์ตอนเต็มมีหลายก้อน: ส่งทีละ 8 ก้อน กันคำสั่งใหญ่เกิน
       await env.DB.prepare("UPDATE vjobs SET status='done', image='' WHERE id=?").bind(id).run();
       if (hid) await env.DB.prepare("UPDATE helpers SET done=done+1, seen=?, cur='' WHERE id=?").bind(Date.now(), hid).run();
       const left = await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status IN ('queued','running')").first();
@@ -1959,6 +2008,69 @@ def concat(j):
     return out, 0, W, H
 
 
+def epcat(j):
+    # รวมทั้งตอนเป็นไฟล์เดียวตามลำดับช็อต: ช็อตที่มีคลิปใช้คลิป ช็อตภาพนิ่งทำเป็นคลิปซูมช้า
+    import re
+    urls = json.loads(j.get("prompt") or "[]")
+    opt = j.get("opt") or {}
+    still, crf, fps = float(opt.get("still") or 3), int(opt.get("crf") or 28), int(opt.get("fps") or 24)
+    d = os.path.join(ROOT, "ec%s" % j["id"])
+    os.makedirs(d, exist_ok=True)
+    ff = ffmpeg_bin()
+    src = []
+    for i, u in enumerate(urls):
+        isimg = "/vi/" in u
+        f = os.path.join(d, "s%03d.%s" % (i, "jpg" if isimg else "mp4"))
+        try:
+            req = urllib.request.Request(u, headers=UA)
+            with urllib.request.urlopen(req, timeout=300) as r, open(f, "wb") as o:
+                shutil.copyfileobj(r, o)
+            src.append((f, isimg))
+        except Exception as e:
+            log("ข้ามช็อต %d (ดึงไฟล์ไม่ได้): %s" % (i + 1, str(e)[:120]))
+    if not src:
+        raise RuntimeError("ไม่มีไฟล์ให้รวม")
+    W = H = 0
+    for f, isimg in src:
+        if not isimg:
+            m = re.search(r", (\d{3,4})x(\d{3,4})", sh('"%s" -i "%s" 2>&1 | grep -m1 "Video:" || true' % (ff, f), check=False))
+            if m:
+                W, H = int(m.group(1)), int(m.group(2))
+                break
+    if not W:
+        from PIL import Image
+        W, H = Image.open(src[0][0]).size
+    k = min(1.0, 1280.0 / max(W, H))
+    W, H = int(W * k) // 2 * 2, int(H * k) // 2 * 2
+    n = max(2, int(still * fps))
+    enc = "-r %d -c:v libx264 -preset veryfast -crf %d -pix_fmt yuv420p -an" % (fps, crf)
+    parts = []
+    for i, (f, isimg) in enumerate(src):
+        o = os.path.join(d, "p%03d.mp4" % i)
+        try:
+            if isimg:
+                z = ("1+0.08*on/%d" % n) if i % 2 == 0 else ("1.08-0.08*on/%d" % n)
+                vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,zoompan=z='%s':d=%d:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=%dx%d:fps=%d,setsar=1" % (W * 2, H * 2, W * 2, H * 2, z, n, W, H, fps)
+                sh('"%s" -y -loglevel error -i "%s" -vf "%s" -frames:v %d %s "%s"' % (ff, f, vf, n, enc, o))
+            else:
+                vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,fps=%d,setsar=1" % (W, H, W, H, fps)
+                sh('"%s" -y -loglevel error -i "%s" -vf "%s" %s "%s"' % (ff, f, vf, enc, o))
+            parts.append(o)
+        except Exception as e:
+            log("ข้ามช็อต %d (แปลงไฟล์ไม่ได้): %s" % (i + 1, str(e)[-160:]))
+    if not parts:
+        raise RuntimeError("แปลงไฟล์ไม่สำเร็จสักช็อต")
+    lst = os.path.join(d, "list.txt")
+    with open(lst, "w") as o:
+        for q in parts:
+            o.write("file '%s'" % q + chr(10))
+    out = os.path.join(ROOT, "job%s.mp4" % j["id"])
+    sh('"%s" -y -loglevel error -f concat -safe 0 -i "%s" -c copy -movflags +faststart "%s"' % (ff, lst, out))
+    shutil.rmtree(d, ignore_errors=True)
+    log("รวมตอนเสร็จ %d ช็อต (%dx%d)" % (len(parts), W, H))
+    return out, 0, W, H
+
+
 # ---------- เทรน LoRA ตัวละคร (kohya sd-scripts · SDXL อนิเมะ · อัตโนมัติจากงาน kind=lora) ----------
 KV = os.path.join(ROOT, "kohya")
 
@@ -2095,6 +2207,9 @@ def prog(jid, step, total, tail):
 def work(job, port):
     if job.get("kind") == "lora":
         return train_lora(job, port)
+    if job.get("kind") == "epcat":
+        log("กำลังรวมทั้งตอน %s" % job.get("project"))
+        return epcat(job)
     if job.get("kind") == "concat":
         log("กำลังรวมคลิป %s → %s" % (job.get("project"), job.get("shot")))
         return concat(job)
@@ -2127,7 +2242,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=2" + ("&nolora=1" if M.get("nolora") else "")
+    return "/k/claim?v=3" + ("&nolora=1" if M.get("nolora") else "")
 
 
 def claim_wait(stat):
@@ -2190,7 +2305,7 @@ def main():
         log("ไม่มีงานวิดีโอในคิว ปิดเครื่องเพื่อประหยัดโควตา")
         return
     stat = {"done": 0}
-    if job.get("kind") == "concat":  # งานรวมคลิปไม่ต้องใช้ GPU
+    if job.get("kind") in ("concat", "epcat"):  # งานรวมคลิปไม่ต้องใช้ GPU
         worker(0, job, stat)
         job = J(claim_path()).get("job")
         if not job:
@@ -2593,7 +2708,7 @@ async function castApi(req, env, url, body) {
           }
           v.prog = g;
         }
-        return json({ ok: true, plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0 });
+        return json({ ok: true, plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
       }
       if (act === 'save') {
         const pl = b.plan || {}; if (!Array.isArray(pl.roles) || !Array.isArray(pl.eps) || !pl.roles.length || !pl.eps.length) return json({ error: 'โครงเรื่องไม่ครบ (ต้องมีบทและตอน)' }, 400);
@@ -2655,6 +2770,37 @@ async function castApi(req, env, url, body) {
         if (!key) return json({ error: 'ไม่พบบท' }, 400);
         m[key] = v; await setSetting(env, 'lw:' + story, JSON.stringify(m)); return json({ ok: true, w: v });
       }
+      if (act === 'setkind') { // ประเภทงาน: อนิเมะ / หนัง / ซีรีส์ / โฆษณา (มีผลกับตอนที่เริ่มทำหลังจากนี้)
+        if (!WORK[b.kind]) return json({ error: 'ไม่รู้จักประเภทงานนี้' }, 400);
+        await setSetting(env, 'wk:' + story, String(b.kind)); return json({ ok: true, kind: b.kind, scenes: WORK[b.kind].scenes, shots: WORK[b.kind].shots });
+      }
+      if (act === 'sb' || act === 'sb_redo' || act === 'sb_ok') { // สตอรีบอร์ดของตอน: ดูทุกช็อต · วาดใหม่รายช็อต · อนุมัติแล้วค่อยทำคลิปทั้งตอน
+        await animeSchema(env);
+        const st = (await rd('epst:' + story)) || {}, cur = st[+b.ep], sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first();
+        const scs = sr ? (await env.DB.prepare('SELECT id,sc,title,script_id,sb,fin FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +b.ep).all()).results : [];
+        if (act === 'sb_redo') {
+          const sh = await env.DB.prepare('SELECT id,script_id,kproj FROM shots WHERE id=?').bind(+b.shot).first();
+          if (!sh || !scs.some(x => +x.script_id === +sh.script_id)) return json({ error: 'ไม่พบช็อตนี้ในตอนนี้' }, 404);
+          if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(sh.kproj).first()).n) return json({ ok: true, pending: true });
+          const cmd = String(b.command || '').trim(); if (cmd) await animeApi(env, { act: 'sb_edit', id: sh.id, command: cmd }); // สั่งแก้ภาพเป็นคำพูด (ไม่ใส่ = วาดใหม่ตามเดิม)
+          await env.DB.batch([env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj), env.DB.prepare('DELETE FROM videos WHERE ep=? AND shot=?').bind('a' + sh.script_id, String(sh.id))]);
+          await animeApi(env, { act: 'kf', script_id: sh.script_id, ids: [sh.id] });
+          return json({ ok: true });
+        }
+        const out = []; let tot = 0, img = 0, wr = 0;
+        for (const e of scs) {
+          const x = { sc: e.sc, title: e.title, shots: [], writing: !e.script_id || +e.sb >= 0 };
+          if (e.script_id) { x.shots = (await animeApi(env, { act: 'shots', script_id: e.script_id })).shots; if (!x.writing) wr++; }
+          tot += x.shots.length; img += x.shots.filter(v => v.img).length; out.push(x);
+        }
+        const ready = scs.length > 0 && wr === scs.length && tot > 0 && img === tot;
+        if (act === 'sb_ok') {
+          if (!cur || cur.status !== 'running') return json({ error: 'ตอนนี้ยังไม่ได้เริ่มทำ' }, 400);
+          if (!ready && !b.force) return json({ error: `สตอรีบอร์ดยังวาดไม่ครบ (${img}/${tot} ภาพ) รอให้ครบก่อน` }, 400);
+          cur.gate = 'ok'; cur.okAt = Date.now(); await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true });
+        }
+        return json({ ok: true, ep: +b.ep, status: cur ? cur.status : '', gate: cur ? cur.gate || '' : '', need: (cur && cur.need) || [], ready, tot, img, scenes: out });
+      }
       const plan = await rd('plan:' + story); if (!plan) return json({ error: 'ยังไม่ได้อัปโหลดโครงเรื่องของเรื่องนี้' }, 404);
       if (act === 'setr') { // เปลี่ยนเพศ / ระดับบทของตัวละคร (ตัวหลัก = ใช้ LoRA ล็อกหน้า)
         const r = plan.roles.find(x => x.key === b.key), v = String(b.value == null ? '' : b.value);
@@ -2708,14 +2854,17 @@ async function castApi(req, env, url, body) {
         }
         return json({ ok: true, cast: done, left: plan.roles.filter(r => r.g && r.g !== 'x' && r.tier !== 'none' && !have.has(r.key) && !done.includes(r.key)).map(r => r.key), nog: plan.roles.filter(r => !r.g).map(r => r.key) });
       }
-      if (act === 'make') { // บทครบ → เริ่มทำทั้งตอนให้เอง (ถ้าตัวหลักยังไม่มี LoRA พร้อม → รอ แล้วเริ่มเองเมื่อพร้อม)
+      if (act === 'make') { // เริ่มทำตอนนี้ · sb=1: ทำถึงสตอรีบอร์ดแล้วหยุดรออนุมัติ · nolora=1: ไม่รอ/ไม่ใช้ LoRA (หน้าตัวละครจะไม่คงที่)
         const E = plan.eps.find(x => x.no === +b.ep); if (!E) return json({ error: 'ไม่มีตอนนี้' }, 404);
-        const ck = await epCheck(env, story, plan, E);
+        const ck = b.nolora ? { miss: [], nol: [] } : await epCheck(env, story, plan, E);
+        if (b.sb) ck.miss = []; // โหมดสตอรีบอร์ด: บังคับเฉพาะตัวหลักต้องมี LoRA ที่เสร็จแล้ว ตัวรองไม่ต้องมีนักแสดง
         if (ck.miss.length) return json({ error: 'ยังไม่ได้ใส่บท: ' + ck.miss.join(', '), missing: ck.miss }, 400);
-        const st = (await rd('epst:' + story)) || {};
-        if (ck.nol.length) { st[E.no] = { status: 'waiting', need: ck.nol, at: Date.now(), all: !!b.all }; await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true, waiting: ck.nol }); }
-        const sid = await epStart(env, story, plan, E); st[E.no] = { status: 'running', series: sid, at: Date.now(), all: !!b.all };
+        const st = (await rd('epst:' + story)) || {}, gate = b.sb ? { gate: 'sb' } : {};
+        if (b.sb) for (const k of Object.keys(st)) if (+k !== E.no && st[k] && st[k].status === 'waiting') delete st[k]; // ทำทีละตอน: ยกเลิกตอนอื่นที่ค้างรอจากระบบเดิม
+        if (ck.nol.length) { st[E.no] = { status: 'waiting', need: ck.nol, at: Date.now(), all: !!b.all, ...gate }; await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true, waiting: ck.nol }); }
+        const sid = await epStart(env, story, plan, E); st[E.no] = { status: 'running', series: sid, at: Date.now(), all: !!b.all, ...gate };
         if (b.all) await setSetting(env, 'anime_ok_' + sid, '99'); // ทำต่อเนื่องทุกตอน ไม่ต้องรอผู้ใช้กดผ่านตอนก่อน
+        else if (b.sb) await setSetting(env, 'anime_ok_' + sid, String(E.no - 1)); // ทำเฉพาะตอนนี้
         await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true, started: true });
       }
       if (act === 'stop') { // หยุดตอนนี้ (ของที่ทำไปแล้วยังอยู่)

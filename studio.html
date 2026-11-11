@@ -1,4 +1,4 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>สตูดิโออนิเมะ</title>
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>สตูดิโอ</title>
 <style>
 :root{color-scheme:light;--bg:#faf9fe;--fg:#1c1c24;--card:#fff;--mu:#6b6980;--ac:#7c5cff;--ac2:#ff7aa8;--ok:#1a9d5c;--warn:#c77700;--bad:#d33;--bd:#ddd9ee}
 *{box-sizing:border-box}body{margin:0;padding:14px;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom));background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans Thai",sans-serif;max-width:720px;margin:auto}
@@ -15,9 +15,13 @@ input[type=text],input[type=password]{width:100%;padding:11px;border-radius:10px
 .bar{height:8px;border-radius:6px;background:var(--bd);overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ac2),var(--ac))}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
 #toast{position:fixed;left:12px;right:12px;bottom:max(14px,env(safe-area-inset-bottom));background:#222;color:#fff;padding:12px 14px;border-radius:12px;display:none;z-index:9;font-size:14px}
+.kd{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.kd button{margin:0;padding:12px 2px;text-align:center}.kd button b{display:block;font-size:26px;line-height:1.2}
+.sbg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.sbg>div{border:1px solid var(--bd);border-radius:10px;overflow:hidden;background:#fff;display:flex;flex-direction:column}.sbg img,.sbg .ph{width:100%;display:block;background:#eeeaf8}.sbg .ph{aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;font-size:22px}
+.sbg .tx{font-size:11px;line-height:1.35;padding:4px 6px;color:var(--mu);flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.sbg button{margin:0;border:0;border-top:1px solid var(--bd);border-radius:0;font-size:13px;padding:7px 0;width:100%}
+.stp{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--ac);color:#fff;font-size:14px;margin-right:6px}
 a.btn{display:inline-block;text-decoration:none;border:1px solid var(--bd);color:var(--fg);padding:9px 13px;border-radius:10px;margin:3px 4px 3px 0}
 </style></head><body>
-<h1>🎬 สตูดิโออนิเมะ</h1><div class="mu">โยนไฟล์บท (.docx) แล้วระบบทำให้ครบทั้งเรื่อง ตัวไหนไม่แน่ใจ ระบบจะถามเป็นปุ่ม</div>
+<h1>🎬 สตูดิโอ</h1><div class="mu">เลือกประเภทงาน → ใส่บทและเลือก LoRA → ดูสตอรีบอร์ด 1 ตอนก่อน แล้วค่อยสั่งทำทั้งตอน</div>
 <div id="app"></div><div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -60,12 +64,13 @@ function parsePlan(blocks){
   eps.forEach(E=>{const tx=E.title+' '+Object.values(E.f).join(' ');E.cast=roles.filter(r=>/คู่หลัก/.test(r.kind)||tx.includes(r.key)||tx.includes(r.name)||(/^พ่อของ/.test(r.kind)&&/พ่อ(?!ค้า)/.test(tx))).map(r=>r.key);});
   return{title,overview:ov,rule:(P.find(x=>/^ทุกตอน/.test(x))||'').slice(0,400),roles,eps:eps.sort((a,b)=>a.no-b.no),locs};}
 /* ---------- สถานะ ---------- */
-const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',editBot:false,lib:[],train:[],autos:null,weights:{},testMsg:'',onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
+const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',editBot:false,lib:[],train:[],autos:null,weights:{},testMsg:'',kind:localStorage.getItem('ss_kind')||'',sb:null,selEp:0,more:false,onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
 const STY=[['rom','💗 รอมคอมใส','bright soft anime style, pastel colors, high-key lighting, delicate fine line art, expressive cute faces, soft blush, detailed hair strands, clean cel shading, romantic comedy mood'],
 ['dark','🌑 ดราม่ามืดหนัก','dark gritty anime style, desaturated cold palette, heavy shadows, strong rim light, detailed fine line art, cinematic dramatic lighting, grim tense atmosphere'],
 ['act','⚔️ แอ็กชันคมเข้ม','dynamic action anime style, bold sharp line art, high contrast, vivid saturated accents, dramatic low angle, motion energy, cinematic lighting'],
 ['cine','🎞 ซีเนม่าเหมือนจริง','cinematic semi-realistic anime style, shallow depth of field, natural lighting, detailed textures, subtle film grain'],
 ['soft','🌸 นุ่มนวลมาตรฐาน','soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading']];
+const KIND=[['anime','🎌','อนิเมะ','916',''],['film','🎬','หนัง','169','cine'],['series','📺','ซีรีส์','169',''],['ad','📣','โฆษณา','916','']];
 const ASP=[['916','📱 TikTok 9:16',768,1344],['11','⬜ จัตุรัส 1:1',1024,1024],['169','🖥 จอกว้าง 16:9',1344,768]];
 let POLL=0;
 const api=(act,o)=>botApi('/api/vcastep',{story:ST.story,act,...(o||{})});
@@ -73,13 +78,15 @@ const tierOf=r=>r.tier||(r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'
 const castOf=k=>ST.cands.find(c=>c.cast_role===k&&c.cast_story===ST.story);
 async function load(){
   clearTimeout(POLL);if(!botCfg().url||!ST.story){render();return;}
-  try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;ST.err='';}catch(e){ST.err=botErr(e);}
+  try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;if(r.kind)ST.kind=r.kind;ST.err='';}catch(e){ST.err=botErr(e);}
   const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
   if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
   try{const r=await api('lib');ST.lib=r.loras||[];ST.weights=r.weights||{};}catch(e){ST.lib=[];}
   try{const r=await api('training');ST.train=r.items||[];ST.autos=r.autos||null;}catch(e){ST.train=[];}
+  const g=sbCur();ST.sb=null;if(g&&ST.epst[g].status==='running'){try{ST.sb=await api('sb',{ep:g});}catch(e){}}
+  const idle=g&&ST.sb&&ST.sb.ready&&ST.epst[g].gate==='sb'&&!ST.sb.scenes.some(x=>x.shots.some(v=>v.pending)); /* สตอรีบอร์ดครบแล้ว รอคนกดอนุมัติ: ไม่ต้องรีเฟรชเอง */
   await autoLora();render();
-  if(Object.values(ST.epst).some(v=>v&&(v.status==='running'||v.status==='waiting')))POLL=setTimeout(load,30000);
+  if(Object.entries(ST.epst).some(([k,v])=>v&&(v.status==='running'||v.status==='waiting')&&!(idle&&+k===g)))POLL=setTimeout(load,g?20000:30000);
   else if(ST.train.some(x=>x.status!=='failed')||ST.lib.some(x=>x.testing)||(!ST.onlyReady&&ST.plan&&ST.plan.roles.some(r=>live(r)&&tierOf(r)==='main'&&(!castOf(r.key)||(castOf(r.key).lora!=='ready'&&castOf(r.key).lora!=='failed')))))POLL=setTimeout(load,20000);}
 /* ตัวหลักที่ยังไม่มีตัวละคร/LoRA: ส่งสร้างให้ (บอทฝึก LoRA ต่อเองเมื่อภาพชุดฝึกครบ) */
 const LG=new Set(); // กันสั่งสร้างตัวละครซ้ำคนเดิม
@@ -88,6 +95,19 @@ async function autoLora(){const pl=ST.plan;if(!pl||ST.onlyReady)return;
   for(const r of pl.roles){if(!live(r)||tierOf(r)!=='main')continue;const c=castOf(r.key);if(!c)continue;
     if(!+c.char_id&&c.lora!=='queued'&&c.lora!=='ready'&&!LG.has(c.id)){LG.add(c.id);try{await api('lorago',{cand:c.id});}catch(e){LG.delete(c.id);}}
     else if(+c.char_id&&c.lora==='none'&&Date.now()-(LT[c.id]||0)>60000){LT[c.id]=Date.now();try{await api('lorago',{cand:c.id});}catch(e){}}}} /* ภาพชุดฝึกพร้อมเมื่อไหร่ สตูดิโอสั่งเทรนเอง · ตัวที่เทรนพังไม่ลองเองซ้ำ ต้องกดเทรนใหม่ */
+const sbCur=()=>{const e=Object.entries(ST.epst).filter(([k,v])=>v&&v.gate&&!ST.fin[k]);return e.length?+e[0][0]:0;};
+/* ---------- ประเภทงาน + สตอรีบอร์ด 1 ตอน ---------- */
+async function setKind(k){const x=KIND.find(v=>v[0]===k);if(!x)return;ST.kind=k;localStorage.setItem('ss_kind',k);
+  if(!ST.plan){render();return;}
+  try{await api('setkind',{kind:k});const a=ASP.find(v=>v[0]===x[3]),s=STY.find(v=>v[0]===(x[4]||ST.sty))||STY[4],o={img_w:a[2],img_h:a[3]};
+    if(x[4]||!ST.sty){o.style=s[2];o.style_preset=s[0];ST.sty=s[0];localStorage.setItem('ss_sty',s[0]);}
+    await botApi('/api/settings',o);ST.asp=a[0];localStorage.setItem('ss_asp',a[0]);toast('ตั้งเป็น'+x[2]+': '+a[1]+' · สไตล์ '+s[1]);}catch(e){toast(botErr(e));}render();}
+async function startSb(no,nolora){ST.busy='กำลังเริ่มสตอรีบอร์ด…';ST.msg='';render();
+  try{const r=await api('make',{ep:no,sb:1,...(nolora?{nolora:1}:{})});toast(r.waiting?'รอ LoRA ของ '+r.waiting.join(', ')+' — เริ่มเองเมื่อพร้อม':'เริ่มแล้ว ระบบกำลังเขียนบทและวาดสตอรีบอร์ด');}catch(e){ST.msg='⚠️ '+botErr(e);}ST.busy='';await load();}
+async function sbRedo(id){const c=prompt('อยากแก้อะไรในช็อตนี้? (เว้นว่าง = วาดใหม่ตามเดิม)','');if(c===null)return;
+  try{const r=await api('sb_redo',{ep:sbCur(),shot:id,command:c});toast(r.pending?'ช็อตนี้กำลังวาดอยู่แล้ว':'สั่งวาดใหม่แล้ว รอสักครู่');}catch(e){toast(botErr(e));}await load();}
+async function sbOk(){if(!confirm('อนุมัติสตอรีบอร์ดนี้ แล้วให้ระบบทำคลิปทั้งตอน?'))return;try{await api('sb_ok',{ep:sbCur()});toast('อนุมัติแล้ว ระบบเริ่มทำทั้งตอน');}catch(e){toast(botErr(e));}await load();}
+async function sbStop(){if(!confirm('ยกเลิกตอนนี้? (ภาพที่วาดไปแล้วยังอยู่)'))return;try{await api('stop',{ep:sbCur()});toast('ยกเลิกแล้ว');}catch(e){toast(botErr(e));}await load();}
 function ep_status(no){const s=ST.epst[no];return s?s.status:'';}
 /* ---------- เริ่มทำทั้งเรื่อง ---------- */
 async function startAll(){
@@ -120,10 +140,9 @@ async function onFile(f){if(!f)return;
     if(!pl.roles.length||!pl.eps.length)throw new Error('อ่านโครงเรื่องไม่ออก ต้องมีตารางตัวละคร และหัวข้อแบบ "ตอน 1 — ชื่อตอน"');
     const name=(pl.title||f.name.replace(/\.\w+$/,'')).slice(0,60);ST.story=name;localStorage.setItem('ss_story',name);
     await botApi('/api/vcastep',{act:'save',story:name,plan:pl});ST.msg='';toast(`อ่านแล้ว ${pl.roles.length} บท · ${pl.eps.length} ตอน`);await load();
-    if(!ST.plan.roles.some(r=>!r.g&&tierOf(r)!=='none'))startAll();
+    if(ST.kind)await setKind(ST.kind);
   }catch(e){toast(botErr(e));}}
-async function setR(key,field,val){try{await api('setr',{key,field,value:val});await load();
-  const pl=ST.plan;if(pl&&!ST.busy&&!Object.keys(ST.epst).length&&!pl.roles.some(r=>!r.g&&tierOf(r)!=='none'))startAll();}catch(e){toast(botErr(e));}}
+async function setR(key,field,val){try{await api('setr',{key,field,value:val});await load();}catch(e){toast(botErr(e));}}
 async function setSty(k){const x=STY.find(v=>v[0]===k);if(!x)return;try{await botApi('/api/settings',{style:x[2],style_preset:k});ST.sty=k;localStorage.setItem('ss_sty',k);toast('ตั้งสไตล์แล้ว (มีผลกับภาพที่ทำใหม่)');render();}catch(e){toast(botErr(e));}}
 async function setAsp(k){const x=ASP.find(v=>v[0]===k);if(!x)return;try{await botApi('/api/settings',{img_w:x[2],img_h:x[3]});ST.asp=k;localStorage.setItem('ss_asp',k);toast('ตั้งสัดส่วนแล้ว (มีผลกับภาพที่ทำใหม่)');render();}catch(e){toast(botErr(e));}}
 async function runQc(){if(ST.qcBusy)return;ST.qcBusy=true;render();
@@ -142,24 +161,58 @@ function render(){const A=$('#app');
   if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button><button data-test="1">🧪 ทดสอบ</button></div>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
   if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
   if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
-  if(!pl){h+=`<div class="c"><label class="drop" id="dz"><div style="font-size:40px">📄</div>แตะเพื่อเลือก หรือลากไฟล์บท (.docx) มาวาง<input type="file" id="pf" accept=".docx" hidden></label></div>`;}
+  const kd=`<div class="c"><h2><span class="stp">1</span>ประเภทงาน</h2><div class="kd">${KIND.map(x=>`<button class="${ST.kind===x[0]?'on':''}" data-kind="${x[0]}"><b>${x[1]}</b>${x[2]}</button>`).join('')}</div>${ST.kind?'':'<div class="mu" style="margin-top:6px">แตะเลือก ระบบตั้งสัดส่วนภาพ ความยาว และจังหวะตัดให้เอง</div>'}</div>`;
+  if(!pl){h+=kd+`<div class="c"><h2><span class="stp">2</span>ใส่บท</h2><label class="drop" id="dz"><div style="font-size:40px">📄</div>แตะเพื่อเลือก หรือลากไฟล์บท (.docx) มาวาง<input type="file" id="pf" accept=".docx" hidden></label></div>`;}
   else{
-    const roles=pl.roles.filter(r=>r.g!=='x'&&tierOf(r)!=='none'||!r.g),nog=pl.roles.filter(r=>!r.g&&tierOf(r)!=='none'),started=Object.keys(ST.epst).length;
-    h+=`<div class="c"><div class="row sp"><h2>${esc(pl.title||ST.story)}</h2><label class="mu" style="cursor:pointer">📄 เปลี่ยนไฟล์<input type="file" id="pf" accept=".docx" hidden></label></div><small>${pl.eps.length} ตอน · ${pl.roles.length} บท · ${pl.locs.length} สถานที่</small></div>`;
-    h+=`<div class="c"><h2>ตัวละคร</h2>${nog.length?`<div class="warn" style="margin-bottom:6px">เลือกเพศให้ครบก่อน ระบบจะได้จับคู่นักแสดงถูกคน</div>`:''}`;
-    h+=roles.map(r=>{const t=tierOf(r),c=castOf(r.key),b=(a,v,cur,n)=>`<button class="${cur===v?'on':''}" data-r="${esc(r.key)}|${a}|${v}">${n}</button>`;
-      const lt=ST.onlyReady?(c&&c.lora==='ready'?'<span class="ok">🧬 LoRA พร้อม</span>':t==='main'?'<span class="warn">ยังไม่ได้เลือก LoRA</span> <button class="sm" data-tab="lora">เลือก</button>':'<span class="mu">ไม่ใช้ LoRA</span>'):c?(c.lora==='ready'?'<span class="ok">🧬 LoRA พร้อม</span>':c.lora==='queued'?'<span class="warn">⏳ กำลังฝึก LoRA</span>':t==='main'?(c.lora==='failed'?'<span class="bad">❌ LoRA ล้มเหลว</span> <button class="sm" data-retry="'+c.id+'">🔁 ลองใหม่</button>'+(c.lora_err?'<div class="bad" style="font-size:12px;word-break:break-all;white-space:pre-wrap">'+esc(c.lora_err)+'</div>':''):'<span class="warn">รอสร้าง LoRA</span>'):'<span class="mu">ไม่ใช้ LoRA</span>'):'';
-      return `<div class="it"><div class="row sp"><span class="row" style="flex-wrap:nowrap;gap:10px">${c&&c.face?`<img src="${esc(botU('/img/'+c.face))}" loading="lazy" style="width:56px;height:56px;border-radius:12px;object-fit:cover;object-position:top;border:1px solid var(--bd)">`:''}<b>${esc(r.key)}</b></span><span class="mu">${esc(r.kind)}${r.age?' · '+r.age+' ปี':''}</span></div>
+    const roles=pl.roles.filter(r=>r.g!=='x'&&tierOf(r)!=='none'||!r.g),nog=pl.roles.filter(r=>!r.g&&tierOf(r)!=='none'),started=Object.keys(ST.epst).length,lib=ST.lib;
+    h+=kd;
+    h+=`<div class="c"><div class="row sp"><h2><span class="stp">2</span>บทและตัวละคร</h2><label class="mu" style="cursor:pointer">📄 เปลี่ยนไฟล์<input type="file" id="pf" accept=".docx" hidden></label></div><div><b>${esc(pl.title||ST.story)}</b> <small>· ${pl.eps.length} ตอน</small></div>
+      ${nog.length?`<div class="warn" style="margin-top:6px">เลือกเพศให้ครบก่อน</div>`:''}${lib.length?'':'<div class="warn" style="margin-top:6px">ยังไม่มี LoRA ที่เทรนเสร็จ — เสร็จเมื่อไหร่จะขึ้นให้เลือกตรงนี้เอง <button class="sm" data-tab="lora">ดูสถานะ</button></div>'}`;
+    h+=roles.map(r=>{const t=tierOf(r),c=castOf(r.key),cur=c?(lib.find(x=>x.cand===c.id)||{}).lid||0:0,b=(a,v,cv,n)=>`<button class="sm ${cv===v?'on':''}" data-r="${esc(r.key)}|${a}|${v}">${n}</button>`;
+      return `<div class="it"><div class="row sp"><span class="row" style="flex-wrap:nowrap;gap:10px">${c&&c.face?`<img src="${esc(botU('/img/'+c.face))}" loading="lazy" style="width:44px;height:44px;border-radius:10px;object-fit:cover;object-position:top;border:1px solid var(--bd)">`:''}<b>${esc(r.key)}</b></span><span class="mu">${t==='main'?'ตัวหลัก':esc(r.kind)}</span></div>
         ${!r.g?`<div class="row">${b('g','f',r.g,'👩 หญิง')}${b('g','m',r.g,'👨 ชาย')}${b('g','x',r.g,'🐾 ไม่ใช่คน')}</div>`
-        :`<div class="row">${b('t','main',t,'🧬 ตัวหลัก')}${b('t','support',t,'👤 ตัวรอง')}${b('t','none',t,'⛔ ไม่ใช้')}</div><div class="mu">${c?'นักแสดง: <b>'+esc(c.name)+'</b> '+lt:'ยังไม่มีนักแสดง (ระบบเลือกให้ตอนเริ่ม)'}</div>`}</div>`;}).join('')+'</div>';
+        :(lib.length?`<select data-lp="${esc(r.key)}" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin-top:4px;background:#fff;color:var(--fg)"><option value="0">${t==='main'?'— เลือก LoRA —':'— ไม่ใช้ LoRA —'}</option>${lib.map(x=>{const other=x.cast_role&&x.cast_story&&x.cast_story!==ST.story,took=x.cast_role&&x.cast_story===ST.story&&x.cast_role!==r.key;return `<option value="${x.lid}" ${+cur===+x.lid?'selected':''} ${other?'disabled':''}>🧬 ${esc(x.name)}${other?' (ใช้เรื่องอื่นอยู่)':took?' (ย้ายจากบท '+esc(x.cast_role)+')':''}</option>`;}).join('')}</select>`:'')
+         +(ST.more?`<div class="row" style="margin-top:4px">${b('t','main',t,'🧬 ตัวหลัก')}${b('t','support',t,'👤 ตัวรอง')}${b('t','none',t,'⛔ ไม่ใช้')}</div>`:'')}</div>`;}).join('')+'</div>';
+    /* ---- 3 · สตอรีบอร์ด ---- */
+    const g=sbCur(),cur=g?ST.epst[g]:null,E=g?pl.eps.find(x=>x.no===g):null,fn=(pl.title||'video').slice(0,30);
+    const doneEps=pl.eps.filter(x=>ST.fin[x.no]&&ST.epst[x.no]&&ST.epst[x.no].gate);
+    h+=`<div class="c"><h2><span class="stp">3</span>สตอรีบอร์ด${E?' · ตอน '+E.no:''}</h2>`;
+    if(ST.busy)h+=`<div class="mu">⏳ ${esc(ST.busy)}</div>`;
+    else if(!g){
+      const no=pl.eps.some(x=>x.no===ST.selEp)?ST.selEp:(pl.eps.find(x=>!ST.fin[x.no])||pl.eps[0]).no,Ex=pl.eps.find(x=>x.no===no);
+      const need=(Ex.cast||[]).map(k=>pl.roles.find(r=>r.key===k)).filter(r=>r&&live(r)&&tierOf(r)==='main'&&!(castOf(r.key)&&castOf(r.key).lora==='ready')).map(r=>r.key),dis=nog.length||!ST.kind?' disabled':'';
+      h+=doneEps.map(x=>`<div class="it"><div class="row sp"><b>ตอน ${x.no} · ${esc(x.title)}</b><span class="ok">✅ เสร็จ</span></div><button class="sm" data-dl="${ST.fin[x.no]}|${esc(fn)}-ep${x.no}.mp4">⬇ ดาวน์โหลด</button><a class="btn sm" href="${esc(botU('/vid/'+ST.fin[x.no]))}" target="_blank">▶ ดู</a></div>`).join('');
+      h+=`<div class="mu">ระบบเขียนบทของตอน แตกเป็นช็อต แล้ววาดภาพทุกช็อตมาให้ดูก่อน ยังไม่ทำคลิปจนกว่าจะกดอนุมัติ</div>`;
+      if(pl.eps.length>1)h+=`<select id="sbep" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin:8px 0;background:#fff;color:var(--fg)">${pl.eps.map(x=>`<option value="${x.no}" ${x.no===no?'selected':''}>ตอน ${x.no} · ${esc(x.title)}${ST.fin[x.no]?' ✅':''}</option>`).join('')}</select>`;
+      if(!ST.kind)h+=`<div class="warn">เลือกประเภทงานที่ข้อ 1 ก่อน</div>`;
+      if(need.length)h+=`<div class="warn" style="margin:6px 0">ตัวหลักที่ยังไม่มี LoRA: ${esc(need.join(', '))}</div><button class="go" data-sb="${no}|1"${dis}>🎨 ทำสตอรีบอร์ดเลย (ไม่ใช้ LoRA)</button><div class="mu" style="margin:4px 0 8px">หน้าตัวละครจะไม่คงที่ทุกช็อต</div><button data-sb="${no}|0"${dis} style="width:100%">⏳ รอ LoRA เสร็จ แล้วเริ่มให้เอง</button>`;
+      else h+=`<button class="go" data-sb="${no}|0"${dis} style="margin-top:6px">🎨 ทำสตอรีบอร์ด ตอน ${no}</button>`;
+    }else if(cur.status==='waiting'){
+      h+=`<div class="warn">⏳ รอ LoRA ของ ${esc((cur.need||[]).join(', '))} — เทรนเสร็จเมื่อไหร่ระบบเริ่มให้เอง</div><div style="margin-top:8px"><button data-sb="${g}|1">ทำเลยโดยไม่ใช้ LoRA</button><button data-a="sbstop">ยกเลิก</button></div>`;
+    }else{
+      const sb=ST.sb,ok=cur.gate==='ok',sc=ST.scn.filter(x=>+x.ep===g),tot=sc.reduce((n,x)=>n+(+x.tot||0),0),vid=sc.reduce((n,x)=>n+(+x.vid||0),0);
+      if(!sb)h+=`<div class="mu">⏳ กำลังโหลดสตอรีบอร์ด…</div>`;
+      else{
+        const wr=sb.scenes.some(x=>x.writing)||!sb.scenes.length,pct=sb.tot?Math.round(sb.img/sb.tot*100):0;
+        if(ok)h+=`<div class="ok">✅ อนุมัติแล้ว — กำลังทำคลิปและรวมเป็นตอน</div><div class="mu">ซีนเสร็จ ${sc.filter(x=>+x.fin).length}/${sc.length||sb.scenes.length} · คลิป ${vid} ช็อต (ช็อตที่เหลือใช้ภาพนิ่งซูมช้า) · ปิดหน้านี้ได้ ระบบทำต่อเอง</div>`;
+        else if(sb.ready)h+=`<div class="ok">ภาพครบ ${sb.tot} ช็อตแล้ว ดูด้านล่าง ช็อตไหนไม่ชอบกด 🔄</div><button class="go" data-a="sbok" style="margin:8px 0">✅ อนุมัติ ทำทั้งตอน</button>`;
+        else h+=`<div class="mu">${wr?'✍️ กำลังเขียนบทและแตกช็อต':'🎨 กำลังวาด'} · ภาพ ${sb.img}/${sb.tot||'?'} · ปิดหน้านี้ได้ ระบบทำต่อเอง</div><div class="bar"><i style="width:${pct}%"></i></div>`;
+        h+=sb.scenes.map(S=>`<div class="mu" style="margin-top:12px"><b>ซีน ${S.sc}</b> · ${esc(S.title||'')}${S.writing?' · กำลังเขียน…':''}</div><div class="sbg">${S.shots.map(v=>`<div>${v.img?`<a href="${esc(botU('/img/'+v.img))}" target="_blank"><img src="${esc(botU('/img/'+v.img))}" loading="lazy"></a>`:`<div class="ph">⏳</div>`}<div class="tx"><b>${v.idx+1}</b> ${esc(v.th||v.beat||'')}</div>${ok?'':`<button data-redo="${v.id}"${v.pending?' disabled':''}>${v.pending?'⏳ กำลังวาด':'🔄 วาดใหม่'}</button>`}</div>`).join('')}</div>`).join('');
+        if(!ok&&sb.ready&&sb.tot>9)h+=`<button class="go" data-a="sbok" style="margin-top:12px">✅ อนุมัติ ทำทั้งตอน</button>`;
+      }
+      h+=`<div style="margin-top:10px"><button data-a="sbstop">⏹ ${ok?'หยุดตอนนี้':'ยกเลิกตอนนี้'}</button></div>`;
+    }
+    h+=`</div>`;
+    if(ST.msg)h+=`<div class="c" style="white-space:pre-wrap">${esc(ST.msg)}</div>`;
+    h+=`<button data-a="more" style="width:100%">${ST.more?'▲ ซ่อน':'⚙️ เพิ่มเติม'}</button>`;
+    if(ST.more){
     h+=`<div class="c"><h2>🎨 สไตล์และสัดส่วนภาพ</h2><div class="mu">สไตล์</div><div class="row">${STY.map(x=>`<button class="${ST.sty===x[0]?'on':''}" data-sty="${x[0]}">${x[1]}</button>`).join('')}</div><div class="mu" style="margin-top:8px">สัดส่วนภาพ (ลง TikTok เลือก 9:16)</div><div class="row">${ASP.map(x=>`<button class="${ST.asp===x[0]?'on':''}" data-asp="${x[0]}">${x[1]}</button>`).join('')}</div><div class="mu" style="margin-top:6px">มีผลกับภาพที่สร้างใหม่หลังจากนี้ ภาพที่ทำไปแล้วไม่เปลี่ยน</div></div>`;
     if(pl.locs.length)h+=`<div class="c"><h2>📍 สถานที่ (${pl.locs.length})</h2>${pl.locs.map(L=>`<div class="it"><div class="row sp"><b>${esc(L.name)}</b><span class="mu">${L.eps[0]===0?'ทุกตอน':L.eps.length?'ตอน '+L.eps.join(', '):''}</span></div>${L.note?`<div class="mu">${esc(L.note)}</div>`:''}</div>`).join('')}</div>`;
-    if(!started)h+=`<div class="c"><h2>🎞 เนื้อเรื่องรายตอน</h2>${pl.eps.map(E=>`<div class="it"><b>ตอน ${E.no} · ${esc(E.title)}</b><div class="mu">${esc(E.f['เรื่อง']||E.f['คดี']||'')}</div>${E.f['ฉากสู้']?`<div class="mu">⚔️ ${esc(E.f['ฉากสู้'])}</div>`:''}${E.cast.length?`<div class="mu">🎭 ${esc(E.cast.join(', '))}</div>`:''}</div>`).join('')}</div>`;
-    if(ST.msg)h+=`<div class="c" style="white-space:pre-wrap">${esc(ST.msg)}</div>`;
-    h+=`<div class="c">${ST.busy?`<div class="mu">⏳ ${esc(ST.busy)}</div>`:started
-      ?`<h2>ความคืบหน้า</h2>${epList(pl)}<div style="margin-top:8px"><button data-a="stop">⏹ หยุดทั้งหมด</button><button data-a="go">🔁 สั่งเริ่มตอนที่ยังไม่ได้เริ่มอีกครั้ง</button></div>`
-      :`<button class="go" data-a="go"${nog.length?' disabled':''}>🚀 สร้างอนิเมะทั้งเรื่อง (${pl.eps.length} ตอน)</button><div class="mu" style="margin-top:6px">ระบบเลือกนักแสดง → ฝึก LoRA ตัวหลัก → ทำทุกตอนต่อเนื่อง ไม่ต้องรอตรวจ</div>`}</div>`;}
-  if(pl&&Object.keys(ST.epst).length){const q=ST.qc,sug=bestEp(),pick=ST.best;
+    h+=`<div class="c"><h2>🎞 เนื้อเรื่องรายตอน</h2>${pl.eps.map(E=>`<div class="it"><b>ตอน ${E.no} · ${esc(E.title)}</b><div class="mu">${esc(E.f['เรื่อง']||E.f['คดี']||'')}</div>${E.f['ฉากสู้']?`<div class="mu">⚔️ ${esc(E.f['ฉากสู้'])}</div>`:''}${E.cast.length?`<div class="mu">🎭 ${esc(E.cast.join(', '))}</div>`:''}</div>`).join('')}</div>`;
+
+    h+=`<div class="c"><h2>🚀 ทำทั้งเรื่องต่อเนื่อง</h2><div class="mu">แบบเดิม: ทำทุกตอนติดกันโดยไม่หยุดให้ดูสตอรีบอร์ด</div>${started?`${epList(pl)}<div style="margin-top:8px"><button data-a="stop">⏹ หยุดทั้งหมด</button><button data-a="go">🔁 สั่งเริ่มตอนที่ยังไม่ได้เริ่ม</button></div>`:`<button data-a="go"${nog.length?' disabled':''} style="margin-top:8px">🚀 เริ่มทำทั้งเรื่อง (${pl.eps.length} ตอน)</button>`}</div>`;
+    }}
+  if(pl&&ST.more&&Object.keys(ST.epst).length){const q=ST.qc,sug=bestEp(),pick=ST.best;
     h+=`<div class="c"><h2>🔍 ตรวจและแก้ซีนอัตโนมัติ</h2><div class="mu">ระบบดูภาพทุกช็อต ถ้าเจอภาพเสีย (มือ/หน้าเพี้ยน ภาพว่าง) จะลบแล้ววาดใหม่เองสูงสุด 2 รอบ แล้วรวมซีนใหม่</div>
       <button class="on" data-a="qc"${ST.qcBusy?' disabled':''} style="margin-top:8px">${ST.qcBusy?'⏳ กำลังตรวจ…':'🔍 ตรวจและแก้ตอนนี้'}</button>
       ${q&&q.vision===false?'<div class="warn" style="margin-top:6px">AI ดูภาพไม่ได้ตอนนี้ ระบบตรวจแค่ภาพว่าง/เสีย ยังไม่ตรวจมือหรือหน้าเพี้ยน</div>':''}
@@ -179,7 +232,12 @@ function render(){const A=$('#app');
   A.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const [k,f,v]=b.dataset.r.split('|');setR(k,f==='g'?'g':'tier',v);});
   A.querySelectorAll('[data-retry]').forEach(b=>b.onclick=async()=>{b.disabled=true;LG.delete(b.dataset.retry);try{await api('lorago',{cand:b.dataset.retry});toast('สั่งสร้าง LoRA ใหม่แล้ว');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-ep]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('make',{ep:+b.dataset.ep,all:true});toast(r.waiting?'ตอนนี้รอ LoRA '+r.waiting.join(', '):'เริ่มทำตอน '+b.dataset.ep+' แล้ว');}catch(e){toast(botErr(e));}await load();});
-  A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>b.dataset.a==='stop'?stopAll():b.dataset.a==='qc'?runQc():startAll());}
+  A.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>setKind(b.dataset.kind));
+  A.querySelectorAll('[data-sb]').forEach(b=>b.onclick=()=>{const [n,nl]=b.dataset.sb.split('|');startSb(+n,nl==='1');});
+  A.querySelectorAll('[data-redo]').forEach(b=>b.onclick=()=>sbRedo(+b.dataset.redo));
+  const se=$('#sbep');if(se)se.onchange=()=>{ST.selEp=+se.value;render();};
+  A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='more'){ST.more=!ST.more;render();}else if(a==='sbok')sbOk();else if(a==='sbstop')sbStop();else if(a==='stop')stopAll();else if(a==='qc')runQc();else startAll();});}
 /* ---------- แถบ LoRA: เลือกเฉพาะ LoRA ที่เทรนเสร็จแล้วมาใช้ในบท ---------- */
 function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ST.tab=b.dataset.tab;render();window.scrollTo(0,0);});
   A.querySelectorAll('[data-bot]').forEach(b=>b.onclick=()=>{ST.editBot=true;render();window.scrollTo(0,0);});
