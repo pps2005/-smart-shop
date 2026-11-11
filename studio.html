@@ -1,15 +1,15 @@
 <!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>สตูดิโออนิเมะ</title>
 <style>
-:root{--bg:#fff;--fg:#1c1c24;--card:#f4f3f9;--mu:#7a7890;--ac:#7c5cff;--ac2:#ff7aa8;--ok:#1a9d5c;--warn:#e08a00;--bad:#d33;--bd:#8883}
-@media(prefers-color-scheme:dark){:root{--bg:#15151c;--fg:#eeeef5;--card:#22222c;--mu:#9a98b0}}
+:root{color-scheme:light;--bg:#faf9fe;--fg:#1c1c24;--card:#fff;--mu:#6b6980;--ac:#7c5cff;--ac2:#ff7aa8;--ok:#1a9d5c;--warn:#c77700;--bad:#d33;--bd:#ddd9ee}
 *{box-sizing:border-box}body{margin:0;padding:14px;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom));background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans Thai",sans-serif;max-width:720px;margin:auto}
 h1{font-size:22px;margin:4px 0}h2{font-size:17px;margin:0 0 6px}small,.mu{color:var(--mu);font-size:13px}
-.c{background:var(--card);border-radius:14px;padding:14px;margin:12px 0}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:12px 0;box-shadow:0 1px 6px #7c5cff12}
 button{font:inherit;border:1px solid var(--bd);background:transparent;color:var(--fg);padding:9px 13px;border-radius:10px;margin:3px 4px 3px 0}
 button.on{background:var(--ac);border-color:var(--ac);color:#fff}button:disabled{opacity:.45}
 button.go{width:100%;padding:16px;font-size:17px;font-weight:600;border:0;color:#fff;background:linear-gradient(135deg,var(--ac2),var(--ac))}
-input[type=text],input[type=password]{width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);font:inherit;margin:4px 0}
-.drop{border:2px dashed var(--ac);border-radius:16px;padding:34px 14px;text-align:center;font-size:17px}.drop.over{background:#7c5cff22}
+input[type=text],input[type=password]{width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);background:#fff;color:var(--fg);font:inherit;margin:4px 0}
+.drop{border:2px dashed var(--ac);border-radius:16px;padding:34px 14px;text-align:center;font-size:17px}.drop.over{background:#7c5cff1a}
+.sm{font-size:13px;padding:5px 10px}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.sp{justify-content:space-between}
 .it{padding:10px 0;border-top:1px solid var(--bd)}.it:first-child{border-top:0}
 .bar{height:8px;border-radius:6px;background:var(--bd);overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ac2),var(--ac))}
@@ -111,10 +111,12 @@ function render(){const A=$('#app');
     h+=`<div class="c"><div class="row sp"><h2>${esc(pl.title||ST.story)}</h2><label class="mu" style="cursor:pointer">📄 เปลี่ยนไฟล์<input type="file" id="pf" accept=".docx" hidden></label></div><small>${pl.eps.length} ตอน · ${pl.roles.length} บท · ${pl.locs.length} สถานที่</small></div>`;
     h+=`<div class="c"><h2>ตัวละคร</h2>${nog.length?`<div class="warn" style="margin-bottom:6px">เลือกเพศให้ครบก่อน ระบบจะได้จับคู่นักแสดงถูกคน</div>`:''}`;
     h+=roles.map(r=>{const t=tierOf(r),c=castOf(r.key),b=(a,v,cur,n)=>`<button class="${cur===v?'on':''}" data-r="${esc(r.key)}|${a}|${v}">${n}</button>`;
-      const lt=c?(c.lora==='ready'?'<span class="ok">🧬 LoRA พร้อม</span>':c.lora==='queued'?'<span class="warn">⏳ กำลังฝึก LoRA</span>':t==='main'?(c.lora==='failed'?'<span class="bad">❌ LoRA ล้มเหลว</span>':'<span class="warn">รอสร้าง LoRA</span>'):'<span class="mu">ไม่ใช้ LoRA</span>'):'';
+      const lt=c?(c.lora==='ready'?'<span class="ok">🧬 LoRA พร้อม</span>':c.lora==='queued'?'<span class="warn">⏳ กำลังฝึก LoRA</span>':t==='main'?(c.lora==='failed'?'<span class="bad">❌ LoRA ล้มเหลว</span> <button class="sm" data-retry="'+c.id+'">🔁 ลองใหม่</button>':'<span class="warn">รอสร้าง LoRA</span>'):'<span class="mu">ไม่ใช้ LoRA</span>'):'';
       return `<div class="it"><div class="row sp"><b>${esc(r.key)}</b><span class="mu">${esc(r.kind)}${r.age?' · '+r.age+' ปี':''}</span></div>
         ${!r.g?`<div class="row">${b('g','f',r.g,'👩 หญิง')}${b('g','m',r.g,'👨 ชาย')}${b('g','x',r.g,'🐾 ไม่ใช่คน')}</div>`
         :`<div class="row">${b('t','main',t,'🧬 ตัวหลัก')}${b('t','support',t,'👤 ตัวรอง')}${b('t','none',t,'⛔ ไม่ใช้')}</div><div class="mu">${c?'นักแสดง: <b>'+esc(c.name)+'</b> '+lt:'ยังไม่มีนักแสดง (ระบบเลือกให้ตอนเริ่ม)'}</div>`}</div>`;}).join('')+'</div>';
+    if(pl.locs.length)h+=`<div class="c"><h2>📍 สถานที่ (${pl.locs.length})</h2>${pl.locs.map(L=>`<div class="it"><div class="row sp"><b>${esc(L.name)}</b><span class="mu">${L.eps[0]===0?'ทุกตอน':L.eps.length?'ตอน '+L.eps.join(', '):''}</span></div>${L.note?`<div class="mu">${esc(L.note)}</div>`:''}</div>`).join('')}</div>`;
+    if(!started)h+=`<div class="c"><h2>🎞 เนื้อเรื่องรายตอน</h2>${pl.eps.map(E=>`<div class="it"><b>ตอน ${E.no} · ${esc(E.title)}</b><div class="mu">${esc(E.f['เรื่อง']||E.f['คดี']||'')}</div>${E.f['ฉากสู้']?`<div class="mu">⚔️ ${esc(E.f['ฉากสู้'])}</div>`:''}${E.cast.length?`<div class="mu">🎭 ${esc(E.cast.join(', '))}</div>`:''}</div>`).join('')}</div>`;
     if(ST.msg)h+=`<div class="c" style="white-space:pre-wrap">${esc(ST.msg)}</div>`;
     h+=`<div class="c">${ST.busy?`<div class="mu">⏳ ${esc(ST.busy)}</div>`:started
       ?`<h2>ความคืบหน้า</h2>${epList(pl)}<div style="margin-top:8px"><button data-a="stop">⏹ หยุดทั้งหมด</button><button data-a="go">🔁 สั่งเริ่มตอนที่ยังไม่ได้เริ่มอีกครั้ง</button></div>`
@@ -123,9 +125,11 @@ function render(){const A=$('#app');
   const pf=$('#pf');if(pf)pf.onchange=e=>{const f=e.target.files[0];e.target.value='';onFile(f);};
   const dz=$('#dz');if(dz){dz.ondragover=e=>{e.preventDefault();dz.classList.add('over');};dz.ondragleave=()=>dz.classList.remove('over');dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');onFile(e.dataTransfer.files[0]);};}
   A.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const [k,f,v]=b.dataset.r.split('|');setR(k,f==='g'?'g':'tier',v);});
+  A.querySelectorAll('[data-retry]').forEach(b=>b.onclick=async()=>{b.disabled=true;LG.delete(b.dataset.retry);try{await api('lorago',{cand:b.dataset.retry});toast('สั่งสร้าง LoRA ใหม่แล้ว');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-ep]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('make',{ep:+b.dataset.ep,all:true});toast(r.waiting?'ตอนนี้รอ LoRA '+r.waiting.join(', '):'เริ่มทำตอน '+b.dataset.ep+' แล้ว');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>b.dataset.a==='stop'?stopAll():startAll());}
 function epList(pl){return pl.eps.map(E=>{const s=ST.epst[E.no],sc=ST.scn.filter(x=>+x.ep===E.no),fin=ST.fin[E.no],tot=sc.reduce((n,x)=>n+(+x.tot||0),0),vid=sc.reduce((n,x)=>n+(+x.vid||0),0),img=sc.reduce((n,x)=>n+(+x.img||0),0),done=sc.filter(x=>+x.fin).length;
-    const st=fin?'<span class="ok">✅ เสร็จ</span>':!s?'<span class="mu">ยังไม่เริ่ม</span>':s.status==='waiting'?`<span class="warn">⏳ รอ LoRA ${esc((s.need||[]).join(', '))}</span>`:`<span class="warn">🎬 กำลังทำ</span>`;
+    const st=fin?'<span class="ok">✅ เสร็จ</span>':!s?`<span class="mu">ยังไม่เริ่ม</span> <button class="sm" data-ep="${E.no}">▶ ทำตอนนี้</button>`:s.status==='waiting'?`<span class="warn">⏳ รอ LoRA ${esc((s.need||[]).join(', '))}</span>`:`<span class="warn">🎬 กำลังทำ</span>`;
     const pct=tot?Math.round((img+vid)/(tot*2)*100):0;
     return `<div class="it"><div class="row sp"><b>ตอน ${E.no} · ${esc(E.title)}</b>${st}</div>${s&&s.status==='running'&&!fin?`<div class="mu">ซีนเสร็จ ${done}/${sc.length||3} · ภาพ ${img}/${tot} · วิดีโอ ${vid}/${tot}</div><div class="bar"><i style="width:${pct}%"></i></div>`:''}
       ${fin?`<a class="btn" href="${esc(botU('/vid/'+fin))}" target="_blank">▶ ดูตอนนี้</a>`:sc.filter(x=>+x.final).map(x=>`<a class="btn" href="${esc(botU('/vid/'+x.final))}" target="_blank">▶ ซีน ${x.sc}</a>`).join('')}</div>`;}).join('');}
