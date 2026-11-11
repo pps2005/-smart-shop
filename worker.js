@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'storyboard-5';
+const BOT_VER = 'lora-store-1';
 
 export default {
   async fetch(req, env, ctx) {
@@ -83,6 +83,25 @@ export default {
 // ---------- ซ่อมงานที่พังอัตโนมัติ ----------
 // งานวิดีโอ/เสียงที่พัง: รอ 2 ชม. (เผื่อแก้โค้ดหรือเครื่องว่าง) แล้วส่งกลับเข้าคิวเอง สูงสุด 6 ครั้ง
 // ภาพที่พัง (ไม่ใช่เพราะโควตา): ลองใหม่เองสูงสุด 2 รอบ
+// ที่เก็บไฟล์ LoRA: Supabase Storage (ฟรี 1 GB) — D1 เล็กเกินจะเก็บไฟล์ LoRA · ตั้งค่า supa_url / supa_key / supa_dir ใน settings
+async function supa(s, method, name, body) {
+  const u = String(s.supa_url || '').replace(/\/+$/, ''), k = s.supa_key, d = s.supa_dir; if (!u || !k || !d) return null;
+  const h = { apikey: k, authorization: 'Bearer ' + k };
+  if (body != null) { h['content-type'] = 'application/octet-stream'; h['x-upsert'] = 'true'; }
+  return fetch(`${u}/storage/v1/object/loras/${d}/${name}`, { method, headers: h, body: body == null ? undefined : body });
+}
+async function supaDelLora(env, lid) { try { const s = await getSettings(env), n = +String(s['lparts:' + lid] || '').split(',')[0] || 0; for (let i = 0; i < n; i++) await supa(s, 'DELETE', `l${lid}_${i}`); if (n) await env.DB.prepare('DELETE FROM settings WHERE key=?').bind('lparts:' + lid).run(); } catch (e) { } }
+async function supaSelfTest(env, s) { // ทดสอบที่เก็บไฟล์: เขียน → เขียนทับ → อ่าน → ลบ (สั่งด้วย settings supa_test=1)
+  let out = '';
+  try {
+    const b = new Uint8Array(300000); for (let i = 0; i < b.length; i++) b[i] = (i * 31 + 7) & 255;
+    const a = await supa(s, 'POST', 'selftest_0', b); if (!a) throw new Error('ยังไม่ได้ตั้งค่า'); out += 'put ' + a.status; if (!a.ok) out += ' ' + (await a.text()).slice(0, 150);
+    const a2 = await supa(s, 'POST', 'selftest_0', b); out += ' · put2 ' + a2.status;
+    const g = await supa(s, 'GET', 'selftest_0'), gb = new Uint8Array(await g.arrayBuffer()); out += ' · get ' + g.status + ' ' + gb.length + (gb.length === b.length && gb[12345] === b[12345] ? ' same' : ' DIFF');
+    const d = await supa(s, 'DELETE', 'selftest_0'); out += ' · del ' + d.status;
+  } catch (e) { out += ' · error ' + String(e.message || e).slice(0, 200); }
+  await setSetting(env, 'supa_test', out);
+}
 async function autoHeal(env) {
   const s = await getSettings(env), now = Date.now();
   if (now - (+s.heal_last || 0) < 30 * 60000) return;
@@ -311,7 +330,7 @@ async function audApi(env, b) {
         const ch = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+c.char_id).first();
         if (ch) {
           const ls = (await env.DB.prepare('SELECT id FROM loras WHERE char_id=?').bind(ch.id).all()).results, pj = charProj(ch);
-          for (const l of ls) st.push(env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id));
+          for (const l of ls) { st.push(env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id)); await supaDelLora(env, l.id); }
           st.push(env.DB.prepare('DELETE FROM loras WHERE char_id=?').bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND project=?").bind(pj), env.DB.prepare("DELETE FROM jobs WHERE project=? AND status<>'running'").bind(pj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(ch.id));
         }
       }
@@ -326,6 +345,7 @@ async function audApi(env, b) {
     const c = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!c) return { error: 'ไม่พบตัวละคร' };
     if (await charBusy(env, c.id)) return { error: 'กำลังรอ/เทรนอยู่ รอให้เสร็จก่อนค่อยลบ' };
     const ls = (await env.DB.prepare('SELECT id FROM loras WHERE char_id=?').bind(c.id).all()).results, pj = charProj(c);
+    for (const l of ls) await supaDelLora(env, l.id);
     await env.DB.batch([...ls.map(l => env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id)), env.DB.prepare('DELETE FROM loras WHERE char_id=?').bind(c.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND project=?").bind(pj), env.DB.prepare("DELETE FROM jobs WHERE project=? AND status='queued'").bind(pj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare('UPDATE aud_cands SET char_id=0 WHERE char_id=?').bind(c.id), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(c.id)]);
     return { ok: true };
   }
@@ -888,6 +908,7 @@ async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
   await animeAuto(env, s).catch(() => {});
+  if (s.supa_test === '1') await supaSelfTest(env, s);
   await animeAdvance(env, s).catch(() => {});
   const useK = await kImgOn(env, s, now);
   if (useK) {
@@ -1126,7 +1147,7 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p === '/k/claim') {
       // เครื่องที่ถือสคริปต์รุ่นเก่า (ไม่ส่ง v หรือ v<2) หรือเครื่องที่ติดตั้งตัวเทรนไม่ผ่านในรอบนี้ → ไม่จ่ายงานเทรน LoRA ให้ (รอเครื่องรอบใหม่)
-      const kv = +url.searchParams.get('v') || 0, noLora = kv < 2 || url.searchParams.get('nolora') === '1' ? 1 : 0, noCat = kv < 3 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
+      const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || url.searchParams.get('nolora') === '1' ? 1 : 0, noCat = kv < 3 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
       const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
@@ -1158,6 +1179,18 @@ async function vRoutes(req, env, url, ctx) {
       const l = await env.DB.prepare('SELECT id FROM loras WHERE vjob=?').bind(id).first();
       const buf = new Uint8Array(await req.arrayBuffer());
       if (!l) return json({ error: 'no lora' }, 404);
+      const part = url.searchParams.get('part');
+      if (part != null) { // ส่งเป็นท่อน (ท่อนละ ~20 MB) ไปเก็บที่ Supabase Storage
+        const of = Math.max(1, +url.searchParams.get('of') || 1), size = +url.searchParams.get('size') || 0;
+        const r = await supa(s, 'POST', `l${l.id}_${+part}`, buf); if (!r) return json({ error: 'ยังไม่ได้ตั้งที่เก็บไฟล์ LoRA' }, 500);
+        if (!r.ok) return json({ error: 'เก็บไฟล์ LoRA ไม่สำเร็จ: ' + r.status + ' ' + (await r.text()).slice(0, 200) }, 502);
+        if (+part + 1 >= of) {
+          await setSetting(env, 'lparts:' + l.id, of + ',' + size);
+          await env.DB.batch([env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id), env.DB.prepare("UPDATE loras SET status='ready', size=?, error=NULL WHERE id=?").bind(size, l.id)]);
+          await notify(env, `🧬 เทรน LoRA ตัวละครเสร็จแล้ว (${Math.round(size / 1048576)} MB) เข้าไปเลือกใช้ในเรื่องได้เลย`);
+        }
+        return json({ ok: true, lid: l.id });
+      }
       if (buf.length < 100000) return json({ error: 'ไฟล์ LoRA เล็กผิดปกติ' }, 400);
       await env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(l.id).run();
       const st = [];
@@ -1169,6 +1202,9 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p.startsWith('/k/lget/')) { // ให้เครื่อง Kaggle ดึง LoRA ไปใช้ตอนสร้างภาพ/ซีน (id = id ของ LoRA)
       await animeSchema(env);
+      const lp = String(s['lparts:' + id] || '').split(','), ln = +lp[0] || 0;
+      if (url.searchParams.get('info')) return json({ parts: ln, size: +lp[1] || 0 });
+      if (ln) { const r = await supa(s, 'GET', `l${id}_${+url.searchParams.get('part') || 0}`); if (!r || !r.ok) return new Response('storage ' + (r ? r.status : 'off'), { status: 502 }); return new Response(r.body, { headers: { 'content-type': 'application/octet-stream' } }); }
       const rows = (await env.DB.prepare('SELECT data FROM lchunks WHERE lid=? ORDER BY idx').bind(id).all()).results;
       if (!rows.length) return new Response('not found', { status: 404 });
       const parts = rows.map(r => b64ToBytes(r.data)); const out = new Uint8Array(parts.reduce((a, x) => a + x.length, 0)); let o = 0; for (const x of parts) { out.set(x, o); o += x.length; }
@@ -1926,7 +1962,19 @@ def ensure_lora(lid):
     dst = os.path.join(COMFY, "models", "loras", fn)
     if not os.path.exists(dst) or os.path.getsize(dst) < 100000:
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        open(dst, "wb").write(call("/k/lget/%s" % lid, timeout=600))
+        try:
+            info = json.loads(call("/k/lget/%s?info=1" % lid, timeout=60))
+        except Exception:
+            info = {}
+        if info.get("parts"):
+            with open(dst + ".tmp", "wb") as o:
+                for i in range(int(info["parts"])):
+                    o.write(call("/k/lget/%s?part=%d" % (lid, i), timeout=600))
+            if info.get("size") and os.path.getsize(dst + ".tmp") != int(info["size"]):
+                raise RuntimeError("ดึงไฟล์ LoRA %s มาไม่ครบ" % lid)
+            os.replace(dst + ".tmp", dst)
+        else:
+            open(dst, "wb").write(call("/k/lget/%s" % lid, timeout=600))
     return fn
 
 
@@ -2173,7 +2221,7 @@ def train_lora(job, port):
     vae = os.path.join(COMFY, "models", "vae", M["sdxlvae"]) if M.get("sdxlvae") else ""
     cmd = ('CUDA_VISIBLE_DEVICES=%d %s "%s/sdxl_train_network.py" --pretrained_model_name_or_path "%s" %s'
            ' --train_data_dir "%s" --output_dir "%s" --output_name lora --caption_extension .txt'
-           ' --network_module networks.lora --network_dim 16 --network_alpha 8 --network_train_unet_only'
+           ' --network_module networks.lora --network_dim 8 --network_alpha 4 --network_train_unet_only'
            ' --resolution 768,768 --enable_bucket --train_batch_size 1 --max_train_steps %d'
            ' --learning_rate 1e-4 --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
            ' --mixed_precision fp16 --save_precision fp16 --gradient_checkpointing --cache_latents --sdpa --no_half_vae --seed 1'
@@ -2186,7 +2234,18 @@ def train_lora(job, port):
     f = os.path.join(out, "lora.safetensors")
     if not os.path.exists(f):
         raise RuntimeError("เทรนจบแต่ไม่พบไฟล์ LoRA")
-    call("/k/lora/%s" % job["id"], raw=open(f, "rb").read(), timeout=900)
+    data = open(f, "rb").read()
+    PART = 20 * 1024 * 1024
+    n = max(1, (len(data) + PART - 1) // PART)
+    lid = 0
+    for i in range(n):  # ส่งเป็นท่อน ท่อนละ 20 MB (ไฟล์ทั้งก้อนใหญ่เกินที่บอทรับได้)
+        r = json.loads(call("/k/lora/%s?part=%d&of=%d&size=%d" % (job["id"], i, n, len(data)), raw=data[i * PART:(i + 1) * PART], timeout=900) or b"{}")
+        lid = r.get("lid") or lid
+    log("ส่งไฟล์ LoRA %s แล้ว (%d MB · %d ท่อน)" % (trig, len(data) / 1048576, n))
+    if lid:  # เก็บสำเนาไว้ในเครื่องรอบนี้เลย ไม่ต้องดึงกลับมาอีก
+        ld = os.path.join(COMFY, "models", "loras")
+        os.makedirs(ld, exist_ok=True)
+        shutil.copy(f, os.path.join(ld, "lora%s.safetensors" % lid))
     shutil.rmtree(d, ignore_errors=True)
     dummy = os.path.join(ROOT, "lora_done_%s.bin" % job["id"])
     open(dummy, "wb").write(b"0" * 2048)
@@ -2268,7 +2327,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=3" + ("&nolora=1" if M.get("nolora") else "")
+    return "/k/claim?v=4" + ("&nolora=1" if M.get("nolora") else "")
 
 
 def claim_wait(stat):
