@@ -42,7 +42,7 @@ export default {
       if (p === '/api/enqueue') return json(await enqueue(env, body));
       if (p === '/api/fluxkeys') return json(await fluxKeysApi(env, body));
       if (p === '/api/settings') {
-        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill', 'script_model', 'img_engine', 'auto_char_engine', 'auto_obj_engine', 'img_model', 'img_quant', 'img_w', 'img_h', 'img_cap'])
+        for (const k of ['interval_min', 'style', 'character', 'steps', 'pace', 'slots', 'style_preset', 'auto_fill', 'script_model', 'img_engine', 'auto_char_engine', 'auto_obj_engine', 'img_model', 'img_quant', 'img_w', 'img_h', 'img_cap', 'auto_lora'])
           if (body[k] !== undefined) await setSetting(env, k, String(body[k]));
         return json({ ok: true });
       }
@@ -2528,12 +2528,30 @@ async function castApi(req, env, url, body) {
         if (!stories.includes(story)) { stories.push(story); await setSetting(env, 'stories', JSON.stringify(stories)); }
         return json({ ok: true, roles: plan.roles.length, eps: plan.eps.length });
       }
+      if (act === 'lib') { // คลัง LoRA: เฉพาะตัวที่เทรนเสร็จแล้ว (status=ready) ของนักแสดงในคลัง + ใช้เป็นบทไหนอยู่
+        const rows = (await env.DB.prepare("SELECT l.id lid, l.char_id, l.size, l.created, a.id cand, a.name, a.role, a.cast_role, a.cast_story FROM loras l JOIN aud_cands a ON a.char_id=l.char_id WHERE l.status='ready' AND l.id=(SELECT MAX(x.id) FROM loras x WHERE x.char_id=l.char_id AND x.status='ready') ORDER BY l.id DESC").all()).results;
+        for (const c of rows) { const fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project LIKE ? AND scene=1').bind(`ออดิชัน·${c.role}·${c.cand}·%`).first(); c.face = (fr && fr.id) || 0; }
+        return json({ ok: true, loras: rows });
+      }
       const plan = await rd('plan:' + story); if (!plan) return json({ error: 'ยังไม่ได้อัปโหลดโครงเรื่องของเรื่องนี้' }, 404);
       if (act === 'setr') { // เปลี่ยนเพศ / ระดับบทของตัวละคร (ตัวหลัก = ใช้ LoRA ล็อกหน้า)
         const r = plan.roles.find(x => x.key === b.key), v = String(b.value == null ? '' : b.value);
         if (!r || !((b.field === 'g' && ['', 'f', 'm', 'x'].includes(v)) || (b.field === 'tier' && ['main', 'support', 'none'].includes(v)))) return json({ error: 'ข้อมูลไม่ถูกต้อง' }, 400);
         if (b.field === 'g') { r.g = v; if (v === 'x') r.tier = 'none'; else if (r.tier === 'none') r.tier = 'support'; } else r.tier = v;
         await setSetting(env, 'plan:' + story, JSON.stringify(plan)); return json({ ok: true });
+      }
+      if (act === 'lorapick') { // เลือก LoRA ที่เทรนเสร็จแล้วให้บทนี้ (lora=0 → ถอดออก) · รับเฉพาะ status=ready เท่านั้น
+        const r = plan.roles.find(x => x.key === b.key); if (!r) return json({ error: 'ไม่พบบทนี้' }, 400);
+        if (!+b.lora) { await env.DB.prepare('UPDATE aud_cands SET cast_role=NULL, cast_story=NULL, chosen=0 WHERE cast_role=? AND cast_story=?').bind(r.key, story).run(); return json({ ok: true }); }
+        const l = await env.DB.prepare('SELECT id,char_id,status FROM loras WHERE id=?').bind(+b.lora).first();
+        if (!l || l.status !== 'ready') return json({ error: 'LoRA นี้ยังเทรนไม่เสร็จ เลือกได้เฉพาะตัวที่เสร็จแล้ว' }, 400);
+        const c = await env.DB.prepare('SELECT id,name,cast_role,cast_story FROM aud_cands WHERE char_id=?').bind(l.char_id).first();
+        if (!c) return json({ error: 'LoRA นี้ไม่อยู่ในคลังนักแสดง' }, 400);
+        if (c.cast_role && c.cast_story && c.cast_story !== story) return json({ error: `${c.name} ใช้อยู่ในเรื่อง "${c.cast_story}" แล้ว ถอดออกจากเรื่องนั้นก่อน` }, 400);
+        await env.DB.batch([
+          env.DB.prepare('UPDATE aud_cands SET cast_role=NULL, cast_story=NULL, chosen=0 WHERE cast_role=? AND cast_story=?').bind(r.key, story),
+          env.DB.prepare('UPDATE aud_cands SET cast_role=?, cast_story=?, chosen=1, kept=1 WHERE id=?').bind(r.key, story, c.id)]);
+        return json({ ok: true });
       }
       if (act === 'cast') { // ใส่/ถอดนักแสดงของบทนี้ (กดเลือกเอง)
         const r = plan.roles.find(x => x.key === b.key); if (!r) return json({ error: 'ไม่พบบทนี้' }, 400);

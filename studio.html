@@ -49,7 +49,7 @@ function parsePlan(blocks){
   eps.forEach(E=>{const tx=E.title+' '+Object.values(E.f).join(' ');E.cast=roles.filter(r=>/คู่หลัก/.test(r.kind)||tx.includes(r.key)||tx.includes(r.name)||(/^พ่อของ/.test(r.kind)&&/พ่อ(?!ค้า)/.test(tx))).map(r=>r.key);});
   return{title,overview:ov,rule:(P.find(x=>/^ทุกตอน/.test(x))||'').slice(0,400),roles,eps:eps.sort((a,b)=>a.no-b.no),locs};}
 /* ---------- สถานะ ---------- */
-const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||''};
+const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',lib:[],onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
 const STY=[['rom','💗 รอมคอมใส','bright soft anime style, pastel colors, high-key lighting, delicate fine line art, expressive cute faces, soft blush, detailed hair strands, clean cel shading, romantic comedy mood'],
 ['dark','🌑 ดราม่ามืดหนัก','dark gritty anime style, desaturated cold palette, heavy shadows, strong rim light, detailed fine line art, cinematic dramatic lighting, grim tense atmosphere'],
 ['act','⚔️ แอ็กชันคมเข้ม','dynamic action anime style, bold sharp line art, high contrast, vivid saturated accents, dramatic low angle, motion energy, cinematic lighting'],
@@ -65,17 +65,21 @@ async function load(){
   try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;ST.err='';}catch(e){ST.err=botErr(e);}
   const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
   if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
+  try{const r=await api('lib');ST.lib=r.loras||[];}catch(e){ST.lib=[];}
   await autoLora();render();
   if(Object.values(ST.epst).some(v=>v&&(v.status==='running'||v.status==='waiting')))POLL=setTimeout(load,30000);}
 /* ตัวหลักที่ยังไม่มีตัวละคร/LoRA: ส่งสร้างให้ (บอทฝึก LoRA ต่อเองเมื่อภาพชุดฝึกครบ) */
 const LG=new Set(); // กันสั่งสร้างตัวละครซ้ำคนเดิม
-async function autoLora(){const pl=ST.plan;if(!pl)return;
+async function autoLora(){const pl=ST.plan;if(!pl||ST.onlyReady)return;
   for(const r of pl.roles){if(!live(r)||tierOf(r)!=='main')continue;const c=castOf(r.key);
     if(c&&!+c.char_id&&c.lora!=='queued'&&c.lora!=='ready'&&!LG.has(c.id)){LG.add(c.id);try{await api('lorago',{cand:c.id});}catch(e){LG.delete(c.id);}}}}
 function ep_status(no){const s=ST.epst[no];return s?s.status:'';}
 /* ---------- เริ่มทำทั้งเรื่อง ---------- */
 async function startAll(){
-  const pl=ST.plan;ST.busy='กำลังจัดนักแสดงและเริ่มทำ…';ST.msg='';render();
+  const pl=ST.plan;
+  if(ST.onlyReady){const miss=pl.roles.filter(r=>live(r)&&tierOf(r)==='main'&&!(castOf(r.key)&&castOf(r.key).lora==='ready')).map(r=>r.key);
+    if(miss.length){ST.msg='ยังไม่ได้เลือก LoRA ที่เสร็จแล้วให้ตัวหลัก: '+miss.join(', ')+' — ไปเลือกที่แถบ 🧬 LoRA';ST.tab='lora';render();return;}}
+  ST.busy='กำลังจัดนักแสดงและเริ่มทำ…';ST.msg='';render();
   try{
     let a=await api('autocast');
     if(a.left&&a.left.length){ // คลังนักแสดงไม่พอ: เก็บผู้สมัครที่ออดิชันไว้แล้วลองจับคู่ใหม่
@@ -119,13 +123,15 @@ function render(){const A=$('#app');
     $('#bs').onclick=()=>{localStorage.setItem('ss_imgbot',JSON.stringify({url:$('#bu').value.trim(),key:$('#bk').value}));load();};return;}
   const pl=ST.plan&&ST.plan.roles&&ST.plan.roles.length?ST.plan:null;let h='';
   if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}</div>`;
+  if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
+  if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
   if(!pl){h+=`<div class="c"><label class="drop" id="dz"><div style="font-size:40px">📄</div>แตะเพื่อเลือก หรือลากไฟล์บท (.docx) มาวาง<input type="file" id="pf" accept=".docx" hidden></label></div>`;}
   else{
     const roles=pl.roles.filter(r=>r.g!=='x'&&tierOf(r)!=='none'||!r.g),nog=pl.roles.filter(r=>!r.g&&tierOf(r)!=='none'),started=Object.keys(ST.epst).length;
     h+=`<div class="c"><div class="row sp"><h2>${esc(pl.title||ST.story)}</h2><label class="mu" style="cursor:pointer">📄 เปลี่ยนไฟล์<input type="file" id="pf" accept=".docx" hidden></label></div><small>${pl.eps.length} ตอน · ${pl.roles.length} บท · ${pl.locs.length} สถานที่</small></div>`;
     h+=`<div class="c"><h2>ตัวละคร</h2>${nog.length?`<div class="warn" style="margin-bottom:6px">เลือกเพศให้ครบก่อน ระบบจะได้จับคู่นักแสดงถูกคน</div>`:''}`;
     h+=roles.map(r=>{const t=tierOf(r),c=castOf(r.key),b=(a,v,cur,n)=>`<button class="${cur===v?'on':''}" data-r="${esc(r.key)}|${a}|${v}">${n}</button>`;
-      const lt=c?(c.lora==='ready'?'<span class="ok">🧬 LoRA พร้อม</span>':c.lora==='queued'?'<span class="warn">⏳ กำลังฝึก LoRA</span>':t==='main'?(c.lora==='failed'?'<span class="bad">❌ LoRA ล้มเหลว</span> <button class="sm" data-retry="'+c.id+'">🔁 ลองใหม่</button>'+(c.lora_err?'<div class="bad" style="font-size:12px;word-break:break-all;white-space:pre-wrap">'+esc(c.lora_err)+'</div>':''):'<span class="warn">รอสร้าง LoRA</span>'):'<span class="mu">ไม่ใช้ LoRA</span>'):'';
+      const lt=ST.onlyReady?(c&&c.lora==='ready'?'<span class="ok">🧬 LoRA พร้อม</span>':t==='main'?'<span class="warn">ยังไม่ได้เลือก LoRA</span> <button class="sm" data-tab="lora">เลือก</button>':'<span class="mu">ไม่ใช้ LoRA</span>'):c?(c.lora==='ready'?'<span class="ok">🧬 LoRA พร้อม</span>':c.lora==='queued'?'<span class="warn">⏳ กำลังฝึก LoRA</span>':t==='main'?(c.lora==='failed'?'<span class="bad">❌ LoRA ล้มเหลว</span> <button class="sm" data-retry="'+c.id+'">🔁 ลองใหม่</button>'+(c.lora_err?'<div class="bad" style="font-size:12px;word-break:break-all;white-space:pre-wrap">'+esc(c.lora_err)+'</div>':''):'<span class="warn">รอสร้าง LoRA</span>'):'<span class="mu">ไม่ใช้ LoRA</span>'):'';
       return `<div class="it"><div class="row sp"><span class="row" style="flex-wrap:nowrap;gap:10px">${c&&c.face?`<img src="${esc(botU('/img/'+c.face))}" loading="lazy" style="width:56px;height:56px;border-radius:12px;object-fit:cover;object-position:top;border:1px solid var(--bd)">`:''}<b>${esc(r.key)}</b></span><span class="mu">${esc(r.kind)}${r.age?' · '+r.age+' ปี':''}</span></div>
         ${!r.g?`<div class="row">${b('g','f',r.g,'👩 หญิง')}${b('g','m',r.g,'👨 ชาย')}${b('g','x',r.g,'🐾 ไม่ใช่คน')}</div>`
         :`<div class="row">${b('t','main',t,'🧬 ตัวหลัก')}${b('t','support',t,'👤 ตัวรอง')}${b('t','none',t,'⛔ ไม่ใช้')}</div><div class="mu">${c?'นักแสดง: <b>'+esc(c.name)+'</b> '+lt:'ยังไม่มีนักแสดง (ระบบเลือกให้ตอนเริ่ม)'}</div>`}</div>`;}).join('')+'</div>';
@@ -146,7 +152,7 @@ function render(){const A=$('#app');
       ${ss.length?`<div class="mu" style="margin:8px 0 4px">หรือโหลดแยกซีน (TikTok แบ่งเป็นพาร์ตสั้นได้)</div>${ss.map(x=>`<button class="sm" data-dl="${x.final}|${esc((pl.title||'anime').slice(0,30))}-ep${pick}-sc${x.sc}.mp4">⬇ ซีน ${x.sc}</button>`).join('')}`:''}
       <div class="mu" style="margin-top:8px">ตอนนี้วิดีโอยังไม่มีเสียงพากย์ ซับ และเพลง ต้องใส่ในแอปตัดต่อก่อนอัปโหลด</div></div>`;}
   }
-  A.innerHTML=h;
+  A.innerHTML=h;bindTabs(A);
   A.querySelectorAll('[data-sty]').forEach(b=>b.onclick=()=>setSty(b.dataset.sty));
   A.querySelectorAll('[data-asp]').forEach(b=>b.onclick=()=>setAsp(b.dataset.asp));
   A.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>pickBest(+b.dataset.pick));
@@ -157,6 +163,22 @@ function render(){const A=$('#app');
   A.querySelectorAll('[data-retry]').forEach(b=>b.onclick=async()=>{b.disabled=true;LG.delete(b.dataset.retry);try{await api('lorago',{cand:b.dataset.retry});toast('สั่งสร้าง LoRA ใหม่แล้ว');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-ep]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('make',{ep:+b.dataset.ep,all:true});toast(r.waiting?'ตอนนี้รอ LoRA '+r.waiting.join(', '):'เริ่มทำตอน '+b.dataset.ep+' แล้ว');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>b.dataset.a==='stop'?stopAll():b.dataset.a==='qc'?runQc():startAll());}
+/* ---------- แถบ LoRA: เลือกเฉพาะ LoRA ที่เทรนเสร็จแล้วมาใช้ในบท ---------- */
+function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ST.tab=b.dataset.tab;render();window.scrollTo(0,0);});}
+function loraTab(pl){
+  const roles=pl.roles.filter(r=>live(r)),lib=ST.lib,mb=x=>x.size?Math.round(x.size/1048576)+' MB':'';
+  const usedBy=x=>x.cast_role?(x.cast_story===ST.story?'ใช้เป็นบท: <b>'+esc(x.cast_role)+'</b>':'ใช้อยู่ในเรื่อง “'+esc(x.cast_story)+'”'):'ยังว่าง';
+  let h=`<div class=\"c\"><h2>🧬 LoRA ที่เสร็จแล้ว (${lib.length})</h2><div class=\"mu\">แสดงเฉพาะ LoRA ที่เทรนเสร็จพร้อมใช้ — ตัวที่กำลังเทรนหรือเทรนพังจะไม่ขึ้นที่นี่และเลือกไม่ได้</div>
+    <label class=\"row\" style=\"margin-top:8px;cursor:pointer\"><input type=\"checkbox\" id=\"onlyr\" ${ST.onlyReady?'checked':''} style=\"width:auto\"> <span>ใช้เฉพาะ LoRA ที่เสร็จแล้ว (ไม่ให้บอทเทรนใหม่เอง)</span></label></div>`;
+  h+=`<div class=\"c\"><h2>📚 คลัง</h2>`+(lib.length?lib.map(x=>`<div class=\"it\"><div class=\"row\" style=\"flex-wrap:nowrap;gap:10px\">${x.face?`<img src=\"${esc(botU('/img/'+x.face))}\" loading=\"lazy\" style=\"width:56px;height:56px;border-radius:12px;object-fit:cover;object-position:top;border:1px solid var(--bd)\">`:''}<div><b>${esc(x.name)}</b> <span class=\"ok\">✅ พร้อมใช้</span> <span class=\"mu\">${mb(x)}</span><div class=\"mu\">${usedBy(x)}</div></div></div></div>`).join(''):'<div class=\"warn\">ยังไม่มี LoRA ที่เทรนเสร็จ — เมื่อบอทเทรนเสร็จจะมาโผล่ที่นี่เอง</div>')+'</div>';
+  h+=`<div class=\"c\"><h2>🎭 เลือก LoRA ให้แต่ละบท</h2>`+roles.map(r=>{const c=castOf(r.key),cur=c?(lib.find(x=>x.cand===c.id)||{}).lid||0:0,t=tierOf(r);
+    return `<div class=\"it\"><div class=\"row sp\"><b>${esc(r.key)}</b><span class=\"mu\">${esc(r.kind)}${t==='main'?' · ตัวหลัก':''}</span></div>
+      <select data-lp=\"${esc(r.key)}\" style=\"width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin-top:4px\"><option value=\"0\">— ไม่เลือก —</option>${lib.map(x=>{const other=x.cast_role&&x.cast_story&&x.cast_story!==ST.story,took=x.cast_role&&x.cast_story===ST.story&&x.cast_role!==r.key;return `<option value=\"${x.lid}\" ${+cur===+x.lid?'selected':''} ${other?'disabled':''}>${esc(x.name)}${other?' (ใช้เรื่องอื่นอยู่)':took?' (ย้ายจากบท '+esc(x.cast_role)+')':''}</option>`;}).join('')}</select>
+      ${t==='main'&&!cur?'<div class=\"warn\" style=\"font-size:13px\">ตัวหลักต้องเลือก LoRA ที่เสร็จแล้วก่อนเริ่มสร้าง</div>':''}</div>`;}).join('')+'</div>';
+  return h;}
+function bindLora(A){
+  const o=A.querySelector('#onlyr');if(o)o.onchange=async()=>{ST.onlyReady=o.checked;localStorage.setItem('ss_onlyready',o.checked?'1':'0');try{await botApi('/api/settings',{auto_lora:o.checked?'0':'1'});}catch(e){toast(botErr(e));}toast(o.checked?'ใช้เฉพาะ LoRA ที่เสร็จแล้ว':'เปิดให้บอทเทรนเองแล้ว');render();};
+  A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});}
 function epList(pl){return pl.eps.map(E=>{const s=ST.epst[E.no],sc=ST.scn.filter(x=>+x.ep===E.no),fin=ST.fin[E.no],tot=sc.reduce((n,x)=>n+(+x.tot||0),0),vid=sc.reduce((n,x)=>n+(+x.vid||0),0),img=sc.reduce((n,x)=>n+(+x.img||0),0),done=sc.filter(x=>+x.fin).length;
     const st=fin?'<span class="ok">✅ เสร็จ</span>':!s?`<span class="mu">ยังไม่เริ่ม</span> <button class="sm" data-ep="${E.no}">▶ ทำตอนนี้</button>`:s.status==='waiting'?`<span class="warn">⏳ รอ LoRA ${esc((s.need||[]).join(', '))}</span>`:`<span class="warn">🎬 กำลังทำ</span>`;
     const pct=tot?Math.round((img+vid)/(tot*2)*100):0;
