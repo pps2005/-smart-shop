@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'webtoon-2';
+const BOT_VER = 'episode-av-1';
 
 export default {
   async fetch(req, env, ctx) {
@@ -712,17 +712,21 @@ async function epAssemble(env, s) {
     if (+vj.live || +vj.n >= 3) continue;
     const sr = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(d.sid).first(); if (!sr) continue;
     const st = await epstOf(env, sr.title); if (!st[d.ep] || st[d.ep].status !== 'running') continue;
-    const urls = [];
+    const urls = []; // แต่ละช็อต: ไฟล์ภาพ/คลิป + บทพูด (ทำซับ) · เสียงพากย์จะเติมช่อง vo เมื่อระบบเสียงพร้อม
     for (const sc of (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(d.sid, d.ep).all()).results) {
-      for (const sh of (await env.DB.prepare('SELECT id,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sc.script_id).all()).results) {
+      for (const sh of (await env.DB.prepare('SELECT id,kproj,say FROM shots WHERE script_id=? ORDER BY idx').bind(sc.script_id).all()).results) {
+        let sy = {}; try { sy = JSON.parse(sh.say || '{}') || {}; } catch (x) { sy = {}; }
+        const it = { who: String(sy.who || ''), say: String(sy.say || '') };
         const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind('a' + sc.script_id, String(sh.id)).first();
-        if (v && v.id) { urls.push(og + '/vv/' + v.id + '?s=' + await vvSig(env, v.id)); continue; }
+        if (v && v.id) { urls.push({ u: og + '/vv/' + v.id + '?s=' + await vvSig(env, v.id), ...it }); continue; }
         const im = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(sh.kproj).first();
-        if (im && im.id) urls.push(og + '/vi/' + im.id + '?s=' + await vvSig(env, 'i' + im.id));
+        if (im && im.id) urls.push({ u: og + '/vi/' + im.id + '?s=' + await vvSig(env, 'i' + im.id), ...it });
       }
     }
     if (!urls.length || urls.length > 400) continue;
-    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'final',?,'','',0,'queued',0,?,'epcat',?)").bind(('ตอน·' + sr.title + '·' + d.ep).slice(0, 60), key, JSON.stringify(urls), Date.now(), JSON.stringify({ still: 3, crf: 28, fps: 24 })).run();
+    const plan = await readPlan(env, sr.title).catch(() => null), PE = plan && plan.eps.find(x => x.no === +d.ep);
+    const spec = { v: 2, title: String((plan && plan.title) || sr.title).split('\n')[0].slice(0, 60), ep: +d.ep, eptitle: PE ? String(PE.title).slice(0, 80) : '', items: urls, bgm: '', credits: ['ภาพและแอนิเมชัน: สร้างด้วย AI', 'ผลิตโดย ' + String(s.studio_name || 'SMART SHOP')] };
+    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'final',?,'','',0,'queued',0,?,'epcat',?)").bind(('ตอน·' + sr.title + '·' + d.ep).slice(0, 60), key, JSON.stringify(spec), Date.now(), JSON.stringify({ still: 3, crf: 28, fps: 24 })).run();
   }
 }
 async function animeApi(env, b) {
@@ -863,13 +867,13 @@ async function animeApi(env, b) {
   }
   if (act === 'vid') { // ภาพคีย์ → วิดีโอช็อตละ ~5 วิ (ลุคอนิเมะ 12fps) ครั้งละไม่เกิน 6 ช็อต ที่เหลือทำรอบถัดไป
     const sid = +b.script_id, ep = 'a' + sid;
-    const rows = (await env.DB.prepare('SELECT id,en,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
+    const rows = (await env.DB.prepare('SELECT id,en,kproj,say FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
     const have = new Set([...(await env.DB.prepare("SELECT DISTINCT shot FROM videos WHERE ep=?").bind(ep).all()).results, ...(await env.DB.prepare("SELECT shot FROM vjobs WHERE ep=? AND status IN ('queued','running')").bind(ep).all()).results].map(x => String(x.shot)));
     let n = 0;
     for (const [i, sh] of rows.entries()) {
       if (n >= 6) break; if (!keyShot(sh, i) || have.has(String(sh.id))) continue;
       const im = await env.DB.prepare('SELECT data FROM images WHERE project=? ORDER BY id DESC LIMIT 1').bind(sh.kproj).first(); if (!im || !im.data) continue;
-      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(5), Date.now(), JSON.stringify({ hq: 0, fps: 12 })).run();
+      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, ${/"who":"[^"]/.test(sh.say || '') ? 'the character is talking, mouth opening and closing naturally while speaking, subtle head movement, ' : ''}smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(5), Date.now(), JSON.stringify({ hq: 0, fps: 12 })).run();
       n++;
     }
     return { queued: n };
@@ -1159,7 +1163,7 @@ async function vRoutes(req, env, url, ctx) {
     }
     if (p === '/k/claim') {
       // เครื่องที่ถือสคริปต์รุ่นเก่า (ไม่ส่ง v หรือ v<2) หรือเครื่องที่ติดตั้งตัวเทรนไม่ผ่านในรอบนี้ → ไม่จ่ายงานเทรน LoRA ให้ (รอเครื่องรอบใหม่)
-      const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || url.searchParams.get('nolora') === '1' ? 1 : 0, noCat = kv < 3 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
+      const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || url.searchParams.get('nolora') === '1' ? 1 : 0, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
       const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
@@ -2094,66 +2098,309 @@ def concat(j):
     return out, 0, W, H
 
 
+TH_MARKS = set(chr(c) for c in [0x0E31] + list(range(0x0E34, 0x0E3B)) + list(range(0x0E47, 0x0E4F)))
+TH_LEAD = set("เแโใไ")
+FONTS = {"dir": "", "name": ""}
+
+
+TH = {"tok": None}
+
+
+def th_tokens(t):
+    # ตัดคำไทยด้วย pythainlp (ติดตั้งครั้งแรกครั้งเดียว) · ใช้ไม่ได้ก็คืน None แล้วไปใช้วิธีสำรอง
+    if TH["tok"] is None:
+        try:
+            try:
+                from pythainlp.tokenize import word_tokenize
+            except Exception:
+                sh("pip install -q pythainlp", check=False)
+                from pythainlp.tokenize import word_tokenize
+            TH["tok"] = lambda x: word_tokenize(x, engine="newmm", keep_whitespace=True)
+        except Exception:
+            TH["tok"] = False
+    if not TH["tok"]:
+        return None
+    try:
+        return [w for w in TH["tok"](t) if w]
+    except Exception:
+        return None
+
+
+def th_vis(t):
+    return sum(1 for ch in t if ch not in TH_MARKS)
+
+
+def wrap_th(t, maxc, maxl=3):
+    # ตัดบรรทัดซับ: ภาษาไทยไม่มีเว้นวรรคระหว่างคำ → ตัดตามคำ (pythainlp) · สำรอง: ตัดที่เว้นวรรค หรือจุดที่สระ/วรรณยุกต์ไม่ขาดจากพยัญชนะ
+    t = " ".join(str(t or "").split())
+    out = []
+    toks = th_tokens(t) if th_vis(t) > maxc else None
+    if toks:
+        cur = ""
+        for w in toks:
+            if cur.strip() and th_vis(cur + w) > maxc:
+                out.append(cur.strip())
+                cur = w.lstrip()
+            else:
+                cur += w
+        if cur.strip():
+            out.append(cur.strip())
+        t = ""
+    while t:
+        n = 0
+        cut = len(t)
+        for i, ch in enumerate(t):
+            if ch not in TH_MARKS:
+                n += 1
+            if n > maxc:
+                cut = i
+                break
+        if cut < len(t):
+            sp = t.rfind(" ", int(cut * 0.4), cut + 1)
+            if sp > 0:
+                cut = sp
+            else:
+                while cut > 2 and (t[cut] in TH_MARKS or t[cut] in "ะาำๅๆ" or t[cut - 1] in TH_LEAD):
+                    cut -= 1
+        out.append(t[:cut].strip())
+        t = t[cut:].strip()
+    if len(out) > maxl:
+        out = out[:maxl - 1] + [" ".join(out[maxl - 1:])]
+    return out
+
+
+def thai_font():
+    # ฟอนต์ไทยสำหรับซับ/เครดิต: ใช้ของเครื่องถ้ามี ไม่งั้นโหลดมาเก็บไว้
+    if FONTS["name"]:
+        return FONTS
+    fd = os.path.join(ROOT, "fonts")
+    os.makedirs(fd, exist_ok=True)
+    for name, urls in (("Sarabun", ["https://github.com/google/fonts/raw/main/ofl/sarabun/Sarabun-Bold.ttf", "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Bold.ttf"]),
+                       ("Noto Sans Thai", ["https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io/fonts/NotoSansThai/hinted/ttf/NotoSansThai-Bold.ttf"])):
+        f = os.path.join(fd, name.replace(" ", "") + "-Bold.ttf")
+        for u in urls:
+            if os.path.exists(f) and os.path.getsize(f) > 20000:
+                break
+            try:
+                with urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=60) as r, open(f, "wb") as o:
+                    shutil.copyfileobj(r, o)
+            except Exception:
+                pass
+        if os.path.exists(f) and os.path.getsize(f) > 20000:
+            FONTS.update(dir=fd, name=name)
+            return FONTS
+        if os.path.exists(f):
+            os.remove(f)
+    have = sh("fc-list :lang=th family 2>/dev/null | head -20", check=False)
+    if not have.strip():
+        sh("apt-get install -y -qq fonts-thai-tlwg >/dev/null 2>&1", check=False)
+        have = sh("fc-list :lang=th family 2>/dev/null | head -20", check=False)
+    for cand in ("Sarabun", "Noto Sans Thai", "Loma", "Garuda", "Waree", "Kinnari"):
+        if cand in have:
+            FONTS.update(dir="", name=cand)
+            return FONTS
+    log("ไม่พบฟอนต์ไทยในเครื่อง ซับอาจแสดงผิด")
+    FONTS.update(dir="", name="Sans")
+    return FONTS
+
+
+def ff_sub():
+    # ffmpeg ที่ฝังซับได้ (ต้องมีตัวกรอง ass): ลองของเครื่องก่อน แล้วค่อยตัวที่มากับ imageio
+    for b in ("ffmpeg", ffmpeg_bin()):
+        try:
+            if " ass " in sh('"%s" -hide_banner -filters 2>/dev/null | grep " ass " || true' % b, check=False):
+                return b
+        except Exception:
+            pass
+    return ""
+
+
+def media_dur(ff, f):
+    import re
+    m = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", sh('"%s" -i "%s" 2>&1 | grep -m1 Duration || true' % (ff, f), check=False))
+    return (int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))) if m else 0.0
+
+
+def ass_time(t):
+    t = max(0.0, t)
+    return "%d:%02d:%05.2f" % (int(t // 3600), int(t % 3600 // 60), t % 60)
+
+
+def ass_esc(t):
+    return str(t).replace("\\", "").replace("{", "(").replace("}", ")").replace("\n", " ")
+
+
 def epcat(j):
     # รวมทั้งตอนเป็นไฟล์เดียวตามลำดับช็อต: ช็อตที่มีคลิปใช้คลิป ช็อตภาพนิ่งทำเป็นคลิปซูมช้า
+    # รุ่น 2: ซับไทยฝังในภาพ · เสียงพากย์รายช็อต (ถ้ามี) · เพลงบรรเลงคลอ เบาลงเองตอนมีเสียงพูด · เอนด์เครดิตท้ายตอน
     import re
-    urls = json.loads(j.get("prompt") or "[]")
+    spec = json.loads(j.get("prompt") or "[]")
+    if isinstance(spec, list):
+        spec = {"items": [{"u": u} for u in spec]}
+    items = spec.get("items") or []
     opt = j.get("opt") or {}
     still, crf, fps = float(opt.get("still") or 3), int(opt.get("crf") or 28), int(opt.get("fps") or 24)
     d = os.path.join(ROOT, "ec%s" % j["id"])
     os.makedirs(d, exist_ok=True)
     ff = ffmpeg_bin()
+
+    def grab(u, f):
+        req = urllib.request.Request(u, headers=UA)
+        with urllib.request.urlopen(req, timeout=300) as r, open(f, "wb") as o:
+            shutil.copyfileobj(r, o)
+        return f
+
     src = []
-    for i, u in enumerate(urls):
+    for i, it in enumerate(items):
+        u = it.get("u") or ""
         isimg = "/vi/" in u
-        f = os.path.join(d, "s%03d.%s" % (i, "jpg" if isimg else "mp4"))
         try:
-            req = urllib.request.Request(u, headers=UA)
-            with urllib.request.urlopen(req, timeout=300) as r, open(f, "wb") as o:
-                shutil.copyfileobj(r, o)
-            src.append((f, isimg))
+            f = grab(u, os.path.join(d, "s%03d.%s" % (i, "jpg" if isimg else "mp4")))
         except Exception as e:
             log("ข้ามช็อต %d (ดึงไฟล์ไม่ได้): %s" % (i + 1, str(e)[:120]))
+            continue
+        vo = ""
+        if it.get("vo"):
+            try:
+                vo = grab(it["vo"], os.path.join(d, "v%03d.wav" % i))
+            except Exception as e:
+                log("ช็อต %d ไม่มีเสียงพากย์ (ดึงไฟล์ไม่ได้): %s" % (i + 1, str(e)[:120]))
+        src.append({"f": f, "img": isimg, "vo": vo, "who": str(it.get("who") or ""), "say": str(it.get("say") or "")})
     if not src:
         raise RuntimeError("ไม่มีไฟล์ให้รวม")
     W = H = 0
-    for f, isimg in src:
-        if not isimg:
-            m = re.search(r", (\d{3,4})x(\d{3,4})", sh('"%s" -i "%s" 2>&1 | grep -m1 "Video:" || true' % (ff, f), check=False))
+    for x in src:
+        if not x["img"]:
+            m = re.search(r", (\d{3,4})x(\d{3,4})", sh('"%s" -i "%s" 2>&1 | grep -m1 "Video:" || true' % (ff, x["f"]), check=False))
             if m:
                 W, H = int(m.group(1)), int(m.group(2))
                 break
     if not W:
         from PIL import Image
-        W, H = Image.open(src[0][0]).size
+        W, H = Image.open(src[0]["f"]).size
     k = min(1.0, 1280.0 / max(W, H))
     W, H = int(W * k) // 2 * 2, int(H * k) // 2 * 2
-    n = max(2, int(still * fps))
-    enc = "-r %d -c:v libx264 -preset veryfast -crf %d -pix_fmt yuv420p -an" % (fps, crf)
+    enc = "-r %d -c:v libx264 -preset veryfast -crf %d -pix_fmt yuv420p -an" % (fps, max(16, crf - 4))
     parts = []
-    for i, (f, isimg) in enumerate(src):
+    for i, x in enumerate(src):
         o = os.path.join(d, "p%03d.mp4" % i)
+        vlen = media_dur(ff, x["vo"]) if x["vo"] else 0.0
         try:
-            if isimg:
+            if x["img"]:
+                # ภาพนิ่ง: ยาวพอให้อ่านซับ/ฟังเสียงจบ
+                dur = max(still, vlen + 0.5, min(6.0, 1.2 + 0.07 * len(x["say"])) if x["say"] else 0)
+                n = max(2, int(round(dur * fps)))
                 z = ("1+0.08*on/%d" % n) if i % 2 == 0 else ("1.08-0.08*on/%d" % n)
                 vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,zoompan=z='%s':d=%d:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=%dx%d:fps=%d,setsar=1" % (W * 2, H * 2, W * 2, H * 2, z, n, W, H, fps)
-                sh('"%s" -y -loglevel error -i "%s" -vf "%s" -frames:v %d %s "%s"' % (ff, f, vf, n, enc, o))
+                sh('"%s" -y -loglevel error -i "%s" -vf "%s" -frames:v %d %s "%s"' % (ff, x["f"], vf, n, enc, o))
+                dur = n / float(fps)
             else:
-                vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,fps=%d,setsar=1" % (W, H, W, H, fps)
-                sh('"%s" -y -loglevel error -i "%s" -vf "%s" %s "%s"' % (ff, f, vf, enc, o))
-            parts.append(o)
+                dv = media_dur(ff, x["f"]) or 5.0
+                dur = max(dv, vlen + 0.4)
+                pad = (",tpad=stop_mode=clone:stop_duration=%.2f" % (dur - dv)) if dur > dv + 0.05 else ""
+                vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,fps=%d,setsar=1%s" % (W, H, W, H, fps, pad)
+                sh('"%s" -y -loglevel error -i "%s" -vf "%s" -t %.2f %s "%s"' % (ff, x["f"], vf, dur, enc, o))
+                dur = media_dur(ff, o) or dur
+            parts.append({"o": o, "dur": dur, "x": x})
         except Exception as e:
             log("ข้ามช็อต %d (แปลงไฟล์ไม่ได้): %s" % (i + 1, str(e)[-160:]))
     if not parts:
         raise RuntimeError("แปลงไฟล์ไม่สำเร็จสักช็อต")
+    body = sum(p["dur"] for p in parts)
+    credits = [str(c) for c in (spec.get("credits") or []) if str(c).strip()][:12]
+    cdur = (4.0 + 0.5 * len(credits)) if (credits or spec.get("title")) else 0.0
+    if cdur:
+        co = os.path.join(d, "credit.mp4")
+        sh('"%s" -y -loglevel error -f lavfi -i "color=c=0x101018:s=%dx%d:r=%d" -t %.2f %s "%s"' % (ff, W, H, fps, cdur, enc, co))
+        parts.append({"o": co, "dur": cdur, "x": None})
     lst = os.path.join(d, "list.txt")
     with open(lst, "w") as o:
-        for q in parts:
-            o.write("file '%s'" % q + chr(10))
+        for p in parts:
+            o.write("file '%s'" % p["o"] + chr(10))
+    silent = os.path.join(d, "silent.mp4")
+    sh('"%s" -y -loglevel error -f concat -safe 0 -i "%s" -c copy "%s"' % (ff, lst, silent))
+    total = body + cdur
+    # ---- เสียง: พากย์เรียงตามช็อต + เพลงคลอ ----
+    SR = 44100
+    al = os.path.join(d, "alist.txt")
+    anyvo = False
+    with open(al, "w") as o:
+        for i, p in enumerate(parts):
+            a = os.path.join(d, "a%03d.wav" % i)
+            x = p["x"]
+            if x and x["vo"]:
+                try:
+                    sh('"%s" -y -loglevel error -i "%s" -af "adelay=150:all=1,apad" -t %.3f -ar %d -ac 2 "%s"' % (ff, x["vo"], p["dur"], SR, a))
+                    anyvo = True
+                except Exception:
+                    sh('"%s" -y -loglevel error -f lavfi -i anullsrc=r=%d:cl=stereo -t %.3f "%s"' % (ff, SR, p["dur"], a))
+            else:
+                sh('"%s" -y -loglevel error -f lavfi -i anullsrc=r=%d:cl=stereo -t %.3f "%s"' % (ff, SR, p["dur"], a))
+            o.write("file '%s'" % a + chr(10))
+    voice = os.path.join(d, "voice.wav")
+    sh('"%s" -y -loglevel error -f concat -safe 0 -i "%s" -c copy "%s"' % (ff, al, voice))
+    bgm = ""
+    if spec.get("bgm"):
+        try:
+            bgm = grab(spec["bgm"], os.path.join(d, "bgm.src"))
+        except Exception as e:
+            log("ไม่มีเพลงประกอบ (ดึงไฟล์ไม่ได้): %s" % str(e)[:120])
+    mix = os.path.join(d, "mix.m4a")
+    if bgm:
+        fo = max(0.0, total - 2.5)
+        fc = ("[1:a]aresample=%d,volume=%.2f,afade=t=in:d=1.5,afade=t=out:st=%.2f:d=2.5[b];[0:a]asplit[v1][v2];[b][v1]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=400[bd];[v2][bd]amix=inputs=2:normalize=0:duration=first[m]"
+              % (SR, float(opt.get("bgmvol") or 0.35), fo))
+        sh('"%s" -y -loglevel error -i "%s" -stream_loop -1 -i "%s" -filter_complex "%s" -map "[m]" -t %.3f -c:a aac -b:a 160k "%s"' % (ff, voice, bgm, fc, total, mix))
+    else:
+        sh('"%s" -y -loglevel error -i "%s" -t %.3f -c:a aac -b:a 128k "%s"' % (ff, voice, total, mix))
+    # ---- ซับ + เครดิต (ASS) ----
     out = os.path.join(ROOT, "job%s.mp4" % j["id"])
-    sh('"%s" -y -loglevel error -f concat -safe 0 -i "%s" -c copy -movflags +faststart "%s"' % (ff, lst, out))
+    subs = [p for p in parts if p["x"] and p["x"]["say"]]
+    done = False
+    fsub = ff_sub() if (subs or cdur) else ""
+    if fsub:
+        fn = thai_font()
+        land = W >= H
+        fs = int(H / 15.0) if land else int(W / 14.0)
+        maxc = max(12, int(W * 0.88 / (fs * 0.5)))
+        ass = os.path.join(d, "subs.ass")
+        with open(ass, "w", encoding="utf-8") as o:
+            o.write("[Script Info]\nScriptType: v4.00+\nPlayResX: %d\nPlayResY: %d\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n" % (W, H))
+            o.write("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+            o.write("Style: D,%s,%d,&H00FFFFFF,&H00FFFFFF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,%.1f,1,2,%d,%d,%d,1\n" % (fn["name"], fs, fs / 11.0, int(W * 0.05), int(W * 0.05), int(H * (0.06 if land else 0.14))))
+            o.write("Style: N,%s,%d,&H00E8F4FF,&H00FFFFFF,&H00101010,&H80000000,0,-1,0,0,100,100,0,0,1,%.1f,1,2,%d,%d,%d,1\n" % (fn["name"], int(fs * 0.86), fs / 12.0, int(W * 0.05), int(W * 0.05), int(H * (0.06 if land else 0.14))))
+            o.write("Style: C,%s,%d,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,%d,%d,0,1\n\n" % (fn["name"], int(fs * 0.8), int(W * 0.08), int(W * 0.08)))
+            o.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+            t = 0.0
+            for p in parts:
+                x = p["x"]
+                if x and x["say"]:
+                    a, b = t + 0.12, t + p["dur"] - 0.08
+                    o.write("Dialogue: 0,%s,%s,%s,,0,0,0,,%s\n" % (ass_time(a), ass_time(b), "D" if x["who"] else "N", "\\N".join(ass_esc(l) for l in wrap_th(x["say"], maxc, 3 if land else 4))))
+                t += p["dur"]
+            if cdur:
+                big = int(fs * 1.25)
+                lines = []
+                if spec.get("title"):
+                    lines.append("{\\fs%d\\b1}%s{\\b0\\fs%d}" % (big, ass_esc(spec["title"]), int(fs * 0.72)))
+                if spec.get("eptitle") or spec.get("ep"):
+                    lines.append(ass_esc(("ตอนที่ %s" % spec["ep"] if spec.get("ep") else "") + ((" · " if spec.get("ep") else "") + str(spec["eptitle"]) if spec.get("eptitle") else "")))
+                    lines.append("")
+                for c in credits:
+                    lines += [ass_esc(l) for l in wrap_th(c, int(maxc * 1.25))]
+                o.write("Dialogue: 0,%s,%s,C,,0,0,0,,{\\fad(700,500)}%s\n" % (ass_time(body + 0.3), ass_time(total - 0.2), "\\N".join(lines)))
+        try:
+            fdopt = (":fontsdir='%s'" % fn["dir"]) if fn["dir"] else ""
+            sh('"%s" -y -loglevel error -i "%s" -i "%s" -vf "ass=\'%s\'%s" -c:v libx264 -preset veryfast -crf %d -pix_fmt yuv420p -r %d -c:a copy -shortest -movflags +faststart "%s"' % (fsub, silent, mix, ass, fdopt, crf, fps, out), cwd=d)
+            done = True
+        except Exception as e:
+            log("ฝังซับไม่สำเร็จ ส่งแบบไม่มีซับแทน: %s" % str(e)[-200:])
+    elif subs or cdur:
+        log("เครื่องนี้ไม่มีตัวฝังซับ ส่งแบบไม่มีซับและเครดิตตัวอักษร")
+    if not done:
+        sh('"%s" -y -loglevel error -i "%s" -i "%s" -c:v copy -c:a copy -shortest -movflags +faststart "%s"' % (ff, silent, mix, out))
     shutil.rmtree(d, ignore_errors=True)
-    log("รวมตอนเสร็จ %d ช็อต (%dx%d)" % (len(parts), W, H))
+    log("รวมตอนเสร็จ %d ช็อต %d วินาที (%dx%d)%s%s%s" % (len(src), total, W, H, " · มีเสียงพากย์" if anyvo else "", " · มีเพลง" if bgm else "", " · มีซับ" if (done and subs) else ""))
     return out, 0, W, H
 
 
@@ -2345,7 +2592,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=4" + ("&nolora=1" if M.get("nolora") else "")
+    return "/k/claim?v=5" + ("&nolora=1" if M.get("nolora") else "")
 
 
 def claim_wait(stat):
