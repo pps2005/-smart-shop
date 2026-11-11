@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'xlora-1';
+const BOT_VER = 'xlora-2';
 
 export default {
   async fetch(req, env, ctx) {
@@ -282,8 +282,10 @@ async function charTrain(env, b) {
 async function restyleTick(env, s) {
   if (!s.restyle) return;
   await animeSchema(env);
-  if (s.restyle === 'start') {
-    const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE c.series_id=0 AND EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','failed')) AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status='ready') AND NOT EXISTS (SELECT 1 FROM vjobs v WHERE v.kind='lora' AND v.status='running' AND v.project='ซีรีส์0·'||c.name)").all()).results;
+  if (String(s.restyle).startsWith('start')) { // 'start' = ทุกตัวที่ LoRA ยังไม่เสร็จ · 'start:3,7' = เฉพาะตัวละคร id ที่ระบุ (เช่น ตัวที่ต้องใช้ในตอนที่จะทำก่อน)
+    const only = String(s.restyle).includes(':') ? new Set(String(s.restyle).split(':')[1].split(',').map(Number).filter(Boolean)) : null;
+    const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE c.series_id=0 AND EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','failed')) AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status='ready') AND NOT EXISTS (SELECT 1 FROM vjobs v WHERE v.kind='lora' AND v.status='running' AND v.project='ซีรีส์0·'||c.name)").all()).results.filter(c => !only || only.has(c.id));
+    if (only) for (const id of only) if (!cs.some(c => c.id === id)) { const c = await env.DB.prepare("SELECT * FROM chars WHERE id=? AND series_id=0 AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=chars.id AND l.status='ready')").bind(id).first(); if (c) cs.push(c); } // ตัวที่ระบุมาแต่ยังไม่เคยเข้าคิวเทรนก็รวมด้วย
     for (const c of cs) {
       const pj = charProj(c);
       await env.DB.batch([env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed','hold') AND project=?").bind(pj), env.DB.prepare("DELETE FROM loras WHERE char_id=? AND status IN ('queued','failed')").bind(c.id), env.DB.prepare("DELETE FROM jobs WHERE project=?").bind(pj), env.DB.prepare("DELETE FROM vjobs WHERE kind='img' AND status='queued' AND project=?").bind(pj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj)]);
