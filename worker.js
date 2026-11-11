@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'episode-av-2';
+const BOT_VER = 'episode-av-3';
 
 export default {
   async fetch(req, env, ctx) {
@@ -614,7 +614,7 @@ async function sbTighten(env, s, sid) {
 async function sbSay(env, s, sid) {
   const rows = (await env.DB.prepare('SELECT id,th,chars FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results; if (!rows.length) return 0;
   const sc = await env.DB.prepare('SELECT body FROM scripts WHERE id=?').bind(sid).first();
-  const o = await llmJson(env, s, `บทของซีนนี้: ${String((sc && sc.body) || '').slice(0, 3000)}\n\nสตอรีบอร์ดเรียงตามลำดับ (เลข: เหตุการณ์ [ตัวละครในช็อต])\n${rows.map((r, i) => `${i + 1}: ${r.th} ${r.chars || '[]'}`).join('\n')}\n\nเขียนบทพูดภาษาไทยสำหรับอ่านแบบมังงะ ช็อตละไม่เกิน 1 ประโยคสั้นๆ (ไม่เกิน 60 ตัวอักษร) เป็นธรรมชาติ ต่อเนื่องกันทั้งซีน คนพูดต้องเป็นตัวละครที่อยู่ในช็อตนั้น ช็อตที่ไม่มีใครพูด (ภาพบรรยากาศ แอ็กชัน) ให้ who เป็น "" และ say เป็นคำบรรยายสั้นๆ หรือ "" ก็ได้\nตอบเป็น JSON array: [{"n":เลขช็อต,"who":"ชื่อคนพูด หรือ \"\"","say":"บทพูด"}]`);
+  const o = await llmJson(env, s, `บทของซีนนี้: ${String((sc && sc.body) || '').slice(0, 3000)}\n\nสตอรีบอร์ดเรียงตามลำดับ (เลข: เหตุการณ์ [ตัวละครในช็อต])\n${rows.map((r, i) => `${i + 1}: ${r.th} ${r.chars || '[]'}`).join('\n')}\n\nเขียนบทพูดภาษาไทยสำหรับอ่านแบบมังงะ ช็อตละไม่เกิน 1 ประโยคสั้นๆ (ไม่เกิน 60 ตัวอักษร) เป็นธรรมชาติ ต่อเนื่องกันทั้งซีน คนพูดต้องเป็นตัวละครที่อยู่ในช็อตนั้น ฉากสนทนาให้ตัวละครสลับกันพูดโต้ตอบไปมาบ่อยๆ (คนเดิมห้ามพูดติดกันเกิน 2 ช็อต) ประโยคสั้น กระชับ มีอารมณ์ ไม่ใช่คำสั่งห้วนๆ คำเดียว ช็อตที่ไม่มีใครพูด (ภาพบรรยากาศ แอ็กชัน) ให้ who เป็น "" และ say เป็นคำบรรยายสั้นๆ หรือ "" ก็ได้\nตอบเป็น JSON array: [{"n":เลขช็อต,"who":"ชื่อคนพูด หรือ \"\"","say":"บทพูด"}]`);
   const arr = Array.isArray(o) ? o : (o && Array.isArray(o.lines) ? o.lines : []), st = [];
   for (const x of arr) { const r = rows[+x.n - 1]; if (!r || typeof x.say !== 'string' || !x.say.trim()) continue; st.push(env.DB.prepare('UPDATE shots SET say=? WHERE id=?').bind(JSON.stringify({ who: String(x.who || '').slice(0, 40), say: x.say.trim().slice(0, 160) }), r.id)); }
   for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20));
@@ -716,9 +716,9 @@ async function epAssemble(env, s) {
     const st = await epstOf(env, sr.title); if (!st[d.ep] || st[d.ep].status !== 'running') continue;
     const urls = []; // แต่ละช็อต: ไฟล์ภาพ/คลิป + บทพูด (ทำซับ) · เสียงพากย์จะเติมช่อง vo เมื่อระบบเสียงพร้อม
     for (const sc of (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(d.sid, d.ep).all()).results) {
-      for (const sh of (await env.DB.prepare('SELECT id,kproj,say FROM shots WHERE script_id=? ORDER BY idx').bind(sc.script_id).all()).results) {
+      for (const sh of (await env.DB.prepare('SELECT id,kproj,say,en FROM shots WHERE script_id=? ORDER BY idx').bind(sc.script_id).all()).results) {
         let sy = {}; try { sy = JSON.parse(sh.say || '{}') || {}; } catch (x) { sy = {}; }
-        const it = { who: String(sy.who || ''), say: String(sy.say || '') };
+        const it = { who: String(sy.who || ''), say: String(sy.say || ''), en: String(sh.en || '').slice(0, 220) }; // en: ใช้เลือกวิธีขยับกล้องและเอฟเฟกต์ฉากสู้ตอนรวมตอน
         const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind('a' + sc.script_id, String(sh.id)).first();
         if (v && v.id) { urls.push({ u: og + '/vv/' + v.id + '?s=' + await vvSig(env, v.id), ...it }); continue; }
         const im = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(sh.kproj).first();
@@ -728,7 +728,7 @@ async function epAssemble(env, s) {
     if (!urls.length || urls.length > 400) continue;
     const plan = await readPlan(env, sr.title).catch(() => null), PE = plan && plan.eps.find(x => x.no === +d.ep);
     const spec = { v: 2, title: String((plan && plan.title) || sr.title).split('\n')[0].slice(0, 60), ep: +d.ep, eptitle: PE ? String(PE.title).slice(0, 80) : '', items: urls, bgm: '', credits: ['ภาพและแอนิเมชัน: สร้างด้วย AI', 'ผลิตโดย ' + String(s.studio_name || 'SMART SHOP')] };
-    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'final',?,'','',0,'queued',0,?,'epcat',?)").bind(('ตอน·' + sr.title + '·' + d.ep).slice(0, 60), key, JSON.stringify(spec), Date.now(), JSON.stringify({ still: 3, crf: 28, fps: 24 })).run();
+    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'final',?,'','',0,'queued',0,?,'epcat',?)").bind(('ตอน·' + sr.title + '·' + d.ep).slice(0, 60), key, JSON.stringify(spec), Date.now(), JSON.stringify({ still: 2.2, crf: 26, fps: 24 })).run();
   }
 }
 async function animeApi(env, b) {
@@ -777,7 +777,7 @@ async function animeApi(env, b) {
     const sr = await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(sc.series_id).first();
     const cs = (await env.DB.prepare('SELECT name,desc FROM chars WHERE series_id=?').bind(sc.series_id).all()).results.concat(await castList(env, sr));
     const total = +b.shots > 0 ? Math.min(180, +b.shots) : 12 * Math.min(15, Math.max(1, +b.minutes || 5)), N = Math.min(10, Math.max(2, Math.ceil(total / beats.length)));
-    const arr = await llmJson(env, s, `ซีรีส์: ${sr ? sr.brief : ''}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nชื่อซีน: ${o.title || ''}\nเหตุการณ์ที่ ${bi + 1}/${beats.length}: ${beats[bi]}\nเขียน ${N} ช็อตต่อเนื่องของเหตุการณ์นี้ (ช็อตละราว 5 วินาที ระบุมุมกล้องและการกระทำ) ตอบเป็น JSON array ของ {"th":"คำอธิบายช็อตภาษาไทยสั้นๆ","en":"English image prompt: setting, action, camera angle (no character names, no hair/clothes details)","chars":["ชื่อตัวละครที่อยู่ในช็อต"]}`);
+    const arr = await llmJson(env, s, `ซีรีส์: ${sr ? sr.brief : ''}\nตัวละคร: ${cs.map(c => c.name + ' = ' + c.desc).join(' | ') || '-'}\nชื่อซีน: ${o.title || ''}\nเหตุการณ์ที่ ${bi + 1}/${beats.length}: ${beats[bi]}\nเขียน ${N} ช็อตต่อเนื่องของเหตุการณ์นี้ (ช็อตละราว 2-4 วินาที ระบุมุมกล้องและการกระทำ · ฉากสนทนาให้สลับช็อตระหว่างคนพูดกับคนฟัง (shot / reverse shot) ใช้โคลสอัพหน้าคนพูดสลับกับภาพสองคน ช็อตหนึ่งมีคนพูดหลักคนเดียว · ฉากต่อสู้ให้แตกเป็นช็อตสั้นๆ หลายมุม: ตั้งท่า → พุ่งเข้า → ปะทะ → ผลลัพธ์) ตอบเป็น JSON array ของ {"th":"คำอธิบายช็อตภาษาไทยสั้นๆ","en":"English image prompt: setting, action, camera angle (no character names, no hair/clothes details)","chars":["ชื่อตัวละครที่อยู่ในช็อต"]}`);
     const list = (Array.isArray(arr) ? arr : [arr]).slice(0, N);
     const base = (await env.DB.prepare('SELECT COUNT(*) n FROM shots WHERE script_id=?').bind(sc.id).first()).n;
     await env.DB.batch(list.map((x, i) => env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created) VALUES (?,?,?,?,?,?,?,?)').bind(sc.id, base + i + 1, bi, String(x.th || '').slice(0, 300), String(x.en || '').slice(0, 600), JSON.stringify(Array.isArray(x.chars) ? x.chars : []), `ฉาก${sc.id}·${base + i + 1}`, Date.now())));
@@ -875,7 +875,7 @@ async function animeApi(env, b) {
     for (const [i, sh] of rows.entries()) {
       if (n >= 6) break; if (!keyShot(sh, i) || have.has(String(sh.id))) continue;
       const im = await env.DB.prepare('SELECT data FROM images WHERE project=? ORDER BY id DESC LIMIT 1').bind(sh.kproj).first(); if (!im || !im.data) continue;
-      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, ${speakShot(sh) ? 'the character is talking, mouth opening and closing naturally while speaking, subtle head movement, ' : ''}smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(5), Date.now(), JSON.stringify({ hq: 0, fps: 12 })).run();
+      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, ${speakShot(sh) ? 'the character is talking, mouth opening and closing naturally while speaking, subtle head movement, ' : ''}smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(speakShot(sh) && !/fight|battle|chase|attack|explo|leap|punch|slash/i.test(sh.en || '') ? 3 : 5), Date.now(), JSON.stringify({ hq: 0, fps: 12 })).run();
       n++;
     }
     return { queued: n };
@@ -2232,6 +2232,83 @@ def ass_esc(t):
     return str(t).replace("\\", "").replace("{", "(").replace("}", ")").replace("\n", " ")
 
 
+ACT_RE = "fight|battle|chase|attack|talisman|explo|seal|spell|leap|punch|slash|strike|clash|kick|dodge|charge|impact|burst"
+CAMS = ["zin", "panR", "zout", "tiltU", "panL", "zin", "tiltD", "zout"]
+
+
+def pick_cam(en, i, dur):
+    # เลือกวิธีขยับกล้องของภาพนิ่งจากคำบรรยายช็อต (ไม่มีคำบอก → หมุนเวียนไม่ให้ซ้ำกันติดๆ)
+    import re
+    e = (en or "").lower()
+    if re.search(ACT_RE, e):
+        return "punch"
+    if re.search("shock|surpris|gasp|sudden|startl|realiz|wide.?eyed", e):
+        return "push"
+    if re.search("low angle|looking up|tower|sky|tall|from below", e):
+        return "tiltU"
+    if re.search("high angle|looking down|from above|bird", e):
+        return "tiltD"
+    if re.search("wide shot|establishing|landscape|city|street|panorama|skyline", e):
+        return "panR" if i % 2 == 0 else "panL"
+    if re.search("close.?up|closeup|face|eyes|portrait", e):
+        return "zin" if i % 2 == 0 else "zout"
+    if dur < 1.7:
+        return "hold"
+    return CAMS[i % len(CAMS)]
+
+
+def cam_expr(cam, n):
+    # คืน (z, x, y) ของ zoompan · on = เลขเฟรม
+    cx, cy = "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
+    if cam == "zout":
+        return "1.10-0.10*on/%d" % n, cx, cy
+    if cam == "panR":
+        return "1.12", "(iw-iw/zoom)*on/%d" % n, cy
+    if cam == "panL":
+        return "1.12", "(iw-iw/zoom)*(1-on/%d)" % n, cy
+    if cam == "tiltU":
+        return "1.12", cx, "(ih-ih/zoom)*(1-on/%d)" % n
+    if cam == "tiltD":
+        return "1.12", cx, "(ih-ih/zoom)*on/%d" % n
+    if cam == "push":
+        k = max(3, int(n * 0.3))
+        return "if(lt(on,%d),1+0.22*on/%d,1.22+0.02*(on-%d)/%d)" % (k, k, k, max(1, n - k)), cx, "ih/2-(ih/zoom/2)-ih*0.03"
+    if cam == "punch":
+        a, b = max(2, int(n * 0.34)), max(4, int(n * 0.67))
+        return "if(lt(on,%d),1.0,if(lt(on,%d),1.28,1.6))" % (a, b), cx, "ih/2-(ih/zoom/2)-ih*0.04"
+    if cam == "hold":
+        return "1.03", cx, cy
+    return "1+0.10*on/%d" % n, cx, cy
+
+
+def speed_lines(d, W, H):
+    # เส้นสปีดโปร่งใส 2 แบบ สลับกันให้ดูสั่นไหว (ใช้ซ้อนบนช็อตแอ็กชัน)
+    out = []
+    try:
+        import math
+        import random
+        from PIL import Image, ImageDraw
+        for v in range(2):
+            f = os.path.join(d, "sl%d.png" % v)
+            if not os.path.exists(f):
+                im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                dr = ImageDraw.Draw(im)
+                rnd = random.Random(7 + v * 13)
+                R = math.hypot(W, H) / 2
+                for _ in range(70):
+                    ang = rnd.uniform(0, math.tau)
+                    r0 = R * rnd.uniform(0.42, 0.8)
+                    w = rnd.uniform(0.004, 0.016)
+                    p = [(W / 2 + r0 * math.cos(ang), H / 2 + r0 * math.sin(ang)), (W / 2 + R * 1.1 * math.cos(ang - w), H / 2 + R * 1.1 * math.sin(ang - w)), (W / 2 + R * 1.1 * math.cos(ang + w), H / 2 + R * 1.1 * math.sin(ang + w))]
+                    dr.polygon(p, fill=(255, 255, 255, rnd.randint(110, 210)))
+                im.save(f)
+            out.append(f)
+    except Exception as e:
+        log("ทำเส้นสปีดไม่ได้: %s" % str(e)[:100])
+        return []
+    return out
+
+
 def epcat(j):
     # รวมทั้งตอนเป็นไฟล์เดียวตามลำดับช็อต: ช็อตที่มีคลิปใช้คลิป ช็อตภาพนิ่งทำเป็นคลิปซูมช้า
     # รุ่น 2: ซับไทยฝังในภาพ · เสียงพากย์รายช็อต (ถ้ามี) · เพลงบรรเลงคลอ เบาลงเองตอนมีเสียงพูด · เอนด์เครดิตท้ายตอน
@@ -2241,7 +2318,7 @@ def epcat(j):
         spec = {"items": [{"u": u} for u in spec]}
     items = spec.get("items") or []
     opt = j.get("opt") or {}
-    still, crf, fps = float(opt.get("still") or 3), int(opt.get("crf") or 28), int(opt.get("fps") or 24)
+    still, crf, fps = float(opt.get("still") or 2.2), int(opt.get("crf") or 28), int(opt.get("fps") or 24)
     d = os.path.join(ROOT, "ec%s" % j["id"])
     os.makedirs(d, exist_ok=True)
     ff = ffmpeg_bin()
@@ -2267,7 +2344,14 @@ def epcat(j):
                 vo = grab(it["vo"], os.path.join(d, "v%03d.wav" % i))
             except Exception as e:
                 log("ช็อต %d ไม่มีเสียงพากย์ (ดึงไฟล์ไม่ได้): %s" % (i + 1, str(e)[:120]))
-        src.append({"f": f, "img": isimg, "vo": vo, "who": str(it.get("who") or ""), "say": str(it.get("say") or "")})
+        sfx = []
+        for k, su in enumerate((it.get("sfx") or [])[:2]):
+            try:
+                sfx.append(grab(su, os.path.join(d, "x%03d_%d.snd" % (i, k))))
+            except Exception:
+                pass
+        en = str(it.get("en") or "")
+        src.append({"f": f, "img": isimg, "vo": vo, "sfx": sfx, "en": en, "act": bool(re.search(ACT_RE, en.lower())), "who": str(it.get("who") or ""), "say": str(it.get("say") or "")})
     if not src:
         raise RuntimeError("ไม่มีไฟล์ให้รวม")
     W = H = 0
@@ -2284,25 +2368,41 @@ def epcat(j):
     W, H = int(W * k) // 2 * 2, int(H * k) // 2 * 2
     enc = "-r %d -c:v libx264 -preset veryfast -crf %d -pix_fmt yuv420p -an" % (fps, max(16, crf - 4))
     parts = []
+    sl = speed_lines(d, W, H) if any(x["act"] for x in src) else []
     for i, x in enumerate(src):
         o = os.path.join(d, "p%03d.mp4" % i)
         vlen = media_dur(ff, x["vo"]) if x["vo"] else 0.0
+        read = min(4.0, max(1.8, 1.0 + 0.065 * th_vis(x["say"]))) if x["say"] else 0.0
+        # เอฟเฟกต์ช็อตแอ็กชัน: จอสั่น + แฟลชขาวตอนเข้า + เส้นสปีด
+        fx = ""
+        ins = ""
+        if x["act"]:
+            fx = ",scale=%d:%d,crop=%d:%d:x='(iw-%d)/2*(1+sin(n*2.3))':y='(ih-%d)/2*(1+cos(n*3.1))',fade=t=in:st=0:d=0.14:color=white" % (int(W * 1.06) // 2 * 2, int(H * 1.06) // 2 * 2, W, H, W, H)
         try:
             if x["img"]:
-                # ภาพนิ่ง: ยาวพอให้อ่านซับ/ฟังเสียงจบ
-                dur = max(still, vlen + 0.5, min(6.0, 1.2 + 0.07 * len(x["say"])) if x["say"] else 0)
+                # ภาพนิ่ง: ยาวพอให้อ่านซับ/ฟังเสียงจบ ไม่ค้างนาน · กล้องขยับหลายแบบ
+                dur = (vlen + 0.35) if vlen else (read or (1.6 if x["act"] else still))
+                dur = max(1.4, dur)
                 n = max(2, int(round(dur * fps)))
-                z = ("1+0.08*on/%d" % n) if i % 2 == 0 else ("1.08-0.08*on/%d" % n)
-                vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,zoompan=z='%s':d=%d:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=%dx%d:fps=%d,setsar=1" % (W * 2, H * 2, W * 2, H * 2, z, n, W, H, fps)
-                sh('"%s" -y -loglevel error -i "%s" -vf "%s" -frames:v %d %s "%s"' % (ff, x["f"], vf, n, enc, o))
-                dur = n / float(fps)
+                z, zx, zy = cam_expr(pick_cam(x["en"], i, dur), n)
+                vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,zoompan=z='%s':d=%d:x='%s':y='%s':s=%dx%d:fps=%d,setsar=1%s" % (W * 2, H * 2, W * 2, H * 2, z, n, zx, zy, W, H, fps, fx)
+                base = '-loop 0 -i "%s"' % x["f"]
+                cnt = "-frames:v %d" % n
             else:
                 dv = media_dur(ff, x["f"]) or 5.0
-                dur = max(dv, vlen + 0.4)
+                # คลิป: ช็อตพูดตัดให้พอดีเสียง/ซับ · ช็อตทั่วไปไม่เกิน 3.5 วิ · ช็อตแอ็กชันใช้เต็ม
+                want = dv if x["act"] else ((vlen + 0.4) if vlen else (max(2.0, read) if read else min(dv, 3.5)))
+                dur = max(1.2, want)
                 pad = (",tpad=stop_mode=clone:stop_duration=%.2f" % (dur - dv)) if dur > dv + 0.05 else ""
-                vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,fps=%d,setsar=1%s" % (W, H, W, H, fps, pad)
-                sh('"%s" -y -loglevel error -i "%s" -vf "%s" -t %.2f %s "%s"' % (ff, x["f"], vf, dur, enc, o))
-                dur = media_dur(ff, o) or dur
+                vf = "scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,fps=%d,setsar=1%s%s" % (W, H, W, H, fps, pad, fx)
+                base = '-i "%s"' % x["f"]
+                cnt = "-t %.2f" % dur
+            if x["act"] and len(sl) == 2:
+                fc = "[0:v]%s[b];[b][1:v]overlay=enable='lt(mod(n,4),2)'[c];[c][2:v]overlay=enable='gte(mod(n,4),2)'[v]" % vf
+                sh('"%s" -y -loglevel error %s -i "%s" -i "%s" -filter_complex "%s" -map "[v]" %s %s "%s"' % (ff, base, sl[0], sl[1], fc, cnt, enc, o))
+            else:
+                sh('"%s" -y -loglevel error %s -vf "%s" %s %s "%s"' % (ff, base, vf, cnt, enc, o))
+            dur = media_dur(ff, o) or dur
             parts.append({"o": o, "dur": dur, "x": x})
         except Exception as e:
             log("ข้ามช็อต %d (แปลงไฟล์ไม่ได้): %s" % (i + 1, str(e)[-160:]))
@@ -2330,10 +2430,13 @@ def epcat(j):
         for i, p in enumerate(parts):
             a = os.path.join(d, "a%03d.wav" % i)
             x = p["x"]
-            if x and x["vo"]:
+            snd = ([(x["vo"], 1.0, 150)] if x and x["vo"] else []) + ([(f, 0.8, 40) for f in x["sfx"]] if x else [])
+            if snd:
                 try:
-                    sh('"%s" -y -loglevel error -i "%s" -af "adelay=150:all=1,apad" -t %.3f -ar %d -ac 2 "%s"' % (ff, x["vo"], p["dur"], SR, a))
-                    anyvo = True
+                    fc = ";".join("[%d:a]aresample=%d,aformat=channel_layouts=stereo,volume=%.2f,adelay=%d:all=1[s%d]" % (k, SR, v, dl, k) for k, (f, v, dl) in enumerate(snd))
+                    fc += ";" + "".join("[s%d]" % k for k in range(len(snd))) + "amix=inputs=%d:normalize=0:duration=longest,apad[m]" % len(snd)
+                    sh('"%s" -y -loglevel error %s -filter_complex "%s" -map "[m]" -t %.3f -ar %d -ac 2 "%s"' % (ff, " ".join('-i "%s"' % f for f, v, dl in snd), fc, p["dur"], SR, a))
+                    anyvo = anyvo or bool(x["vo"])
                 except Exception:
                     sh('"%s" -y -loglevel error -f lavfi -i anullsrc=r=%d:cl=stereo -t %.3f "%s"' % (ff, SR, p["dur"], a))
             else:
