@@ -10,7 +10,7 @@ import IDEAS from './ideas.json';
 import WORLD from './world.json';
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'episode-av-1';
+const BOT_VER = 'episode-av-2';
 
 export default {
   async fetch(req, env, ctx) {
@@ -669,7 +669,9 @@ async function epWrite(env, s, e) {
   return r.meta.last_row_id;
 }
 // ช็อตสำคัญ (ฉากสู้/เคลื่อนไหว/ช็อตเปิดทุก 5 ช็อต) ทำเป็นวิดีโอ ที่เหลือใช้ภาพนิ่งซูมเลื่อน
-const keyShot = (sh, i) => i % 5 === 0 || /fight|battle|chase|run|jump|attack|talisman|glow|explo|seal|spell|leap|punch/i.test(sh.en || '');
+// ช็อตที่ทำเป็นคลิปขยับ: ทุกช็อตที่ 5 · ช็อตแอ็กชัน · ช็อตที่ตัวละครในภาพเป็นคนพูด (ปากขยับ) — ช็อตบรรยาย/เล่าสถานการณ์ใช้ภาพนิ่งซูมช้า
+const speakShot = sh => { try { const y = JSON.parse(sh.say || '{}') || {}, c = JSON.parse(sh.chars || '[]'); return !!(y.who && y.say && Array.isArray(c) && c.includes(y.who)); } catch (e) { return false; } };
+const keyShot = (sh, i) => i % 5 === 0 || /fight|battle|chase|run|jump|attack|talisman|glow|explo|seal|spell|leap|punch/i.test(sh.en || '') || speakShot(sh);
 // ทำงานต่อเองทีละขั้นต่อรอบ cron: บท → ช็อต → ภาพคีย์ → วิดีโอ → รวมตอน (ทีละตอน เรียงตามลำดับ เพราะ GPU ฟรีมีจำกัด)
 async function animeAdvance(env, s) {
   if (s.auto_anime === '0') return;
@@ -687,7 +689,7 @@ async function animeAdvance(env, s) {
     if (gsb && s['sbfix:' + sid] == null) { let r = { cut: 0, fix: 0 }; try { r = await sbTighten(env, s, sid); } catch (x) { } await setSetting(env, 'sbfix:' + sid, r.cut + ',' + r.fix); return; } // แตกช็อตครบ → ให้ AI ตรวจตัดช็อตซ้ำ/แก้มุมกล้องก่อนวาด
     if (gsb && s['sbsay:' + sid] == null) { let n = 0; try { n = await sbSay(env, s, sid); } catch (x) { } await setSetting(env, 'sbsay:' + sid, String(n)); return; } // บทพูดรายช็อต
     if (gsb && s['sbdone:' + sid] === '1') continue; // ซีนนี้ภาพครบและตรวจแล้ว รออนุมัติ: ไม่ต้องอ่านอะไรอีก
-    const rows = (await env.DB.prepare('SELECT id,en,kproj FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
+    const rows = (await env.DB.prepare('SELECT id,en,kproj,say,chars FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
     const hasImg = (await env.DB.prepare('SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj)').bind(sid).first()).n;
     if (hasImg < rows.length) {
       const need = (await env.DB.prepare("SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND NOT EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj) AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.project=s.kproj AND j.status IN ('queued','running','kaggle'))").bind(sid).first()).n;
@@ -867,13 +869,13 @@ async function animeApi(env, b) {
   }
   if (act === 'vid') { // ภาพคีย์ → วิดีโอช็อตละ ~5 วิ (ลุคอนิเมะ 12fps) ครั้งละไม่เกิน 6 ช็อต ที่เหลือทำรอบถัดไป
     const sid = +b.script_id, ep = 'a' + sid;
-    const rows = (await env.DB.prepare('SELECT id,en,kproj,say FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
+    const rows = (await env.DB.prepare('SELECT id,en,kproj,say,chars FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
     const have = new Set([...(await env.DB.prepare("SELECT DISTINCT shot FROM videos WHERE ep=?").bind(ep).all()).results, ...(await env.DB.prepare("SELECT shot FROM vjobs WHERE ep=? AND status IN ('queued','running')").bind(ep).all()).results].map(x => String(x.shot)));
     let n = 0;
     for (const [i, sh] of rows.entries()) {
       if (n >= 6) break; if (!keyShot(sh, i) || have.has(String(sh.id))) continue;
       const im = await env.DB.prepare('SELECT data FROM images WHERE project=? ORDER BY id DESC LIMIT 1').bind(sh.kproj).first(); if (!im || !im.data) continue;
-      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, ${/"who":"[^"]/.test(sh.say || '') ? 'the character is talking, mouth opening and closing naturally while speaking, subtle head movement, ' : ''}smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(5), Date.now(), JSON.stringify({ hq: 0, fps: 12 })).run();
+      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, ${speakShot(sh) ? 'the character is talking, mouth opening and closing naturally while speaking, subtle head movement, ' : ''}smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(5), Date.now(), JSON.stringify({ hq: 0, fps: 12 })).run();
       n++;
     }
     return { queued: n };
