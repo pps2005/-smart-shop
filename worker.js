@@ -3589,6 +3589,12 @@ async function castApi(req, env, url, body) {
         if (!key) return json({ error: 'ไม่พบบท' }, 400);
         m[key] = v; await setSetting(env, 'lw:' + story, JSON.stringify(m)); return json({ ok: true, w: v });
       }
+      if (act === 'helpers') { // ผู้ช่วย Kaggle: ลิงก์สคริปต์ให้ผู้ช่วยกดรันใน Kaggle ของตัวเอง
+        const S9 = await getSettings(env), base = S9.self_url || url.origin;
+        if (b.set) { await env.DB.prepare('UPDATE helpers SET on_=? WHERE id=?').bind(b.on ? 1 : 0, +b.set).run(); }
+        const hs = (await env.DB.prepare('SELECT id,name,key,on_,seen,done,cur FROM helpers ORDER BY id').all()).results;
+        return json({ ok: true, items: hs.map(h => ({ id: h.id, name: h.name, on: +h.on_, seen: +h.seen || 0, done: +h.done || 0, cur: h.cur || '', link: base + '/h/' + h.key })) });
+      }
       if (act === 'quota') { // โควตาฟรีทั้งหมดที่ใช้ (แยกจากหลอดอ่านฐานข้อมูล)
         const S9 = await getSettings(env), now = Date.now(), dy = utcDay(now), wk = kgWeek(now), Q = {};
         for (const r of (await env.DB.prepare("SELECT day,k,v FROM qmeter WHERE day IN (?,?,'all')").bind(dy, wk).all()).results) Q[(r.day === wk && r.day !== dy ? 'w:' : '') + r.k] = +r.v;
