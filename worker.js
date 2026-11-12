@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-6';
+const BOT_VER = 'manga-7';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -549,8 +549,10 @@ function fluxDraft(job, s) {
   if (!String(job.project || '').startsWith('ฉาก') || !p.includes('[[STYLE]]')) return withStyle(p, s);
   const body = p.replace(/chr\d+x,?\s*/g, '').replace(/,?\s*\[\[STYLE\]\]/, '');
   // ภาพร่างสตอรีบอร์ด = มังงะขาวดำตัดเส้นหมึก (ผู้ใช้เลือก): ไม่มีสี/แสงให้แกว่งข้ามช่อง · ตั้ง settings draft_style เพื่อเปลี่ยนได้
-  const st = String(s.draft_style || '').trim() || 'black and white manga page illustration, monochrome, clean fine ink line art with thin delicate pen lines, soft screentone dot shading, white background areas, expressive detailed eyes, no color, no gray gradients, no text, no speech bubbles, single panel';
-  return `${st}. ${body.replace(/,?\s*single cinematic illustration/, '')}`;
+  const st = String(s.draft_style || '').trim() || 'black and white manga page illustration, monochrome, clean fine ink line art with thin delicate pen lines, soft screentone dot shading, white background areas, expressive detailed eyes, no color anywhere, hair shaded only with black ink or gray screentone, no gray gradients, no text, no speech bubbles, single panel';
+  // ตัดคำบอกสีออกจากคำบรรยาย (เช่น red hair) ไม่งั้น Flux ระบายสีนั้นลงภาพขาวดำ — เจอจริง: ผมแดงของรินโผล่มาเป็นสี
+  const mono = body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/ {2,}/g, ' ');
+  return `${st}. ${mono}. Strictly black ink on white paper, grayscale only, absolutely no colored areas.`;
 }
 function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
 // เจนต่อเนื่อง: คิวว่างเมื่อไร เติมผู้สมัครออดิชันใหม่เอง (สลับบท) — เอาไว้ให้ได้ภาพมากพอเลือกทำ LoRA
