@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'quota-1';
+const BOT_VER = 'helper-auto-1';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
@@ -128,6 +128,7 @@ async function handleCron(event, env, ctx) {
     if (rrNow > READ_STOP) return; // ถึง 85% แล้ว: งานเบื้องหลังทุกอย่างพักไว้ทำต่อหลังรีเซ็ต 07:00 เพื่อให้หน้าเว็บยังเปิดได้ (เดิมกันแค่คิววาดภาพ งานอื่นยังวิ่งจนทะลุ 100%)
     ctx.waitUntil(tick(tagged(env, 'bg:tick'), false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
     ctx.waitUntil(autoHeal(tagged(env, 'bg:heal')).catch(() => {}).then(() => vTick(tagged(env, 'bg:kaggle'), false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
+    ctx.waitUntil(helperKTick(tagged(env, 'bg:kaggle')).catch(() => { })); // ผู้ช่วย (ครอบครัว) ที่ผูก API ของ Kaggle ไว้: เปิดเครื่องบัญชีเขาเองเมื่อคิวงานเยอะ
     ctx.waitUntil(castBatch(tagged(env, 'bg:cast'), 0, false).catch(() => {}));
     ctx.waitUntil(audDaily(tagged(env, 'bg:aud')).catch(() => {}));
 }
@@ -1738,6 +1739,43 @@ async function vvSig(env, id) {
   return [...new Uint8Array(h)].slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ---- ผู้ช่วยแบบรันอัตโนมัติ: ผู้ช่วยให้ API token ของ Kaggle ตัวเองไว้ ระบบเปิดเครื่องบัญชีเขาให้เอง (ใช้โควตา GPU ของเขา) ----
+let helperCols = false;
+async function helperSchema(env) {
+  if (helperCols) return; helperCols = true;
+  for (const c of ['kuser TEXT', 'kkey TEXT', "kstat TEXT DEFAULT ''", 'kpushed INTEGER DEFAULT 0', 'kpause INTEGER DEFAULT 0', 'kchecked INTEGER DEFAULT 0', "kerr TEXT DEFAULT ''"]) await env.DB.prepare('ALTER TABLE helpers ADD COLUMN ' + c).run().catch(() => { });
+}
+const hEnv = h => ({ KAGGLE_USERNAME: String(h.kuser || '').trim(), KAGGLE_KEY: String(h.kkey || '').trim() });
+async function helperKTick(env) {
+  await helperSchema(env);
+  const hs = (await env.DB.prepare("SELECT id,name,key,kuser,kkey,kstat,kpushed,kpause,kchecked FROM helpers WHERE on_=1 AND COALESCE(kuser,'')<>'' AND COALESCE(kkey,'')<>'' ORDER BY id").all()).results;
+  if (!hs.length) return { skipped: 'no helpers' };
+  const now = Date.now(), S = {};
+  for (const r of (await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('self_url','k_status','k_pause','k_quant')").all()).results) S[r.key] = r.value;
+  const q = ((await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status='queued'").first()) || {}).n || 0;
+  const mainBusy = /running|queued|starting/.test(String(S.k_status || '')), mainPaused = now < (+S.k_pause || 0);
+  let launched = 0;
+  for (const h of hs) {
+    if (now - (+h.kchecked || 0) < 120000) continue;
+    await env.DB.prepare('UPDATE helpers SET kchecked=? WHERE id=?').bind(now, h.id).run();
+    const he = hEnv(h), st = await kFetch(he, `/kernels/status?userName=${encodeURIComponent(he.KAGGLE_USERNAME)}&kernelSlug=${KSLUG}`);
+    const status = String((st.j && st.j.status) || (st.ok ? '' : st.status === 404 ? 'none' : 'error ' + st.status)).toLowerCase();
+    if (/running|starting|queued/.test(String(h.kstat || '')) && !/running|queued/.test(status) && +h.kpushed) await qadd(env, 'kgh:h' + h.id, Math.min(12, (now - +h.kpushed) / 3600000), kgWeek(+h.kpushed));
+    if (/running|queued/.test(status)) { await env.DB.prepare('UPDATE helpers SET kstat=? WHERE id=?').bind(status, h.id).run(); continue; }
+    if (/^error 40[13]/.test(status)) { await env.DB.prepare("UPDATE helpers SET kstat=?, kerr='API ของ Kaggle ใช้ไม่ได้ (token ผิดหรือหมดอายุ)', kpause=? WHERE id=?").bind(status, now + 6 * 3600000, h.id).run(); continue; }
+    await env.DB.prepare('UPDATE helpers SET kstat=? WHERE id=?').bind(status, h.id).run();
+    if (launched || now < (+h.kpause || 0) || now - (+h.kpushed || 0) < 5 * 60000) continue;
+    // เปิดเครื่องผู้ช่วยเมื่อคุ้ม: คิวเยอะ (เครื่องหลักทำอยู่แล้วยังเหลือเยอะ) หรือเครื่องหลักหมดโควตา — คิวน้อยไม่เปิด เพราะเปิดเครื่องแต่ละรอบเสียเวลาโหลดโมเดล ~15 นาที
+    if (!(q >= (mainPaused ? 1 : mainBusy ? 4 : 8))) continue;
+    if (!S.self_url) continue;
+    const text = KAGGLE_PY.replace('__API__', S.self_url).replace('__TOKEN__', h.key).replace('__MAXH__', '11').replace('__QUANT__', S.k_quant || 'Q4_K_M');
+    const push = await kFetch(he, '/kernels/push', { method: 'POST', body: JSON.stringify({ slug: `${he.KAGGLE_USERNAME}/${KSLUG}`, newTitle: KSLUG, text, language: 'python', kernelType: 'script', isPrivate: true, enableGpu: true, enableTpu: false, enableInternet: true, machineShape: 'NvidiaTeslaT4', datasetDataSources: [], competitionDataSources: [], kernelDataSources: [], modelDataSources: [], categoryIds: [] }) });
+    const err = !push.ok ? `Kaggle ${push.status}: ${JSON.stringify(push.j).slice(0, 200)}` : (push.j && (push.j.error || push.j.errorMessage)) || '';
+    await env.DB.prepare('UPDATE helpers SET kpushed=?, kerr=?, kstat=?, kpause=? WHERE id=?').bind(now, String(err).slice(0, 300), err ? 'error' : 'starting', err ? now + (/quota|limit|exceed/i.test(err) ? 6 : 1) * 3600000 : 0, h.id).run();
+    if (!err) launched = 1;
+  }
+  return { ok: true, launched };
+}
 // ---- สคริปต์สำหรับผู้ช่วย (เปิดใน Kaggle ของตัวเอง) ----
 async function helperScript(env, url) {
   await ensureSchema(env);
@@ -3591,9 +3629,21 @@ async function castApi(req, env, url, body) {
       }
       if (act === 'helpers') { // ผู้ช่วย Kaggle: ลิงก์สคริปต์ให้ผู้ช่วยกดรันใน Kaggle ของตัวเอง
         const S9 = await getSettings(env), base = S9.self_url || url.origin;
+        await helperSchema(env);
         if (b.set) { await env.DB.prepare('UPDATE helpers SET on_=? WHERE id=?').bind(b.on ? 1 : 0, +b.set).run(); }
-        const hs = (await env.DB.prepare('SELECT id,name,key,on_,seen,done,cur FROM helpers ORDER BY id').all()).results;
-        return json({ ok: true, items: hs.map(h => ({ id: h.id, name: h.name, on: +h.on_, seen: +h.seen || 0, done: +h.done || 0, cur: h.cur || '', link: base + '/h/' + h.key })) });
+        if (b.add) { const nm = String(b.add).trim().slice(0, 40) || 'ผู้ช่วย', key = 'h' + crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8); await env.DB.prepare('INSERT INTO helpers (name,key,on_,created) VALUES (?,?,1,?)').bind(nm, key, Date.now()).run(); }
+        if (b.unk) await env.DB.prepare("UPDATE helpers SET kuser=NULL, kkey=NULL, kstat='', kerr='' WHERE id=?").bind(+b.unk).run();
+        if (b.setk) { // ผูก API ของ Kaggle: ทดสอบก่อนว่าใช้ได้ แล้วค่อยเก็บ (ไม่ส่งค่า key กลับไปหน้าเว็บ)
+          let ku = String(b.kuser || '').trim().replace(/^@/, ''), kk = String(b.kkey || '').trim();
+          try { const jj = JSON.parse(kk); if (jj && jj.key) { kk = String(jj.key); ku = ku || String(jj.username || ''); } } catch (e) { } // วางทั้งไฟล์ kaggle.json ก็ได้
+          if (!ku || kk.length < 20) return json({ error: 'ใส่ชื่อผู้ใช้ Kaggle และ API key ให้ครบ' }, 400);
+          const t = await kFetch({ KAGGLE_USERNAME: ku, KAGGLE_KEY: kk }, `/kernels/list?user=${encodeURIComponent(ku)}&pageSize=1`);
+          if (t.status === 401 || t.status === 403) return json({ error: 'Kaggle ไม่รับ API key นี้ (ชื่อผู้ใช้หรือ key ไม่ถูก)' }, 400);
+          await env.DB.prepare("UPDATE helpers SET kuser=?, kkey=?, kerr='', kpause=0, on_=1 WHERE id=?").bind(ku, kk, +b.setk).run();
+        }
+        const wk = kgWeek(), hk = {}; for (const r of (await env.DB.prepare("SELECT k,v FROM qmeter WHERE day=? AND k LIKE 'kgh:h%'").bind(wk).all().catch(() => ({ results: [] }))).results || []) hk[r.k] = +r.v;
+        const hs = (await env.DB.prepare('SELECT id,name,key,on_,seen,done,cur,kuser,kstat,kpushed,kpause,kerr FROM helpers ORDER BY id').all()).results, now = Date.now();
+        return json({ ok: true, items: hs.map(h => { const run = /running|starting|queued/.test(String(h.kstat || '')) && +h.kpushed ? Math.min(12, (now - +h.kpushed) / 3600000) : 0; return { id: h.id, name: h.name, on: +h.on_, seen: +h.seen || 0, done: +h.done || 0, cur: h.cur || '', link: base + '/h/' + h.key, auto: !!h.kuser, kuser: h.kuser || '', kstat: h.kstat || '', kerr: h.kerr || '', kpause: +h.kpause || 0, kgh: (hk['kgh:h' + h.id] || 0) + run }; }) });
       }
       if (act === 'quota') { // โควตาฟรีทั้งหมดที่ใช้ (แยกจากหลอดอ่านฐานข้อมูล)
         const S9 = await getSettings(env), now = Date.now(), dy = utcDay(now), wk = kgWeek(now), Q = {};
