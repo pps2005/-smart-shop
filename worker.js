@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-2';
+const BOT_VER = 'manga-3';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -571,7 +571,10 @@ async function llmJson(env, s, user) {
   let t = out && out.response; if (t && typeof t === 'object') t = JSON.stringify(t);
   t = String(t || '').replace(/```json|```/g, '');
   const a = t.search(/[\[{]/); if (a < 0) throw new Error('AI ไม่ได้ตอบเป็น JSON ลองใหม่อีกครั้ง');
-  return JSON.parse(t.slice(a, t.lastIndexOf(t[a] === '[' ? ']' : '}') + 1));
+  try { return JSON.parse(t.slice(a, t.lastIndexOf(t[a] === '[' ? ']' : '}') + 1)); }
+  catch (e) { // คำตอบยาวจนถูกตัดกลางคัน: เก็บเฉพาะรายการที่เขียนจบแล้ว (เจอจริงกับตัวเขียนช่องมังงะ — ค้างทั้งตอน)
+    const b = t.indexOf('['), k = t.lastIndexOf('},'); if (b >= 0 && k > b) { try { return JSON.parse(t.slice(b, k + 1) + ']'); } catch (e2) { } }
+    throw new Error('AI ตอบ JSON ไม่ครบ: ' + String(e.message || e).slice(0, 80)); }
 }
 let animeReady = false;
 async function animeSchema(env) {
@@ -895,7 +898,11 @@ async function animeAdvance(env, s) {
     const sid = e.script_id;
     const gsb = ((m.st[e.ep] || {}).gate) === 'sb';
     if (e.sb >= 0 && gsb) { // โหมดสตอรีบอร์ด: เขียนเป็นช่องมังงะ (ภาพ + บทพูดพร้อมกัน) แล้วอ่านทวนเติมช่องที่ขาด — ไม่ใช้ตัวตัดช็อต/ตัวเติมบทพูดรุ่นเก่า
-      const r = await animeApi(env, { act: 'sb_panels', script_id: sid, beat: e.sb, shots: m.W.shots });
+      const fk = 'sbfail:' + sid, [fn, ft] = String(s[fk] || '0|0').split('|').map(Number);
+      if (fn >= 3 && Date.now() - ft < 30 * 60000) continue; // พลาด 3 ครั้งติด: พักซีนนี้ 30 นาที ไม่วนเรียก AI ทุกนาที (เคยวนค้าง 5 ชม.)
+      let r; try { r = await animeApi(env, { act: 'sb_panels', script_id: sid, beat: e.sb, shots: m.W.shots }); }
+      catch (x) { await setSetting(env, fk, (fn >= 3 ? 1 : fn + 1) + '|' + Date.now()); await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind(`⚠️ เขียนสตอรีบอร์ดซีน ${sid} เหตุการณ์ ${e.sb + 1} ไม่สำเร็จ: ${String(x && x.message || x).slice(0, 300)}`, Date.now()).run().catch(() => { }); return; }
+      if (fn) await env.DB.prepare('DELETE FROM settings WHERE key=?').bind(fk).run();
       if (r.next < 0) { await setSetting(env, 'sbfix:' + sid, '0,0'); await setSetting(env, 'sbsay:' + sid, 'v2'); await env.DB.prepare("DELETE FROM settings WHERE key IN (?,?)").bind('sbrev:' + sid, 'sbdone:' + sid).run(); }
       await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
     if (e.sb >= 0) { const r = await animeApi(env, { act: 'sb_beat', script_id: sid, beat: e.sb, shots: m.W.shots }); await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
@@ -1009,9 +1016,10 @@ async function animeApi(env, b) {
     const roles = ((plan && plan.roles) || []).filter(r => r.tier !== 'none'), names = roles.map(r => r.key).concat(xs.filter(x => x.kind === 'enemy').map(x => x.name));
     const scn = await env.DB.prepare('SELECT title,logline,ep,sc FROM scenes WHERE script_id=?').bind(sc.id).first();
     const prev = (await env.DB.prepare('SELECT th,say FROM shots WHERE script_id=? ORDER BY idx DESC LIMIT 3').bind(sc.id).all()).results.reverse().map(r => { let y = {}; try { y = JSON.parse(r.say || '{}'); } catch (e) { } return `[${r.th}] ${(y.lines || []).map(l => (l.who || 'บรรยาย') + ': ' + l.say).join(' / ')}`; }).join('\n');
-    const total = +b.shots > 0 ? Math.min(180, +b.shots) : 20, N = Math.min(8, Math.max(3, Math.ceil(total / beats.length)));
+    const total = +b.shots > 0 ? Math.min(180, +b.shots) : 20, N = Math.min(5, Math.max(3, Math.ceil(total / beats.length)));
     const arr = await llmJson(env, s, `เรื่อง: ${String(sr ? sr.brief : '').slice(0, 1800)}\nตัวละครที่ใช้ชื่อได้ (ต้องสะกดตามนี้): ${roles.map(r => `${r.key} (${r.g === 'f' ? 'หญิง' : r.g === 'm' ? 'ชาย' : 'ไม่ใช่คน'} ${r.age || ''} ${r.kind}: ${r.look || ''}${r.traits ? ' · ' + r.traits : ''})`).join(' | ')}${xs.filter(x => x.kind === 'enemy').length ? ' | ศัตรู: ' + xs.filter(x => x.kind === 'enemy').map(x => x.name).join(', ') : ''}\nซีน: ${scn ? scn.title + ' — ' + scn.logline : o.title || ''}\nเหตุการณ์ทั้งซีน: ${beats.map((x, i) => (i + 1) + ') ' + x).join(' ').slice(0, 1200)}\nช่องก่อนหน้า:\n${prev || '(เริ่มซีน)'}\n\nเขียนมังงะของ "เหตุการณ์ที่ ${bi + 1}: ${beats[bi]}" เป็น ${N} ช่อง (เพิ่มได้ถึง ${N + 3} ช่องถ้าบทพูดเยอะ) ภาพละ 16:9 ให้คนที่ไม่รู้เรื่องมาก่อนอ่านแล้วเข้าใจ:\n- ${bi === 0 ? 'ช่องแรกเป็นภาพกว้างบอกสถานที่และเวลา พร้อมคำบรรยาย (who ว่าง) ' : 'ต่อจากช่องก่อนหน้าให้เนียน '}ตัวละครที่โผล่ครั้งแรกในซีนต้องมีคำบรรยายสั้นๆ ว่าเป็นใคร\n- บทพูดต้องเล่าเหตุและผล: ใครต้องการอะไร เกิดอะไรขึ้น อีกฝ่ายตอบอย่างไร ห้ามบทพูดลอยๆ คำเดียว (เช่น "ฟังนะ" "ว่าไง" "ดีไหม") ห้ามพูดซ้ำสิ่งที่ภาพบอกแล้ว\n- ช่องละ 1-3 บรรทัด ตัวละครสลับกันพูด ถ้าพูดเยอะให้แตกเป็นหลายช่อง ภาษาไทยล้วน ห้ามมีอักษรจีนหรือญี่ปุ่น\n- shot ต้องหลากหลาย ห้ามซ้ำกันเกิน 2 ช่องติด เลือกจาก: wide (เห็นฉากกว้าง) | medium | closeup (หน้า สีหน้าชัด) | two (สองคนในภาพ) | ots (ข้ามไหล่) | low (มุมต่ำ) | high (มุมสูง) | insert (ภาพของ/มือ/รายละเอียด ไม่มีหน้า) | back (จากด้านหลัง)\n- en = ภาษาอังกฤษ บอกสถานที่ + ใครทำอะไร ท่าทาง สีหน้า เรียกตัวละครว่า the man / the woman / the creature ห้ามใส่ชื่อ ห้ามบรรยายผมหรือชุด ภาพหนึ่งมีคนไม่เกิน 2 คน\n- think = ความคิดในใจสั้นๆ และ ono = คำเสียงประกอบ ใส่เฉพาะช่องจังหวะตลกหรืออารมณ์พุ่ง · loc = ชื่อสถานที่จากรายการ (${places.slice(0, 10).join(' | ') || '-'}) ถ้าตรง · chain = true เฉพาะท่าต่อสู้ที่ต่อจากช่องก่อนในมุมกล้องเดิม\nตอบเป็น JSON array: [{"shot":"wide","th":"ภาพนี้คืออะไร","en":"...","chars":["ชื่อ"],"lines":[{"who":"","say":""}],"think":"","ono":"","loc":"","chain":false}]`);
     const list = (Array.isArray(arr) ? arr : (arr && Array.isArray(arr.panels) ? arr.panels : [arr])).slice(0, N + 3).map(x => cleanPanel(x || {}, names, places)).filter(Boolean);
+    if (!list.length) throw new Error('AI เขียนช่องมาใช้ไม่ได้เลย (ตอบ: ' + JSON.stringify(arr).slice(0, 160) + ')');
     const base = ((await env.DB.prepare('SELECT MAX(idx) m FROM shots WHERE script_id=?').bind(sc.id).first()) || {}).m || 0;
     if (list.length) await env.DB.batch(list.map((x, i) => env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(sc.id, base + i + 1, bi, x.th, x.en, JSON.stringify(x.chars), `ฉาก${sc.id}·${base + i + 1}`, Date.now(), x.say, i > 0 ? x.chain : 0, x.loc)));
     return { next: bi + 1 < beats.length ? bi + 1 : -1, added: list.length, names, places };
