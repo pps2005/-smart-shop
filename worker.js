@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'helper-auto-1';
+const BOT_VER = 'quality-max-1';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
@@ -128,7 +128,8 @@ async function handleCron(event, env, ctx) {
     if (rrNow > READ_STOP) return; // ถึง 85% แล้ว: งานเบื้องหลังทุกอย่างพักไว้ทำต่อหลังรีเซ็ต 07:00 เพื่อให้หน้าเว็บยังเปิดได้ (เดิมกันแค่คิววาดภาพ งานอื่นยังวิ่งจนทะลุ 100%)
     ctx.waitUntil(tick(tagged(env, 'bg:tick'), false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
     ctx.waitUntil(autoHeal(tagged(env, 'bg:heal')).catch(() => {}).then(() => vTick(tagged(env, 'bg:kaggle'), false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
-    ctx.waitUntil(helperKTick(tagged(env, 'bg:kaggle')).catch(() => { })); // ผู้ช่วย (ครอบครัว) ที่ผูก API ของ Kaggle ไว้: เปิดเครื่องบัญชีเขาเองเมื่อคิวงานเยอะ
+    ctx.waitUntil(helperKTick(tagged(env, 'bg:kaggle')).catch(() => { }));
+    ctx.waitUntil(cpuKTick(tagged(env, 'bg:kaggle')).catch(() => { })); // ผู้ช่วย (ครอบครัว) ที่ผูก API ของ Kaggle ไว้: เปิดเครื่องบัญชีเขาเองเมื่อคิวงานเยอะ
     ctx.waitUntil(castBatch(tagged(env, 'bg:cast'), 0, false).catch(() => {}));
     ctx.waitUntil(audDaily(tagged(env, 'bg:aud')).catch(() => {}));
 }
@@ -925,10 +926,12 @@ async function epWrite(env, s, e) {
 // ช็อตสำคัญ (ฉากสู้/เคลื่อนไหว/ช็อตเปิดทุก 5 ช็อต) ทำเป็นวิดีโอ ที่เหลือใช้ภาพนิ่งซูมเลื่อน
 // ช็อตที่ทำเป็นคลิปขยับ: ทุกช็อตที่ 5 · ช็อตแอ็กชัน · ช็อตที่ตัวละครในภาพเป็นคนพูด (ปากขยับ) — ช็อตบรรยาย/เล่าสถานการณ์ใช้ภาพนิ่งซูมช้า
 const speakShot = sh => { try { const y = JSON.parse(sh.say || '{}') || {}, c = JSON.parse(sh.chars || '[]'), ls = Array.isArray(y.lines) ? y.lines : [y]; return Array.isArray(c) && ls.some(l => l && l.who && l.say && c.includes(l.who)); } catch (e) { return false; } };
-const keyShot = (sh, i) => i % 5 === 0 || /fight|battle|chase|run|jump|attack|talisman|glow|explo|seal|spell|leap|punch/i.test(sh.en || '') || speakShot(sh) || !!+sh.chain;
+let VALL = true, HELPN = 0; // คุณภาพสูงสุด: ทุกช็อตขยับ (ปิดได้ที่ settings v_all=0)
+const keyShot = (sh, i) => VALL || i % 5 === 0 || /fight|battle|chase|run|jump|attack|talisman|glow|explo|seal|spell|leap|punch/i.test(sh.en || '') || speakShot(sh) || !!+sh.chain;
 // ทำงานต่อเองทีละขั้นต่อรอบ cron: บท → ช็อต → ภาพคีย์ → วิดีโอ → รวมตอน (ทีละตอน เรียงตามลำดับ เพราะ GPU ฟรีมีจำกัด)
 async function animeAdvance(env, s) {
   if (s.auto_anime === '0') return;
+  VALL = s.v_all !== '0';
   await animeSchema(env);
   await epWaiting(env);
   await epAssemble(env, s).catch(() => {});
@@ -1166,9 +1169,10 @@ async function animeApi(env, b) {
     const have = new Set([...(await env.DB.prepare("SELECT DISTINCT shot FROM videos WHERE ep=?").bind(ep).all()).results, ...(await env.DB.prepare("SELECT shot FROM vjobs WHERE ep=? AND status IN ('queued','running')").bind(ep).all()).results].map(x => String(x.shot)));
     let n = 0;
     for (const [i, sh] of rows.entries()) {
+      VALL = s.v_all !== '0'; if (i === 0) HELPN = (((await env.DB.prepare("SELECT COUNT(*) n FROM helpers WHERE on_=1 AND COALESCE(kuser,'')<>''").first().catch(() => null)) || {}).n) || 0; // ผู้ช่วยรันอัตโนมัติ 1 คน = +1 แบบต่อช็อต · 2 คนขึ้นไป = +2 (สูงสุด 5)
       if (n >= 6) break; if (!keyShot(sh, i) || have.has(String(sh.id))) continue;
       const im = await env.DB.prepare('SELECT data FROM images WHERE project=? ORDER BY id DESC LIMIT 1').bind(sh.kproj).first(); if (!im || !im.data) continue;
-      const isAct = /fight|battle|chase|attack|talisman|explo|seal|spell|leap|punch|slash|strike|clash|kick|dodge|charge|impact|burst/i.test(sh.en || ''), nx = rows[i + 1], vo = isAct ? { hq: 1 } : { hq: 0, fps: 12 }; // ช็อตแอ็กชัน: คุณภาพสูง + เติมเฟรมให้ลื่น · ช็อตทั่วไป: ลุคอนิเมะ 12fps
+      const isAct = /fight|battle|chase|attack|talisman|explo|seal|spell|leap|punch|slash|strike|clash|kick|dodge|charge|impact|burst/i.test(sh.en || ''), nx = rows[i + 1], vo = isAct ? { hq: 1 } : { hq: s.v_hq === '0' ? 0 : 1, fps: 12 }; vo.takes = Math.max(1, Math.min(5, (+s.v_takes || 3) + (HELPN >= 2 ? 2 : HELPN))); // คุณภาพสูงสุด: ทุกช็อต 8 สเต็ป + ทำหลายแบบแล้วเลือกที่ดีที่สุด // ช็อตแอ็กชัน: คุณภาพสูง + เติมเฟรมให้ลื่น · ช็อตทั่วไป: ลุคอนิเมะ 12fps
       if (nx && +nx.chain && s.self_url) { const ni = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(nx.kproj).first(); if (ni && ni.id) vo.end = s.self_url + '/vi/' + ni.id + '?s=' + await vvSig(env, 'i' + ni.id); } // ท่าถัดไปของชุดต่อเนื่อง = เฟรมสุดท้ายของคลิปนี้
       await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,opt) VALUES (?,?,?,?,?,?,?,'queued',0,?,?)").bind('อนิเมะ·' + sid, ep, String(sh.id), `anime style, ${sh.en}, ${speakShot(sh) ? 'the character is talking, mouth opening and closing naturally while speaking, subtle head movement, ' : ''}${isAct ? 'fast dynamic action, strong motion, impact, ' : ''}smooth natural motion, consistent face and outfit, no morphing`.slice(0, 600), VNEG, im.data, vFrames(vo.end ? 3 : (speakShot(sh) && !isAct ? 3 : 5)), Date.now(), JSON.stringify(vo)).run();
       n++;
@@ -1471,9 +1475,10 @@ async function vRoutes(req, env, url, ctx) {
     if (p === '/k/claim') {
       if ((+s[readDay()] || 0) > READ_KSTOP) return json({ job: null, paused: 'reads' }); // ถึง 95%: ไม่จ่ายงานใหม่ เครื่องทำงานที่ถืออยู่ให้จบแล้วปิดเอง ทำต่อพรุ่งนี้
       // เครื่องที่ถือสคริปต์รุ่นเก่า (ไม่ส่ง v หรือ v<2) หรือเครื่องที่ติดตั้งตัวเทรนไม่ผ่านในรอบนี้ → ไม่จ่ายงานเทรน LoRA ให้ (รอเครื่องรอบใหม่)
+      const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat')) AND (?6=0 OR kind NOT IN ('epcat','concat')) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -1698,9 +1703,11 @@ async function vTick(env, force) {
   kEnv(env, await getSettings(env));
   if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return { skipped: 'no kaggle' };
   await ensureSchema(env);
-  const q = await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status='queued'").first();
+  const s = await getSettings(env), now = Date.now(), cpuOff = s.v_cpu !== '0';
+  const q = await env.DB.prepare("SELECT COUNT(*) n, MIN(created) t0 FROM vjobs WHERE status='queued' AND (?1=0 OR kind NOT IN ('epcat','concat'))").bind(cpuOff ? 1 : 0).first();
   if (!q.n) return { skipped: 'empty' };
-  const s = await getSettings(env), now = Date.now();
+  // รวมงานก่อนเปิดเครื่อง: เปิดแต่ละรอบเสียเวลาโหลดโมเดล ~15 นาที (นับเป็นโควตา) → รอให้มีงาน ≥6 ชิ้น หรืองานแรกรอเกิน 20 นาที
+  if (!force && q.n < 6 && now - (+q.t0 || now) < 20 * 60000 && !/running|queued|starting/.test(String(s.k_status || ''))) return { skipped: 'batching ' + q.n };
   if (!force && now - (+s.k_checked || 0) < 120000) return { skipped: 'wait' };
   if (now < (+s.k_pause || 0)) return { skipped: 'paused' };
   await setSetting(env, 'k_checked', String(now));
@@ -1717,7 +1724,7 @@ async function vTick(env, force) {
   if (/error/.test(status) && stt.j && stt.j.failureMessage) await setSetting(env, 'k_error', String(stt.j.failureMessage).slice(0, 300));
   if (!s.ktoken) { s.ktoken = crypto.randomUUID().replace(/-/g, ''); await setSetting(env, 'ktoken', s.ktoken); }
   if (!s.self_url) return { error: 'ยังไม่รู้ลิงก์ของบอท เปิดหน้าสตูดิโอ 1 ครั้งก่อน' };
-  const text = KAGGLE_PY.replace('__API__', s.self_url).replace('__TOKEN__', s.ktoken).replace('__MAXH__', '10').replace('__QUANT__', s.k_quant || 'Q4_K_M');
+  const text = KAGGLE_PY.replace('__API__', s.self_url).replace('__TOKEN__', s.ktoken).replace('__MAXH__', '10').replace('__QUANT__', s.k_quant || 'Q4_K_M').replace('__CPU__', '0');
   const push = await kFetch(env, '/kernels/push', { method: 'POST', body: JSON.stringify({ slug, newTitle: KSLUG, text, language: 'python', kernelType: 'script', isPrivate: true, enableGpu: true, enableTpu: false, enableInternet: true, machineShape: 'NvidiaTeslaT4', datasetDataSources: [], competitionDataSources: [], kernelDataSources: [], modelDataSources: [], categoryIds: [] }) });
   await setSetting(env, 'k_pushed', String(now));
   const err = !push.ok ? `Kaggle ${push.status}: ${JSON.stringify(push.j).slice(0, 220)}` : (push.j && (push.j.error || push.j.errorMessage)) || '';
@@ -1739,6 +1746,25 @@ async function vvSig(env, id) {
   return [...new Uint8Array(h)].slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ---- เครื่อง CPU ของ Kaggle (ไม่จำกัดชั่วโมงต่อสัปดาห์): รับงานรวมตอน/ซับ/เสียงผสม/รวมคลิป ประหยัดโควตา GPU ----
+async function cpuKTick(env) {
+  const S = {}; for (const r of (await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('v_cpu','kc_status','kc_pushed','kc_checked','self_url','ktoken','k_quant','k_user','k_key')").all()).results) S[r.key] = r.value;
+  if (S.v_cpu === '0') return { skipped: 'off' };
+  const now = Date.now(); if (now - (+S.kc_checked || 0) < 120000) return { skipped: 'wait' };
+  const q = ((await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status='queued' AND kind IN ('epcat','concat')").first()) || {}).n || 0;
+  if (!q) return { skipped: 'empty' };
+  await setSetting(env, 'kc_checked', String(now));
+  const ke = { ...env }; kEnv(ke, S); if (!ke.KAGGLE_USERNAME || !ke.KAGGLE_KEY || !S.self_url || !S.ktoken) return { skipped: 'no kaggle' };
+  const slug = KSLUG + '-cpu', st = await kFetch(ke, `/kernels/status?userName=${encodeURIComponent(ke.KAGGLE_USERNAME)}&kernelSlug=${slug}`);
+  const status = String((st.j && st.j.status) || (st.ok ? '' : 'none')).toLowerCase(); await setSetting(env, 'kc_status', status);
+  if (/running|queued/.test(status) || now - (+S.kc_pushed || 0) < 5 * 60000) return { running: true };
+  const text = KAGGLE_PY.replace('__API__', S.self_url).replace('__TOKEN__', S.ktoken).replace('__MAXH__', '11').replace('__QUANT__', S.k_quant || 'Q4_K_M').replace('__CPU__', '1');
+  const push = await kFetch(ke, '/kernels/push', { method: 'POST', body: JSON.stringify({ slug: `${ke.KAGGLE_USERNAME}/${slug}`, newTitle: slug, text, language: 'python', kernelType: 'script', isPrivate: true, enableGpu: false, enableTpu: false, enableInternet: true, datasetDataSources: [], competitionDataSources: [], kernelDataSources: [], modelDataSources: [], categoryIds: [] }) });
+  await setSetting(env, 'kc_pushed', String(now));
+  const err = !push.ok ? `Kaggle CPU ${push.status}: ${JSON.stringify(push.j).slice(0, 200)}` : (push.j && (push.j.error || push.j.errorMessage)) || '';
+  if (err) { await setSetting(env, 'kc_status', 'error'); await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('⚠️ เปิดเครื่อง CPU ไม่สำเร็จ: ' + String(err).slice(0, 300), now).run().catch(() => { }); }
+  return { pushed: !err };
+}
 // ---- ผู้ช่วยแบบรันอัตโนมัติ: ผู้ช่วยให้ API token ของ Kaggle ตัวเองไว้ ระบบเปิดเครื่องบัญชีเขาให้เอง (ใช้โควตา GPU ของเขา) ----
 let helperCols = false;
 async function helperSchema(env) {
@@ -1768,7 +1794,7 @@ async function helperKTick(env) {
     // เปิดเครื่องผู้ช่วยเมื่อคุ้ม: คิวเยอะ (เครื่องหลักทำอยู่แล้วยังเหลือเยอะ) หรือเครื่องหลักหมดโควตา — คิวน้อยไม่เปิด เพราะเปิดเครื่องแต่ละรอบเสียเวลาโหลดโมเดล ~15 นาที
     if (!(q >= (mainPaused ? 1 : mainBusy ? 4 : 8))) continue;
     if (!S.self_url) continue;
-    const text = KAGGLE_PY.replace('__API__', S.self_url).replace('__TOKEN__', h.key).replace('__MAXH__', '11').replace('__QUANT__', S.k_quant || 'Q4_K_M');
+    const text = KAGGLE_PY.replace('__API__', S.self_url).replace('__TOKEN__', h.key).replace('__MAXH__', '11').replace('__QUANT__', S.k_quant || 'Q4_K_M').replace('__CPU__', '0');
     const push = await kFetch(he, '/kernels/push', { method: 'POST', body: JSON.stringify({ slug: `${he.KAGGLE_USERNAME}/${KSLUG}`, newTitle: KSLUG, text, language: 'python', kernelType: 'script', isPrivate: true, enableGpu: true, enableTpu: false, enableInternet: true, machineShape: 'NvidiaTeslaT4', datasetDataSources: [], competitionDataSources: [], kernelDataSources: [], modelDataSources: [], categoryIds: [] }) });
     const err = !push.ok ? `Kaggle ${push.status}: ${JSON.stringify(push.j).slice(0, 200)}` : (push.j && (push.j.error || push.j.errorMessage)) || '';
     await env.DB.prepare('UPDATE helpers SET kpushed=?, kerr=?, kstat=?, kpause=? WHERE id=?').bind(now, String(err).slice(0, 300), err ? 'error' : 'starting', err ? now + (/quota|limit|exceed/i.test(err) ? 6 : 1) * 3600000 : 0, h.id).run();
@@ -1783,7 +1809,7 @@ async function helperScript(env, url) {
   const h = key.length > 20 ? await env.DB.prepare('SELECT id,name FROM helpers WHERE key=? AND on_=1').bind(key).first() : null;
   if (!h) return new Response('print("รหัสผู้ช่วยนี้ใช้ไม่ได้แล้ว ติดต่อเจ้าของสตูดิโอ")\n', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
   const s = await getSettings(env);
-  const text = KAGGLE_PY.replace('__API__', s.self_url || url.origin).replace('__TOKEN__', key).replace('__MAXH__', '11').replace('__QUANT__', s.k_quant || 'Q4_K_M');
+  const text = KAGGLE_PY.replace('__API__', s.self_url || url.origin).replace('__TOKEN__', key).replace('__MAXH__', '11').replace('__QUANT__', s.k_quant || 'Q4_K_M').replace('__CPU__', '0');
   return new Response(text, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
 }
 
@@ -1796,6 +1822,7 @@ import os, sys, json, time, subprocess, urllib.request, urllib.error, random, sh
 API = "__API__"
 TOKEN = "__TOKEN__"
 MAXH = float("__MAXH__")
+CPU = "__CPU__" == "1"  # เครื่อง CPU: ทำเฉพาะงานรวมตอน/รวมคลิป ไม่ติดตั้งโมเดล
 QUANT = "__QUANT__"
 T0 = time.time()
 UA = {"user-agent": "anime-video-bot/1.0"}
@@ -2087,8 +2114,25 @@ def gen(j, port=8188):
     import io
     img = Image.open(io.BytesIO(call("/k/img/%s" % j["id"]))).convert("RGB")
     seq, fps, t0, W, H = [], 16, time.time(), 0, 0
+    takes = max(1, min(5, int(opt.get("takes") or 1))) if passes == 1 else 1
     for k in range(passes):
-        frames, fps, W, H = gen_pass(j, img, k, port, F1, opt)
+        if takes > 1:
+            # ทำหลายแบบ แล้วเก็บแบบที่หน้าตัวละครเพี้ยนน้อยสุดและขยับพอดี (วัดบนเครื่องนี้ ไม่ใช้โควตา AI)
+            best = None
+            for t in range(takes):
+                fr, fps_t, W_t, H_t = gen_pass(j, img, k, port, F1, opt, tag="t%d" % t)
+                sc, info = take_score(fr, img)
+                log("ช็อต %s แบบที่ %d/%d: คะแนน %.3f (%s)" % (j.get("shot"), t + 1, takes, sc, info))
+                if best is None or sc > best[0]:
+                    if best:
+                        [os.remove(f) for f in best[1] if os.path.exists(f)]
+                    best = (sc, fr, fps_t, W_t, H_t, t)
+                else:
+                    [os.remove(f) for f in fr if os.path.exists(f)]
+            frames, fps, W, H = best[1], best[2], best[3], best[4]
+            log("ช็อต %s เลือกแบบที่ %d" % (j.get("shot"), best[5] + 1))
+        else:
+            frames, fps, W, H = gen_pass(j, img, k, port, F1, opt)
         seq += frames if k == 0 else frames[1:]
         img = Image.open(frames[-1]).convert("RGB")
     jid = j["id"]
@@ -2109,11 +2153,37 @@ def gen(j, port=8188):
     return mp4, time.time() - t0, W, H
 
 
-def gen_pass(j, im, k, port=8188, F=81, opt=None):
+def take_score(frames, ref):
+    # วัดแบบง่าย: (1) เฟรมช่วงหลังยังมีโครงภาพคล้ายภาพต้นฉบับ = หน้า/ตัวไม่ละลาย (2) ขยับพอ ไม่นิ่งเป็นภาพ (3) ไม่กระพริบกระตุก
+    import numpy as np
+    from PIL import Image
+
+    def g(x):
+        im = x if hasattr(x, "convert") else Image.open(x)
+        return np.asarray(im.convert("L").resize((96, 54)), dtype=np.float32) / 255.0
+
+    def corr(a, b):
+        a = a - a.mean()
+        b = b - b.mean()
+        return float((a * b).sum() / (np.sqrt((a * a).sum() * (b * b).sum()) + 1e-6))
+    r = g(ref)
+    arr = [g(f) for f in frames]  # ทุกเฟรม (ภาพย่อ 96x54 เร็ว) จะได้จับการกระพริบที่เกิดเฟรมเว้นเฟรม
+    if len(arr) < 3:
+        return 0.0, "เฟรมน้อย"
+    late = arr[len(arr) // 2:]
+    keep = float(np.mean([corr(a, r) for a in late[::max(1, len(late) // 12)]]))
+    d = [float(np.abs(arr[i + 1] - arr[i]).mean()) for i in range(len(arr) - 1)]
+    step, jitter = float(np.mean(d)), float(np.std(d))  # ต่างกันทีละเฟรม: สูงผิดปกติ = กระพริบ/สั่น
+    span = float(np.mean([np.abs(a - arr[0]).mean() for a in late]))  # ขยับไปจากเฟรมแรกแค่ไหน: ต่ำมาก = แทบเป็นภาพนิ่ง
+    sc = keep - (0.5 if span < 0.008 else 0.0) - max(0.0, step - 0.03) * 5 - jitter * 2
+    return sc, "คงรูป %.2f ขยับ %.3f กระตุก %.3f" % (keep, span, step)
+
+
+def gen_pass(j, im, k, port=8188, F=81, opt=None, tag=""):
     opt = opt or {}
     hq = bool(opt.get("hq"))
     ST = 8 if hq else 4  # ช็อตสำคัญ: 8 steps + ภาพใหญ่ขึ้น
-    jid = "%s_p%d" % (j["id"], k)
+    jid = "%s_p%d%s" % (j["id"], k, tag)
     W, H = size_for(*im.size, area=(720 * 720 if hq else 640 * 640))
     fname = "job%s.jpg" % jid
     im.save(os.path.join(COMFY, "input", fname), quality=95)
@@ -3098,7 +3168,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=5" + ("&nolora=1" if M.get("nolora") else "")
+    return "/k/claim?v=6" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
@@ -3161,6 +3231,10 @@ def main():
         log("ไม่มีงานวิดีโอในคิว ปิดเครื่องเพื่อประหยัดโควตา")
         return
     stat = {"done": 0}
+    if CPU:  # เครื่อง CPU: รับงานรวมตอนไปเรื่อยๆ จนคิวว่าง
+        worker(0, job, stat)
+        log("เครื่อง CPU จบรอบ รวมเสร็จ %d งาน" % stat["done"])
+        return
     if job.get("kind") in ("concat", "epcat"):  # งานรวมคลิปไม่ต้องใช้ GPU
         worker(0, job, stat)
         job = J(claim_path()).get("job")
