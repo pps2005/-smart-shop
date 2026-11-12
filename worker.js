@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'quality-max-1';
+const BOT_VER = 'voice-1';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
@@ -88,6 +88,7 @@ async function handleFetch(req, env, ctx) {
       if (p === '/api/ping') return json({ ok: true, bot: 'anime-image-bot', github: !!(env.GH_TOKEN && env.GH_REPO), ver: BOT_VER, kseen: +((await getSettings(env)).k_seen) || 0 });
       if (p === '/api/state') return json(await getState(env));
       if (p.startsWith('/img/')) return getImage(env, +p.split('/')[2]);
+      if (p.startsWith('/vo/')) { const r = await env.DB.prepare('SELECT data,mime FROM voices WHERE id=?').bind(+p.split('/')[2]).first(); return r ? new Response(b64ToBytes(r.data), { headers: { 'content-type': r.mime || 'audio/mp4', 'cache-control': 'private, max-age=31536000, immutable', ...CORS } }) : new Response('not found', { status: 404 }); } // เสียงพากย์ทีละบรรทัด
       if (p === '/api/zip') return makeZip(env, url.searchParams.get('project') || '', url.searchParams.get('starred') === '1');
       if (req.method !== 'POST') return json({ error: 'not found' }, 404);
       const body = await req.json().catch(() => ({}));
@@ -411,7 +412,7 @@ async function sbImportTick(env, s) {
     const sid = e.script_id, old = (await env.DB.prepare('SELECT kproj FROM shots WHERE script_id=?').bind(sid).all()).results, st = [];
     for (const o of old) st.push(env.DB.prepare('DELETE FROM images WHERE project=?').bind(o.kproj), env.DB.prepare("DELETE FROM jobs WHERE project=?").bind(o.kproj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'").bind(o.kproj));
     st.push(env.DB.prepare('DELETE FROM shots WHERE script_id=?').bind(sid));
-    list.forEach((x, i) => { const ls = (x.lines || []).map(l => ({ who: String(l.who || ''), say: String(l.say || '') }));
+    list.forEach((x, i) => { const ls = (x.lines || []).map(l => ({ who: String(l.who || ''), say: String(l.say || ''), ...(l.ja ? { ja: String(l.ja) } : {}), ...(l.emo ? { emo: String(l.emo) } : {}) })); // ja/emo = บทพากย์ญี่ปุ่น + อารมณ์
       st.push(env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,0,?,?,?,?,?,?,?,?)').bind(sid, i + 1, String(x.th || ''), String(x.en || '').slice(0, 600), JSON.stringify(x.chars || []), `ฉาก${sid}·${i + 1}`, Date.now(), JSON.stringify({ who: ls[0] ? ls[0].who : '', say: ls[0] ? ls[0].say : '', lines: ls, ...(x.think ? { think: x.think } : {}), ...(x.ono ? { ono: x.ono } : {}) }), x.chain ? 1 : 0, x.loc || null)); });
     for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20));
     await env.DB.prepare('UPDATE scenes SET sb=-1, fin=0, auto=1 WHERE id=?').bind(e.id).run();
@@ -1107,7 +1108,7 @@ async function animeApi(env, b) {
   }
   if (act === 'shots') {
     const sid = +b.script_id, ep = 'a' + sid;
-    const rows = (await env.DB.prepare("SELECT s.id,s.idx,s.beat,s.th,s.chars,s.say, COALESCE((SELECT MAX(i.id) FROM images i WHERE i.project=s.kproj),0) img, (SELECT COUNT(*) FROM jobs j WHERE j.project=s.kproj AND j.status IN ('queued','running','kaggle')) pending, COALESCE((SELECT MAX(v.id) FROM videos v WHERE v.ep=?1 AND v.shot=CAST(s.id AS TEXT)),0) vid, (SELECT COUNT(*) FROM vjobs q WHERE q.ep=?1 AND q.shot=CAST(s.id AS TEXT) AND q.status IN ('queued','running')) vpend FROM shots s WHERE s.script_id=?2 ORDER BY s.idx").bind(ep, sid).all()).results;
+    const rows = (await env.DB.prepare("SELECT s.id,s.idx,s.beat,s.th,s.chars,s.say, COALESCE((SELECT MAX(i.id) FROM images i WHERE i.project=s.kproj),0) img, (SELECT COUNT(*) FROM jobs j WHERE j.project=s.kproj AND j.status IN ('queued','running','kaggle')) pending, COALESCE((SELECT MAX(v.id) FROM videos v WHERE v.ep=?1 AND v.shot=CAST(s.id AS TEXT)),0) vid, (SELECT COUNT(*) FROM vjobs q WHERE q.ep=?1 AND q.shot=CAST(s.id AS TEXT) AND q.status IN ('queued','running')) vpend, (SELECT group_concat(v.line||':'||v.id) FROM voices v WHERE v.shot=s.id) vo FROM shots s WHERE s.script_id=?2 ORDER BY s.idx").bind(ep, sid).all()).results;
     return { shots: rows };
   }
   if (act === 'lora_use') { await env.DB.prepare('UPDATE loras SET use=? WHERE id=?').bind(b.on ? 1 : 0, +b.id).run(); return { ok: true }; }
@@ -1417,6 +1418,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS rmeter (day TEXT, tag TEXT, n INTEGER, c INTEGER, PRIMARY KEY(day,tag))'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS qmeter (day TEXT, k TEXT, v REAL, PRIMARY KEY(day,k))'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS voices (id INTEGER PRIMARY KEY AUTOINCREMENT, shot INTEGER, line INTEGER, data TEXT, mime TEXT, created INTEGER, UNIQUE(shot,line))'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT, helper INTEGER DEFAULT 0)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS char_profiles (name TEXT PRIMARY KEY, data TEXT, updated INTEGER)"),
@@ -1475,10 +1477,10 @@ async function vRoutes(req, env, url, ctx) {
     if (p === '/k/claim') {
       if ((+s[readDay()] || 0) > READ_KSTOP) return json({ job: null, paused: 'reads' }); // ถึง 95%: ไม่จ่ายงานใหม่ เครื่องทำงานที่ถืออยู่ให้จบแล้วปิดเอง ทำต่อพรุ่งนี้
       // เครื่องที่ถือสคริปต์รุ่นเก่า (ไม่ส่ง v หรือ v<2) หรือเครื่องที่ติดตั้งตัวเทรนไม่ผ่านในรอบนี้ → ไม่จ่ายงานเทรน LoRA ให้ (รอเครื่องรอบใหม่)
-      const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
+      const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat')) AND (?6=0 OR kind NOT IN ('epcat','concat')) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -1539,9 +1541,16 @@ async function vRoutes(req, env, url, ctx) {
       const parts = rows.map(r => b64ToBytes(r.data)); const out = new Uint8Array(parts.reduce((a, x) => a + x.length, 0)); let o = 0; for (const x of parts) { out.set(x, o); o += x.length; }
       return new Response(out, { headers: { 'content-type': 'application/octet-stream' } });
     }
+    if (p.startsWith('/k/vo/')) { // เครื่อง CPU ส่งเสียงพากย์มาทีละบรรทัด
+      const j = await env.DB.prepare("SELECT id FROM vjobs WHERE id=? AND kind='tts'").bind(id).first(); if (!j) return json({ error: 'no job' }, 404);
+      const buf = new Uint8Array(await req.arrayBuffer()); if (buf.length < 200) return json({ error: 'ไฟล์เสียงเล็กผิดปกติ' }, 400);
+      await env.DB.prepare('INSERT OR REPLACE INTO voices (shot,line,data,mime,created) VALUES (?,?,?,?,?)').bind(+url.searchParams.get('shot'), +url.searchParams.get('line'), bytesToB64(buf), 'audio/mp4', Date.now()).run();
+      return json({ ok: true });
+    }
     if (p.startsWith('/k/done/')) {
       const j = await env.DB.prepare('SELECT * FROM vjobs WHERE id=?').bind(id).first();
       if (!j) return json({ error: 'no job' }, 404);
+      if (j.kind === 'tts') { await env.DB.prepare('DELETE FROM vjobs WHERE id=?').bind(id).run(); return json({ ok: true }); }
       if (j.kind === 'lora') { await env.DB.prepare("UPDATE vjobs SET status='done' WHERE id=?").bind(id).run(); return json({ ok: true }); }
       const buf = new Uint8Array(await req.arrayBuffer());
       if (buf.length < 1000) return json({ error: 'ไฟล์เล็กผิดปกติ' }, 400);
@@ -1704,7 +1713,7 @@ async function vTick(env, force) {
   if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return { skipped: 'no kaggle' };
   await ensureSchema(env);
   const s = await getSettings(env), now = Date.now(), cpuOff = s.v_cpu !== '0';
-  const q = await env.DB.prepare("SELECT COUNT(*) n, MIN(created) t0 FROM vjobs WHERE status='queued' AND (?1=0 OR kind NOT IN ('epcat','concat'))").bind(cpuOff ? 1 : 0).first();
+  const q = await env.DB.prepare("SELECT COUNT(*) n, MIN(created) t0 FROM vjobs WHERE status='queued' AND (?1=0 OR kind NOT IN ('epcat','concat','tts'))").bind(cpuOff ? 1 : 0).first();
   if (!q.n) return { skipped: 'empty' };
   // รวมงานก่อนเปิดเครื่อง: เปิดแต่ละรอบเสียเวลาโหลดโมเดล ~15 นาที (นับเป็นโควตา) → รอให้มีงาน ≥6 ชิ้น หรืองานแรกรอเกิน 20 นาที
   if (!force && q.n < 6 && now - (+q.t0 || now) < 20 * 60000 && !/running|queued|starting/.test(String(s.k_status || ''))) return { skipped: 'batching ' + q.n };
@@ -1746,12 +1755,28 @@ async function vvSig(env, id) {
   return [...new Uint8Array(h)].slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ---- ผังเสียงพากย์เริ่มต้น (VOICEVOX ฟรี ใส่เครดิต "VOICEVOX:ชื่อ") · sp = ชื่อต้นเสียง, st = สไตล์, speed/pitch/into/vol = ปรับเสียง, emo = สไตล์ตามอารมณ์เฉพาะตัว ----
+const VCAST_DEFAULT = {
+  narrator: { sp: '雨晴はう', st: 'ノーマル', speed: 0.95, pitch: 0, into: 1.0 },
+  'โทวะ': { sp: '玄野武宏', st: 'ノーマル', speed: 1.0, pitch: 0, into: 1.15 },
+  'ริน': { sp: '九州そら', st: 'ノーマル', speed: 0.95, pitch: -0.03, into: 0.85, emo: { d: { st: 'あまあま', pitch: 0.03, into: 1.25, speed: 1.05 }, t: { st: 'ツンツン' } } },
+  'มิโอะ': { sp: '冥鳴ひまり', st: 'ノーマル', speed: 1.0, pitch: 0, into: 0.55 },
+  'หัวหน้าซาเอกิ': { sp: '波音リツ', st: 'ノーマル', speed: 0.9, pitch: -0.05, into: 0.9 },
+  'ป้าฮานะ': { sp: 'もち子さん', st: 'ノーマル', speed: 1.15, pitch: 0, into: 1.3 },
+  'ไค': { sp: '白上虎太郎', st: 'ふつう', speed: 1.1, pitch: 0.02, into: 1.3 },
+  'ท่านเก็นโด': { sp: '麒ヶ島宗麟', st: 'ノーマル', speed: 0.85, pitch: 0, into: 0.9 },
+  'เท็ตสึ': { sp: '青山龍星', st: 'ノーマル', speed: 0.95, pitch: -0.02, into: 1.0 },
+  'โมจิ': { sp: 'ずんだもん', st: 'あまあま', speed: 1.2, pitch: 0.12, into: 1.5 },
+  _m: { sp: '剣崎雌雄', st: 'ノーマル', speed: 1.0, pitch: -0.02, into: 1.0 }, // ตัวประกอบชาย
+  _f: { sp: '春日部つむぎ', st: 'ノーマル', speed: 1.0, pitch: 0, into: 1.0 }, // ตัวประกอบหญิง
+  _x: { sp: 'No.7', st: 'ノーマル', speed: 0.9, pitch: -0.08, into: 0.7 }, // อสูร/สิ่งที่ไม่ใช่คน
+};
 // ---- เครื่อง CPU ของ Kaggle (ไม่จำกัดชั่วโมงต่อสัปดาห์): รับงานรวมตอน/ซับ/เสียงผสม/รวมคลิป ประหยัดโควตา GPU ----
 async function cpuKTick(env) {
   const S = {}; for (const r of (await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('v_cpu','kc_status','kc_pushed','kc_checked','self_url','ktoken','k_quant','k_user','k_key')").all()).results) S[r.key] = r.value;
   if (S.v_cpu === '0') return { skipped: 'off' };
   const now = Date.now(); if (now - (+S.kc_checked || 0) < 120000) return { skipped: 'wait' };
-  const q = ((await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status='queued' AND kind IN ('epcat','concat')").first()) || {}).n || 0;
+  const q = ((await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE status='queued' AND kind IN ('epcat','concat','tts')").first()) || {}).n || 0;
   if (!q) return { skipped: 'empty' };
   await setSetting(env, 'kc_checked', String(now));
   const ke = { ...env }; kEnv(ke, S); if (!ke.KAGGLE_USERNAME || !ke.KAGGLE_KEY || !S.self_url || !S.ktoken) return { skipped: 'no kaggle' };
@@ -2151,6 +2176,113 @@ def gen(j, port=8188):
     sh('"%s" -y -loglevel error -framerate %d -i "%s/%%05d.png" -vf "%s" -c:v libx264 -preset veryfast -crf %d -pix_fmt yuv420p -movflags +faststart "%s"' % (ffmpeg_bin(), fps, tmp, vf, crf, mp4))
     shutil.rmtree(tmp, ignore_errors=True)
     return mp4, time.time() - t0, W, H
+
+
+# ---------- เสียงพากย์ญี่ปุ่น: VOICEVOX (ฟรี รันบน CPU) ----------
+VV = {"ok": False, "url": "http://127.0.0.1:50021"}
+EMO_ST = {"h": ["喜び", "わーい", "うきうき", "楽々", "あまあま"], "a": ["怒り", "ツンギレ", "おこ", "ツンツン"], "s": ["悲しみ", "かなしい", "悲しい", "しくしく", "びえーん"],
+          "w": ["ささやき", "ヒソヒソ", "内緒話", "囁き"], "x": ["びくびく", "おどろき", "悲しみ"], "t": ["ツンツン", "クール", "セクシー"], "d": ["あまあま", "喜び", "わーい"]}
+
+
+def ensure_voicevox():
+    if VV["ok"]:
+        return
+    d = os.path.join(ROOT, "voicevox")
+    runs = [f for f in glob.glob(os.path.join(d, "**", "run"), recursive=True) if os.path.isfile(f)]
+    if not runs:
+        os.makedirs(d, exist_ok=True)
+        ver = "0.19.1"
+        f = os.path.join(d, "vv.7z")
+        url = "https://github.com/VOICEVOX/voicevox_engine/releases/download/%s/voicevox_engine-linux-cpu-%s.7z.001" % (ver, ver)
+        log("กำลังโหลดตัวทำเสียงพากย์ VOICEVOX %s (ครั้งแรกของรอบ)" % ver)
+        sh('wget -q -O "%s" "%s" || curl -sL -o "%s" "%s"' % (f, url, f, url))
+        if not sh("which 7z || which 7za", check=False).strip():
+            sh("apt-get install -y -q p7zip-full >/dev/null 2>&1 || true", check=False)
+        if sh("which 7z || which 7za", check=False).strip():
+            sh('$(which 7z || which 7za) x -y -o"%s" "%s" >/dev/null' % (d, f))
+        else:
+            sh("pip install -q py7zr", check=False)
+            import py7zr
+            with py7zr.SevenZipFile(f, "r") as z:
+                z.extractall(d)
+        os.remove(f)
+        runs = [f for f in glob.glob(os.path.join(d, "**", "run"), recursive=True) if os.path.isfile(f)]
+        if not runs:
+            raise RuntimeError("แตกไฟล์ VOICEVOX ไม่สำเร็จ")
+    r = runs[0]
+    os.chmod(r, 0o755)
+    subprocess.Popen([r, "--host", "127.0.0.1", "--port", "50021"], cwd=os.path.dirname(r), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    t = time.time()
+    while time.time() - t < 600:
+        try:
+            urllib.request.urlopen(VV["url"] + "/version", timeout=5).read()
+            break
+        except Exception:
+            time.sleep(3)
+    else:
+        raise RuntimeError("VOICEVOX ไม่ตอบภายใน 10 นาที")
+    VV["sp"] = json.loads(urllib.request.urlopen(VV["url"] + "/speakers", timeout=60).read())
+    VV["ok"] = True
+    log("ตัวทำเสียงพากย์พร้อม (%d ต้นเสียง)" % len(VV["sp"]))
+
+
+def vv_style(name, style, emo):
+    sps = VV["sp"]
+    cand = [s for s in sps if name and name in s["name"]] or [s for s in sps if "四国めたん" in s["name"]] or sps[:1]
+    sp = cand[0]
+    want = EMO_ST.get(emo, []) + ([style] if style else []) + ["ノーマル", "ふつう"]
+    for w in want:
+        for st in sp["styles"]:
+            if st["name"] == w:
+                return st["id"], sp["name"]
+    return sp["styles"][0]["id"], sp["name"]
+
+
+def vv_req(path, data=None, q=None):
+    u = VV["url"] + path + ("?" + urllib.parse.urlencode(q) if q else "")
+    rq = urllib.request.Request(u, data=(json.dumps(data).encode() if data is not None else b""), method="POST", headers={"content-type": "application/json"})
+    return urllib.request.urlopen(rq, timeout=300).read()
+
+
+def tts_job(j):
+    import urllib.parse
+    ensure_voicevox()
+    t0 = time.time()
+    o = j.get("opt") or {}
+    cast = o.get("cast") or {}
+    done = 0
+    for ln in o.get("lines") or []:
+        who = str(ln.get("who") or "")
+        name = who.lstrip("~")
+        g = ln.get("g") or ""
+        c = cast.get("narrator") if not who else cast.get(name) or (cast.get("_x") if g == "x" else cast.get("_f") if g == "f" else cast.get("_m")) or {}
+        emo = ln.get("emo") or "n"
+        c = dict(c, **((c.get("emo") or {}).get(emo) or {}))
+        sid, spn = vv_style(c.get("sp"), c.get("st"), emo if emo not in ("n", "d") else "")
+        try:
+            qd = json.loads(vv_req("/audio_query", q={"text": ln["ja"], "speaker": sid}))
+            qd["speedScale"] = float(c.get("speed", 1.0)) * (0.92 if emo == "w" else 1.0)
+            qd["pitchScale"] = float(c.get("pitch", 0.0))
+            qd["intonationScale"] = float(c.get("into", 1.0)) * (1.15 if emo in ("x", "a") else 1.0)
+            qd["volumeScale"] = float(c.get("vol", 1.0)) * (0.85 if who.startswith("~") else 1.0)
+            qd["prePhonemeLength"] = 0.08
+            qd["postPhonemeLength"] = 0.15
+            wav = vv_req("/synthesis", qd, q={"speaker": sid})
+            wf = os.path.join(ROOT, "vo.wav")
+            mf = os.path.join(ROOT, "vo.m4a")
+            open(wf, "wb").write(wav)
+            af = '-af "aecho=0.8:0.55:35:0.22"' if who.startswith("~") else ""  # ความคิดในใจ: ก้องเบาๆ แบบอนิเมะ
+            sh('"%s" -y -loglevel error -i "%s" %s -ac 1 -ar 24000 -c:a aac -b:a 64k "%s"' % (ffmpeg_bin(), wf, af, mf))
+            call("/k/vo/%s?shot=%s&line=%s" % (j["id"], ln["shot"], ln["line"]), raw=open(mf, "rb").read(), timeout=120)
+            done += 1
+        except Exception as e:
+            log("เสียงบรรทัด %s/%s พัง: %s" % (ln.get("shot"), ln.get("line"), str(e)[:200]))
+    log("ทำเสียงพากย์ %s เสร็จ %d/%d บรรทัด" % (j.get("project"), done, len(o.get("lines") or [])))
+    if not done and o.get("lines"):
+        raise RuntimeError("ทำเสียงไม่ได้สักบรรทัด")
+    f = os.path.join(ROOT, "tts%s.txt" % j["id"])
+    open(f, "w").write("ok %d\n" % done)
+    return f, time.time() - t0, 0, 0
 
 
 def take_score(frames, ref):
@@ -3133,6 +3265,8 @@ def prog(jid, step, total, tail):
 def work(job, port):
     if job.get("kind") == "lora":
         return train_lora(job, port)
+    if job.get("kind") == "tts":
+        return tts_job(job)
     if job.get("kind") == "epcat":
         log("กำลังรวมทั้งตอน %s" % job.get("project"))
         return epcat(job)
@@ -3168,7 +3302,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=6" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=7" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
@@ -3700,6 +3834,23 @@ async function castApi(req, env, url, body) {
         const key = clip(b.key, 40), v = Math.round(Math.max(0.3, Math.min(1.2, +b.w || 0.8)) * 100) / 100, m = (await rd('lw:' + story)) || {};
         if (!key) return json({ error: 'ไม่พบบท' }, 400);
         m[key] = v; await setSetting(env, 'lw:' + story, JSON.stringify(m)); return json({ ok: true, w: v });
+      }
+      if (act === 'vo_cast') { // ผังเสียงพากย์ของเรื่อง (แก้ได้: ส่ง cast มาแทน)
+        if (b.cast && typeof b.cast === 'object') await setSetting(env, 'vcast:' + story, JSON.stringify(b.cast));
+        return json({ ok: true, cast: (await rd('vcast:' + story)) || VCAST_DEFAULT });
+      }
+      if (act === 'vo_make') { // สั่งทำเสียงพากย์ญี่ปุ่นของตอน (บรรทัดที่มีบทญี่ปุ่น) บนเครื่อง CPU ของ Kaggle
+        const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!sr) return json({ error: 'ไม่พบเรื่อง' }, 404);
+        const cast = (await rd('vcast:' + story)) || VCAST_DEFAULT, plan = await rd('plan:' + story), G = {}; for (const r of ((plan && plan.roles) || [])) G[r.key] = r.g;
+        const scs = (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +b.ep).all()).results;
+        let nl = 0, nj = 0;
+        for (const sc of scs) { if (!sc.script_id) continue;
+          const rows = (await env.DB.prepare("SELECT s.id,s.say,(SELECT group_concat(v.line) FROM voices v WHERE v.shot=s.id) have FROM shots s WHERE s.script_id=? ORDER BY s.idx").bind(sc.script_id).all()).results, L = [];
+          for (const r of rows) { let y = {}; try { y = JSON.parse(r.say || '{}'); } catch (e) { } const hv = new Set(String(r.have || '').split(',').filter(Boolean).map(Number));
+            (y.lines || []).forEach((l, i) => { if (!l.ja || (!b.redo && hv.has(i))) return; const w = String(l.who || ''), nm = w.replace(/^~/, ''); L.push({ shot: r.id, line: i, who: w, ja: String(l.ja).slice(0, 300), emo: String(l.emo || 'n'), g: G[nm] || '' }); }); }
+          for (let k = 0; k < L.length; k += 80) { const part = L.slice(k, k + 80);
+            await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind('เสียงพากย์·' + story + '·ตอน' + (+b.ep), 'v' + sc.script_id, Date.now(), JSON.stringify({ lines: part, cast })).run(); nj++; nl += part.length; } }
+        return json({ ok: true, jobs: nj, lines: nl });
       }
       if (act === 'helpers') { // ผู้ช่วย Kaggle: ลิงก์สคริปต์ให้ผู้ช่วยกดรันใน Kaggle ของตัวเอง
         const S9 = await getSettings(env), base = S9.self_url || url.origin;
