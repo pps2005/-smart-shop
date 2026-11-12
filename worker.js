@@ -11,10 +11,13 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'meter-2';
+const BOT_VER = 'meter-3';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
-const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4500000, READ_KSTOP = 4750000; // 64% ชะลอ · 90% หยุดงานเบื้องหลังทุกอย่าง ทำต่อวันถัดไป · 95% หยุดจ่ายงานให้เครื่อง Kaggle (ผู้ใช้กำหนด)
+const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
+// ชะลอตั้งแต่ต้นวัน: แบ่งโควตาให้พอทั้งวัน (ใช้ได้ราว 80% เกลี่ยตาม 24 ชม. + เผื่อ 5%) ถ้าใช้เร็วกว่ากำหนด งานเบื้องหลังจะเว้นช่วงห่างขึ้นเอง
+function readPace(rr, now) { const t = now || Date.now(), d0 = Date.parse(new Date(t).toISOString().slice(0, 10) + 'T00:00:00Z'), budget = READ_CAP * (0.80 * (t - d0) / 86400000 + 0.05);
+  return { budget, every: rr <= budget ? 1 : rr <= budget + READ_CAP * 0.05 ? 3 : rr <= budget + READ_CAP * 0.10 ? 6 : 12 }; }
 const readDay = () => 'rr:' + new Date().toISOString().slice(0, 10);
 function meterDB(db, acc, tag0) { // นับแถวที่อ่าน แยกตามที่มา (tag) เพื่อโชว์หลอด % ในหน้าสตูดิโอ
   let tag = tag0 || 'อื่นๆ';
@@ -113,7 +116,8 @@ async function handleFetch(req, env, ctx) {
 async function handleCron(event, env, ctx) {
     await ensureSchema(env);
     const rrNow = +(((await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(readDay()).first().catch(() => null)) || {}).value) || 0;
-    if (rrNow > READ_STOP) return; // ถึง 90% แล้ว: งานเบื้องหลังทุกอย่างพักไว้ทำต่อหลังรีเซ็ต 07:00 เพื่อให้หน้าเว็บยังเปิดได้ (เดิมกันแค่คิววาดภาพ งานอื่นยังวิ่งจนทะลุ 100%)
+    if (rrNow <= READ_STOP) { const pc = readPace(rrNow); if (new Date().getUTCMinutes() % pc.every) return; } // ใช้เร็วกว่ากำหนด: เว้นช่วงทำงาน (ทุก 3/6/12 นาที)
+    if (rrNow > READ_STOP) return; // ถึง 85% แล้ว: งานเบื้องหลังทุกอย่างพักไว้ทำต่อหลังรีเซ็ต 07:00 เพื่อให้หน้าเว็บยังเปิดได้ (เดิมกันแค่คิววาดภาพ งานอื่นยังวิ่งจนทะลุ 100%)
     ctx.waitUntil(tick(tagged(env, 'bg:tick'), false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
     ctx.waitUntil(autoHeal(tagged(env, 'bg:heal')).catch(() => {}).then(() => vTick(tagged(env, 'bg:kaggle'), false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
     ctx.waitUntil(castBatch(tagged(env, 'bg:cast'), 0, false).catch(() => {}));
@@ -1204,7 +1208,7 @@ async function kTopUp(env, s) {
 async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
-  if (!force) { const rr = +s[readDay()] || 0; if (rr > READ_STOP) return { skipped: 'reads ' + rr }; if (rr > READ_SLOW && new Date().getUTCMinutes() % 5) return { skipped: 'reads-slow ' + rr }; } // ใกล้เพดานอ่านรายวัน: งานเบื้องหลังทำทุก 5 นาที · เกือบเต็ม: หยุดงานเบื้องหลัง (เครื่อง Kaggle ยังส่งงานได้)
+  if (!force) { const rr = +s[readDay()] || 0; if (rr > READ_STOP) return { skipped: 'reads ' + rr }; } // ใกล้เพดานอ่านรายวัน: งานเบื้องหลังทำทุก 5 นาที · เกือบเต็ม: หยุดงานเบื้องหลัง (เครื่อง Kaggle ยังส่งงานได้)
   await animeAuto(tagged(env, 'bg:anime'), s).catch(() => {});
   if (s.supa_test === '1') await supaSelfTest(env, s);
   await sbImportTick(env, s).catch(() => { });
@@ -3509,7 +3513,7 @@ async function castApi(req, env, url, body) {
           }
           v.prog = g;
         }
-        let meter = null; try { const dy = new Date().toISOString().slice(0, 10); meter = { cap: READ_CAP, slow: READ_SLOW, stop: READ_STOP, kstop: READ_KSTOP, day: dy, now: Date.now(), total: +((await getSettings(env))[readDay()]) || 0, by: (await env.DB.prepare('SELECT tag,n,c FROM rmeter WHERE day=? ORDER BY n DESC').bind(dy).all()).results }; } catch (e) { meter = null; }
+        let meter = null; try { const dy = new Date().toISOString().slice(0, 10); const tt0 = +((await getSettings(env))[readDay()]) || 0, pc0 = readPace(tt0); meter = { cap: READ_CAP, stop: READ_STOP, web: READ_WEB, kstop: READ_KSTOP, budget: Math.round(pc0.budget), every: pc0.every, day: dy, now: Date.now(), total: tt0, by: (await env.DB.prepare('SELECT tag,n,c FROM rmeter WHERE day=? ORDER BY n DESC').bind(dy).all()).results }; } catch (e) { meter = null; }
         return json({ ok: true, meter, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
       }
       if (act === 'save') {
