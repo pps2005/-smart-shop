@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'meter-3';
+const BOT_VER = 'boost-1';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
@@ -115,8 +115,9 @@ async function handleFetch(req, env, ctx) {
 }
 async function handleCron(event, env, ctx) {
     await ensureSchema(env);
-    const rrNow = +(((await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(readDay()).first().catch(() => null)) || {}).value) || 0;
-    if (rrNow <= READ_STOP) { const pc = readPace(rrNow); if (new Date().getUTCMinutes() % pc.every) return; } // ใช้เร็วกว่ากำหนด: เว้นช่วงทำงาน (ทุก 3/6/12 นาที)
+    const kv0 = {}; for (const x of ((await env.DB.prepare('SELECT key,value FROM settings WHERE key IN (?,?)').bind(readDay(), 'boost_until').all().catch(() => ({ results: [] }))).results || [])) kv0[x.key] = x.value;
+    const rrNow = +kv0[readDay()] || 0, boost = +kv0.boost_until > Date.now();
+    if (rrNow <= READ_STOP && !boost) { const pc = readPace(rrNow); if (new Date().getUTCMinutes() % pc.every) return; } // ปุ่มเร่งสตอรีบอร์ด: ไม่เว้นช่วง // ใช้เร็วกว่ากำหนด: เว้นช่วงทำงาน (ทุก 3/6/12 นาที)
     if (rrNow > READ_STOP) return; // ถึง 85% แล้ว: งานเบื้องหลังทุกอย่างพักไว้ทำต่อหลังรีเซ็ต 07:00 เพื่อให้หน้าเว็บยังเปิดได้ (เดิมกันแค่คิววาดภาพ งานอื่นยังวิ่งจนทะลุ 100%)
     ctx.waitUntil(tick(tagged(env, 'bg:tick'), false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
     ctx.waitUntil(autoHeal(tagged(env, 'bg:heal')).catch(() => {}).then(() => vTick(tagged(env, 'bg:kaggle'), false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
@@ -1228,8 +1229,9 @@ async function tick(env, force) {
   }
   if (!force) {
     if (now < +s.paused_until && !(await activeKeys(env, now)).length) return { skipped: 'paused' };
-    if (now - +s.last_run < (+s.interval_min || 1) * 60000 - 15000) return { skipped: 'wait' };
-    const sl = await slotCheck(env, s, now); // แบ่งทำเป็นช่วงเวลา แต่ละช่วงมีโควตาของตัวเอง
+    const boost = +s.boost_until > now; // ปุ่มเร่ง: วาดทุกนาที และใช้โควตาวาดของทั้งวันได้เลย ไม่ต้องรอช่วงเวลาถัดไป
+    if (now - +s.last_run < (boost ? 1 : (+s.interval_min || 1)) * 60000 - 15000) return { skipped: 'wait' };
+    const sl = boost ? { full: false } : await slotCheck(env, s, now); // แบ่งทำเป็นช่วงเวลา แต่ละช่วงมีโควตาของตัวเอง
     if (sl.full) return { skipped: 'slot full' };
     if (now - +s.last_run > 180000) await env.DB.prepare("UPDATE jobs SET status='queued' WHERE status='running'").run();
   }
@@ -3514,7 +3516,7 @@ async function castApi(req, env, url, body) {
           v.prog = g;
         }
         let meter = null; try { const dy = new Date().toISOString().slice(0, 10); const tt0 = +((await getSettings(env))[readDay()]) || 0, pc0 = readPace(tt0); meter = { cap: READ_CAP, stop: READ_STOP, web: READ_WEB, kstop: READ_KSTOP, budget: Math.round(pc0.budget), every: pc0.every, day: dy, now: Date.now(), total: tt0, by: (await env.DB.prepare('SELECT tag,n,c FROM rmeter WHERE day=? ORDER BY n DESC').bind(dy).all()).results }; } catch (e) { meter = null; }
-        return json({ ok: true, meter, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
+        return json({ ok: true, meter, boost: +((await getSettings(env)).boost_until) || 0, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
       }
       if (act === 'save') {
         const pl = b.plan || {}; if (!Array.isArray(pl.roles) || !Array.isArray(pl.eps) || !pl.roles.length || !pl.eps.length) return json({ error: 'โครงเรื่องไม่ครบ (ต้องมีบทและตอน)' }, 400);
@@ -3576,6 +3578,7 @@ async function castApi(req, env, url, body) {
         if (!key) return json({ error: 'ไม่พบบท' }, 400);
         m[key] = v; await setSetting(env, 'lw:' + story, JSON.stringify(m)); return json({ ok: true, w: v });
       }
+      if (act === 'boost') { const h = Math.max(0, Math.min(6, +b.hours || 0)); await setSetting(env, 'boost_until', String(h ? Date.now() + h * 3600000 : 0)); return json({ ok: true, until: h ? Date.now() + h * 3600000 : 0 }); } // เร่งสตอรีบอร์ดชั่วคราว (สูงสุด 6 ชม.) · ยังหยุดเองที่ 85%
       if (act === 'setkind') { // ประเภทงาน: อนิเมะ / หนัง / ซีรีส์ / โฆษณา (มีผลกับตอนที่เริ่มทำหลังจากนี้)
         if (!WORK[b.kind]) return json({ error: 'ไม่รู้จักประเภทงานนี้' }, 400);
         await setSetting(env, 'wk:' + story, String(b.kind)); return json({ ok: true, kind: b.kind, scenes: WORK[b.kind].scenes, shots: WORK[b.kind].shots });
