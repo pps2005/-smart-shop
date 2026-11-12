@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-4';
+const BOT_VER = 'manga-5';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -542,6 +542,13 @@ function legacyFix(p) {
     .split(', no people').join('').split('no people, ').join('');
   if (objy && p.includes('[[STYLE]]')) p = p.split('[[STYLE]]').join('[[STYLE_OBJ]]');
   return p;
+}
+// ตัวสำรอง (Flux) วาดช่องสตอรีบอร์ด: ใช้ LoRA ไม่ได้ → ตัดคำกระตุ้น LoRA ทิ้ง และย้ายลายเส้นไว้ "ต้นคำสั่ง" (อยู่ท้ายแล้ว Flux ไม่ค่อยทำตาม ภาพออกโทนอุ่นเงานุ่ม)
+function fluxDraft(job, s) {
+  const p = String(job.prompt || '');
+  if (!String(job.project || '').startsWith('ฉาก') || !p.includes('[[STYLE]]')) return withStyle(p, s);
+  const body = p.replace(/chr\d+x,?\s*/g, '').replace(/,?\s*\[\[STYLE\]\]/, '');
+  return `anime screenshot from a modern TV anime, ${curStyle(s)}. ${body}`;
 }
 function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
 // เจนต่อเนื่อง: คิวว่างเมื่อไร เติมผู้สมัครออดิชันใหม่เอง (สลับบท) — เอาไว้ให้ได้ภาพมากพอเลือกทำ LoRA
@@ -1207,7 +1214,7 @@ async function tick(env, force) {
   await setSetting(env, 'last_run', String(now));
   await env.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(job.id).run();
   try {
-    const out = await genImage(env, s, withStyle(job.prompt, s).slice(0, 2048), Math.min(8, Math.max(1, +job.steps || +s.steps || 4)), +job.seed || 0);
+    const out = await genImage(env, s, fluxDraft(job, s).slice(0, 2048), Math.min(8, Math.max(1, +job.steps || +s.steps || 4)), +job.seed || 0);
     await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (?,?,?,?,?,0,?)')
       .bind(job.id, job.project, job.scene, job.prompt, out.image, Date.now()).run();
     await env.DB.prepare('DELETE FROM jobs WHERE id=?').bind(job.id).run();
