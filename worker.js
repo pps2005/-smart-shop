@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-1';
+const BOT_VER = 'manga-2';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -358,6 +358,20 @@ async function xlNew(env, story, kind, name, desc) {
   await charRefs(env, id, 16);
   await env.DB.prepare("UPDATE jobs SET steps=8 WHERE project=? AND status='queued'").bind('ซีรีส์0·' + name).run();
   return { ok: true, id };
+}
+// วาดช่องที่มีตัวละครของตอนนั้นใหม่ทั้งหมด (settings sb_redraw = "เรื่อง|ตอน") — ใช้หลังแก้ตัวสั่งวาดหรือ LoRA เพิ่งเสร็จ · ช่องฉากหลังล้วนไม่แตะ
+async function sbRedrawTick(env, s) {
+  if (!s.sb_redraw) return;
+  const [story, epS] = String(s.sb_redraw).split('|');
+  await env.DB.prepare("DELETE FROM settings WHERE key='sb_redraw'").run();
+  const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!sr) return;
+  const scs = (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +epS).all()).results;
+  for (const sc of scs) { if (!sc.script_id) continue;
+    const l = (await env.DB.prepare("SELECT id,kproj FROM shots WHERE script_id=? AND chars IS NOT NULL AND chars<>'[]' AND chars<>''").bind(sc.script_id).all()).results; if (!l.length) continue;
+    await env.DB.prepare('DELETE FROM settings WHERE key=?').bind('sbdone:' + sc.script_id).run();
+    for (let i = 0; i < l.length; i += 20) await env.DB.batch(l.slice(i, i + 20).flatMap(sh => [env.DB.prepare("DELETE FROM jobs WHERE project=? AND status='queued'").bind(sh.kproj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj)]));
+    await animeApi(env, { act: 'kf', script_id: +sc.script_id, ids: l.map(x => x.id) });
+  }
 }
 // นำเข้าสตอรีบอร์ดที่เขียนมือจาก sbx.json แทนที่ช็อตเดิมของตอนนั้น (settings sb_import = "เรื่อง|ตอน") แล้วให้ระบบวาดภาพตามปกติ · ไม่ให้ AI ตัดช็อต/เขียนบทพูดทับ
 async function sbImportTick(env, s) {
@@ -1023,10 +1037,16 @@ async function animeApi(env, b) {
       if (only ? !only.has(sh.id) : (hv.has(sh.kproj) || pd.has(sh.kproj))) continue;
       const { names, m } = shotLoraPick(sh, LM), nch = m.filter(c => c.k === 'char').length;
       const lset = new Set(LM.lc.filter(c => m.some(x => x.lid === c.lid)).map(c => c.name)), extra = [], gs = [];
-      for (const n of names) { const R = ROLES.find(r => r.key === n); if (R && R.g && R.g !== 'x') gs.push(R.g); if (!lset.has(n) && LOOKS[n] && !String(sh.en).includes(LOOKS[n].slice(0, 24))) extra.push(LOOKS[n]); }
-      const cnt = !names.length ? (/wide shot|insert shot/.test(sh.en) ? 'no humans' : '') : gs.length === 1 && names.length === 1 ? 'solo, ' + (gs[0] === 'f' ? '1girl' : '1boy') + ', single character' : gs.length === 2 ? '2people, ' + (gs[0] === gs[1] ? (gs[0] === 'f' ? '2girls' : '2boys') : '1boy, 1girl') : '';
+      let crt = 0; const ages = [];
+      for (const n of names) { const R = ROLES.find(r => r.key === n), lk = String(LOOKS[n] || (R && R.look) || ''); if (!lset.has(n) && LOOKS[n] && !String(sh.en).includes(LOOKS[n].slice(0, 24))) extra.push(LOOKS[n]);
+        if (/creature|spirit|cat-like|beast|monster|animal|mascot/i.test(lk) || (R && /วิญญาณ|สัตว์|ภูต|ปีศาจ/.test(String(R.kind || '')))) { crt++; continue; } // ตัวที่ไม่ใช่คน ไม่นับเป็นจำนวนคนในภาพ
+        const g = R && (R.g === 'f' || R.g === 'm') ? R.g : /\b(woman|girl|female)\b/i.test(lk) ? 'f' : 'm'; gs.push(g); ages.push([g, +(R && R.age) || +((lk.match(/(\d\d)-year-old/) || [])[1]) || 0]); }
+      const old = ages.map(([g, a]) => g === 'm' ? (a >= 60 ? 'old man' : a >= 36 ? 'mature male, middle-aged man' : '') : (a >= 60 ? 'old woman' : a >= 45 ? 'mature female, middle-aged woman' : '')).filter(Boolean).join(', ');
+      const nf = gs.filter(g => g === 'f').length, nm = gs.length - nf, gt = n => n === 1 ? '1' : n === 2 ? '2' : '3';
+      // จำนวนคน+เพศ ต้องอยู่ "ต้นคำสั่ง" (อยู่ท้ายแล้วโมเดลวาดเป็นกลุ่มผู้หญิง/ตารางหน้าคน — เจอจริงกับตอน 1)
+      const cnt = !gs.length ? (crt ? 'no humans, creature' : /wide shot|insert shot/.test(sh.en) ? 'no humans' : '') : [gs.length === 1 ? 'solo' : '', nm ? gt(nm) + (nm > 1 ? 'boys' : 'boy') : '', nf ? gt(nf) + (nf > 1 ? 'girls' : 'girl') : '', nm && !nf ? 'male focus' : '', old, crt ? 'one small creature' : '', gs.length === 1 ? 'single character' : gs.length === 2 ? 'only two people' : ''].filter(Boolean).join(', ');
       st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: c.w }))), sh.id));
-      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${m.map(c => c.tag || ('chr' + c.cid + 'x')).join(', ')}${m.length ? ', ' : ''}${sh.en}${extra.length ? ', ' + extra.join('; ') : ''}${cnt ? ', ' + cnt : ''}, single cinematic illustration, [[STYLE]]`.slice(0, 1800), Date.now(), nch ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
+      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${cnt ? cnt + ', ' : ''}${m.map(c => c.tag || ('chr' + c.cid + 'x')).join(', ')}${m.length ? ', ' : ''}${sh.en}${extra.length ? ', ' + extra.join('; ') : ''}, single cinematic illustration, [[STYLE]]`.slice(0, 1800), Date.now(), nch ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
       n++;
     }
     if (st.length) await env.DB.batch(st);
@@ -1153,6 +1173,7 @@ async function tick(env, force) {
   await animeAuto(env, s).catch(() => {});
   if (s.supa_test === '1') await supaSelfTest(env, s);
   await sbImportTick(env, s).catch(() => { });
+  await sbRedrawTick(env, s).catch(() => { });
   if (s.design_cast) { await env.DB.prepare("DELETE FROM settings WHERE key='design_cast'").run(); await designCast(env, s, String(s.design_cast)).catch(() => { }); }
   await restyleTick(env, s).catch(() => { });
   await xlTick(env).catch(() => { });
@@ -2149,7 +2170,7 @@ IMG_MODELS = [
     ("cagliostrolab/animagine-xl-4.0", "animagine-xl-4.0.safetensors"),
 ]
 IMG_POS = "masterpiece, high score, great score, absurdres, "
-IMG_NEG = "multiple views, collage, grid, split screen, comic panels, character sheet, reference sheet, turnaround, lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry"
+IMG_NEG = "crowd, 4girls, 5girls, 6+girls, 4boys, 6+boys, clone, identical faces, multiple views, collage, grid, split screen, comic panels, character sheet, reference sheet, turnaround, lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry"
 IMG_QUANTS = ["Q5_K_S", "Q4_K_S", "Q4_0", "Q8_0"]
 FLUX_REPO = "city96/FLUX.1-dev-gguf"
 FLUX_TE = "comfyanonymous/flux_text_encoders"
