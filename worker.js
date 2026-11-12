@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'webtoon-3';
+const BOT_VER = 'lorafix-1';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -300,7 +300,7 @@ async function charTrain(env, b) {
   const all = (await env.DB.prepare('SELECT id,scene,starred FROM images WHERE project=? ORDER BY id').bind(pj).all()).results;
   const st = all.filter(x => x.starred), use = (st.length ? st : all).slice(0, 24);
   if (use.length < 8) return { error: st.length ? `ติด ⭐ แค่ ${st.length} ภาพ ต้องอย่างน้อย 8 (หรือไม่ติดเลย = ใช้ทุกภาพ)` : `มีภาพแค่ ${all.length} ภาพ ต้องอย่างน้อย 8 ภาพ` };
-  const trig = 'chr' + ch.id + 'x', imgs = use.map(x => ({ id: x.id, cap: `${trig}, ${xlVar(ch, (+x.scene || 1) - 1)}` }));
+  const trig = 'chr' + ch.id + 'x', imgs = use.map(x => ({ id: x.id, cap: `${xlKind(ch) === 'char' ? loraTag({ cid: ch.id, desc: ch.desc }) : trig}, ${xlVar(ch, (+x.scene || 1) - 1)}` }));
   await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
   const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs, pri: await loraPri(env, ch.id), dim: xlKind(ch) === 'char' ? 8 : 4 })).run();
   await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(ch.id, r.meta.last_row_id, Date.now()).run();
@@ -638,17 +638,19 @@ async function workOf(env, title) { let k = ''; try { const r = await env.DB.pre
 async function epstOf(env, title) { try { const r = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('epst:' + title).first(); return r ? JSON.parse(r.value) : {}; } catch (e) { return {}; } }
 async function shotLoraMap(env, seriesId) { // LoRA ที่พร้อมใช้ของตัวละครในเรื่องนี้ + น้ำหนักต่อบท
   const sc = { series_id: seriesId };
-  const lc = (await env.DB.prepare("SELECT c.id cid,c.name,l.id lid FROM chars c JOIN loras l ON l.char_id=c.id AND l.status='ready' AND l.use=1 WHERE c.series_id=? OR c.series_id=0").bind(sc.series_id).all()).results;
-  for (const c of await castList(env, await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(sc.series_id).first())) if (c.lid) lc.push({ cid: c.cid, name: c.name, lid: c.lid }); // LoRA ของนักแสดงที่ใส่บทไว้ (ชื่อบท = ชื่อใน shots.chars)
+  const lc = (await env.DB.prepare("SELECT c.id cid,c.name,c.desc,l.id lid FROM chars c JOIN loras l ON l.char_id=c.id AND l.status='ready' AND l.use=1 WHERE c.series_id=? OR c.series_id=0").bind(sc.series_id).all()).results;
+  for (const c of await castList(env, await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(sc.series_id).first())) if (c.lid) lc.push({ cid: c.cid, name: c.name, lid: c.lid, desc: ((await env.DB.prepare('SELECT desc FROM chars WHERE id=?').bind(c.cid).first()) || {}).desc || '' }); // LoRA ของนักแสดงที่ใส่บทไว้ (ชื่อบท = ชื่อใน shots.chars)
   let wm = {}; try { const srt = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(sc.series_id).first(), wr = srt && await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('lw:' + srt.title).first(); wm = wr ? JSON.parse(wr.value) : {}; } catch (e) { wm = {}; }
   let xl = []; try { const srt = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(seriesId).first(); if (srt) xl = (await env.DB.prepare("SELECT c.id cid,c.name,c.kind,l.id lid FROM chars c JOIN loras l ON l.char_id=c.id AND l.status='ready' AND l.use=1 WHERE c.story=? AND c.kind IN ('style','place') ORDER BY l.id DESC").bind(srt.title).all()).results; } catch (e) { xl = []; }
   return { lc: lc.filter(c => !xl.some(x => x.cid === c.cid)), wm, xl };
 }
+// คำเรียก LoRA ในคำสั่งวาด: คำกระตุ้น + เพศ + ลักษณะเด่นสั้นๆ ของตัวนั้น (คำกระตุ้นอย่างเดียวไม่พอ โมเดลจะวาดเป็นคนอื่น — เจอจริงกับ LoRA ชุดแรก)
+const loraTag = c => { const d = String(c.desc || ''), g = /\b(woman|girl|female)\b/i.test(d) ? '1girl' : /\b(man|boy|male)\b/i.test(d) ? '1boy' : ''; return ['chr' + c.cid + 'x', g, d.split(',').slice(0, 4).join(',').slice(0, 170)].filter(Boolean).join(', '); };
 // LoRA ที่ช็อตนี้ควรใช้: ตัวละคร/ศัตรูในช็อต (สูงสุด 2) + สไตล์ของเรื่อง + สถานที่ (ถ้ายังไม่เกิน 3 ตัว — ซ้อนมากกว่านี้ภาพเริ่มเละ)
 function shotLoraPick(sh, L) {
   let names = []; try { names = JSON.parse(sh.chars || '[]'); } catch (e) { names = []; }
   const seen = new Set(), m = [];
-  for (const c of L.lc) if (names.includes(c.name) && !seen.has(+c.lid) && m.length < 2) { seen.add(+c.lid); m.push({ cid: c.cid, lid: c.lid, w: +(L.wm || {})[c.name] || 0.8, k: 'char' }); }
+  for (const c of L.lc) if (names.includes(c.name) && !seen.has(+c.lid) && m.length < 2) { seen.add(+c.lid); m.push({ cid: c.cid, lid: c.lid, w: +(L.wm || {})[c.name] || 0.9, k: 'char', tag: loraTag(c) }); }
   const st = (L.xl || []).find(x => x.kind === 'style'); if (st) m.push({ cid: st.cid, lid: st.lid, w: 0.6, k: 'style' });
   const pl = sh.loc && (L.xl || []).find(x => x.kind === 'place' && x.name === sh.loc); if (pl && m.length < 3) m.push({ cid: pl.cid, lid: pl.lid, w: 0.7, k: 'place' });
   return { names, m };
@@ -938,7 +940,7 @@ async function animeApi(env, b) {
       if (only ? !only.has(sh.id) : (hv.has(sh.kproj) || pd.has(sh.kproj))) continue;
       const { names, m } = shotLoraPick(sh, LM), nch = m.filter(c => c.k === 'char').length;
       st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: c.w }))), sh.id));
-      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${m.map(c => 'chr' + c.cid + 'x').join(', ')}${m.length ? ', ' : ''}${sh.en}, [[STYLE]]`.slice(0, 1800), Date.now(), nch ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
+      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${m.map(c => c.tag || ('chr' + c.cid + 'x')).join(', ')}${m.length ? ', ' : ''}${sh.en}, [[STYLE]]`.slice(0, 1800), Date.now(), nch ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
       n++;
     }
     if (st.length) await env.DB.batch(st);
@@ -2782,7 +2784,7 @@ def train_lora(job, port):
                 comfy("/free", {"unload_models": True, "free_memory": True}, port=port)
             except Exception:
                 pass
-        steps = max(800, min(1800, len(imgs) * 80))
+        steps = max(1200, min(2000, len(imgs) * 100))  # ชุดแรกเทรน 960 สเต็ปแล้วแทบไม่มีผลกับภาพ → เพิ่มสเต็ป + แรงขึ้น
         ldim = max(2, min(32, int(opt.get("dim") or 8)))  # ตัวละคร 8 · ศัตรู/สถานที่/สไตล์ 4 (ไฟล์เล็กลงครึ่งหนึ่ง)
         ckpt = os.path.join(COMFY, "models", "checkpoints", M["sdxl"])
         vae = os.path.join(COMFY, "models", "vae", M["sdxlvae"]) if M.get("sdxlvae") else ""
@@ -2790,10 +2792,10 @@ def train_lora(job, port):
                ' --train_data_dir "%s" --output_dir "%s" --output_name lora --caption_extension .txt'
                ' --network_module networks.lora --network_dim %d --network_alpha %d --network_train_unet_only'
                ' --resolution 768,768 --enable_bucket --train_batch_size 1 --max_train_steps %d'
-               ' --learning_rate 1e-4 --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
+               ' --learning_rate 2e-4 --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
                ' --mixed_precision fp16 --save_precision fp16 --gradient_checkpointing --cache_latents --sdpa --no_half_vae --seed 1'
                ' --shuffle_caption --keep_tokens 1 --min_snr_gamma 5 --noise_offset 0.05 --max_grad_norm 1.0'
-               % (max(0, (port or 8188) - 8188), M.get("kpy") or ('"%s/venv/bin/python"' % KV), KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, ldim, max(1, ldim // 2), steps))
+               % (max(0, (port or 8188) - 8188), M.get("kpy") or ('"%s/venv/bin/python"' % KV), KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, ldim, ldim, steps))
         log("เริ่มเทรน LoRA %s (%d ภาพ · %d สเต็ป)" % (trig, len(imgs), steps))
         t0 = time.time()
         prog(job["id"], 0, steps, "เริ่มเทรน")
@@ -3413,9 +3415,9 @@ async function castApi(req, env, url, body) {
       if (act === 'lora_test') { // วาดภาพทดสอบหน้าด้วย LoRA ที่เสร็จแล้ว (เห็นผลในคลัง LoRA)
         const l = await env.DB.prepare('SELECT id,char_id,status FROM loras WHERE id=?').bind(+b.lora).first();
         if (!l || l.status !== 'ready') return json({ error: 'LoRA นี้ยังไม่พร้อม' }, 400);
-        const pj = 'ทดสอบLoRA·' + l.id;
+        const pj = 'ทดสอบLoRA·' + l.id, tc = await env.DB.prepare('SELECT id cid,desc FROM chars WHERE id=?').bind(l.char_id).first();
         if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n) return json({ ok: true, pending: true });
-        await env.DB.batch([env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,4)").bind(pj, `chr${l.char_id}x, upper body portrait, looking at viewer, gentle smile, plain light background, [[STYLE]]`, Date.now())]);
+        await env.DB.batch([env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,1,?,'queued',?,4)").bind(pj, `${tc ? loraTag(tc) : 'chr' + l.char_id + 'x'}, solo, upper body portrait, looking at viewer, gentle smile, plain light background, [[STYLE]]`, Date.now())]);
         return json({ ok: true });
       }
       if (act === 'lorawt') { // น้ำหนัก LoRA ต่อบท (0.3–1.2) ใช้ตอนสร้างภาพคีย์ของช็อตที่มีตัวละครนั้น
