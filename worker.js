@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-11';
+const BOT_VER = 'manga-12';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -955,7 +955,7 @@ async function epAssemble(env, s) {
     for (const sc of (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(d.sid, d.ep).all()).results) {
       for (const sh of (await env.DB.prepare('SELECT id,kproj,say,en,chain FROM shots WHERE script_id=? ORDER BY idx').bind(sc.script_id).all()).results) {
         let sy = {}; try { sy = JSON.parse(sh.say || '{}') || {}; } catch (x) { sy = {}; }
-        const it = { lines: Array.isArray(sy.lines) ? sy.lines : (sy.say ? [{ who: String(sy.who || ''), say: String(sy.say) }] : []), think: String(sy.think || ''), ono: String(sy.ono || ''), en: String(sh.en || '').slice(0, 220), ...(+sh.chain ? { chain: 1 } : {}) }; // en: ใช้เลือกวิธีขยับกล้องและเอฟเฟกต์ฉากสู้ตอนรวมตอน
+        const it = { lines: (Array.isArray(sy.lines) ? sy.lines : (sy.say ? [{ who: String(sy.who || ''), say: String(sy.say) }] : [])).map(l => String(l.who || '')[0] === '~' ? { who: '', say: '(' + String(l.who).slice(1) + ' ในใจ) ' + String(l.say || '') } : l), /* ความคิดในใจ (~ชื่อ) → ซับวงเล็บ */ think: String(sy.think || ''), ono: String(sy.ono || ''), en: String(sh.en || '').slice(0, 220), ...(+sh.chain ? { chain: 1 } : {}) }; // en: ใช้เลือกวิธีขยับกล้องและเอฟเฟกต์ฉากสู้ตอนรวมตอน
         const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind('a' + sc.script_id, String(sh.id)).first();
         if (v && v.id) { urls.push({ u: og + '/vv/' + v.id + '?s=' + await vvSig(env, v.id), ...it }); continue; }
         const im = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(sh.kproj).first();
