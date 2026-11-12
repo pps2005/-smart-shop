@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-9';
+const BOT_VER = 'manga-10';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -552,7 +552,8 @@ function fluxDraft(job, s, shEn) {
   // Flux ไม่ค่อยทำตามแท็กอายุ ต้องบอกเป็นประโยค (เจอจริง: ป้าฮานะ 61 ออกมาเป็นสาว)
   const age = [/\bold woman\b/.test(p) ? 'The woman is elderly, around sixty years old, with clear wrinkles on her face, not young' : '', /\bold man\b/.test(p) ? 'The man is elderly, around seventy years old, with clear wrinkles, not young' : '', /middle-aged man/.test(p) ? 'The man is an adult around forty drawn as a good-looking slender anime man with a smooth face and no wrinkles, just slightly tired eyes' : '', /middle-aged woman/.test(p) ? 'The woman is middle-aged, in her fifties, with a mature face and some wrinkles, not young' : ''].filter(Boolean).join('. ');
   // ภาพร่างสตอรีบอร์ด = มังงะขาวดำตัดเส้นหมึก (ผู้ใช้เลือก): ไม่มีสี/แสงให้แกว่งข้ามช่อง · ตั้ง settings draft_style เพื่อเปลี่ยนได้
-  const st = String(s.draft_style || '').trim() || 'black and white manga page illustration, monochrome, clean fine ink line art with thin delicate pen lines, soft screentone dot shading, white background areas, expressive detailed eyes, no color anywhere, hair shaded only with black ink or gray screentone, no gray gradients, no text, no letters, no numbers, no speech bubbles, single panel, every character drawn in the same delicate manga style with slender anime proportions and anime faces, never a western cartoon caricature';
+  const wide = /establishing shot|wide shot|insert shot/i.test(p);
+  const st = String(s.draft_style || '').trim() || ('black and white manga illustration drawn with a fine-tip pen on clean white paper, very thin delicate uniform ink lines, airy and light, mostly white space, no solid black fills, hair drawn as many fine separate strands left white, only light dot screentone on small shadow areas, soft gentle faces with large detailed sparkling eyes, ' + (wide ? 'simple lightly sketched background with thin lines' : 'almost empty white background with only a few thin lines hinting at the place') + ', no color anywhere, no gray gradients, no text, no letters, no numbers, no speech bubbles, single panel, every character drawn in the same delicate manga style with slender anime proportions and anime faces, never a western cartoon caricature');
   // ตัดคำบอกสีออกจากคำบรรยาย (เช่น red hair) ไม่งั้น Flux ระบายสีนั้นลงภาพขาวดำ — เจอจริง: ผมแดงของรินโผล่มาเป็นสี
   const mono = body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/, a tired gentle face/gi, ', a gentle face').replace(/\ba plain /gi, 'a ').replace(/\b(mature male|middle-aged man),\s*/gi, '').replace(/ {2,}/g, ' ');
   return `${st}. ${age ? age + '. ' : ''}${mono}. Strictly black ink on white paper, grayscale only, absolutely no colored areas.`;
