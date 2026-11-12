@@ -11,13 +11,15 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-12';
+const BOT_VER = 'meter-1';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
 const readDay = () => 'rr:' + new Date().toISOString().slice(0, 10);
-function meterDB(db, acc) {
-  const add = r => { acc.n += (r && r.meta && +r.meta.rows_read) || 0; return r; };
+function meterDB(db, acc, tag0) { // นับแถวที่อ่าน แยกตามที่มา (tag) เพื่อโชว์หลอด % ในหน้าสตูดิโอ
+  let tag = tag0 || 'อื่นๆ';
+  acc.by = acc.by || {};
+  const add = r => { const n = (r && r.meta && +r.meta.rows_read) || 0; acc.n += n; acc.by[tag] = (acc.by[tag] || 0) + n; return r; };
   const wrap = st => ({
     __st: st,
     bind: (...a) => wrap(st.bind(...a)),
@@ -25,21 +27,26 @@ function meterDB(db, acc) {
     run: async () => add(await st.run()),
     first: async c => { const r = add(await st.all()), row = r.results && r.results[0]; return row == null ? null : (c ? row[c] : row); }
   });
-  return { prepare: q => wrap(db.prepare(q)), batch: async l => { const r = await db.batch(l.map(x => x.__st || x)); for (const x of r) add(x); return r; } };
+  return { prepare: q => wrap(db.prepare(q)), batch: async l => { const r = await db.batch(l.map(x => x.__st || x)); for (const x of r) add(x); return r; }, setTag: t => { tag = t; }, withTag: t => meterDB(db, acc, t) };
 }
+const tagged = (env, t) => (env.DB && env.DB.withTag ? { ...env, DB: env.DB.withTag(t) } : env);
 async function flushReads(db, acc, min) {
-  const n = acc.n; if (n < (min || 1)) return; acc.n = 0;
-  try { await db.prepare("INSERT INTO settings (key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(settings.value AS INTEGER)+CAST(excluded.value AS INTEGER) AS TEXT)").bind(readDay(), String(n)).run(); } catch (e) { }
+  const n = acc.n; if (n < (min || 1)) return; acc.n = 0; const by = acc.by || {}; acc.by = {};
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    await db.batch([db.prepare("INSERT INTO settings (key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(settings.value AS INTEGER)+CAST(excluded.value AS INTEGER) AS TEXT)").bind(readDay(), String(n)),
+      ...Object.entries(by).filter(([, v]) => v > 0).map(([t, v]) => db.prepare('INSERT INTO rmeter (day,tag,n,c) VALUES (?1,?2,?3,1) ON CONFLICT(day,tag) DO UPDATE SET n=n+excluded.n, c=c+1').bind(day, t, v))]);
+  } catch (e) { try { await db.prepare('CREATE TABLE IF NOT EXISTS rmeter (day TEXT, tag TEXT, n INTEGER, c INTEGER, PRIMARY KEY(day,tag))').run(); } catch (x) { } }
 }
 export default {
   async fetch(req, env0, ctx) {
     const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) };
-    try { return await handleFetch(req, env, ctx); } finally { ctx.waitUntil(flushReads(env0.DB, acc, 25)); }
+    try { return await handleFetch(req, env, ctx); } finally { ctx.waitUntil(flushReads(env0.DB, acc, 1)); }
   },
   async scheduled(event, env0, ctx) {
     const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) }, jobs = [];
     await handleCron(event, env, { waitUntil: p => jobs.push(p) });
-    ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
+    ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare('DELETE FROM rmeter WHERE day < ?').bind(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
   },
 };
 async function handleFetch(req, env, ctx) {
@@ -47,6 +54,7 @@ async function handleFetch(req, env, ctx) {
     const p = url.pathname;
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (p === '/') return new Response(HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    if (p.startsWith('/k/') && env.DB.setTag) env.DB.setTag('kaggle:' + (p.split('/')[2] || ''));
     if (p.startsWith('/k/')) return (await vRoutes(req, env, url, ctx).catch(e => json({ error: String(e.message || e) }, 500)));
     if (p.startsWith('/h/')) return (await helperScript(env, url).catch(e => new Response('# error: ' + String(e.message || e), { status: 500 })));
     if (p.startsWith('/vv/')) { // ลิงก์คลิปแบบมีลายเซ็น ให้เครื่อง Kaggle ดึงไปรวมคลิป (ไม่เปิดรหัสผ่านเจ้าของ)
@@ -61,6 +69,7 @@ async function handleFetch(req, env, ctx) {
       return r && r.data ? new Response(b64ToBytes(r.data), { headers: { 'content-type': 'image/jpeg' } }) : new Response('not found', { status: 404 });
     }
     if (!authOK(req, url, env)) return json({ error: 'รหัสผ่านไม่ถูกต้อง' }, 401);
+    if (env.DB.setTag) env.DB.setTag(p.startsWith('/img/') ? 'web:img' : 'web:' + p.replace(/^\/api\//, ''));
     await ensureSchema(env);
     if (selfUrl !== url.origin) { selfUrl = url.origin; ctx.waitUntil(setSetting(env, 'self_url', url.origin)); }
     try {
@@ -72,6 +81,7 @@ async function handleFetch(req, env, ctx) {
       if (p === '/api/zip') return makeZip(env, url.searchParams.get('project') || '', url.searchParams.get('starred') === '1');
       if (req.method !== 'POST') return json({ error: 'not found' }, 404);
       const body = await req.json().catch(() => ({}));
+      if (env.DB.setTag) env.DB.setTag('web:' + p.replace(/^\/api\//, '') + (body && body.act ? ':' + String(body.act).slice(0, 20) : ''));
       if (p.startsWith('/api/vcast')) { const cr = await castApi(req, env, url, body); if (cr) return cr; }
       if (p.startsWith('/api/v')) { const vr = await vApi(req, env, url, ctx, body); if (vr) return vr; }
       if (p === '/api/anime') return json(await animeApi(env, body));
@@ -102,10 +112,10 @@ async function handleFetch(req, env, ctx) {
 }
 async function handleCron(event, env, ctx) {
     await ensureSchema(env);
-    ctx.waitUntil(tick(env, false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
-    ctx.waitUntil(autoHeal(env).catch(() => {}).then(() => vTick(env, false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
-    ctx.waitUntil(castBatch(env, 0, false).catch(() => {}));
-    ctx.waitUntil(audDaily(env).catch(() => {}));
+    ctx.waitUntil(tick(tagged(env, 'bg:tick'), false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
+    ctx.waitUntil(autoHeal(tagged(env, 'bg:heal')).catch(() => {}).then(() => vTick(tagged(env, 'bg:kaggle'), false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
+    ctx.waitUntil(castBatch(tagged(env, 'bg:cast'), 0, false).catch(() => {}));
+    ctx.waitUntil(audDaily(tagged(env, 'bg:aud')).catch(() => {}));
 }
 
 // ---------- ซ่อมงานที่พังอัตโนมัติ ----------
@@ -1193,14 +1203,14 @@ async function tick(env, force) {
   const s = await getSettings(env);
   const now = Date.now();
   if (!force) { const rr = +s[readDay()] || 0; if (rr > READ_STOP) return { skipped: 'reads ' + rr }; if (rr > READ_SLOW && new Date().getUTCMinutes() % 5) return { skipped: 'reads-slow ' + rr }; } // ใกล้เพดานอ่านรายวัน: งานเบื้องหลังทำทุก 5 นาที · เกือบเต็ม: หยุดงานเบื้องหลัง (เครื่อง Kaggle ยังส่งงานได้)
-  await animeAuto(env, s).catch(() => {});
+  await animeAuto(tagged(env, 'bg:anime'), s).catch(() => {});
   if (s.supa_test === '1') await supaSelfTest(env, s);
   await sbImportTick(env, s).catch(() => { });
   await sbRedrawTick(env, s).catch(() => { });
   if (s.design_cast) { await env.DB.prepare("DELETE FROM settings WHERE key='design_cast'").run(); await designCast(env, s, String(s.design_cast)).catch(() => { }); }
-  await restyleTick(env, s).catch(() => { });
-  await xlTick(env).catch(() => { });
-  await animeAdvance(env, s).catch(() => {});
+  await restyleTick(tagged(env, 'bg:lora'), s).catch(() => { });
+  await xlTick(tagged(env, 'bg:lora')).catch(() => { });
+  await animeAdvance(tagged(env, 'bg:anime'), s).catch(() => {});
   const useK = await kImgOn(env, s, now);
   if (useK) {
     if (!force && s.auto_fill === '1') await kTopUp(env, s);
@@ -1383,6 +1393,7 @@ async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, scene INTEGER, prompt TEXT, status TEXT DEFAULT 'queued', error TEXT, created INTEGER, steps INTEGER, heal INTEGER DEFAULT 0)"),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS images (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, scene INTEGER, prompt TEXT, data TEXT, starred INTEGER DEFAULT 0, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS rmeter (day TEXT, tag TEXT, n INTEGER, c INTEGER, PRIMARY KEY(day,tag))'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT, helper INTEGER DEFAULT 0)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS char_profiles (name TEXT PRIMARY KEY, data TEXT, updated INTEGER)"),
@@ -3495,7 +3506,8 @@ async function castApi(req, env, url, body) {
           }
           v.prog = g;
         }
-        return json({ ok: true, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
+        let meter = null; try { const dy = new Date().toISOString().slice(0, 10); meter = { cap: READ_CAP, slow: READ_SLOW, stop: READ_STOP, day: dy, now: Date.now(), total: +((await getSettings(env))[readDay()]) || 0, by: (await env.DB.prepare('SELECT tag,n,c FROM rmeter WHERE day=? ORDER BY n DESC').bind(dy).all()).results }; } catch (e) { meter = null; }
+        return json({ ok: true, meter, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
       }
       if (act === 'save') {
         const pl = b.plan || {}; if (!Array.isArray(pl.roles) || !Array.isArray(pl.eps) || !pl.roles.length || !pl.eps.length) return json({ error: 'โครงเรื่องไม่ครบ (ต้องมีบทและตอน)' }, 400);
