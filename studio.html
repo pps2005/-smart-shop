@@ -19,8 +19,11 @@ input[type=text],input[type=password]{width:100%;padding:11px;border-radius:10px
 .sbg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.sbg>div{border:1px solid var(--bd);border-radius:10px;overflow:hidden;background:#fff;display:flex;flex-direction:column}.sbg img,.sbg .ph{width:100%;display:block;background:#eeeaf8}.sbg .ph{aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;font-size:22px}
 .sbg .tx{font-size:11px;line-height:1.35;padding:4px 6px;color:var(--mu);flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.sbg button{margin:0;border:0;border-top:1px solid var(--bd);border-radius:0;font-size:13px;padding:7px 0;width:100%}
 .sbb{display:flex}.sbb button:last-child{flex:0 0 38px;border-left:1px solid var(--bd)}
-.wt{margin:12px -14px;background:#fff}.wth{padding:14px;font-size:18px;border-top:3px solid var(--ac);border-bottom:1px solid var(--bd)}.wp img{width:100%;display:block}.wp .ph{aspect-ratio:16/9;background:#eeeaf8;display:flex;align-items:center;justify-content:center;color:var(--mu)}
-.bb+.bb,.nr+.bb{margin-top:-6px}.fxt{margin:6px 14px 0;display:flex;gap:10px;align-items:center}.fxt i{color:#ff69b4;font-weight:700;transform:rotate(-3deg)}.fxt b{color:#3aa0ff;font-size:19px;transform:rotate(4deg)}.bb{margin:8px 14px 14px;padding:9px 13px;border:2px solid #222;border-radius:18px;background:#fff;font-size:15px;line-height:1.45}.bb b{display:block;font-size:12px;color:var(--ac)}.nr{margin:6px 14px 12px;font-size:13px;color:var(--mu);font-style:italic}
+.wt{margin:12px -14px;background:#fff;padding-bottom:6px}.wth{padding:14px;font-size:18px;border-top:3px solid var(--ac);border-bottom:1px solid var(--bd);margin-bottom:18px}.wp{position:relative;margin:0 0 30px}.wp .im{position:relative}.wp img{width:100%;display:block}.wp .ph{aspect-ratio:16/9;background:#eeeaf8;display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:13px;padding:10px;text-align:center}
+.bb{position:relative;width:fit-content;max-width:80%;margin:8px 16px;padding:10px 15px;border:2px solid #1c1c24;border-radius:22px;background:#fff;font-size:15.5px;line-height:1.42;color:#1c1c24}.bb b{display:block;font-size:11.5px;color:var(--ac);margin-bottom:1px}
+.bb.r{margin-left:auto}.bb::before{content:'';position:absolute;top:-11px;left:24px;border:6px solid transparent;border-bottom-color:#1c1c24;border-top:0;border-bottom-width:11px}.bb.r::before{left:auto;right:24px}.im+.bb{margin-top:-14px}
+.nr{width:fit-content;max-width:88%;margin:8px 16px;padding:7px 11px;border:1.5px solid #1c1c24;background:#fff8dc;font-size:14px;line-height:1.4;color:#1c1c24}
+.fx1,.fx2{position:absolute;font-weight:800;-webkit-text-stroke:3px #fff;paint-order:stroke fill;pointer-events:none;line-height:1.1}.fx1{top:6%;left:5%;color:#ff4fa3;font-size:17px;transform:rotate(-7deg);max-width:55%}.fx2{top:8%;right:5%;color:#2f8cff;font-size:27px;transform:rotate(9deg)}
 .stp{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--ac);color:#fff;font-size:14px;margin-right:6px}
 a.btn{display:inline-block;text-decoration:none;border:1px solid var(--bd);color:var(--fg);padding:9px 13px;border-radius:10px;margin:3px 4px 3px 0}
 </style></head><body>
@@ -115,6 +118,7 @@ async function sbRedo(id){const c=prompt('อยากแก้อะไรใ�
   try{const r=await api('sb_redo',{ep:sbCur(),shot:id,command:c});toast(r.pending?'ช็อตนี้กำลังวาดอยู่แล้ว':'สั่งวาดใหม่แล้ว รอสักครู่');}catch(e){toast(botErr(e));}await load();}
 async function sbOk(){if(!confirm('อนุมัติสตอรีบอร์ดนี้ แล้วให้ระบบทำคลิปทั้งตอน?'))return;try{await api('sb_ok',{ep:sbCur()});toast('อนุมัติแล้ว ระบบเริ่มทำทั้งตอน');}catch(e){toast(botErr(e));}await load();}
 async function sbLora(){try{const r=await api('sb_lora',{ep:sbCur()});toast('สั่งวาดใหม่ '+(r.redo||0)+' ช็อตด้วย LoRA แล้ว');}catch(e){toast(botErr(e));}await load();}
+async function sbStill(){if(!confirm('ทำตอนนี้เป็นวิดีโอภาพนิ่ง + ซับ (ไม่มีอนิเมชั่น) ไว้ดูทั้งตอนก่อน?'))return;try{await api('sb_ok',{ep:sbCur(),still:1});toast('เริ่มรวมเป็นวิดีโอภาพนิ่งแล้ว');}catch(e){toast(botErr(e));}await load();}
 async function sbStop(){if(!confirm('ยกเลิกตอนนี้? (ภาพที่วาดไปแล้วยังอยู่)'))return;try{await api('stop',{ep:sbCur()});toast('ยกเลิกแล้ว');}catch(e){toast(botErr(e));}await load();}
 function ep_status(no){const s=ST.epst[no];return s?s.status:'';}
 /* ---------- เริ่มทำทั้งเรื่อง ---------- */
@@ -186,7 +190,7 @@ function render(){const A=$('#app');
     const gl=sbList(),g=sbCur(),cur=g?ST.epst[g]:null,E=g?pl.eps.find(x=>x.no===g):null,fn=(pl.title||'video').slice(0,30),say=v=>{try{const y=JSON.parse(v.say||'null')||{};y.lines=Array.isArray(y.lines)&&y.lines.length?y.lines:(y.say?[{who:y.who||'',say:y.say}]:[]);return y;}catch(e){return {lines:[]};}};
     const doneEps=pl.eps.filter(x=>ST.fin[x.no]&&ST.epst[x.no]&&ST.epst[x.no].gate),nextNo=(pl.eps.find(x=>!ST.epst[x.no]&&!ST.fin[x.no]&&x.no>(gl[gl.length-1]||0))||{}).no||0;
     h+=`<div class="c"><h2><span class="stp">3</span>สตอรีบอร์ด</h2>`;
-    h+=doneEps.map(x=>`<div class="it"><div class="row sp"><b>ตอน ${x.no} · ${esc(x.title)}</b><span class="ok">✅ เสร็จ</span></div><button class="sm" data-dl="${ST.fin[x.no]}|${esc(fn)}-ep${x.no}.mp4">⬇ ดาวน์โหลด</button><a class="btn sm" href="${esc(botU('/vid/'+ST.fin[x.no]))}" target="_blank">▶ ดู</a></div>`).join('');
+    h+=doneEps.map(x=>`<div class="it"><div class="row sp"><b>ตอน ${x.no} · ${esc(x.title)}</b><span class="ok">✅ เสร็จ</span></div><button class="sm" data-dl="${ST.fin[x.no]}|${esc(fn)}-ep${x.no}.mp4">⬇ ดาวน์โหลด</button><a class="btn sm" href="${esc(botU('/vid/'+ST.fin[x.no]))}" target="_blank">▶ ดู</a><button class="sm" data-reopen="${x.no}">↩ กลับไปแก้สตอรีบอร์ด / ทำอนิเมะเต็ม</button></div>`).join('');
     if(ST.busy)h+=`<div class="mu">⏳ ${esc(ST.busy)}</div>`;
     else if(!gl.length){
       const no=pl.eps.some(x=>x.no===ST.selEp)?ST.selEp:(pl.eps.find(x=>!ST.fin[x.no])||pl.eps[0]).no,set=pl.eps.filter(x=>x.no>=no).slice(0,3),last=set[set.length-1].no;
@@ -201,8 +205,10 @@ function render(){const A=$('#app');
       const stat=n=>{const c=ST.epst[n],sb=ST.sbs[n];if(c.status==='waiting')return `<span class="warn">⏳ รอ LoRA ${esc((c.need||[]).join(', '))}</span>`;if(!sb)return '<span class="mu">⏳ กำลังเริ่ม</span>';if(c.gate==='ok')return '<span class="ok">✅ อนุมัติแล้ว กำลังทำคลิป</span>';if(sb.ready)return `<span class="ok">ภาพครบ ${sb.tot} ช็อต</span>`;return `<span class="mu">${sb.tot?'🎨 ภาพ '+sb.img+'/'+sb.tot:'✍️ กำลังเขียนบท'}</span>`;};
       if(ST.sbMode==='read'){
         h+=`<div class="mu">เลื่อนอ่านต่อเนื่อง ${gl.length} ตอน · จะแก้ภาพหรืออนุมัติ กด "แก้ทีละช็อต"</div></div>`;
-        h+=gl.map(n=>{const Ex=pl.eps.find(x=>x.no===n)||{},sb=ST.sbs[n];let k=0;
-          return `<div class="wt"><div class="wth"><b>ตอน ${n}</b> · ${esc(Ex.title||'')}<div style="font-size:13px;font-weight:400;margin-top:2px">${stat(n)}</div></div>${sb?sb.scenes.map(S=>S.shots.map(v=>{const d=say(v);k++;return `<div class="wp">${v.img?`<img src="${esc(botU('/img/'+v.img))}" loading="lazy">`:`<div class="ph">⏳ ${k}</div>`}${d.think||d.ono?`<div class="fxt">${d.think?`<i>💭 ${esc(d.think)}</i>`:''}${d.ono?`<b>${esc(d.ono)}</b>`:''}</div>`:''}${d.lines.length?d.lines.map(l=>l.who?`<div class="bb"><b>${esc(l.who)}</b>${esc(l.say)}</div>`:`<div class="nr">${esc(l.say)}</div>`).join(''):(v.img?'':`<div class="nr">${esc(v.th||'')}</div>`)}</div>`;}).join('')+(S.writing?'<div class="nr">✍️ ซีนนี้กำลังเขียนบท…</div>':'')).join(''):''}</div>`;}).join('');
+        h+=gl.map(n=>{const Ex=pl.eps.find(x=>x.no===n)||{},sb=ST.sbs[n],side={};let k=0,sn=0;
+          return `<div class="wt"><div class="wth"><b>ตอน ${n}</b> · ${esc(Ex.title||'')}<div style="font-size:13px;font-weight:400;margin-top:2px">${stat(n)}</div></div>${sb?sb.scenes.map(S=>S.shots.map(v=>{const d=say(v);k++;
+            const tx=d.lines.map(l=>{if(!l.who)return `<div class="nr">${esc(l.say)}</div>`;if(!(l.who in side))side[l.who]=sn++%2?'r':'l';return `<div class="bb ${side[l.who]}"><b>${esc(l.who)}</b>${esc(l.say)}</div>`;}).join('');
+            return `<div class="wp"><div class="im">${v.img?`<img src="${esc(botU('/img/'+v.img))}" loading="lazy">`:`<div class="ph">⏳ ${k} · ${esc(v.th||'')}</div>`}${d.think?`<div class="fx1">${esc(d.think)}</div>`:''}${d.ono?`<div class="fx2">${esc(d.ono)}</div>`:''}</div>${tx}</div>`;}).join('')+(S.writing?'<div class="nr">✍️ ซีนนี้กำลังเขียนบท…</div>':'')).join(''):''}</div>`;}).join('');
         h+=`<div class="c">`;
       }else{
         if(gl.length>1)h+=`<div class="row" style="margin-bottom:6px">${gl.map(n=>`<button class="sm ${n===g?'on':''}" data-sbsel="${n}">ตอน ${n}</button>`).join('')}</div>`;
@@ -215,6 +221,7 @@ function render(){const A=$('#app');
             const wr=sb.scenes.some(x=>x.writing)||!sb.scenes.length,pct=sb.tot?Math.round(sb.img/sb.tot*100):0;
             if(ok)h+=`<div class="mu">ซีนเสร็จ ${sc.filter(x=>+x.fin).length}/${sc.length||sb.scenes.length} · คลิป ${vid} ช็อต (ช็อตที่เหลือใช้ภาพนิ่งซูมช้า) · ปิดหน้านี้ได้ ระบบทำต่อเอง</div>`;
             else if(sb.ready&&(sb.need||[]).length)h+=`<div class="warn" style="margin-top:6px">นี่คือฉบับร่าง (ยังไม่ใช้ LoRA) — ของจริงเริ่มได้เมื่อเลือก LoRA ให้ตัวหลักครบ ยังขาด: ${esc(sb.need.join(', '))} (เลือกที่ข้อ 2)</div>`;
+            if(!ok&&sb.ready)h+=`<button data-a="sbstill" style="width:100%;margin-top:6px">🎞 ทำเป็นวิดีโอภาพนิ่ง + ซับก่อน (ยังไม่มีอนิเมชั่น)</button>`;
             else if(sb.ready&&sb.stale)h+=`<div class="warn">LoRA ครบแล้ว แต่มี ${sb.stale} ช็อตที่วาดไว้ก่อนมี LoRA หน้าตัวละครจะยังไม่ตรง</div><button class="go" data-a="sblora" style="margin:8px 0">🧬 เริ่มของจริง: วาดด้วย LoRA คุณภาพสูง (${sb.stale} ช็อต)</button>`;
             else if(sb.ready)h+=`<button class="go" data-a="sbok" style="margin:8px 0">✅ อนุมัติ ทำตอน ${g} เป็นคลิป</button>`;
             else h+=`<div class="mu">${wr?'✍️ กำลังเขียนบทและแตกช็อต':'🎨 กำลังวาด'} · ปิดหน้านี้ได้ ระบบทำต่อเอง</div><div class="bar"><i style="width:${pct}%"></i></div>`;
@@ -261,10 +268,11 @@ function render(){const A=$('#app');
   A.querySelectorAll('[data-sbm]').forEach(b=>b.onclick=()=>{ST.sbMode=b.dataset.sbm;localStorage.setItem('ss_sbmode',ST.sbMode);render();});
   A.querySelectorAll('[data-sbsel]').forEach(b=>b.onclick=()=>{ST.sbSel=+b.dataset.sbsel;ST.sb=ST.sbs[ST.sbSel]||null;render();});
   A.querySelectorAll('[data-redo]').forEach(b=>b.onclick=()=>sbRedo(+b.dataset.redo));
+  A.querySelectorAll('[data-reopen]').forEach(b=>b.onclick=async()=>{if(!confirm('กลับไปที่สตอรีบอร์ดของตอนนี้? (ไฟล์วิดีโอที่รวมไว้จะถูกลบ)'))return;try{await api('sb_reopen',{ep:+b.dataset.reopen});}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('ลบช็อตนี้ออกจากสตอรีบอร์ด?'))return;try{await api('sb_del',{ep:sbCur(),shot:+b.dataset.del});toast('ลบช็อตแล้ว');}catch(e){toast(botErr(e));}await load();});
   const se=$('#sbep');if(se)se.onchange=()=>{ST.selEp=+se.value;render();};
   A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});
-  A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='more'){ST.more=!ST.more;render();}else if(a==='sbok')sbOk();else if(a==='sblora')sbLora();else if(a==='sbstop')sbStop();else if(a==='stop')stopAll();else if(a==='qc')runQc();else startAll();});}
+  A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='more'){ST.more=!ST.more;render();}else if(a==='sbok')sbOk();else if(a==='sblora')sbLora();else if(a==='sbstill')sbStill();else if(a==='sbstop')sbStop();else if(a==='stop')stopAll();else if(a==='qc')runQc();else startAll();});}
 /* ---------- แถบ LoRA: เลือกเฉพาะ LoRA ที่เทรนเสร็จแล้วมาใช้ในบท ---------- */
 function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ST.tab=b.dataset.tab;render();window.scrollTo(0,0);});
   A.querySelectorAll('[data-bot]').forEach(b=>b.onclick=()=>{ST.editBot=true;render();window.scrollTo(0,0);});

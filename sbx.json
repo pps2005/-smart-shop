@@ -1,0 +1,724 @@
+{
+"สาเหตุที่ฉันรัก": {
+"1": {
+"1": [
+{
+"th": "เมืองฮิบิกิใต้ม่านอาคม ยามเย็น",
+"en": "wide establishing shot of a walled fantasy city under a faint glowing dome barrier at dusk, a tall bell tower in the center",
+"chars": [],
+"lines": [
+{
+"who": "",
+"say": "เมืองฮิบิกิ อยู่รอดได้เพราะม่านอาคม"
+},
+{
+"who": "",
+"say": "และเสียงระฆังตอนสามทุ่มของทุกคืน"
+}
+]
+},
+{
+"th": "ออฟฟิศคลังอาคม",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, wide shot, clerks working at desks, stacks of paper talismans",
+"chars": [],
+"lines": [
+{
+"who": "",
+"say": "คลังอาคมฮิบิกิ ที่เก็บยันต์ทุกแผ่นของเมือง"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "โทวะนั่งนับยันต์ที่โต๊ะมุมสุด",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, medium shot, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest carefully counting stacks of paper talismans at a corner desk",
+"chars": [
+"โทวะ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "สามร้อยหกสิบ... สามร้อยหกสิบเอ็ด..."
+},
+{
+"who": "",
+"say": "โทวะ คาซึมะ เสมียนคลัง อายุ 42 ปี"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "โทวะขมวดคิ้วมองสมุดบัญชี",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, close-up, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest frowning at a ledger book, an empty slot on the shelf behind him",
+"chars": [
+"โทวะ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "...เอ๊ะ"
+},
+{
+"who": "โทวะ",
+"say": "ยันต์ไฟหายไป 40 แผ่น?"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "โทวะหน้าเหวอ",
+"en": "simplified comedic reaction face, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest, blank white eyes, shocked open mouth, sweat drops, on a simple flat pale blue background with gloomy lines",
+"chars": [
+"โทวะ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "นับใหม่อีกรอบ... ก็ยังหาย!"
+}
+],
+"think": "ซวยแล้ว...",
+"ono": "เฮือก!"
+},
+{
+"th": "มิโอะนั่งโต๊ะข้างๆ ไม่มองหน้า",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, two-shot, a 27-year-old woman clerk with straight black hair, cold expression, neat uniform vest writing at her desk decorated with small stuffed animals without looking up, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest leaning over nervously",
+"chars": [
+"โทวะ",
+"มิโอะ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "คุณมิโอะ เมื่อวานใครเข้าคลังบ้างครับ"
+},
+{
+"who": "มิโอะ",
+"say": "ไม่ทราบค่ะ"
+},
+{
+"who": "มิโอะ",
+"say": "แล้วอย่าชวนคุยตอนทำงานนะคะ หัวหน้า"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "โทวะคอตก",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, medium shot, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest slumping his shoulders, deflated expression, dark gloomy lines above his head",
+"chars": [
+"โทวะ"
+],
+"lines": [
+{
+"who": "",
+"say": "ลูกน้องคนเดียวของเขา ไม่เคยมองหน้าเขาเลย"
+}
+],
+"think": "เราเป็นหัวหน้าจริงเหรอ...",
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "หัวหน้าซาเอกิเดินเข้ามา",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, low angle shot, a stern 58-year-old woman manager with a grey bob haircut and a dark formal jacket standing with arms crossed, looking down sternly",
+"chars": [
+"หัวหน้าซาเอกิ"
+],
+"lines": [
+{
+"who": "หัวหน้าซาเอกิ",
+"say": "โทวะ"
+},
+{
+"who": "หัวหน้าซาเอกิ",
+"say": "ยันต์ไฟ 40 แผ่น หายไปจากชั้นของเธอ"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "โทวะก้มหัวขอโทษ",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, side view, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest bowing deeply in apology in front of a stern 58-year-old woman manager with a grey bob haircut and a dark formal jacket",
+"chars": [
+"โทวะ",
+"หัวหน้าซาเอกิ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "ขอโทษครับ! ผมนับทุกเย็น"
+},
+{
+"who": "โทวะ",
+"say": "เมื่อวานยังครบอยู่เลยครับ"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "หัวหน้าซาเอกิพูดเสียงเข้ม",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, close-up, a stern 58-year-old woman manager with a grey bob haircut and a dark formal jacket with a serious shadowed face, holding one glowing red paper talisman",
+"chars": [
+"หัวหน้าซาเอกิ"
+],
+"lines": [
+{
+"who": "หัวหน้าซาเอกิ",
+"say": "ยันต์ไฟเผาอสูรได้ทั้งฝูง"
+},
+{
+"who": "หัวหน้าซาเอกิ",
+"say": "ถ้ามันไปอยู่ผิดมือ เธอรู้ใช่ไหมว่าจะเกิดอะไร"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "โทวะรับปาก หัวหน้าหันหลัง",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, over-the-shoulder shot from behind a stern 58-year-old woman manager with a grey bob haircut and a dark formal jacket walking away, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest standing straight with a determined but nervous face",
+"chars": [
+"โทวะ",
+"หัวหน้าซาเอกิ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "ผมจะหาให้เจอครับ"
+},
+{
+"who": "หัวหน้าซาเอกิ",
+"say": "ก่อนระฆังคืนพรุ่งนี้"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "หัวหน้าซาเอกิเหลือบมองเงาของโทวะ",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light, close-up of a stern 58-year-old woman manager with a grey bob haircut and a dark formal jacket glancing back over her shoulder at a long strange shadow on the floor, mysterious mood",
+"chars": [
+"หัวหน้าซาเอกิ"
+],
+"lines": [
+{
+"who": "",
+"say": "หัวหน้าซาเอกิ มองเงาของเขา"
+},
+{
+"who": "",
+"say": "นานกว่าที่ควรจะมอง"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+},
+{
+"th": "ออฟฟิศว่าง โทวะเก็บของคนเดียว",
+"en": "inside a magic talisman archive office, file shelves up to the ceiling, warm afternoon light at dusk, wide shot, empty desks, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest alone packing his bag, long orange shadows",
+"chars": [
+"โทวะ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "...วันนี้ก็ไม่มีใครบอกลาอีกแล้ว"
+}
+],
+"loc": "ออฟฟิศคลังอาคม"
+}
+],
+"2": [
+{
+"th": "ตู้กดน้ำหลังโกดังยามค่ำ",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, wide establishing shot, nobody around",
+"chars": [],
+"lines": [
+{
+"who": "",
+"say": "หลังโกดัง มีตู้กดน้ำเก่าอยู่ตู้หนึ่ง"
+},
+{
+"who": "",
+"say": "ที่เดียวในเมืองที่เขารู้สึกว่าเป็นของตัวเอง"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "โทวะกดกาแฟกระป๋อง",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, close-up of a hand pressing a vending machine button, a can dropping, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest lit by the machine light",
+"chars": [
+"โทวะ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "กาแฟหวานพิเศษ..."
+},
+{
+"who": "โทวะ",
+"say": "รางวัลของคนโดนด่า"
+}
+],
+"ono": "ตึ่ง!",
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "โมจิโผล่บนตู้กดน้ำ โทวะสะดุ้ง",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, a small round cat-like spirit creature with a glowing lantern at the tip of its tail sitting on top of the vending machine staring down, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest jumping back startled with a comical shocked face",
+"chars": [
+"โทวะ",
+"โมจิ"
+],
+"lines": [
+{
+"who": "โมจิ",
+"say": "มุจิ!"
+}
+],
+"ono": "ว้าก!",
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "โมจิขู่จะเอากาแฟ",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, close-up, a small round cat-like spirit creature with a glowing lantern at the tip of its tail puffing up and growling cutely, reaching for a coffee can",
+"chars": [
+"โทวะ",
+"โมจิ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "อะ อะไรเนี่ย แมว? ตะเกียง?"
+},
+{
+"who": "โมจิ",
+"say": "มุจิ มุจิ!"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "มือของใครบางคนยื่นขนมปังให้โมจิ",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, close-up of a slender hand in a black sleeve offering a piece of bread to a small round cat-like spirit creature with a glowing lantern at the tip of its tail",
+"chars": [
+"ริน",
+"โมจิ"
+],
+"lines": [
+{
+"who": "ริน",
+"say": "มันแค่หิว"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "รินในฮู้ดดำ ผมแดง",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, close-up portrait, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie, hood up, face lit by the vending machine glow, quiet expression",
+"chars": [
+"ริน"
+],
+"lines": [
+{
+"who": "",
+"say": "ผู้หญิงผมแดง ยืนเงียบอยู่ตรงนั้น"
+},
+{
+"who": "",
+"say": "ตั้งแต่เมื่อไหร่ก็ไม่รู้"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "รินกดกาแฟดำ",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, medium shot, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie taking a black coffee can from the vending machine",
+"chars": [
+"ริน"
+],
+"lines": [
+{
+"who": "ริน",
+"say": "กาแฟดำ"
+}
+],
+"ono": "ตึ่ง!",
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "สองคนนั่งม้านั่งคนละฝั่ง",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, wide two-shot, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest and a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie sitting at opposite ends of the old bench holding coffee cans",
+"chars": [
+"โทวะ",
+"ริน"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "เอ่อ... ดึกแล้ว มาทำอะไรแถวนี้ครับ"
+},
+{
+"who": "ริน",
+"say": "รอระฆัง"
+},
+{
+"who": "โทวะ",
+"say": "อ๋อ... ผมก็เหมือนกันมั้งครับ"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "รินมองกระป๋องกาแฟหวานของโทวะ",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, close-up, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie looking sideways with a deadpan half-lidded stare at a sweet coffee can",
+"chars": [
+"โทวะ",
+"ริน"
+],
+"lines": [
+{
+"who": "ริน",
+"say": "หวานขนาดนั้น ดื่มลงได้ยังไง"
+},
+{
+"who": "โทวะ",
+"say": "วันนี้ผมโดนด่ามา ต้องการน้ำตาลครับ"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "รินยิ้มนิดเดียว",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, close-up, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie with a very slight amused smile, eyes on her coffee",
+"chars": [
+"โทวะ",
+"ริน"
+],
+"lines": [
+{
+"who": "ริน",
+"say": "โดนด่าเรื่องอะไร"
+},
+{
+"who": "โทวะ",
+"say": "ของหายครับ 40 ชิ้น"
+},
+{
+"who": "โทวะ",
+"say": "ผมนับผิดไม่เป็นด้วยสิ"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "ปลายนิ้วรินมีรอยไหม้สีหมึก",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, extreme close-up of a woman's fingers holding a black coffee can, dark ink-like burn marks on the fingertips",
+"chars": [
+"ริน"
+],
+"lines": [
+{
+"who": "",
+"say": "ปลายนิ้วของเธอ มีรอยไหม้สีหมึก"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "รินแซว โทวะหัวเราะแห้ง",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, two-shot, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie speaking calmly, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest laughing awkwardly scratching his head",
+"chars": [
+"โทวะ",
+"ริน"
+],
+"lines": [
+{
+"who": "ริน",
+"say": "คนที่นับไม่เคยผิด..."
+},
+{
+"who": "ริน",
+"say": "น่ากลัวกว่าอสูรอีกนะ"
+},
+{
+"who": "โทวะ",
+"say": "ชมหรือด่าครับเนี่ย"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "นั่งเงียบๆ มีโมจิกินขนมปังตรงกลาง",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, wide shot from behind the bench, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest and a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie sitting quietly, a small round cat-like spirit creature with a glowing lantern at the tip of its tail eating bread between them, peaceful night",
+"chars": [
+"โทวะ",
+"ริน",
+"โมจิ"
+],
+"lines": [
+{
+"who": "",
+"say": "คุยกันแค่ไม่กี่ประโยค"
+},
+{
+"who": "",
+"say": "แต่เป็นบทสนทนาที่ดีที่สุดของวันของเขา"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "รินลุกขึ้น ดึงฮู้ด",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, low angle medium shot, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie standing up and pulling her hood forward, looking at the sky",
+"chars": [
+"ริน"
+],
+"lines": [
+{
+"who": "ริน",
+"say": "ใกล้สามทุ่มแล้ว"
+},
+{
+"who": "ริน",
+"say": "กลับบ้านซะ คุณเสมียน"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+},
+{
+"th": "ม้านั่งว่าง เหลือกระป๋องกาแฟดำ",
+"en": "behind an old warehouse at night, a single glowing vending machine and an old wooden bench, soft blue light, close-up of an empty black coffee can left on the old bench, faint steam, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest blurred in the background looking around",
+"chars": [
+"โทวะ"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "เอ๊ะ รู้ได้ไงว่าผมเป็นเสมียน—"
+},
+{
+"who": "",
+"say": "เหลือแค่กระป๋องกาแฟดำที่ยังอุ่น"
+}
+],
+"loc": "ตู้กดน้ำหลังโกดังคลังอาคม"
+}
+],
+"3": [
+{
+"th": "ระฆังฮิบิกิดัง",
+"en": "inside a tall bell tower at night, low angle shot of a giant bronze bell swinging, glowing sound ripples",
+"chars": [],
+"lines": [
+{
+"who": "",
+"say": "สามทุ่มตรง ระฆังฮิบิกิดัง"
+}
+],
+"ono": "ง่อง——"
+},
+{
+"th": "ม่านอาคมบนฟ้ากะพริบ",
+"en": "night sky above a walled city, a huge dome barrier flickering like a glitching screen, wide shot from the rooftops",
+"chars": [],
+"lines": [
+{
+"who": "",
+"say": "ม่านอาคมสั่นไหว"
+},
+{
+"who": "",
+"say": "เหมือนจอภาพที่ใกล้จะดับ"
+}
+],
+"loc": "กำแพงและขอบม่าน"
+},
+{
+"th": "รินวิ่งบนหลังคา ผมแดงปลิว",
+"en": "city rooftops at night, dynamic side shot, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie running fast across the roof tiles, hood blown off, red hair flowing",
+"chars": [
+"ริน"
+],
+"lines": []
+},
+{
+"th": "รินกระโดดข้ามกำแพงเมือง",
+"en": "top of a huge city wall at night, low angle shot, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie leaping high over the wall against the flickering barrier sky",
+"chars": [
+"ริน"
+],
+"lines": [],
+"ono": "ฟึ่บ!",
+"loc": "กำแพงและขอบม่าน"
+},
+{
+"th": "นอกม่าน ฝูงอสูรรออยู่",
+"en": "outside the city barrier at night, floating rock islands in darkness, black mist, real stars, wide shot, a horde of shadow demons wearing cracked white human masks with glowing eyes",
+"chars": [],
+"lines": [
+{
+"who": "",
+"say": "นอกม่าน ฝูงอสูรรออยู่แล้ว"
+}
+],
+"loc": "ดินแดนนอกม่าน"
+},
+{
+"th": "รินคลี่ยันต์ไฟ",
+"en": "outside the city barrier at night, floating rock islands in darkness, black mist, real stars, medium shot, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie fanning out a handful of glowing red paper talismans, confident calm face",
+"chars": [
+"ริน"
+],
+"lines": [
+{
+"who": "ริน",
+"say": "คืนนี้มากันเยอะนะ"
+}
+],
+"loc": "ดินแดนนอกม่าน"
+},
+{
+"th": "ฝูงอสูรพุ่งเข้าใส่",
+"en": "outside the city barrier at night, floating rock islands in darkness, black mist, real stars, low angle wide shot, shadow demons with cracked white masks lunging forward to attack, claws out",
+"chars": [],
+"lines": [],
+"loc": "ดินแดนนอกม่าน"
+},
+{
+"th": "รินเหวี่ยงแขนซัดยันต์",
+"en": "outside the city barrier at night, floating rock islands in darkness, black mist, real stars, low angle wide shot, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie swinging her arm throwing glowing red paper talismans toward shadow demons",
+"chars": [
+"ริน"
+],
+"lines": [],
+"loc": "ดินแดนนอกม่าน"
+},
+{
+"th": "ยันต์ลุกเป็นวงไฟ",
+"en": "outside the city barrier at night, floating rock islands in darkness, black mist, real stars, low angle wide shot, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie with her arm extended, paper talismans igniting into a ring of fire, bright impact burst",
+"chars": [
+"ริน"
+],
+"lines": [],
+"ono": "ฟู่ม!",
+"loc": "ดินแดนนอกม่าน",
+"chain": 1
+},
+{
+"th": "ฝูงอสูรไหม้เป็นเถ้า",
+"en": "outside the city barrier at night, floating rock islands in darkness, black mist, real stars, low angle wide shot, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie standing firm, shadow demons burning into ash, shockwave of flames",
+"chars": [
+"ริน"
+],
+"lines": [],
+"loc": "ดินแดนนอกม่าน",
+"chain": 1
+},
+{
+"th": "ยันต์ในมือรินมีตราคลังอาคม",
+"en": "outside the city barrier at night, floating rock islands in darkness, black mist, real stars, extreme close-up of a hand with ink-burned fingertips holding a red paper talisman stamped with an official archive seal, ash falling",
+"chars": [
+"ริน"
+],
+"lines": [
+{
+"who": "",
+"say": "ยันต์ไฟ ประทับตราคลังอาคมฮิบิกิ"
+},
+{
+"who": "",
+"say": "ยันต์ 40 แผ่น ที่หายไปจากชั้นของโทวะ"
+}
+],
+"loc": "ดินแดนนอกม่าน"
+},
+{
+"th": "รินมองแสงไฟเมือง",
+"en": "outside the city barrier at night, floating rock islands in darkness, black mist, real stars, back view, a 26-year-old woman with long loose red hair, calm sharp eyes, wearing a black hoodie standing on a rock looking at the distant glowing dome city, red hair in the wind",
+"chars": [
+"ริน"
+],
+"lines": [
+{
+"who": "ริน",
+"say": "ขอยืมหน่อยนะ คุณเสมียน"
+}
+],
+"loc": "ดินแดนนอกม่าน"
+},
+{
+"th": "เช้าวันใหม่ ร้านขนมปัง",
+"en": "a bright cozy bakery counter in the morning, shelves of bread, sunlight, wide establishing shot of the storefront, customers passing by",
+"chars": [],
+"lines": [
+{
+"who": "",
+"say": "เช้าวันต่อมา"
+}
+],
+"loc": "ร้านขนมปังป้าฮานะ"
+},
+{
+"th": "โทวะซื้อขนมปัง พนักงานยิ้มหวาน",
+"en": "a bright cozy bakery counter in the morning, shelves of bread, sunlight, two-shot across the counter, sleepy a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest pointing at bread, a 26-year-old bakery clerk woman with red hair tied in a neat low bun, white apron, sweet bright smile greeting him cheerfully",
+"chars": [
+"โทวะ",
+"ริน"
+],
+"lines": [
+{
+"who": "โทวะ",
+"say": "ขนมปังถั่วแดงหนึ่งชิ้นครับ"
+},
+{
+"who": "ริน",
+"say": "ได้เลยค่ะ ลูกค้าประจำ!"
+}
+],
+"loc": "ร้านขนมปังป้าฮานะ"
+},
+{
+"th": "มือที่ยื่นถุงขนมปังมีรอยไหม้",
+"en": "a bright cozy bakery counter in the morning, shelves of bread, sunlight, extreme close-up of a woman's hand passing a paper bread bag over the counter, dark ink-like burn marks on the fingertips",
+"chars": [
+"ริน"
+],
+"lines": [
+{
+"who": "",
+"say": "รอยไหม้สีหมึก ที่ปลายนิ้ว"
+}
+],
+"loc": "ร้านขนมปังป้าฮานะ"
+},
+{
+"th": "โทวะชะงัก",
+"en": "a bright cozy bakery counter in the morning, shelves of bread, sunlight, close-up, a 42-year-old plain office clerk man with short messy black hair, round glasses, a tired gentle face, loose necktie, rumpled white shirt and grey vest frozen with wide eyes behind his glasses, holding a bread bag",
+"chars": [
+"โทวะ"
+],
+"lines": [],
+"think": "รอยแบบเดียวกับเมื่อคืน...?",
+"loc": "ร้านขนมปังป้าฮานะ"
+},
+{
+"th": "รินยิ้มหวานเอียงคอ",
+"en": "a bright cozy bakery counter in the morning, shelves of bread, sunlight, close-up portrait, a 26-year-old bakery clerk woman with red hair tied in a neat low bun, white apron, sweet bright smile tilting her head with an innocent sweet smile, soft sparkles in the background",
+"chars": [
+"ริน"
+],
+"lines": [
+{
+"who": "ริน",
+"say": "มีอะไรติดหน้าฉันเหรอคะ?"
+},
+{
+"who": "",
+"say": "— จบตอนที่ 1 —"
+}
+],
+"loc": "ร้านขนมปังป้าฮานะ"
+}
+]
+}
+}
+}

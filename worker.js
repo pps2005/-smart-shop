@@ -8,9 +8,10 @@
 import SCENES from './scenes.json';
 import IDEAS from './ideas.json';
 import WORLD from './world.json';
+import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'meter-1';
+const BOT_VER = 'webtoon-3';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -357,6 +358,26 @@ async function xlNew(env, story, kind, name, desc) {
   await charRefs(env, id, 16);
   await env.DB.prepare("UPDATE jobs SET steps=8 WHERE project=? AND status='queued'").bind('ซีรีส์0·' + name).run();
   return { ok: true, id };
+}
+// นำเข้าสตอรีบอร์ดที่เขียนมือจาก sbx.json แทนที่ช็อตเดิมของตอนนั้น (settings sb_import = "เรื่อง|ตอน") แล้วให้ระบบวาดภาพตามปกติ · ไม่ให้ AI ตัดช็อต/เขียนบทพูดทับ
+async function sbImportTick(env, s) {
+  if (!s.sb_import) return;
+  await animeSchema(env);
+  const [story, epS] = String(s.sb_import).split('|'), ep = +epS, D = (SBX[story] || {})[String(ep)];
+  await env.DB.prepare("DELETE FROM settings WHERE key='sb_import'").run();
+  const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!D || !sr) return;
+  for (const [sc, list] of Object.entries(D)) {
+    const e = await env.DB.prepare('SELECT id,script_id FROM scenes WHERE series_id=? AND ep=? AND sc=?').bind(sr.id, ep, +sc).first(); if (!e || !e.script_id) continue;
+    const sid = e.script_id, old = (await env.DB.prepare('SELECT kproj FROM shots WHERE script_id=?').bind(sid).all()).results, st = [];
+    for (const o of old) st.push(env.DB.prepare('DELETE FROM images WHERE project=?').bind(o.kproj), env.DB.prepare("DELETE FROM jobs WHERE project=?").bind(o.kproj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'").bind(o.kproj));
+    st.push(env.DB.prepare('DELETE FROM shots WHERE script_id=?').bind(sid));
+    list.forEach((x, i) => { const ls = (x.lines || []).map(l => ({ who: String(l.who || ''), say: String(l.say || '') }));
+      st.push(env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,0,?,?,?,?,?,?,?,?)').bind(sid, i + 1, String(x.th || ''), String(x.en || '').slice(0, 600), JSON.stringify(x.chars || []), `ฉาก${sid}·${i + 1}`, Date.now(), JSON.stringify({ who: ls[0] ? ls[0].who : '', say: ls[0] ? ls[0].say : '', lines: ls, ...(x.think ? { think: x.think } : {}), ...(x.ono ? { ono: x.ono } : {}) }), x.chain ? 1 : 0, x.loc || null)); });
+    for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20));
+    await env.DB.prepare('UPDATE scenes SET sb=-1, fin=0, auto=1 WHERE id=?').bind(e.id).run();
+    await setSetting(env, 'sbfix:' + sid, '0,0'); await setSetting(env, 'sbsay:' + sid, 'hand');
+    await env.DB.prepare('DELETE FROM settings WHERE key=?').bind('sbdone:' + sid).run();
+  }
 }
 async function charRename(env, b) {
   await animeSchema(env);
@@ -808,6 +829,7 @@ async function animeAdvance(env, s) {
       if (!need) continue; // ทุกช็อตที่ขาดภาพเข้าคิวแล้ว: รอวาด
       const r = await animeApi(env, { act: 'kf', script_id: sid }); if (r.queued) return; continue; } // ภาพคีย์เข้าคิวครบแล้ว → ไปเตรียมซีนถัดไประหว่างรอวาด
     if (gsb) { if (!m.qc) { m.qc = 1; const q = await qcRun(env, m.title, 4, sid).catch(() => null); if (q && !q.left && !(q.eps || []).some(E => E.fixing)) await setSetting(env, 'sbdone:' + sid, '1'); } continue; } // ระหว่างรอ: AI ตรวจภาพทีละ 4 ใบ ภาพเสียลบแล้ววาดใหม่เอง (สูงสุด 2 รอบต่อช็อต) · สตอรีบอร์ดซีนนี้ครบแล้ว: รอผู้ใช้กดอนุมัติก่อนทำคลิป (ระหว่างนี้ไปทำซีนถัดไปของตอนเดียวกัน)
+    if ((m.st[e.ep] || {}).still) { await env.DB.prepare('UPDATE scenes SET fin=1 WHERE id=?').bind(e.id).run(); return; } // ฉบับภาพนิ่ง: ข้ามขั้นทำคลิป ไปรวมตอนเลย
     const q = await animeApi(env, { act: 'vid', script_id: sid });
     let miss = false;
     for (const [i, sh] of rows.entries()) { if (!keyShot(sh, i)) continue; const v = await env.DB.prepare('SELECT MAX(id) id FROM videos WHERE ep=? AND shot=?').bind('a' + sid, String(sh.id)).first(); if (!v || !v.id) { miss = true; break; } }
@@ -1042,6 +1064,7 @@ async function tick(env, force) {
   if (!force) { const rr = +s[readDay()] || 0; if (rr > READ_STOP) return { skipped: 'reads ' + rr }; if (rr > READ_SLOW && new Date().getUTCMinutes() % 5) return { skipped: 'reads-slow ' + rr }; } // ใกล้เพดานอ่านรายวัน: งานเบื้องหลังทำทุก 5 นาที · เกือบเต็ม: หยุดงานเบื้องหลัง (เครื่อง Kaggle ยังส่งงานได้)
   await animeAuto(env, s).catch(() => {});
   if (s.supa_test === '1') await supaSelfTest(env, s);
+  await sbImportTick(env, s).catch(() => { });
   await restyleTick(env, s).catch(() => { });
   await xlTick(env).catch(() => { });
   await animeAdvance(env, s).catch(() => {});
@@ -3404,7 +3427,7 @@ async function castApi(req, env, url, body) {
         if (!WORK[b.kind]) return json({ error: 'ไม่รู้จักประเภทงานนี้' }, 400);
         await setSetting(env, 'wk:' + story, String(b.kind)); return json({ ok: true, kind: b.kind, scenes: WORK[b.kind].scenes, shots: WORK[b.kind].shots });
       }
-      if (act === 'sb' || act === 'sb_redo' || act === 'sb_ok' || act === 'sb_lora' || act === 'sb_del') { // สตอรีบอร์ดของตอน: ดูทุกช็อต · วาดใหม่รายช็อต · อนุมัติแล้วค่อยทำคลิปทั้งตอน
+      if (act === 'sb' || act === 'sb_redo' || act === 'sb_ok' || act === 'sb_lora' || act === 'sb_del' || act === 'sb_reopen') { // สตอรีบอร์ดของตอน: ดูทุกช็อต · วาดใหม่รายช็อต · อนุมัติแล้วค่อยทำคลิปทั้งตอน
         await animeSchema(env);
         const st = (await rd('epst:' + story)) || {}, cur = st[+b.ep], sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first();
         const scs = sr ? (await env.DB.prepare('SELECT id,sc,title,script_id,sb,fin FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +b.ep).all()).results : [];
@@ -3436,6 +3459,12 @@ async function castApi(req, env, url, body) {
           for (const [sid, l] of Object.entries(by)) { await env.DB.prepare('DELETE FROM settings WHERE key=?').bind('sbdone:' + sid).run(); for (let i = 0; i < l.length; i += 20) await env.DB.batch(l.slice(i, i + 20).map(sh => env.DB.prepare("DELETE FROM jobs WHERE project=? AND status='queued'").bind(sh.kproj))); for (let i = 0; i < l.length; i += 20) await env.DB.batch(l.slice(i, i + 20).map(sh => env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj))); await animeApi(env, { act: 'kf', script_id: +sid, ids: l.map(x => x.id) }); }
           return json({ ok: true, redo: stale.length });
         }
+        if (act === 'sb_reopen') { // กลับไปที่สตอรีบอร์ดของตอนนี้ (เช่น หลังดูฉบับภาพนิ่งแล้วจะทำอนิเมะเต็ม): ลบไฟล์รวมตอนเดิม เปิดด่านอนุมัติใหม่
+          if (!cur || !sr) return json({ error: 'ไม่พบตอนนี้' }, 404);
+          const key = 'E' + sr.id + 'x' + (+b.ep);
+          await env.DB.batch([env.DB.prepare('DELETE FROM vchunks WHERE vid IN (SELECT id FROM videos WHERE ep=? AND shot=?)').bind(key, 'final'), env.DB.prepare("DELETE FROM videos WHERE ep=? AND shot='final'").bind(key), env.DB.prepare("DELETE FROM vjobs WHERE ep=? AND kind='epcat'").bind(key), env.DB.prepare('UPDATE scenes SET fin=0, auto=1 WHERE series_id=? AND ep=?').bind(sr.id, +b.ep)]);
+          cur.status = 'running'; cur.gate = 'sb'; delete cur.still; await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true });
+        }
         const out = []; let tot = 0, img = 0, wr = 0;
         for (const e of scs) {
           const x = { sc: e.sc, title: e.title, shots: [], writing: !e.script_id || +e.sb >= 0 };
@@ -3450,6 +3479,7 @@ async function castApi(req, env, url, body) {
         if (act === 'sb_ok') {
           if (!cur || cur.status !== 'running') return json({ error: 'ตอนนี้ยังไม่ได้เริ่มทำ' }, 400);
           if (!ready && !b.force) return json({ error: `สตอรีบอร์ดยังวาดไม่ครบ (${img}/${tot} ภาพ) รอให้ครบก่อน` }, 400);
+          if (b.still) { cur.gate = 'ok'; cur.still = 1; cur.okAt = Date.now(); await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true, still: true }); } // ฉบับภาพนิ่ง + ซับ (ไม่ทำคลิป ไม่บังคับ LoRA) ไว้ดูทั้งตอนก่อน
           if (need.length) return json({ error: 'ยังเลือก LoRA ที่เสร็จแล้วให้ตัวหลักไม่ครบ: ' + need.join(', ') }, 400);
           if (stale.length) return json({ error: `มี ${stale.length} ช็อตที่ยังไม่ได้วาดด้วย LoRA ล่าสุด กดวาดใหม่ด้วย LoRA ก่อน` }, 400);
           cur.gate = 'ok'; cur.okAt = Date.now(); await setSetting(env, 'epst:' + story, JSON.stringify(st)); return json({ ok: true });
