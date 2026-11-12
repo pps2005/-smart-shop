@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-10';
+const BOT_VER = 'manga-11';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -550,12 +550,12 @@ function fluxDraft(job, s, shEn) {
   // มีคำกระตุ้น LoRA = คำสั่งพ่วงชุดประจำตัวของตัวละครมาด้วย (เช่น ฮู้ดดำของริน) ซึ่งทับชุดที่ช่องนั้นระบุ → ใช้เฉพาะจำนวนคน + คำบรรยายของช่อง
   const body = shEn && /chr\d+x/.test(p) ? p.split(/chr\d+x/)[0] + shEn : p.replace(/chr\d+x,?\s*/g, '').replace(/,?\s*\[\[STYLE\]\]/, '');
   // Flux ไม่ค่อยทำตามแท็กอายุ ต้องบอกเป็นประโยค (เจอจริง: ป้าฮานะ 61 ออกมาเป็นสาว)
-  const age = [/\bold woman\b/.test(p) ? 'The woman is elderly, around sixty years old, with clear wrinkles on her face, not young' : '', /\bold man\b/.test(p) ? 'The man is elderly, around seventy years old, with clear wrinkles, not young' : '', /middle-aged man/.test(p) ? 'The man is an adult around forty drawn as a good-looking slender anime man with a smooth face and no wrinkles, just slightly tired eyes' : '', /middle-aged woman/.test(p) ? 'The woman is middle-aged, in her fifties, with a mature face and some wrinkles, not young' : ''].filter(Boolean).join('. ');
+  const age = /\b(old woman|old man|middle-aged)/.test(p) ? 'Every character is drawn youthful and attractive, looking much younger than their real age, smooth faces without wrinkles' : ''; // ผู้ใช้สั่ง: ทุกตัวดูหนุ่มสาว อายุเยอะให้สวย/หล่อกว่าวัย
   // ภาพร่างสตอรีบอร์ด = มังงะขาวดำตัดเส้นหมึก (ผู้ใช้เลือก): ไม่มีสี/แสงให้แกว่งข้ามช่อง · ตั้ง settings draft_style เพื่อเปลี่ยนได้
   const wide = /establishing shot|wide shot|insert shot/i.test(p);
   const st = String(s.draft_style || '').trim() || ('black and white manga illustration drawn with a fine-tip pen on clean white paper, very thin delicate uniform ink lines, airy and light, mostly white space, no solid black fills, hair drawn as many fine separate strands left white, only light dot screentone on small shadow areas, soft gentle faces with large detailed sparkling eyes, ' + (wide ? 'simple lightly sketched background with thin lines' : 'almost empty white background with only a few thin lines hinting at the place') + ', no color anywhere, no gray gradients, no text, no letters, no numbers, no speech bubbles, single panel, every character drawn in the same delicate manga style with slender anime proportions and anime faces, never a western cartoon caricature');
   // ตัดคำบอกสีออกจากคำบรรยาย (เช่น red hair) ไม่งั้น Flux ระบายสีนั้นลงภาพขาวดำ — เจอจริง: ผมแดงของรินโผล่มาเป็นสี
-  const mono = body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/, a tired gentle face/gi, ', a gentle face').replace(/\ba plain /gi, 'a ').replace(/\b(mature male|middle-aged man),\s*/gi, '').replace(/ {2,}/g, ' ');
+  const mono = body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/, a tired gentle face/gi, ', a gentle face').replace(/\ba plain /gi, 'a ').replace(/\b(mature male|middle-aged man|mature female|middle-aged woman|old woman|old man),\s*/gi, '').replace(/ {2,}/g, ' ');
   return `${st}. ${age ? age + '. ' : ''}${mono}. Strictly black ink on white paper, grayscale only, absolutely no colored areas.`;
 }
 function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
@@ -1064,7 +1064,7 @@ async function animeApi(env, b) {
       for (const n of names) { const R = ROLES.find(r => r.key === n), lk = String(LOOKS[n] || (R && R.look) || ''); if (!lset.has(n) && LOOKS[n] && !String(sh.en).includes(LOOKS[n].slice(0, 24))) extra.push(LOOKS[n]);
         if (/creature|spirit|cat-like|beast|monster|animal|mascot/i.test(lk) || (R && /วิญญาณ|สัตว์|ภูต|ปีศาจ/.test(String(R.kind || '')))) { crt++; continue; } // ตัวที่ไม่ใช่คน ไม่นับเป็นจำนวนคนในภาพ
         const g = R && (R.g === 'f' || R.g === 'm') ? R.g : /\b(woman|girl|female)\b/i.test(lk) ? 'f' : 'm'; gs.push(g); ages.push([g, +(R && R.age) || +((lk.match(/(\d\d)-year-old/) || [])[1]) || 0]); }
-      const old = ages.map(([g, a]) => g === 'm' ? (a >= 60 ? 'old man' : a >= 36 ? 'mature male, middle-aged man' : '') : (a >= 60 ? 'old woman' : a >= 45 ? 'mature female, middle-aged woman' : '')).filter(Boolean).join(', ');
+      const old = ''; // เลิกใส่แท็กวัยกลางคน/สูงวัย (ผู้ใช้สั่ง: ทุกตัวละครดูหนุ่มสาว)
       const nf = gs.filter(g => g === 'f').length, nm = gs.length - nf, gt = n => n === 1 ? '1' : n === 2 ? '2' : '3';
       // จำนวนคน+เพศ ต้องอยู่ "ต้นคำสั่ง" (อยู่ท้ายแล้วโมเดลวาดเป็นกลุ่มผู้หญิง/ตารางหน้าคน — เจอจริงกับตอน 1)
       const cnt = !gs.length ? (crt ? 'no humans, creature' : /wide shot|insert shot/.test(sh.en) && !/\b(man|woman|men|women|customers?|guard|merchant|thugs?|figures?|demons?|hands?|finger|clerks?|people|person)\b/i.test(sh.en) ? 'no humans' : '') : [gs.length === 1 ? 'solo' : '', nm ? gt(nm) + (nm > 1 ? 'boys' : 'boy') : '', nf ? gt(nf) + (nf > 1 ? 'girls' : 'girl') : '', nm && !nf ? 'male focus' : '', old, crt ? 'one small creature' : '', gs.length === 1 ? 'single character' : gs.length === 2 ? 'only two people' : ''].filter(Boolean).join(', ');
