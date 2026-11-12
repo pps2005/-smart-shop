@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-3';
+const BOT_VER = 'manga-4';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -1052,7 +1052,7 @@ async function animeApi(env, b) {
       const old = ages.map(([g, a]) => g === 'm' ? (a >= 60 ? 'old man' : a >= 36 ? 'mature male, middle-aged man' : '') : (a >= 60 ? 'old woman' : a >= 45 ? 'mature female, middle-aged woman' : '')).filter(Boolean).join(', ');
       const nf = gs.filter(g => g === 'f').length, nm = gs.length - nf, gt = n => n === 1 ? '1' : n === 2 ? '2' : '3';
       // จำนวนคน+เพศ ต้องอยู่ "ต้นคำสั่ง" (อยู่ท้ายแล้วโมเดลวาดเป็นกลุ่มผู้หญิง/ตารางหน้าคน — เจอจริงกับตอน 1)
-      const cnt = !gs.length ? (crt ? 'no humans, creature' : /wide shot|insert shot/.test(sh.en) ? 'no humans' : '') : [gs.length === 1 ? 'solo' : '', nm ? gt(nm) + (nm > 1 ? 'boys' : 'boy') : '', nf ? gt(nf) + (nf > 1 ? 'girls' : 'girl') : '', nm && !nf ? 'male focus' : '', old, crt ? 'one small creature' : '', gs.length === 1 ? 'single character' : gs.length === 2 ? 'only two people' : ''].filter(Boolean).join(', ');
+      const cnt = !gs.length ? (crt ? 'no humans, creature' : /wide shot|insert shot/.test(sh.en) && !/\b(man|woman|men|women|customers?|guard|merchant|thugs?|figures?|demons?|hands?|finger|clerks?|people|person)\b/i.test(sh.en) ? 'no humans' : '') : [gs.length === 1 ? 'solo' : '', nm ? gt(nm) + (nm > 1 ? 'boys' : 'boy') : '', nf ? gt(nf) + (nf > 1 ? 'girls' : 'girl') : '', nm && !nf ? 'male focus' : '', old, crt ? 'one small creature' : '', gs.length === 1 ? 'single character' : gs.length === 2 ? 'only two people' : ''].filter(Boolean).join(', ');
       st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: c.w }))), sh.id));
       st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${cnt ? cnt + ', ' : ''}${m.map(c => c.tag || ('chr' + c.cid + 'x')).join(', ')}${m.length ? ', ' : ''}${sh.en}${extra.length ? ', ' + extra.join('; ') : ''}, single cinematic illustration, [[STYLE]]`.slice(0, 1800), Date.now(), nch ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
       n++;
