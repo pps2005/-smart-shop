@@ -76,12 +76,22 @@ function meterCard(){const M=ST.meter;if(!M)return ST.reads>=60?`<div class="c w
     ${img?`<div>• เปิดดูภาพใหม่ 100 ภาพ: ~${f(pc(img*100))}% (ภาพที่เคยเปิดแล้วไม่นับซ้ำ)</div>`:''}
     ${kg?`<div>• เครื่อง Kaggle รับ/ส่งงาน: ~${f(pc(kg))}% ต่อครั้ง</div>`:''}
     <div class="mu" style="font-size:12px;margin-top:4px">ตัวเลขประเมินจากค่าเฉลี่ยของวันนี้ ยิ่งใช้นานยิ่งแม่น ช่วงเช้าหลังรีเซ็ตอาจคลาดเคลื่อนมาก</div></div></div></details></div>`;}
+// การ์ดโควตาฟรีทั้งหมด (แยกจากหลอดอ่านฐานข้อมูล/เว็บล่ม)
+function quotaCard(){const Q=ST.quota;if(!Q||!Q.items)return '';
+  const f=x=>x>=10?Math.round(x).toLocaleString('th-TH'):x>=1?x.toFixed(1):x.toFixed(2),pc=it=>Math.min(100,it.used/it.cap*100);
+  const rs=t=>{if(!t)return 'สะสม ไม่รีเซ็ต';const d=t-Date.now(),h=d/3.6e6;return 'รีเซ็ต '+(h<24?`ในอีก ${h<1?Math.max(1,Math.round(d/6e4))+' นาที':Math.round(h)+' ชม.'}`:new Date(t).toLocaleDateString('th-TH',{weekday:'short',day:'numeric',month:'short'})+' '+new Date(t).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}));};
+  const col=x=>x>=95?'#c0392b':x>=80?'#e67e22':x>=50?'#f1c40f':'#27ae60',worst=Q.items.reduce((m,it)=>Math.max(m,pc(it)),0);
+  return `<div class="c"><details><summary style="cursor:pointer;list-style:none"><b>🧾 โควตาฟรีทั้งหมด</b> <span class="mu">${Q.items.length} รายการ · สูงสุด <b style="color:${col(worst)}">${f(worst)}%</b> · แตะเพื่อดู</span></summary>
+  <div style="margin-top:8px">${Q.items.map(it=>{const x=pc(it);return `<div style="margin:9px 0"><div style="display:flex;gap:6px;font-size:13.5px"><span style="flex:1">${esc(it.name)}${it.full?' <b style="color:#c0392b">หมดแล้ว</b>':''}</span><b style="color:${col(x)}">${f(x)}%</b></div>
+    <div style="height:8px;border-radius:4px;background:#eee;overflow:hidden;margin:3px 0"><div style="height:100%;width:${x}%;background:${col(x)}"></div></div>
+    <div class="mu" style="font-size:12px">${it.est?'ประมาณ ':''}${f(it.used)} / ${f(it.cap)} ${esc(it.unit)} · ${rs(it.reset)}${it.note?' · '+esc(it.note):''}</div></div>`;}).join('')}
+  <div class="mu" style="font-size:12px;margin-top:6px">อัปเดตทุก 5 นาที · "ประมาณ" = ระบบนับเอง ไม่ใช่ตัวเลขจากผู้ให้บริการ ตัวเลขจริงดูได้ที่ Cloudflare / kaggle.com / Supabase · เริ่มนับหลังอัปเดตนี้ ก่อนหน้านี้ไม่มีข้อมูล</div></div></details></div>`;}
 let tt=0;function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',5000);}
 /* ---------- บอท (ใช้ลิงก์/รหัสเดียวกับสตูดิโอเดิม) ---------- */
 function botCfg(){try{return JSON.parse(localStorage.getItem('ss_imgbot')||'{}')||{};}catch(e){return {};}}
 function botU(p){const c=botCfg();return String(c.url||'').replace(/\/+$/,'')+p+(p.includes('?')?'&':'?')+'k='+encodeURIComponent(c.key||'');}
 function botErr(e){const m=String(e&&e.message||e);return /failed to fetch|load failed|networkerror|network request/i.test(m)?'ติดต่อบอทไม่ได้ ตรวจลิงก์บอท หรือบอทยังไม่ได้ deploy':m;}
-const SNAP_ACTS=new Set(['get','sb','lib','training','xl_list','eps']); /* ข้อมูลที่ดูอย่างเดียว: เก็บสำเนาล่าสุดไว้ในเครื่อง เผื่อฐานข้อมูลเต็มโควตา/บอทล่ม จะยังเปิดดูได้ */
+const SNAP_ACTS=new Set(['get','sb','lib','training','xl_list','eps','quota']); /* ข้อมูลที่ดูอย่างเดียว: เก็บสำเนาล่าสุดไว้ในเครื่อง เผื่อฐานข้อมูลเต็มโควตา/บอทล่ม จะยังเปิดดูได้ */
 async function botApi0(p,body){const r=await fetch(botU(p),body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});
   if(r.status===401)throw new Error('รหัสผ่านบอทไม่ถูกต้อง');const j=await r.json().catch(()=>({error:'บอทตอบกลับไม่ถูกต้อง (ลิงก์ถูกไหม?)'}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j;}
 function snapGet(p,body){try{const v=JSON.parse(localStorage.getItem('snap:'+p+':'+(body.story||'')+':'+body.act+':'+(body.ep||body.series_id||''))||'null');return v?v.j:null;}catch(e){return null;}}
@@ -138,6 +148,7 @@ async function load(){
   try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;if(r.kind)ST.kind=r.kind;ST.reads=+r.reads||0;ST.meter=r.meter||null;ST.boost=+r.boost||0;ST.err='';}catch(e){ST.err=botErr(e);}
   {const lv=ST.meter?ST.meter.total/ST.meter.cap:(ST.reads||0)/100;ST.save=ST.force?0:lv>=0.95?3:lv>=0.9?2:lv>=0.85?1:0;ST.force=0;} /* 85% ขึ้นไป: หน้าเว็บประหยัดการอ่านเพื่อไม่ให้ล่ม */
   const cached=(act,o)=>ST.save?snapGet('/api/vcastep',{story:ST.story,act,...(o||{})}):null;
+  if(!ST.qAt||Date.now()-ST.qAt>300000||ST.qForce){ST.qForce=0;try{const r=(ST.save>=1&&snapGet('/api/vcastep',{story:ST.story,act:'quota'}))||await api('quota');ST.quota=r;ST.qAt=Date.now();}catch(e){}} /* โควตาอื่นๆ: ดึงทุก 5 นาที */
   const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
   if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
   try{const r=cached('lib')||await api('lib');ST.lib=r.loras||[];ST.weights=r.weights||{};}catch(e){ST.lib=[];}
@@ -224,7 +235,7 @@ function render(){const A=$('#app');
   const pl=ST.plan&&ST.plan.roles&&ST.plan.roles.length?ST.plan:null;let h='';
   if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button><button data-test="1">🧪 ทดสอบ</button></div>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
   if(window._staleAt)h+=`<div class="c warn">📴 ฐานข้อมูลใช้ไม่ได้ชั่วคราว${/exceeded|limit|โควตา|D1/i.test(window._staleErr||'')?' (โควตาอ่านฟรีของวันหมด กลับมาเอง 07:00)':''} — กำลังแสดงข้อมูลล่าสุดที่เก็บไว้ในเครื่องนี้ เมื่อ ${new Date(window._staleAt).toLocaleString('th-TH',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})} · อ่านและดูแบบอนิเมะได้ ภาพที่เคยเปิดแล้วยังขึ้น · ปุ่มแก้ไข/วาดใหม่จะใช้ไม่ได้จนกว่าฐานข้อมูลกลับมา</div>`;
-  h+=meterCard();
+  h+=meterCard();h+=quotaCard();
   if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
   if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
   const kd=`<div class="c"><h2><span class="stp">1</span>ประเภทงาน</h2><div class="kd">${KIND.map(x=>`<button class="${ST.kind===x[0]?'on':''}" data-kind="${x[0]}"><b>${x[1]}</b>${x[2]}</button>`).join('')}</div>${ST.kind?'':'<div class="mu" style="margin-top:6px">แตะเลือก ระบบตั้งสัดส่วนภาพ ความยาว และจังหวะตัดให้เอง</div>'}</div>`;

@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'boost-1';
+const BOT_VER = 'quota-1';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
@@ -22,7 +22,7 @@ const readDay = () => 'rr:' + new Date().toISOString().slice(0, 10);
 function meterDB(db, acc, tag0) { // นับแถวที่อ่าน แยกตามที่มา (tag) เพื่อโชว์หลอด % ในหน้าสตูดิโอ
   let tag = tag0 || 'อื่นๆ';
   acc.by = acc.by || {};
-  const add = r => { const n = (r && r.meta && +r.meta.rows_read) || 0; acc.n += n; acc.by[tag] = (acc.by[tag] || 0) + n; return r; };
+  const add = r => { const n = (r && r.meta && +r.meta.rows_read) || 0; acc.n += n; acc.by[tag] = (acc.by[tag] || 0) + n; acc.w = (acc.w || 0) + ((r && r.meta && +r.meta.rows_written) || 0); if (r && r.meta && +r.meta.size_after) acc.size = +r.meta.size_after; return r; };
   const wrap = st => ({
     __st: st,
     bind: (...a) => wrap(st.bind(...a)),
@@ -32,18 +32,25 @@ function meterDB(db, acc, tag0) { // นับแถวที่อ่าน แ
   });
   return { prepare: q => wrap(db.prepare(q)), batch: async l => { const r = await db.batch(l.map(x => x.__st || x)); for (const x of r) add(x); return r; }, setTag: t => { tag = t; }, withTag: t => meterDB(db, acc, t) };
 }
+// โควตาฟรีอื่นๆ (แยกจากหลอดอ่านฐานข้อมูล): qmeter(day,k,v) · day = วัน UTC หรือวันเริ่มสัปดาห์ Kaggle
+const utcDay = t => new Date(t || Date.now()).toISOString().slice(0, 10);
+const kgWeek = t => { const d = new Date(t || Date.now()), back = (d.getUTCDay() + 1) % 7; return utcDay(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - back)); }; // Kaggle รีเซ็ตราวเสาร์ 00:00 UTC (07:00 ไทย) — ค่าประมาณ
+async function qadd(env, k, v, day) { try { await env.DB.prepare('INSERT INTO qmeter (day,k,v) VALUES (?1,?2,?3) ON CONFLICT(day,k) DO UPDATE SET v=v+excluded.v').bind(day || utcDay(), k, v).run(); } catch (e) { } }
+async function qset(env, k, v, day) { try { await env.DB.prepare('INSERT INTO qmeter (day,k,v) VALUES (?1,?2,?3) ON CONFLICT(day,k) DO UPDATE SET v=excluded.v').bind(day || utcDay(), k, v).run(); } catch (e) { } }
 const tagged = (env, t) => (env.DB && env.DB.withTag ? { ...env, DB: env.DB.withTag(t) } : env);
 async function flushReads(db, acc, min) {
-  const n = acc.n; if (n < (min || 1)) return; acc.n = 0; const by = acc.by || {}; acc.by = {};
+  const n = acc.n, w = acc.w || 0, sz = acc.size || 0, rq = acc.req ? 1 : 0; acc.req = 0; if (n < (min || 1) && !w && !rq) return; acc.n = 0; acc.w = 0; const by = acc.by || {}; acc.by = {};
   const day = new Date().toISOString().slice(0, 10);
   try {
     await db.batch([db.prepare("INSERT INTO settings (key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(settings.value AS INTEGER)+CAST(excluded.value AS INTEGER) AS TEXT)").bind(readDay(), String(n)),
-      ...Object.entries(by).filter(([, v]) => v > 0).map(([t, v]) => db.prepare('INSERT INTO rmeter (day,tag,n,c) VALUES (?1,?2,?3,1) ON CONFLICT(day,tag) DO UPDATE SET n=n+excluded.n, c=c+1').bind(day, t, v))]);
-  } catch (e) { try { await db.prepare('CREATE TABLE IF NOT EXISTS rmeter (day TEXT, tag TEXT, n INTEGER, c INTEGER, PRIMARY KEY(day,tag))').run(); } catch (x) { } }
+      ...Object.entries(by).filter(([, v]) => v > 0).map(([t, v]) => db.prepare('INSERT INTO rmeter (day,tag,n,c) VALUES (?1,?2,?3,1) ON CONFLICT(day,tag) DO UPDATE SET n=n+excluded.n, c=c+1').bind(day, t, v)),
+      ...(w || rq ? [db.prepare('INSERT INTO qmeter (day,k,v) VALUES (?1,?2,?3) ON CONFLICT(day,k) DO UPDATE SET v=v+excluded.v').bind(day, 'dw', w + 2 + Object.keys(by).length), db.prepare('INSERT INTO qmeter (day,k,v) VALUES (?1,?2,?3) ON CONFLICT(day,k) DO UPDATE SET v=v+excluded.v').bind(day, 'req', rq)] : []),
+      ...(sz ? [db.prepare("INSERT INTO qmeter (day,k,v) VALUES ('all','dbsize',?1) ON CONFLICT(day,k) DO UPDATE SET v=excluded.v").bind(sz)] : [])]);
+  } catch (e) { try { await db.batch([db.prepare('CREATE TABLE IF NOT EXISTS rmeter (day TEXT, tag TEXT, n INTEGER, c INTEGER, PRIMARY KEY(day,tag))'), db.prepare('CREATE TABLE IF NOT EXISTS qmeter (day TEXT, k TEXT, v REAL, PRIMARY KEY(day,k))')]); } catch (x) { } }
 }
 export default {
   async fetch(req, env0, ctx) {
-    const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) };
+    const acc = { n: 0, req: 1 }, env = { ...env0, DB: meterDB(env0.DB, acc) };
     try { return await handleFetch(req, env, ctx); } finally { ctx.waitUntil(flushReads(env0.DB, acc, 1)); }
   },
   async scheduled(event, env0, ctx) {
@@ -527,8 +534,8 @@ async function fluxKeysApi(env, b) {
 async function genImage(env, s, prompt, steps, seed) {
   const now = Date.now();
   if (now >= +s.paused_until) {
-    try { const out = await env.AI.run(MODEL, { prompt, steps }); if (out && out.image) return { image: out.image, by: '' }; throw new Error('AI ไม่ได้ส่งภาพกลับมา'); }
-    catch (e) { const m = String(e.message || e); if (!isQuota(m)) throw e; await setSetting(env, 'img_err', new Date().toISOString() + ' ' + m.slice(0, 400)); await setSetting(env, 'paused_until', String(nextReset())); s.paused_until = String(nextReset()); }
+    try { const out = await env.AI.run(MODEL, { prompt, steps }); if (out && out.image) { await qadd(env, 'nu', 19.2 + 38.4 * steps); await qadd(env, 'img', 1); return { image: out.image, by: '' }; } throw new Error('AI ไม่ได้ส่งภาพกลับมา'); }
+    catch (e) { const m = String(e.message || e); if (!isQuota(m)) throw e; await qset(env, 'nu_full', 1); await setSetting(env, 'img_err', new Date().toISOString() + ' ' + m.slice(0, 400)); await setSetting(env, 'paused_until', String(nextReset())); s.paused_until = String(nextReset()); }
   }
   const day = new Date(now + 7 * 3600000).toISOString().slice(0, 10);
   for (const k of await activeKeys(env, now)) {
@@ -599,7 +606,9 @@ function imgEngineFor(j, s) {
 // ===== เวอร์ชันเรียบ: ซีรีส์ → บท (AI เสนอ/สั่งแก้) → (ต่อไป: ตัวละคร LoRA → ซีน → ตอน) =====
 const SCRIPT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'; // เปลี่ยนได้ที่ settings.script_model (ชื่อโมเดล Workers AI)
 async function llmJson(env, s, user) {
-  const out = await env.AI.run(s.script_model || SCRIPT_MODEL, { messages: [{ role: 'system', content: 'คุณเป็นนักเขียนบทอนิเมะ ตอบเป็นภาษาไทย และตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น' }, { role: 'user', content: user }], max_tokens: 2400 });
+  let out; try { out = await env.AI.run(s.script_model || SCRIPT_MODEL, { messages: [{ role: 'system', content: 'คุณเป็นนักเขียนบทอนิเมะ ตอบเป็นภาษาไทย และตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น' }, { role: 'user', content: user }], max_tokens: 2400 }); }
+  catch (e) { if (isQuota(String(e.message || e))) await qset(env, 'nu_full', 1); throw e; }
+  { const u = out && out.usage, ti = (u && +u.prompt_tokens) || Math.ceil(String(user).length / 2), to = (u && +u.completion_tokens) || Math.ceil(String((out && out.response) || '').length / 2); await qadd(env, 'nu', ti * 0.026668 + to * 0.204805); await qadd(env, 'llm', 1); } // ราคาเป็น neurons ของ llama-3.3-70b fp8 (ประมาณ)
   let t = out && out.response; if (t && typeof t === 'object') t = JSON.stringify(t);
   t = String(t || '').replace(/```json|```/g, '');
   const a = t.search(/[\[{]/); if (a < 0) throw new Error('AI ไม่ได้ตอบเป็น JSON ลองใหม่อีกครั้ง');
@@ -1402,6 +1411,7 @@ async function ensureSchema(env) {
     env.DB.prepare('CREATE TABLE IF NOT EXISTS images (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER, project TEXT, scene INTEGER, prompt TEXT, data TEXT, starred INTEGER DEFAULT 0, created INTEGER)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS rmeter (day TEXT, tag TEXT, n INTEGER, c INTEGER, PRIMARY KEY(day,tag))'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS qmeter (day TEXT, k TEXT, v REAL, PRIMARY KEY(day,k))'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS notices (id INTEGER PRIMARY KEY AUTOINCREMENT, msg TEXT, created INTEGER)'),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS vjobs (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, ep TEXT, shot TEXT, prompt TEXT, neg TEXT, image TEXT, frames INTEGER, status TEXT DEFAULT 'queued', error TEXT, tries INTEGER DEFAULT 0, created INTEGER, started INTEGER, kind TEXT DEFAULT 'gen', opt TEXT, helper INTEGER DEFAULT 0)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS char_profiles (name TEXT PRIMARY KEY, data TEXT, updated INTEGER)"),
@@ -1696,6 +1706,7 @@ async function vTick(env, force) {
   const slug = `${env.KAGGLE_USERNAME}/${KSLUG}`;
   const stt = await kFetch(env, `/kernels/status?userName=${encodeURIComponent(env.KAGGLE_USERNAME)}&kernelSlug=${KSLUG}`);
   const status = String((stt.j && stt.j.status) || (stt.ok ? '' : 'none')).toLowerCase();
+  if (/running|starting|queued/.test(String(s.k_status || '')) && !/running|queued/.test(status) && +s.k_pushed) await qadd(env, 'kgh', Math.min(12, (now - +s.k_pushed) / 3600000), kgWeek(+s.k_pushed)); // รอบเครื่องจบ: บวกชั่วโมงที่ใช้ (นับจากตอนสั่งเปิดถึงตอนเห็นว่าจบ ≈ เกินจริงเล็กน้อย)
   await setSetting(env, 'k_status', status);
   if (/running|queued/.test(status)) {
     // กันกรณีเครื่องค้าง: ถ้าไม่ได้ยินเสียงจาก kernel เกิน 90 นาที ปล่อยให้รอบต่อไปจัดการ
@@ -3577,6 +3588,24 @@ async function castApi(req, env, url, body) {
         const key = clip(b.key, 40), v = Math.round(Math.max(0.3, Math.min(1.2, +b.w || 0.8)) * 100) / 100, m = (await rd('lw:' + story)) || {};
         if (!key) return json({ error: 'ไม่พบบท' }, 400);
         m[key] = v; await setSetting(env, 'lw:' + story, JSON.stringify(m)); return json({ ok: true, w: v });
+      }
+      if (act === 'quota') { // โควตาฟรีทั้งหมดที่ใช้ (แยกจากหลอดอ่านฐานข้อมูล)
+        const S9 = await getSettings(env), now = Date.now(), dy = utcDay(now), wk = kgWeek(now), Q = {};
+        for (const r of (await env.DB.prepare("SELECT day,k,v FROM qmeter WHERE day IN (?,?,'all')").bind(dy, wk).all()).results) Q[(r.day === wk && r.day !== dy ? 'w:' : '') + r.k] = +r.v;
+        const kRun = /running|starting|queued/.test(String(S9.k_status || '')) && +S9.k_pushed ? (now - +S9.k_pushed) / 3600000 : 0, kFull = /weekly GPU quota/i.test(String(S9.k_error || '')) && now < (+S9.k_pause || 0) + 7 * 86400000;
+        const kgh = (Q['w:kgh'] || (wk === dy ? Q.kgh : 0) || 0) + Math.min(12, kRun);
+        const supa = ((await env.DB.prepare("SELECT COALESCE(SUM(size),0) n FROM loras WHERE status IN ('ready','old') AND size>0").first()) || {}).n || 0;
+        const resetD = new Date(Date.parse(dy + 'T00:00:00Z') + 86400000).getTime(), resetW = Date.parse(wk + 'T00:00:00Z') + 7 * 86400000;
+        const helpers = (await env.DB.prepare('SELECT name,n,day FROM fluxkeys WHERE on_=1').all().catch(() => ({ results: [] }))).results || [];
+        return json({ ok: true, now, items: [
+          { k: 'd1r', name: 'ฐานข้อมูล · อ่าน', used: +S9[readDay()] || 0, cap: READ_CAP, unit: 'แถว', reset: resetD, note: 'เต็มแล้วเว็บล่ม · ดูรายละเอียดที่หลอดด้านบน' },
+          { k: 'd1w', name: 'ฐานข้อมูล · เขียน', used: Q.dw || 0, cap: 100000, unit: 'แถว', reset: resetD, est: 1 },
+          { k: 'req', name: 'คำขอเข้าบอท (หน้าเว็บ + Kaggle)', used: Q.req || 0, cap: 100000, unit: 'ครั้ง', reset: resetD },
+          { k: 'ai', name: 'Cloudflare AI (วาดสำรอง + เขียนบท)', used: Q.nu_full ? Math.max(10000, Q.nu || 0) : (Q.nu || 0), cap: 10000, unit: 'neurons', reset: resetD, est: 1, full: !!Q.nu_full, note: `วาด ${Q.img || 0} ภาพ · เรียก AI เขียนบท ${Q.llm || 0} ครั้ง${helpers.length ? ' · บัญชีผู้ช่วย ' + helpers.map(h => h.name + ' ' + (h.day === new Date(now + 7 * 3600000).toISOString().slice(0, 10) ? h.n || 0 : 0) + ' ภาพ').join(', ') : ''}` },
+          { k: 'kg', name: 'Kaggle GPU', used: kFull ? Math.max(30, kgh) : kgh, cap: 30, unit: 'ชม.', reset: resetW, est: 1, full: kFull, note: kRun ? `เครื่องกำลังทำงาน (รอบนี้ ${kRun.toFixed(1)} ชม.)` : '' },
+          { k: 'supa', name: 'Supabase · ไฟล์ LoRA', used: Math.round(supa / 1048576), cap: 1024, unit: 'MB', reset: 0 },
+          { k: 'd1s', name: 'ฐานข้อมูล · พื้นที่เก็บ', used: Math.round((Q.dbsize || 0) / 1048576), cap: 5120, unit: 'MB', reset: 0 },
+        ] });
       }
       if (act === 'boost') { const h = Math.max(0, Math.min(6, +b.hours || 0)); await setSetting(env, 'boost_until', String(h ? Date.now() + h * 3600000 : 0)); return json({ ok: true, until: h ? Date.now() + h * 3600000 : 0 }); } // เร่งสตอรีบอร์ดชั่วคราว (สูงสุด 6 ชม.) · ยังหยุดเองที่ 85%
       if (act === 'setkind') { // ประเภทงาน: อนิเมะ / หนัง / ซีรีส์ / โฆษณา (มีผลกับตอนที่เริ่มทำหลังจากนี้)
