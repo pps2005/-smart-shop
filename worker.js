@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'lorafix-1';
+const BOT_VER = 'manga-1';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -342,7 +342,7 @@ async function restyleTick(env, s) {
 // LoRA ประเภทอื่น: ภาพชุดฝึกครบเมื่อไหร่ ส่งเทรนเอง
 async function xlTick(env) {
   await animeSchema(env);
-  const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE c.series_id=0 AND c.kind IN ('enemy','place','style') AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
+  const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE c.series_id=0 AND (c.kind IN ('enemy','place','style') OR (c.kind='char' AND c.story IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
   for (const c of cs) {
     const pj = charProj(c);
     if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n) continue;
@@ -720,6 +720,66 @@ async function qcRun(env, story, budget, onlySid) {
   }
   return { ok: true, eps: out, left, vision: seen === 0 ? null : nul < seen };
 }
+// ===== สตอรีบอร์ดแบบมังงะ (v2): บทพูดกับภาพเกิดพร้อมกันทีละช่อง · มุมกล้องเป็นตัวเลือกตายตัว · รูปลักษณ์ตัวละครใส่จากบทเสมอ · มีรอบ "อ่านทวน" ให้ AI เติมช่องที่ขาดจนเรื่องต่อกัน =====
+const SHOTS = { wide: 'wide shot', medium: 'medium shot, waist up', closeup: 'close-up of the face', two: 'two-shot', ots: 'over-the-shoulder shot', low: 'low angle shot', high: 'high angle shot from above', insert: 'extreme close-up insert shot of an object or hands, no face', back: 'view from behind' };
+const thOnly = t => String(t == null ? '' : t).replace(/[぀-ヿ㐀-鿿＀-￯]+/g, '').replace(/\s+/g, ' ').trim(); // ตัดอักษรจีน/ญี่ปุ่นที่ AI ชอบหลุดมา
+function cleanPanel(x, names, places) {
+  const fix = w => { w = thOnly(w); if (!w) return ''; if (names.includes(w)) return w; const f = names.find(n => n.includes(w) || w.includes(n)); return f || null; };
+  const solo = (Array.isArray(x.chars) ? x.chars : []).map(fix).filter(Boolean), lines = (Array.isArray(x.lines) ? x.lines : []).map(l => { let w = fix(l && l.who); if (w === '' && l && String(l.who || '').trim() && solo.length === 1) w = solo[0]; /* ชื่อคนพูดเป็นอักษรต่างชาติ: ถ้าช่องนั้นมีตัวละครเดียว ถือว่าเป็นคนนั้น */ return { who: w, say: thOnly(l && l.say).slice(0, 120) }; }).filter(l => l.say && l.who !== null && !/^(ฟังนะ|ว่าไง|ดีไหม|อะไรนะ|เอาล่ะ)$/.test(l.say)).slice(0, 3);
+  const chars = [...new Set((Array.isArray(x.chars) ? x.chars : []).map(fix).filter(Boolean).concat(lines.map(l => l.who).filter(Boolean)))].slice(0, 4);
+  const shot = SHOTS[x.shot] ? x.shot : 'medium', en = String(x.en || '').replace(/\s+/g, ' ').trim().slice(0, 380);
+  if (!en) return null;
+  const think = thOnly(x.think).slice(0, 40), ono = thOnly(x.ono).slice(0, 14);
+  return { th: thOnly(x.th).slice(0, 200) || en.slice(0, 80), en: SHOTS[shot] + ', ' + en, chars, say: JSON.stringify({ who: lines[0] ? lines[0].who : '', say: lines[0] ? lines[0].say : '', lines, ...(think ? { think } : {}), ...(ono ? { ono } : {}) }), chain: x.chain ? 1 : 0, loc: places.includes(x.loc) ? x.loc : null, shot };
+}
+// รูปลักษณ์ตัวละครตามบท (ถ้าบทไม่ได้บอก ให้ออกแบบตามธีมของเรื่อง) — ใช้ทั้งตอนวาดร่างและตอนออกแบบ LoRA · เก็บใน settings looks:<เรื่อง> แก้เองได้
+async function roleLooks(env, s, story, plan) {
+  let L = {}; try { const r = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('looks:' + story).first(); L = r ? JSON.parse(r.value) : {}; } catch (e) { L = {}; }
+  const miss = ((plan && plan.roles) || []).filter(r => r.tier !== 'none' && !L[r.key]);
+  if (!miss.length || !plan) return L;
+  try {
+    const o = await llmJson(env, s, `เรื่อง: ${plan.title || story}\n${String(plan.overview || '').slice(0, 700)}\nตัวละครที่ต้องออกแบบ:\n${miss.map(r => `- ${r.key}: ${r.g === 'f' ? 'หญิง' : r.g === 'm' ? 'ชาย' : 'ไม่ใช่คน'} อายุ ${r.age || '?'} · ${r.kind} · ${r.look || ''} · ${r.traits || ''}`).join('\n')}\nที่ออกแบบไว้แล้ว (ห้ามซ้ำ): ${Object.entries(L).map(([k, v]) => k + ' = ' + v).join(' | ').slice(0, 900) || '-'}\n\nออกแบบรูปลักษณ์ของแต่ละตัวเป็นคำสั่งวาดภาพภาษาอังกฤษ ไม่เกิน 30 คำ: เพศ อายุ ทรงผม สีผม สีตา ชุดประจำตัว จุดเด่น 1 อย่าง ให้แต่ละตัวต่างกันชัดเจน ยึดตามที่บทบอก ส่วนที่บทไม่ได้บอกให้ออกแบบให้เข้ากับธีมของเรื่อง ตัวละครที่เป็นคนต้องเป็นผู้ใหญ่ ห้ามชุดนักเรียน ออกแบบขึ้นใหม่ ห้ามอ้างถึงตัวละครจากเรื่องอื่น ตัวที่ไม่ใช่คนให้บรรยายเป็นสัตว์หรืออสูร\nตอบเป็น JSON: {"ชื่อตัวละคร":"english look"}`);
+    for (const r of miss) if (typeof o[r.key] === 'string' && o[r.key].trim().length > 15) L[r.key] = o[r.key].trim().slice(0, 240);
+    await setSetting(env, 'looks:' + story, JSON.stringify(L));
+  } catch (e) { }
+  return L;
+}
+// อ่านทวนทั้งซีนแบบคนอ่านครั้งแรก: แก้บทพูดที่ลอย เติมช่องที่ขาดให้เรื่องต่อกัน (ทำครั้งเดียวต่อซีน)
+async function sbReview(env, s, sid, names, places) {
+  await env.DB.prepare('UPDATE shots SET idx=idx*10 WHERE script_id=? AND idx<5000').bind(sid).run();
+  const rows = (await env.DB.prepare('SELECT id,idx,th,say,chars FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results; if (rows.length < 3) return { edit: 0, add: 0 };
+  const sc = await env.DB.prepare('SELECT s.title,s.logline,p.body FROM scenes s JOIN scripts p ON p.id=s.script_id WHERE s.script_id=?').bind(sid).first();
+  const txt = rows.map((r, i) => { let y = {}; try { y = JSON.parse(r.say || '{}'); } catch (e) { } return `${i + 1}. [ภาพ: ${r.th}] ${(y.lines || []).map(l => (l.who || 'บรรยาย') + ': ' + l.say).join(' / ') || '(ไม่มีคำ)'}`; }).join('\n');
+  const o = await llmJson(env, s, `นี่คือมังงะ 1 ซีน เรียงตามช่อง\nซีนนี้ต้องเล่าว่า: ${sc ? sc.title + ' — ' + sc.logline : ''}\nบทของซีน: ${String((sc && sc.body) || '').slice(0, 1500)}\nตัวละครที่ใช้ชื่อได้: ${names.join(', ')}\n\n${txt}\n\nอ่านแบบคนที่ไม่รู้เรื่องมาก่อน แล้วแก้ให้อ่านรู้เรื่องครบ: ใครเป็นใคร อยู่ที่ไหน ต้องการอะไร เกิดอะไรขึ้น แล้วจบซีนอย่างไร\n- edit = ช่องที่บทพูดลอย ไม่ต่อกับช่องก่อน หรือไม่บอกอะไร ให้เขียน lines ใหม่ (1-3 บรรทัด)\n- add = ช่องที่ต้องเพิ่มเพราะเรื่องกระโดด ขาดเหตุผล ขาดปฏิกิริยา หรือบทพูดแน่นเกินไป (ระบุ after = เลขช่องที่จะแทรกต่อท้าย; shot เลือกจาก ${Object.keys(SHOTS).join(' | ')}; en = ฉากและการกระทำภาษาอังกฤษ เรียกตัวละครว่า the man / the woman / the creature ห้ามใส่ชื่อ ห้ามบรรยายผมหรือชุด)\nไม่เกินอย่างละ 6 รายการ ภาษาไทยล้วน ถ้าอ่านรู้เรื่องดีแล้วให้ตอบรายการว่าง\nตอบเป็น JSON: {"edit":[{"n":1,"lines":[{"who":"","say":""}]}],"add":[{"after":1,"shot":"medium","th":"","en":"","chars":[""],"lines":[{"who":"","say":""}]}]}`);
+  const st = []; let ne = 0, na = 0;
+  for (const x of (Array.isArray(o.edit) ? o.edit : []).slice(0, 6)) { const r = rows[+x.n - 1]; if (!r) continue; const p = cleanPanel({ en: 'x', lines: x.lines, chars: [] }, names, places); let y = {}; try { y = JSON.parse(p.say); } catch (e) { } if (!y.lines || !y.lines.length) continue; let old = {}; try { old = JSON.parse(r.say || '{}'); } catch (e) { } st.push(env.DB.prepare('UPDATE shots SET say=? WHERE id=?').bind(JSON.stringify({ ...old, who: y.lines[0].who, say: y.lines[0].say, lines: y.lines }), r.id)); ne++; }
+  const used = {};
+  for (const x of (Array.isArray(o.add) ? o.add : []).slice(0, 6)) { const r = rows[+x.after - 1]; if (!r) continue; const p = cleanPanel(x, names, places); if (!p) continue; used[r.id] = (used[r.id] || 0) + 1; if (used[r.id] > 4) continue; const idx = r.idx + used[r.id] * 2;
+    st.push(env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,0,?,?,?,?,?,?,0,?)').bind(sid, idx, p.th, p.en, JSON.stringify(p.chars), `ฉาก${sid}·${idx}`, Date.now(), p.say, p.loc)); na++; }
+  for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20));
+  return { edit: ne, add: na };
+}
+// ออกแบบตัวละครของเรื่องจากบท → วาดชุดฝึก → เทรน LoRA → ใส่บทให้เอง (settings design_cast=<เรื่อง> หรือปุ่มในสตูดิโอ)
+async function designCast(env, s, story) {
+  await animeSchema(env);
+  const plan = await readPlan(env, story); if (!plan) return { error: 'ไม่พบโครงเรื่อง' };
+  const L = await roleLooks(env, s, story, plan), made = [];
+  await env.DB.prepare("UPDATE aud_cands SET cast_role=NULL, cast_story=NULL, chosen=0 WHERE cast_story=? AND NOT EXISTS (SELECT 1 FROM chars c WHERE c.id=aud_cands.char_id AND c.story=?)").bind(story, story).run(); // ถอดนักแสดงจากคลังเก่าที่ไม่ได้ออกแบบมาเพื่อเรื่องนี้ (ไม่ลบ)
+  for (const r of plan.roles) {
+    if (r.tier === 'none' || !L[r.key]) continue;
+    if (await env.DB.prepare('SELECT 1 FROM aud_cands WHERE cast_story=? AND cast_role=?').bind(story, r.key).first()) continue;
+    let name = String(r.key).replace(/[·\n]/g, ' ').slice(0, 30); if (await env.DB.prepare('SELECT id FROM chars WHERE series_id=0 AND name=?').bind(name).first()) name = (name + ' ' + story).slice(0, 40);
+    if (await env.DB.prepare('SELECT id FROM chars WHERE series_id=0 AND name=?').bind(name).first()) continue;
+    const desc = `${r.g === 'f' ? 'woman, ' : r.g === 'm' ? 'man, ' : ''}${L[r.key]}`.slice(0, 500);
+    const c = await env.DB.prepare("INSERT INTO chars (series_id,name,desc,created,kind,story) VALUES (0,?,?,?,'char',?)").bind(name, desc, Date.now(), story).run(), cid = c.meta.last_row_id;
+    await env.DB.prepare("INSERT INTO aud_cands (role,name,age,traits,intro,look,chosen,created,kept,cast_role,cast_story,char_id) VALUES ('',?,?,'','',?,1,?,1,?,?,?)").bind(name, +r.age || 0, desc, Date.now(), r.key, story, cid).run();
+    await charRefs(env, cid, 16);
+    await env.DB.prepare("UPDATE jobs SET steps=8 WHERE project=? AND status='queued'").bind('ซีรีส์0·' + name).run();
+    made.push(r.key);
+  }
+  await setSetting(env, 'lora_go', '1');
+  return { ok: true, made };
+}
 // ตรวจสตอรีบอร์ดเองก่อนวาด: ตัดช็อตที่ซ้ำ/ไม่เดินเรื่อง และเปลี่ยนมุมกล้องช็อตที่ซ้ำมุมติดกัน (ทำครั้งเดียวต่อซีน)
 async function sbTighten(env, s, sid) {
   const rows = (await env.DB.prepare('SELECT id,idx,th,en,kproj,chain FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
@@ -819,8 +879,13 @@ async function animeAdvance(env, s) {
     const m = meta[e.series_id] || (meta[e.series_id] = await (async () => { const sr = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(e.series_id).first(), t = sr ? sr.title : ''; return { title: t, W: await workOf(env, t), st: await epstOf(env, t) }; })());
     if (!e.script_id) { await epWrite(env, s, e); return; }
     const sid = e.script_id;
-    if (e.sb >= 0) { const r = await animeApi(env, { act: 'sb_beat', script_id: sid, beat: e.sb, shots: m.W.shots }); await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
     const gsb = ((m.st[e.ep] || {}).gate) === 'sb';
+    if (e.sb >= 0 && gsb) { // โหมดสตอรีบอร์ด: เขียนเป็นช่องมังงะ (ภาพ + บทพูดพร้อมกัน) แล้วอ่านทวนเติมช่องที่ขาด — ไม่ใช้ตัวตัดช็อต/ตัวเติมบทพูดรุ่นเก่า
+      const r = await animeApi(env, { act: 'sb_panels', script_id: sid, beat: e.sb, shots: m.W.shots });
+      if (r.next < 0) { await setSetting(env, 'sbfix:' + sid, '0,0'); await setSetting(env, 'sbsay:' + sid, 'v2'); await env.DB.prepare("DELETE FROM settings WHERE key IN (?,?)").bind('sbrev:' + sid, 'sbdone:' + sid).run(); }
+      await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
+    if (e.sb >= 0) { const r = await animeApi(env, { act: 'sb_beat', script_id: sid, beat: e.sb, shots: m.W.shots }); await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
+    if (gsb && s['sbsay:' + sid] === 'v2' && s['sbrev:' + sid] == null) { let r = { edit: 0, add: 0 }; try { const pl = await readPlan(env, m.title), names = ((pl && pl.roles) || []).filter(x => x.tier !== 'none').map(x => x.key), places = ((pl && pl.locs) || []).map(l => l.name); r = await sbReview(env, s, sid, names, places); } catch (x) { } await setSetting(env, 'sbrev:' + sid, r.edit + ',' + r.add); return; }
     if (gsb && s['sbfix:' + sid] == null) { let r = { cut: 0, fix: 0 }; try { r = await sbTighten(env, s, sid); } catch (x) { } await setSetting(env, 'sbfix:' + sid, r.cut + ',' + r.fix); return; } // แตกช็อตครบ → ให้ AI ตรวจตัดช็อตซ้ำ/แก้มุมกล้องก่อนวาด
     if (gsb && s['sbsay:' + sid] == null) { let n = 0; try { n = await sbSay(env, s, sid); } catch (x) { } await setSetting(env, 'sbsay:' + sid, String(n)); return; } // บทพูดรายช็อต
     if (gsb && s['sbdone:' + sid] === '1') continue; // ซีนนี้ภาพครบและตรวจแล้ว รออนุมัติ: ไม่ต้องอ่านอะไรอีก
@@ -920,6 +985,23 @@ async function animeApi(env, b) {
     await env.DB.batch(list.map((x, i) => env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,chain,loc) VALUES (?,?,?,?,?,?,?,?,?,?)').bind(sc.id, base + i + 1, bi, String(x.th || '').slice(0, 300), String(x.en || '').slice(0, 600), JSON.stringify(Array.isArray(x.chars) ? x.chars : []), `ฉาก${sc.id}·${base + i + 1}`, Date.now(), i > 0 && x.chain ? 1 : 0, places.includes(x.loc) ? x.loc : null)));
     return { next: bi + 1 < beats.length ? bi + 1 : -1, added: list.length };
   }
+  if (act === 'sb_panels') { // v2: เขียนช่องมังงะของเหตุการณ์นี้ (ภาพ + บทพูดพร้อมกัน)
+    const sc = await env.DB.prepare('SELECT * FROM scripts WHERE id=?').bind(+b.script_id).first(); if (!sc) throw new Error('ไม่พบบท');
+    let o = {}; try { o = JSON.parse(sc.body); } catch { o = {}; }
+    const beats = o.beats || [], bi = +b.beat || 0; if (!beats.length) throw new Error('บทนี้ยังไม่มีเหตุการณ์');
+    if (bi === 0) { const old = (await env.DB.prepare('SELECT kproj FROM shots WHERE script_id=?').bind(sc.id).all()).results, st = [env.DB.prepare('DELETE FROM shots WHERE script_id=?').bind(sc.id)]; for (const x of old) st.push(env.DB.prepare('DELETE FROM images WHERE project=?').bind(x.kproj), env.DB.prepare('DELETE FROM jobs WHERE project=?').bind(x.kproj)); for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20)); }
+    const sr = await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(sc.series_id).first(), plan = sr ? await readPlan(env, sr.title) : null;
+    const xs = sr ? (await env.DB.prepare("SELECT name,desc,kind FROM chars WHERE story=? AND kind IN ('enemy','place')").bind(sr.title).all().catch(() => ({ results: [] }))).results : [], places = xs.filter(x => x.kind === 'place').map(x => x.name).concat(((plan && plan.locs) || []).map(l => l.name));
+    const roles = ((plan && plan.roles) || []).filter(r => r.tier !== 'none'), names = roles.map(r => r.key).concat(xs.filter(x => x.kind === 'enemy').map(x => x.name));
+    const scn = await env.DB.prepare('SELECT title,logline,ep,sc FROM scenes WHERE script_id=?').bind(sc.id).first();
+    const prev = (await env.DB.prepare('SELECT th,say FROM shots WHERE script_id=? ORDER BY idx DESC LIMIT 3').bind(sc.id).all()).results.reverse().map(r => { let y = {}; try { y = JSON.parse(r.say || '{}'); } catch (e) { } return `[${r.th}] ${(y.lines || []).map(l => (l.who || 'บรรยาย') + ': ' + l.say).join(' / ')}`; }).join('\n');
+    const total = +b.shots > 0 ? Math.min(180, +b.shots) : 20, N = Math.min(8, Math.max(3, Math.ceil(total / beats.length)));
+    const arr = await llmJson(env, s, `เรื่อง: ${String(sr ? sr.brief : '').slice(0, 1800)}\nตัวละครที่ใช้ชื่อได้ (ต้องสะกดตามนี้): ${roles.map(r => `${r.key} (${r.g === 'f' ? 'หญิง' : r.g === 'm' ? 'ชาย' : 'ไม่ใช่คน'} ${r.age || ''} ${r.kind}: ${r.look || ''}${r.traits ? ' · ' + r.traits : ''})`).join(' | ')}${xs.filter(x => x.kind === 'enemy').length ? ' | ศัตรู: ' + xs.filter(x => x.kind === 'enemy').map(x => x.name).join(', ') : ''}\nซีน: ${scn ? scn.title + ' — ' + scn.logline : o.title || ''}\nเหตุการณ์ทั้งซีน: ${beats.map((x, i) => (i + 1) + ') ' + x).join(' ').slice(0, 1200)}\nช่องก่อนหน้า:\n${prev || '(เริ่มซีน)'}\n\nเขียนมังงะของ "เหตุการณ์ที่ ${bi + 1}: ${beats[bi]}" เป็น ${N} ช่อง (เพิ่มได้ถึง ${N + 3} ช่องถ้าบทพูดเยอะ) ภาพละ 16:9 ให้คนที่ไม่รู้เรื่องมาก่อนอ่านแล้วเข้าใจ:\n- ${bi === 0 ? 'ช่องแรกเป็นภาพกว้างบอกสถานที่และเวลา พร้อมคำบรรยาย (who ว่าง) ' : 'ต่อจากช่องก่อนหน้าให้เนียน '}ตัวละครที่โผล่ครั้งแรกในซีนต้องมีคำบรรยายสั้นๆ ว่าเป็นใคร\n- บทพูดต้องเล่าเหตุและผล: ใครต้องการอะไร เกิดอะไรขึ้น อีกฝ่ายตอบอย่างไร ห้ามบทพูดลอยๆ คำเดียว (เช่น "ฟังนะ" "ว่าไง" "ดีไหม") ห้ามพูดซ้ำสิ่งที่ภาพบอกแล้ว\n- ช่องละ 1-3 บรรทัด ตัวละครสลับกันพูด ถ้าพูดเยอะให้แตกเป็นหลายช่อง ภาษาไทยล้วน ห้ามมีอักษรจีนหรือญี่ปุ่น\n- shot ต้องหลากหลาย ห้ามซ้ำกันเกิน 2 ช่องติด เลือกจาก: wide (เห็นฉากกว้าง) | medium | closeup (หน้า สีหน้าชัด) | two (สองคนในภาพ) | ots (ข้ามไหล่) | low (มุมต่ำ) | high (มุมสูง) | insert (ภาพของ/มือ/รายละเอียด ไม่มีหน้า) | back (จากด้านหลัง)\n- en = ภาษาอังกฤษ บอกสถานที่ + ใครทำอะไร ท่าทาง สีหน้า เรียกตัวละครว่า the man / the woman / the creature ห้ามใส่ชื่อ ห้ามบรรยายผมหรือชุด ภาพหนึ่งมีคนไม่เกิน 2 คน\n- think = ความคิดในใจสั้นๆ และ ono = คำเสียงประกอบ ใส่เฉพาะช่องจังหวะตลกหรืออารมณ์พุ่ง · loc = ชื่อสถานที่จากรายการ (${places.slice(0, 10).join(' | ') || '-'}) ถ้าตรง · chain = true เฉพาะท่าต่อสู้ที่ต่อจากช่องก่อนในมุมกล้องเดิม\nตอบเป็น JSON array: [{"shot":"wide","th":"ภาพนี้คืออะไร","en":"...","chars":["ชื่อ"],"lines":[{"who":"","say":""}],"think":"","ono":"","loc":"","chain":false}]`);
+    const list = (Array.isArray(arr) ? arr : (arr && Array.isArray(arr.panels) ? arr.panels : [arr])).slice(0, N + 3).map(x => cleanPanel(x || {}, names, places)).filter(Boolean);
+    const base = ((await env.DB.prepare('SELECT MAX(idx) m FROM shots WHERE script_id=?').bind(sc.id).first()) || {}).m || 0;
+    if (list.length) await env.DB.batch(list.map((x, i) => env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(sc.id, base + i + 1, bi, x.th, x.en, JSON.stringify(x.chars), `ฉาก${sc.id}·${base + i + 1}`, Date.now(), x.say, i > 0 ? x.chain : 0, x.loc)));
+    return { next: bi + 1 < beats.length ? bi + 1 : -1, added: list.length, names, places };
+  }
   if (act === 'sb_edit') {
     const sh = await env.DB.prepare('SELECT * FROM shots WHERE id=?').bind(+b.id).first(); if (!sh) throw new Error('ไม่พบช็อต');
     const cmd = String(b.command || '').trim().slice(0, 400); if (!cmd) throw new Error('พิมพ์คำสั่งแก้ก่อน');
@@ -932,6 +1014,7 @@ async function animeApi(env, b) {
     const rows = (await env.DB.prepare('SELECT * FROM shots WHERE script_id=? ORDER BY idx').bind(+b.script_id).all()).results;
     const only = Array.isArray(b.ids) ? new Set(b.ids.map(Number)) : null;
     const LM = await shotLoraMap(env, sc.series_id);
+    const srK = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(sc.series_id).first(), planK = srK ? await readPlan(env, srK.title) : null, ROLES = (planK && planK.roles) || [], LOOKS = planK ? await roleLooks(env, s, srK.title, planK) : {};
     const hv = new Set((await env.DB.prepare('SELECT DISTINCT project FROM images WHERE project LIKE ?').bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
     const pd = new Set((await env.DB.prepare("SELECT DISTINCT project FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle')").bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
     const st = []; let n = 0;
@@ -939,8 +1022,11 @@ async function animeApi(env, b) {
     for (const sh of rows) {
       if (only ? !only.has(sh.id) : (hv.has(sh.kproj) || pd.has(sh.kproj))) continue;
       const { names, m } = shotLoraPick(sh, LM), nch = m.filter(c => c.k === 'char').length;
+      const lset = new Set(LM.lc.filter(c => m.some(x => x.lid === c.lid)).map(c => c.name)), extra = [], gs = [];
+      for (const n of names) { const R = ROLES.find(r => r.key === n); if (R && R.g && R.g !== 'x') gs.push(R.g); if (!lset.has(n) && LOOKS[n] && !String(sh.en).includes(LOOKS[n].slice(0, 24))) extra.push(LOOKS[n]); }
+      const cnt = !names.length ? (/wide shot|insert shot/.test(sh.en) ? 'no humans' : '') : gs.length === 1 && names.length === 1 ? 'solo, ' + (gs[0] === 'f' ? '1girl' : '1boy') + ', single character' : gs.length === 2 ? '2people, ' + (gs[0] === gs[1] ? (gs[0] === 'f' ? '2girls' : '2boys') : '1boy, 1girl') : '';
       st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: c.w }))), sh.id));
-      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${m.map(c => c.tag || ('chr' + c.cid + 'x')).join(', ')}${m.length ? ', ' : ''}${sh.en}, [[STYLE]]`.slice(0, 1800), Date.now(), nch ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
+      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${m.map(c => c.tag || ('chr' + c.cid + 'x')).join(', ')}${m.length ? ', ' : ''}${sh.en}${extra.length ? ', ' + extra.join('; ') : ''}${cnt ? ', ' + cnt : ''}, single cinematic illustration, [[STYLE]]`.slice(0, 1800), Date.now(), nch ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
       n++;
     }
     if (st.length) await env.DB.batch(st);
@@ -1067,6 +1153,7 @@ async function tick(env, force) {
   await animeAuto(env, s).catch(() => {});
   if (s.supa_test === '1') await supaSelfTest(env, s);
   await sbImportTick(env, s).catch(() => { });
+  if (s.design_cast) { await env.DB.prepare("DELETE FROM settings WHERE key='design_cast'").run(); await designCast(env, s, String(s.design_cast)).catch(() => { }); }
   await restyleTick(env, s).catch(() => { });
   await xlTick(env).catch(() => { });
   await animeAdvance(env, s).catch(() => {});
@@ -2062,7 +2149,7 @@ IMG_MODELS = [
     ("cagliostrolab/animagine-xl-4.0", "animagine-xl-4.0.safetensors"),
 ]
 IMG_POS = "masterpiece, high score, great score, absurdres, "
-IMG_NEG = "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry"
+IMG_NEG = "multiple views, collage, grid, split screen, comic panels, character sheet, reference sheet, turnaround, lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry"
 IMG_QUANTS = ["Q5_K_S", "Q4_K_S", "Q4_0", "Q8_0"]
 FLUX_REPO = "city96/FLUX.1-dev-gguf"
 FLUX_TE = "comfyanonymous/flux_text_encoders"
@@ -3495,6 +3582,7 @@ async function castApi(req, env, url, body) {
         if (b.field === 'g') { r.g = v; if (v === 'x') r.tier = 'none'; else if (r.tier === 'none') r.tier = 'support'; } else r.tier = v;
         await setSetting(env, 'plan:' + story, JSON.stringify(plan)); return json({ ok: true });
       }
+      if (act === 'design_cast') return json(await designCast(env, await getSettings(env), story));
       if (act === 'xl_list') { // LoRA ประเภทอื่นของเรื่องนี้ + สถานะ
         await animeSchema(env);
         const rows = (await env.DB.prepare("SELECT c.id,c.name,c.kind,c.desc,(SELECT COUNT(*) FROM images i WHERE i.project='ซีรีส์0·'||c.name) img,(SELECT MIN(i.id) FROM images i WHERE i.project='ซีรีส์0·'||c.name) face,(SELECT COUNT(*) FROM jobs j WHERE j.project='ซีรีส์0·'||c.name AND j.status IN ('queued','running','kaggle')) pend,(SELECT l.status FROM loras l WHERE l.char_id=c.id AND l.status<>'old' ORDER BY l.id DESC LIMIT 1) lora,(SELECT l.size FROM loras l WHERE l.char_id=c.id AND l.status='ready' ORDER BY l.id DESC LIMIT 1) size FROM chars c WHERE c.series_id=0 AND c.story=? AND c.kind IN ('enemy','place','style') ORDER BY c.kind,c.id").bind(story).all()).results;
