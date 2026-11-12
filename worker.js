@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-7';
+const BOT_VER = 'manga-8';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -544,15 +544,18 @@ function legacyFix(p) {
   return p;
 }
 // ตัวสำรอง (Flux) วาดช่องสตอรีบอร์ด: ใช้ LoRA ไม่ได้ → ตัดคำกระตุ้น LoRA ทิ้ง และย้ายลายเส้นไว้ "ต้นคำสั่ง" (อยู่ท้ายแล้ว Flux ไม่ค่อยทำตาม ภาพออกโทนอุ่นเงานุ่ม)
-function fluxDraft(job, s) {
+function fluxDraft(job, s, shEn) {
   const p = String(job.prompt || '');
   if (!String(job.project || '').startsWith('ฉาก') || !p.includes('[[STYLE]]')) return withStyle(p, s);
-  const body = p.replace(/chr\d+x,?\s*/g, '').replace(/,?\s*\[\[STYLE\]\]/, '');
+  // มีคำกระตุ้น LoRA = คำสั่งพ่วงชุดประจำตัวของตัวละครมาด้วย (เช่น ฮู้ดดำของริน) ซึ่งทับชุดที่ช่องนั้นระบุ → ใช้เฉพาะจำนวนคน + คำบรรยายของช่อง
+  const body = shEn && /chr\d+x/.test(p) ? p.split(/chr\d+x/)[0] + shEn : p.replace(/chr\d+x,?\s*/g, '').replace(/,?\s*\[\[STYLE\]\]/, '');
+  // Flux ไม่ค่อยทำตามแท็กอายุ ต้องบอกเป็นประโยค (เจอจริง: ป้าฮานะ 61 ออกมาเป็นสาว)
+  const age = [/\bold woman\b/.test(p) ? 'The woman is elderly, around sixty years old, with clear wrinkles on her face, not young' : '', /\bold man\b/.test(p) ? 'The man is elderly, around seventy years old, with clear wrinkles, not young' : '', /middle-aged man/.test(p) ? 'The man is middle-aged, in his forties, with a tired adult face, not a young man' : '', /middle-aged woman/.test(p) ? 'The woman is middle-aged, in her fifties, with a mature face and some wrinkles, not young' : ''].filter(Boolean).join('. ');
   // ภาพร่างสตอรีบอร์ด = มังงะขาวดำตัดเส้นหมึก (ผู้ใช้เลือก): ไม่มีสี/แสงให้แกว่งข้ามช่อง · ตั้ง settings draft_style เพื่อเปลี่ยนได้
   const st = String(s.draft_style || '').trim() || 'black and white manga page illustration, monochrome, clean fine ink line art with thin delicate pen lines, soft screentone dot shading, white background areas, expressive detailed eyes, no color anywhere, hair shaded only with black ink or gray screentone, no gray gradients, no text, no speech bubbles, single panel';
   // ตัดคำบอกสีออกจากคำบรรยาย (เช่น red hair) ไม่งั้น Flux ระบายสีนั้นลงภาพขาวดำ — เจอจริง: ผมแดงของรินโผล่มาเป็นสี
   const mono = body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/ {2,}/g, ' ');
-  return `${st}. ${mono}. Strictly black ink on white paper, grayscale only, absolutely no colored areas.`;
+  return `${st}. ${age ? age + '. ' : ''}${mono}. Strictly black ink on white paper, grayscale only, absolutely no colored areas.`;
 }
 function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
 // เจนต่อเนื่อง: คิวว่างเมื่อไร เติมผู้สมัครออดิชันใหม่เอง (สลับบท) — เอาไว้ให้ได้ภาพมากพอเลือกทำ LoRA
@@ -1218,7 +1221,8 @@ async function tick(env, force) {
   await setSetting(env, 'last_run', String(now));
   await env.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(job.id).run();
   try {
-    const out = await genImage(env, s, fluxDraft(job, s).slice(0, 2048), Math.min(8, Math.max(1, +job.steps || +s.steps || 4)), +job.seed || 0);
+    let shEn = ''; if (String(job.project || '').startsWith('ฉาก') && /chr\d+x/.test(String(job.prompt || ''))) { const shr = await env.DB.prepare('SELECT en FROM shots WHERE kproj=?').bind(job.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; }
+    const out = await genImage(env, s, fluxDraft(job, s, shEn).slice(0, 2048), Math.min(8, Math.max(1, +job.steps || +s.steps || 4)), +job.seed || 0);
     await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (?,?,?,?,?,0,?)')
       .bind(job.id, job.project, job.scene, job.prompt, out.image, Date.now()).run();
     await env.DB.prepare('DELETE FROM jobs WHERE id=?').bind(job.id).run();
