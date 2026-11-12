@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'manga-5';
+const BOT_VER = 'manga-6';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4300000;
@@ -362,12 +362,12 @@ async function xlNew(env, story, kind, name, desc) {
 // วาดช่องที่มีตัวละครของตอนนั้นใหม่ทั้งหมด (settings sb_redraw = "เรื่อง|ตอน") — ใช้หลังแก้ตัวสั่งวาดหรือ LoRA เพิ่งเสร็จ · ช่องฉากหลังล้วนไม่แตะ
 async function sbRedrawTick(env, s) {
   if (!s.sb_redraw) return;
-  const [story, epS] = String(s.sb_redraw).split('|');
+  const [story, epS, mode] = String(s.sb_redraw).split('|'); // ตัวที่สาม 'all' = วาดใหม่ทุกช่องรวมฉากหลัง
   await env.DB.prepare("DELETE FROM settings WHERE key='sb_redraw'").run();
   const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!sr) return;
   const scs = (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +epS).all()).results;
   for (const sc of scs) { if (!sc.script_id) continue;
-    const l = (await env.DB.prepare("SELECT id,kproj FROM shots WHERE script_id=? AND chars IS NOT NULL AND chars<>'[]' AND chars<>''").bind(sc.script_id).all()).results; if (!l.length) continue;
+    const l = (await env.DB.prepare("SELECT id,kproj FROM shots WHERE script_id=? AND (?='all' OR (chars IS NOT NULL AND chars<>'[]' AND chars<>''))").bind(sc.script_id, mode || '').all()).results; if (!l.length) continue;
     await env.DB.prepare('DELETE FROM settings WHERE key=?').bind('sbdone:' + sc.script_id).run();
     for (let i = 0; i < l.length; i += 20) await env.DB.batch(l.slice(i, i + 20).flatMap(sh => [env.DB.prepare("DELETE FROM jobs WHERE project=? AND status='queued'").bind(sh.kproj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj)]));
     await animeApi(env, { act: 'kf', script_id: +sc.script_id, ids: l.map(x => x.id) });
@@ -548,7 +548,9 @@ function fluxDraft(job, s) {
   const p = String(job.prompt || '');
   if (!String(job.project || '').startsWith('ฉาก') || !p.includes('[[STYLE]]')) return withStyle(p, s);
   const body = p.replace(/chr\d+x,?\s*/g, '').replace(/,?\s*\[\[STYLE\]\]/, '');
-  return `anime screenshot from a modern TV anime, ${curStyle(s)}. ${body}`;
+  // ภาพร่างสตอรีบอร์ด = มังงะขาวดำตัดเส้นหมึก (ผู้ใช้เลือก): ไม่มีสี/แสงให้แกว่งข้ามช่อง · ตั้ง settings draft_style เพื่อเปลี่ยนได้
+  const st = String(s.draft_style || '').trim() || 'black and white manga page illustration, monochrome, clean fine ink line art with thin delicate pen lines, soft screentone dot shading, white background areas, expressive detailed eyes, no color, no gray gradients, no text, no speech bubbles, single panel';
+  return `${st}. ${body.replace(/,?\s*single cinematic illustration/, '')}`;
 }
 function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
 // เจนต่อเนื่อง: คิวว่างเมื่อไร เติมผู้สมัครออดิชันใหม่เอง (สลับบท) — เอาไว้ให้ได้ภาพมากพอเลือกทำ LoRA
