@@ -49,13 +49,18 @@ function playEp(n){const sb=ST.sbs[n];if(!sb)return;const st=[];
   const kd=e=>{if(e.key==='ArrowRight'||e.key===' ')go(1);else if(e.key==='ArrowLeft')go(-1);else if(e.key==='Escape')close();};document.addEventListener('keydown',kd);
   o.onclick=e=>{if(e.target.closest('[data-x]'))return close();if(e.target.closest('[data-a]')){auto=!auto;e.target.textContent=auto?'⏸ หยุด':'▶ เล่นเอง';show();return;}if(e.target.closest('.bar'))return;go(e.clientX<window.innerWidth/3?-1:1);};
   show();}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&window._needLoad){window._needLoad=0;load();}}); /* ดึงข้อมูลต่อเมื่อกลับมาเปิดหน้านี้ ไม่ดึงทิ้งไว้ตอนสลับแท็บ */
 let tt=0;function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',5000);}
 /* ---------- บอท (ใช้ลิงก์/รหัสเดียวกับสตูดิโอเดิม) ---------- */
 function botCfg(){try{return JSON.parse(localStorage.getItem('ss_imgbot')||'{}')||{};}catch(e){return {};}}
 function botU(p){const c=botCfg();return String(c.url||'').replace(/\/+$/,'')+p+(p.includes('?')?'&':'?')+'k='+encodeURIComponent(c.key||'');}
 function botErr(e){const m=String(e&&e.message||e);return /failed to fetch|load failed|networkerror|network request/i.test(m)?'ติดต่อบอทไม่ได้ ตรวจลิงก์บอท หรือบอทยังไม่ได้ deploy':m;}
-async function botApi(p,body){const r=await fetch(botU(p),body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});
+const SNAP_ACTS=new Set(['get','sb','lib','training','xl_list','eps']); /* ข้อมูลที่ดูอย่างเดียว: เก็บสำเนาล่าสุดไว้ในเครื่อง เผื่อฐานข้อมูลเต็มโควตา/บอทล่ม จะยังเปิดดูได้ */
+async function botApi0(p,body){const r=await fetch(botU(p),body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});
   if(r.status===401)throw new Error('รหัสผ่านบอทไม่ถูกต้อง');const j=await r.json().catch(()=>({error:'บอทตอบกลับไม่ถูกต้อง (ลิงก์ถูกไหม?)'}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j;}
+async function botApi(p,body){const sk=body&&SNAP_ACTS.has(body.act)?'snap:'+p+':'+(body.story||'')+':'+body.act+':'+(body.ep||body.series_id||''):'';
+  try{const j=await botApi0(p,body);if(sk){try{localStorage.setItem(sk,JSON.stringify({t:Date.now(),j}));}catch(e){}}return j;}
+  catch(e){const m=String(e.message||e);if(sk&&!/รหัสผ่าน/.test(m)){try{const v=JSON.parse(localStorage.getItem(sk)||'null');if(v){window._staleAt=Math.min(window._staleAt||Infinity,v.t);window._staleErr=m;return v.j;}}catch(x){}}throw e;}}
 async function testBot(url,key){
   url=String(url||'').trim().replace(/\/+$/,'');
   if(!/^https?:\/\//i.test(url))return{ok:false,m:'❌ ลิงก์ต้องขึ้นต้นด้วย https:// เช่น https://xxx.workers.dev'};
@@ -102,7 +107,7 @@ const api=(act,o)=>botApi('/api/vcastep',{story:ST.story,act,...(o||{})});
 const tierOf=r=>r.tier||(r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'main':'support'),live=r=>r.g!=='x'&&tierOf(r)!=='none';
 const castOf=k=>ST.cands.find(c=>c.cast_role===k&&c.cast_story===ST.story);
 async function load(){
-  clearTimeout(POLL);if(!botCfg().url||!ST.story){render();return;}
+  clearTimeout(POLL);window._staleAt=0;window._staleErr='';if(document.hidden){window._needLoad=1;return;}if(!botCfg().url||!ST.story){render();return;}
   try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;if(r.kind)ST.kind=r.kind;ST.reads=+r.reads||0;ST.err='';}catch(e){ST.err=botErr(e);}
   const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
   if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
@@ -189,6 +194,7 @@ function render(){const A=$('#app');
     const bc=$('#bc');if(bc)bc.onclick=()=>{ST.editBot=false;render();};return;}
   const pl=ST.plan&&ST.plan.roles&&ST.plan.roles.length?ST.plan:null;let h='';
   if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button><button data-test="1">🧪 ทดสอบ</button></div>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
+  if(window._staleAt)h+=`<div class="c warn">📴 ฐานข้อมูลใช้ไม่ได้ชั่วคราว${/exceeded|limit|โควตา|D1/i.test(window._staleErr||'')?' (โควตาอ่านฟรีของวันหมด กลับมาเอง 07:00)':''} — กำลังแสดงข้อมูลล่าสุดที่เก็บไว้ในเครื่องนี้ เมื่อ ${new Date(window._staleAt).toLocaleString('th-TH',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})} · อ่านและดูแบบอนิเมะได้ ภาพที่เคยเปิดแล้วยังขึ้น · ปุ่มแก้ไข/วาดใหม่จะใช้ไม่ได้จนกว่าฐานข้อมูลกลับมา</div>`;
   if(ST.reads>=60)h+=`<div class="c ${ST.reads>=85?'bad':'warn'}">⚠️ วันนี้ใช้โควตาอ่านฐานข้อมูลไปแล้ว ${ST.reads}% ${ST.reads>=85?'— ระบบหยุดงานเบื้องหลังไว้จนถึง 07:00 เพื่อไม่ให้ดับทั้งระบบ':ST.reads>=64?'— ระบบชะลองานเบื้องหลังลง':''}</div>`;
   if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
   if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}

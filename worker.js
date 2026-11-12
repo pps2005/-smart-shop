@@ -1297,7 +1297,7 @@ async function getImage(env, id) {
   if (!r) return new Response('not found', { status: 404 });
   const bytes = b64ToBytes(r.data);
   const type = bytes[0] === 0x89 && bytes[1] === 0x50 ? 'image/png' : bytes[0] === 0x52 && bytes[8] === 0x57 ? 'image/webp' : 'image/jpeg';
-  return new Response(bytes, { headers: { 'content-type': type, 'cache-control': 'private, max-age=86400', ...CORS } });
+  return new Response(bytes, { headers: { 'content-type': type, 'cache-control': 'private, max-age=31536000, immutable', ...CORS } }); // ภาพแต่ละเลขไม่เคยเปลี่ยน: ให้เครื่องผู้ใช้เก็บไว้ได้ยาว ไม่ต้องอ่านฐานข้อมูลซ้ำ และยังดูได้ตอนฐานข้อมูลเต็มโควตา
 }
 
 // ---------- ZIP (stored, no compression) ----------
