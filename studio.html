@@ -156,6 +156,7 @@ function parsePlan(blocks){
   eps.forEach(E=>{const tx=E.title+' '+Object.values(E.f).join(' ');E.cast=roles.filter(r=>/คู่หลัก/.test(r.kind)||tx.includes(r.key)||tx.includes(r.name)||(/^พ่อของ/.test(r.kind)&&/พ่อ(?!ค้า)/.test(tx))).map(r=>r.key);});
   return{title,overview:ov,rule:(P.find(x=>/^ทุกตอน/.test(x))||'').slice(0,400),roles,eps:eps.sort((a,b)=>a.no-b.no),locs};}
 /* ---------- สถานะ ---------- */
+(function(){const m=location.hash.match(/#sync=([^&]+)/);if(!m)return;try{const o=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1])))));if(o.url){localStorage.setItem('ss_imgbot',JSON.stringify({url:o.url,key:o.key||''}));}if(o.story)localStorage.setItem('ss_story',o.story);if(o.sty)localStorage.setItem('ss_sty',o.sty);if(o.asp)localStorage.setItem('ss_asp',o.asp);history.replaceState(null,'',location.pathname+location.search);window._synced=1;}catch(e){}})(); /* ลิงก์ตั้งค่าจากอีกเครื่อง: บันทึกลิงก์บอท/รหัส/เรื่อง แล้วลบออกจากแถบที่อยู่ */
 const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',editBot:false,lib:[],train:[],xl:[],autos:null,weights:{},testMsg:'',kind:localStorage.getItem('ss_kind')||'',sb:null,sbs:{},sbSel:0,sbMode:localStorage.getItem('ss_sbmode')||'read',selEp:0,more:false,onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
 const STY=[['tv','📺 เส้นสะอาด สีเรียบ (อนิเมะทีวี)','clean modern TV anime style, thin crisp uniform line art, flat cel shading with a single soft shadow tone, simple flat colors, clean color fills, minimal gradients, no painterly texture, no bloom, no heavy rendering, clear readable shapes, bright even lighting, consistent character design'],
 ['rom','💗 รอมคอมใส','bright soft anime style, pastel colors, high-key lighting, delicate fine line art, expressive cute faces, soft blush, detailed hair strands, clean cel shading, romantic comedy mood'],
@@ -264,6 +265,8 @@ function render(){const A=$('#app');
   const pl=ST.plan&&ST.plan.roles&&ST.plan.roles.length?ST.plan:null;let h='';
   if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button><button data-test="1">🧪 ทดสอบ</button></div>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
   if(window._staleAt)h+=`<div class="c warn">📴 ฐานข้อมูลใช้ไม่ได้ชั่วคราว${/exceeded|limit|โควตา|D1/i.test(window._staleErr||'')?' (โควตาอ่านฟรีของวันหมด กลับมาเอง 07:00)':''} — กำลังแสดงข้อมูลล่าสุดที่เก็บไว้ในเครื่องนี้ เมื่อ ${new Date(window._staleAt).toLocaleString('th-TH',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})} · อ่านและดูแบบอนิเมะได้ ภาพที่เคยเปิดแล้วยังขึ้น · ปุ่มแก้ไข/วาดใหม่จะใช้ไม่ได้จนกว่าฐานข้อมูลกลับมา</div>`;
+  if(window._synced){window._synced=0;setTimeout(()=>toast('รับการตั้งค่าจากอีกเครื่องแล้ว'),300);}
+  if(botCfg().url)h+=`<div class="c" style="display:flex;gap:8px;align-items:center"><span class="mu" style="flex:1;font-size:13px">📲 เปิดสตูดิโอบน iPad / เครื่องอื่น ให้เห็นเหมือนเครื่องนี้</span><button data-sync>ส่งลิงก์ตั้งค่า</button></div>`;
   h+=meterCard();h+=quotaCard();h+=helperCard();
   if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
   if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
@@ -369,6 +372,11 @@ function render(){const A=$('#app');
   A.querySelectorAll('[data-hunk]').forEach(b=>b.onclick=()=>{b.disabled=true;hcall({unk:+b.dataset.hunk},'ยกเลิกการผูกแล้ว');});
   {const ab=A.querySelector('[data-haddb]');if(ab)ab.onclick=()=>{const n=A.querySelector('[data-hadd]').value.trim();if(!n)return toast('ใส่ชื่อก่อน');ab.disabled=true;hcall({add:n},'เพิ่มผู้ช่วยแล้ว');};}
   A.querySelectorAll('[data-hcopy]').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.hcopy);toast('คัดลอกลิงก์แล้ว ส่งให้ผู้ช่วยได้เลย');}catch(e){prompt('คัดลอกลิงก์นี้',b.dataset.hcopy);}});
+  A.querySelectorAll('[data-sync]').forEach(b=>b.onclick=async()=>{const c=botCfg(),o={url:c.url,key:c.key,story:ST.story,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||''};
+    const u=location.origin+location.pathname+'#sync='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(o)))));
+    if(!confirm('ลิงก์นี้มีรหัสบอทอยู่ด้วย ส่งให้เครื่องของคุณเองเท่านั้น (AirDrop / โน้ต / แชทกับตัวเอง) ห้ามส่งให้คนอื่น'))return;
+    try{if(navigator.share){await navigator.share({title:'ตั้งค่าสตูดิโอ',url:u});return;}}catch(e){}
+    try{await navigator.clipboard.writeText(u);toast('คัดลอกลิงก์แล้ว ไปเปิดบน iPad ได้เลย');}catch(e){prompt('คัดลอกลิงก์นี้ไปเปิดบน iPad',u);}});
   A.querySelectorAll('[data-mrefresh]').forEach(b=>b.onclick=()=>{ST.force=1;load();});
   A.querySelectorAll('[data-vomake]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('vo_make',{ep:+b.dataset.vomake});toast(r.lines?`สั่งทำเสียง ${r.lines} บรรทัดแล้ว เครื่อง CPU ของ Kaggle จะทำให้`:'ไม่มีบรรทัดที่ต้องทำ (บรรทัดที่ยังไม่มีบทญี่ปุ่นจะข้าม)');}catch(e){toast(botErr(e));}});
   {if(!window._voAu)window._voAu=new Audio();A.querySelectorAll('[data-vo]').forEach(el=>el.onclick=()=>{const a=window._voAu;a.pause();a.src=botU('/vo/'+el.dataset.vo);a.play().catch(()=>{});});}
