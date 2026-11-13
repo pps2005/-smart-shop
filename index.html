@@ -328,7 +328,8 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&window._n
 // หลอด % โควตาอ่านฐานข้อมูลวันนี้ แยกตามที่มา + ประเมินว่าทำต่อ/ทำเพิ่มจะใช้กี่ %
 const MTAG=[[/^web:vcastep:sb/,'หน้าสตูดิโอ · สตอรีบอร์ด','#8b7cf6'],[/^web:vcastep:(lib|training|xl_)/,'หน้าสตูดิโอ · LoRA','#b49cff'],[/^web:(vcastep:get|vcastep$|anime)/,'หน้าสตูดิโอ · ข้อมูลเรื่อง/ตอน','#c9bfff'],[/^web:img/,'เปิดดูภาพ','#e0d8ff'],[/^web:/,'หน้าเว็บ · อื่นๆ','#ddd'],
   [/^kaggle/,'เครื่อง Kaggle รับ/ส่งงาน','#3fb6a8'],[/^bg:anime/,'เบื้องหลัง · สตอรีบอร์ด/อนิเมะอัตโนมัติ','#f0a640'],[/^bg:tick/,'เบื้องหลัง · คิววาดภาพ','#f5c060'],[/^bg:lora/,'เบื้องหลัง · LoRA','#e8885a'],[/^bg:kaggle/,'เบื้องหลัง · ดูแลงาน Kaggle/วิดีโอ','#d0664a'],[/^bg:heal/,'เบื้องหลัง · ซ่อมงานที่พัง','#c05050'],[/^bg:(cast|aud)/,'เบื้องหลัง · คัดนักแสดง','#a04060'],[/./,'อื่นๆ','#999']];
-function meterCard(){const M=ST.meter;if(!M)return ST.reads>=60?`<div class="c warn">⚠️ วันนี้ใช้โควตาอ่านฐานข้อมูลไปแล้ว ${ST.reads}%</div>`:'';
+function meterCard(){const qp=quotaPct();const warn85=qp>=85?`<div class="c warn" style="background:#fde2e2;border:1px solid #e88;color:#900">⚠️ วันนี้ใช้โควตาไปแล้ว ${qp.toFixed(0)}% — งานใหม่ควรทำวันถัดไปหลัง 07:00 น. (งานที่สั่งไว้แล้วจะทำต่อพรุ่งนี้เอง)</div>`:'';return warn85+meterCard0();}
+function meterCard0(){const M=ST.meter;if(!M)return ST.reads>=60?`<div class="c warn">⚠️ วันนี้ใช้โควตาอ่านฐานข้อมูลไปแล้ว ${ST.reads}%</div>`:'';
   const cap=M.cap,pc=x=>x/cap*100,f=x=>x>=10?x.toFixed(0):x>=1?x.toFixed(1):x>=0.01?x.toFixed(2):'<0.01';
   const G={};for(const r of M.by||[]){const m=MTAG.find(t=>t[0].test(r.tag));const g=G[m[1]]||(G[m[1]]={l:m[1],col:m[2],n:0,c:0,tags:{}});g.n+=+r.n;g.c+=+r.c;g.tags[r.tag]={n:+r.n,c:+r.c};}
   const gs=Object.values(G).sort((a,b)=>b.n-a.n),tot=Math.max(M.total,gs.reduce((a,g)=>a+g.n,0)),other=Math.max(0,tot-gs.reduce((a,g)=>a+g.n,0));
@@ -437,7 +438,10 @@ const STY=[['tv','📺 เส้นสะอาด สีเรียบ (อน
 const KIND=[['anime','🎌','อนิเมะ','916',''],['film','🎬','หนัง','169','cine'],['series','📺','ซีรีส์','169',''],['ad','📣','โฆษณา','916','']];
 const ASP=[['916','📱 TikTok 9:16',768,1344],['11','⬜ จัตุรัส 1:1',1024,1024],['169','🖥 จอกว้าง 16:9',1344,768]];
 let POLL=0;
-const api=(act,o)=>botApi('/api/vcastep',{story:ST.story,act,...(o||{})});
+const HEAVY=new Set(['vo_make','vo_samples','make','sb_redo','sb_reopen','boost','lorago','autocast','design_cast','xl_new','xl_auto','lora_test','training','pick']);
+function quotaPct(){const M=ST.meter;return M&&M.cap?(M.total||0)/M.cap*100:(+ST.reads||0);}
+/* โควตาอ่านฐานข้อมูลวันนี้เกิน 85%: เตือนก่อนสั่งงานหนัก ว่าควรทำวันถัดไป (รีเซ็ต 07:00 น.) */
+const api=(act,o)=>{const q=quotaPct();if(HEAVY.has(act)&&q>=85&&!confirm(`วันนี้ใช้โควตาฐานข้อมูลไปแล้ว ${q.toFixed(0)}% (เกิน 85%)\nควรทำวันถัดไปหลัง 07:00 น. เพื่อไม่ให้เว็บล่ม\n\nจะสั่งต่อเลยไหม?`))return Promise.reject(new Error('ยกเลิก — ไว้ทำพรุ่งนี้'));return botApi('/api/vcastep',{story:ST.story,act,...(o||{})});};
 const tierOf=r=>r.tier||(r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'main':'support'),live=r=>r.g!=='x'&&tierOf(r)!=='none';
 const castOf=k=>ST.cands.find(c=>c.cast_role===k&&c.cast_story===ST.story);
 async function load(){

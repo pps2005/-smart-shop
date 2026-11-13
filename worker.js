@@ -123,10 +123,13 @@ async function handleFetch(req, env, ctx) {
 }
 async function handleCron(event, env, ctx) {
     await ensureSchema(env);
-    const kv0 = {}; for (const x of ((await env.DB.prepare('SELECT key,value FROM settings WHERE key IN (?,?)').bind(readDay(), 'boost_until').all().catch(() => ({ results: [] }))).results || [])) kv0[x.key] = x.value;
-    const rrNow = +kv0[readDay()] || 0, boost = +kv0.boost_until > Date.now();
+    const kv0 = {}; for (const x of ((await env.DB.prepare('SELECT key,value FROM settings WHERE key IN (?,?,?,?)').bind(readDay(), 'boost_until', 'sb_import', 'sb_redraw').all().catch(() => ({ results: [] }))).results || [])) kv0[x.key] = x.value;
+    const rrNow = +kv0[readDay()] || 0;
+    // งานที่สั่งอัปเดต (นำเข้าสตอรีบอร์ด/วาดใหม่) = งานด่วน: ไม่ต้องรอรอบที่ชะลอไว้ · เปิดโหมดเร่ง 10 นาทีให้ส่งงานวาดต่อได้ทันที (ยกเว้นเกิน 90% เพื่อกันเว็บล่ม)
+    if ((kv0.sb_import || kv0.sb_redraw) && rrNow <= READ_WEB && !(+kv0.boost_until > Date.now())) { kv0.boost_until = String(Date.now() + 10 * 60000); await setSetting(env, 'boost_until', kv0.boost_until); }
+    const boost = +kv0.boost_until > Date.now();
     if (rrNow <= READ_STOP && !boost) { const pc = readPace(rrNow); if (new Date().getUTCMinutes() % pc.every) return; } // ปุ่มเร่งสตอรีบอร์ด: ไม่เว้นช่วง // ใช้เร็วกว่ากำหนด: เว้นช่วงทำงาน (ทุก 3/6/12 นาที)
-    if (rrNow > READ_STOP) return; // ถึง 85% แล้ว: งานเบื้องหลังทุกอย่างพักไว้ทำต่อหลังรีเซ็ต 07:00 เพื่อให้หน้าเว็บยังเปิดได้ (เดิมกันแค่คิววาดภาพ งานอื่นยังวิ่งจนทะลุ 100%)
+    if (rrNow > (boost ? READ_WEB : READ_STOP)) return; // ถึง 85% แล้ว (โหมดเร่ง/งานด่วน: ถึง 90%): งานเบื้องหลังทุกอย่างพักไว้ทำต่อหลังรีเซ็ต 07:00 เพื่อให้หน้าเว็บยังเปิดได้ (เดิมกันแค่คิววาดภาพ งานอื่นยังวิ่งจนทะลุ 100%)
     ctx.waitUntil(tick(tagged(env, 'bg:tick'), false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
     ctx.waitUntil(autoHeal(tagged(env, 'bg:heal')).catch(() => {}).then(() => vTick(tagged(env, 'bg:kaggle'), false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
     ctx.waitUntil(helperKTick(tagged(env, 'bg:kaggle')).catch(() => { }));
