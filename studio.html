@@ -33,34 +33,71 @@ a.btn{display:inline-block;text-decoration:none;border:1px solid var(--bd);color
 const $=s=>document.querySelector(s),esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // ตัวเล่นแบบอนิเมะ: ภาพ 16:9 เต็มจอ ซับขึ้นทีละบรรทัด (บทเล่า = ตัวเอียง · บทพูด = ชื่อ: ข้อความ · ในใจ = วงเล็บ) แตะขวา/ล่าง = ถัดไป แตะซ้าย = ย้อน
 function playEp(n){const sb=ST.sbs[n];if(!sb)return;const st=[];
-  sb.scenes.forEach(S=>S.shots.forEach(v=>{const d=say(v),img=v.img?botU('/img/'+v.img):'',ls=d.lines.length?d.lines:[{who:'',say:''}];
+  sb.scenes.forEach((S,si)=>S.shots.forEach(v=>{const d=say(v),img=v.img?botU('/img/'+v.img):'',ls=d.lines.length?d.lines:[{who:'',say:''}];
     const vm={};String(v.vo||'').split(',').forEach(x=>{const [a,b]=x.split(':');if(b)vm[a]=b;});
     const fx=[d.think||'',d.ono||''],tr=[d.thinkTh?'('+d.thinkTh+')':'',d.onoTh?'『'+d.onoTh+'』':''].filter(Boolean).join('  ');
-    if(tr&&d.lines.length)st.push({img,ph:v.th||'',who:'',t:tr,sx:1,vo:'',fx}); /* เสียงประกอบ/คำลอยภาษาญี่ปุ่นบนภาพ → คำแปลไทยขึ้นซับก่อนบทพูด */
-    ls.forEach((l,i)=>st.push({img,ph:v.th||'',who:l.who||'',t:(!d.lines.length&&!l.say&&tr)?tr:l.say||'',sx:(!d.lines.length&&tr)?1:0,vo:vm[i]||'',fx}));}));
-  if(!st.length)return;let i=0,auto=st.some(x=>x.vo),tm=0,kt=0;
-  const o=document.createElement('div');o.id='anp';o.innerHTML=`<style>#anp{position:fixed;inset:0;height:100vh;height:100dvh;background:#000;z-index:9999;display:flex;flex-direction:column;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box}#anp .fr{position:relative;width:min(100%,calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9));width:min(100%,calc(100vh * 16 / 9));aspect-ratio:16/9;margin:0 auto;background:#111;overflow:hidden;container-type:inline-size}@supports (height:100dvh){#anp .fr{width:min(100%,calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9))}}#anp .fr img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transition:opacity .35s}#anp .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-size:14px;padding:20px;text-align:center}#anp .sub{position:absolute;left:4%;right:4%;bottom:5%;text-align:center;color:#fff;font-size:clamp(15px,3.6vw,30px);font-size:clamp(15px,3.6cqw,34px);line-height:1.45;text-shadow:0 0 4px #000,0 0 4px #000,2px 2px 3px #000;transition:opacity .2s}#anp .sub b{color:#ffd76a;font-weight:600}#anp .sub .w{transition:color .12s,opacity .12s}#anp .sub .w.o{opacity:.45}#anp .sub.nv{font-style:italic;color:#e8eefc}#anp .sub.tk{font-style:italic;color:#c9c3ff}#anp .sub.sx{color:#ffd76a;font-size:clamp(13px,3vw,24px);letter-spacing:.5px}#anp .f1{position:absolute;left:6%;top:8%;color:#fff;font-size:clamp(13px,3vw,24px);font-style:italic;text-shadow:0 0 4px #000,0 0 4px #000}#anp .f2{position:absolute;right:6%;top:8%;color:#7fd0ff;font-weight:800;font-size:clamp(18px,5vw,44px);transform:rotate(-8deg);text-shadow:2px 2px 0 #000}#anp .bar{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;padding:10px;gap:8px;z-index:2}#anp .bar button{background:rgba(0,0,0,.55);color:#fff;border:1px solid #555;border-radius:18px;padding:6px 12px;font-size:14px;min-height:36px}@media (min-width:700px){#anp .bar button{font-size:17px;padding:9px 16px;min-height:44px}#anp [data-n]{font-size:15px!important}}#anp .pg{position:absolute;left:0;bottom:0;height:3px;background:#8b7cf6;transition:width .2s}</style><div class="fr"><img><div class="ph"></div><div class="f1"></div><div class="f2"></div><div class="sub"></div><div class="pg"></div></div><div class="bar"><button data-x>✕ ปิด</button><button data-snd>🔊 เสียงพากย์</button><button data-fs>⛶</button><span style="color:#aaa;font-size:13px;align-self:center" data-n></span><button data-a>▶ เล่นเอง</button></div><div data-st style="position:absolute;left:0;right:0;bottom:6px;text-align:center;color:#999;font-size:12px;z-index:2"></div>`;
-  document.body.appendChild(o);const $o=q=>o.querySelector(q),im=$o('img');$o('[data-a]').textContent=auto?'⏸ หยุด':'▶ เล่นเอง';
+    if(tr&&d.lines.length)st.push({img,sc:si+1,ph:v.th||'',who:'',t:tr,sx:1,vo:'',fx}); /* เสียงประกอบ/คำลอยภาษาญี่ปุ่นบนภาพ → คำแปลไทยขึ้นซับก่อนบทพูด */
+    ls.forEach((l,i)=>st.push({img,sc:si+1,ph:v.th||'',who:l.who||'',t:(!d.lines.length&&!l.say&&tr)?tr:l.say||'',sx:(!d.lines.length&&tr)?1:0,vo:vm[i]||'',fx}));}));
+  if(!st.length)return;let i=0,auto=false,tm=0,kt=0,hideT=0,started=false;
+  const o=document.createElement('div');o.id='anp';o.innerHTML=`<style>#anp{position:fixed;inset:0;height:100vh;height:100dvh;background:#000;z-index:9999;display:flex;flex-direction:column;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box}
+#anp .fr{position:relative;width:min(100%,calc(100vh * 16 / 9));aspect-ratio:16/9;margin:0 auto;background:#111;overflow:hidden;container-type:inline-size}@supports (height:100dvh){#anp .fr{width:min(100%,calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9))}}
+#anp .fr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s;transform-origin:50% 50%}#anp .fr img.on{opacity:1}#anp .fr img.kb{animation:kb 9s ease-out forwards}#anp .fr img.kb2{animation:kb2 9s ease-out forwards}@keyframes kb{from{transform:scale(1)}to{transform:scale(1.08) translate(-1%,-1%)}}@keyframes kb2{from{transform:scale(1.08) translate(1%,0)}to{transform:scale(1) translate(0,0)}}
+#anp .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-size:14px;padding:20px;text-align:center}
+#anp .sub{position:absolute;left:4%;right:4%;bottom:6%;text-align:center;color:#fff;font-size:clamp(15px,3.6vw,30px);font-size:clamp(15px,3.4cqw,34px);line-height:1.45;text-shadow:0 0 4px #000,0 0 4px #000,2px 2px 3px #000;z-index:1}#anp .sub b{color:#ffd76a;font-weight:600}#anp .sub .w{transition:opacity .12s}#anp .sub .w.o{opacity:.4}#anp .sub.nv{font-style:italic;color:#e8eefc}#anp .sub.tk{font-style:italic;color:#c9c3ff}#anp .sub.sx{color:#ffd76a;font-size:clamp(13px,3vw,24px)}
+#anp .f1{position:absolute;left:6%;top:8%;color:#fff;font-size:clamp(13px,3vw,24px);font-style:italic;text-shadow:0 0 4px #000,0 0 4px #000}#anp .f2{position:absolute;right:6%;top:8%;color:#7fd0ff;font-weight:800;font-size:clamp(18px,5vw,44px);transform:rotate(-8deg);text-shadow:2px 2px 0 #000}
+#anp .big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:3;background:rgba(0,0,0,.35)}#anp .big span{width:84px;height:84px;border-radius:50%;background:rgba(0,0,0,.6);border:2px solid #fff;color:#fff;font-size:38px;display:flex;align-items:center;justify-content:center;padding-left:6px;box-sizing:border-box}
+#anp .ui{transition:opacity .3s}#anp.hid .ui{opacity:0;pointer-events:none}
+#anp .top{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;padding:10px;gap:8px;z-index:4;background:linear-gradient(#000a,#0000)}
+#anp .ctl{position:absolute;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));z-index:4;background:linear-gradient(#0000,#000c)}
+#anp button{background:rgba(0,0,0,.55);color:#fff;border:1px solid #555;border-radius:18px;padding:6px 12px;font-size:14px;min-height:38px;min-width:40px}
+#anp .row{display:flex;align-items:center;gap:8px}#anp input[type=range]{flex:1;accent-color:#8b7cf6;height:28px}#anp .tm{color:#ddd;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#anp [data-st]{color:#bbb;font-size:12px;text-align:center;min-height:16px}
+@media (min-width:700px){#anp button{font-size:17px;padding:9px 16px;min-height:46px;min-width:50px}#anp .tm{font-size:15px}}</style>
+<div class="fr"><img><img><div class="ph"></div><div class="f1"></div><div class="f2"></div><div class="sub"></div><div class="big"><span>▶</span></div></div>
+<div class="top ui"><button data-x>✕</button><span class="tm" data-n></span><span style="display:flex;gap:6px"><button data-snd></button><button data-fs>⛶</button></span></div>
+<div class="ctl ui"><div data-st></div><div class="row"><button data-p>⏮</button><button data-a>▶</button><button data-nx>⏭</button><span class="tm" data-t>0:00</span><input type="range" min="0" value="0" step="1" data-sk><span class="tm" data-tt>0:00</span></div></div>`;
+  document.body.appendChild(o);const $o=q=>o.querySelector(q),ims=[...o.querySelectorAll('.fr img')];let cur=0;
   const seg=t=>{try{return [...new Intl.Segmenter('th',{granularity:'word'}).segment(t)].map(x=>x.segment);}catch(e){return t.split(/(\s+)/);}};
   const stt=m=>{$o('[data-st]').textContent=m||'';};
-  const au=new Audio();let snd=localStorage.getItem('ss_snd')!=='0',waitAu=false;$o('[data-snd]').textContent=snd?'🔊 เสียงพากย์':'🔇 ปิดเสียง';
-  const sayVo=x=>{au.pause();if(!snd||!x.vo){stt(x.vo?'':(x.t&&!x.sx?'(บรรทัดนี้ยังไม่มีเสียงพากย์)':''));return false;}au.src=botU('/vo/'+x.vo);stt('⏳ กำลังโหลดเสียง');au.play().then(()=>stt('')).catch(e=>stt('⚠️ เล่นเสียงไม่ได้: '+(e&&e.name||'')+' — แตะที่ซับเพื่อลองใหม่'));return true;};
-  au.onerror=()=>stt('⚠️ โหลดเสียงไม่ได้');
-  const dur=x=>1600+x.t.length*85+(x.t?0:900);
-  function show(){const x=st[i];if(x.img){if(im.getAttribute('src')!==x.img){im.style.opacity=0;im.onload=()=>im.style.opacity=1;im.src=x.img;}$o('.ph').textContent='';}else{im.removeAttribute('src');im.style.opacity=0;$o('.ph').textContent='⏳ ภาพยังไม่เสร็จ · '+x.ph;}
+  const au=new Audio();au.preload='auto';const pre=new Audio();pre.preload='auto';let snd=localStorage.getItem('ss_snd')!=='0',waitAu=false;
+  const sndT=()=>$o('[data-snd]').textContent=snd?'🔊':'🔇';sndT();
+  const dur=x=>x.d?x.d*1000+450:1600+x.t.length*85+(x.t?0:900);
+  const fmt=ms=>{const s=Math.round(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+  const sk=$o('[data-sk]');sk.max=st.length-1;
+  const tot=()=>st.reduce((a,x)=>a+dur(x),0),upT=()=>{let a=0;for(let k=0;k<i;k++)a+=dur(st[k]);$o('[data-t]').textContent=fmt(a);$o('[data-tt]').textContent=fmt(tot());sk.value=i;$o('[data-n]').textContent=`ตอน ${n} · ฉาก ${st[i].sc} · ${i+1}/${st.length}`;};
+  const sayVo=x=>{au.pause();if(!snd||!x.vo){stt(x.vo?'':(x.t&&!x.sx?'(บรรทัดนี้ยังไม่มีเสียงพากย์)':''));return false;}au.src=botU('/vo/'+x.vo);stt('');au.play().catch(e=>stt('⚠️ เล่นเสียงไม่ได้ — แตะที่ซับเพื่อลองใหม่'));return true;};
+  au.onloadedmetadata=()=>{if(isFinite(au.duration)&&st[i]&&st[i].vo&&au.src.includes(st[i].vo)){st[i].d=au.duration;upT();}};
+  const preload=()=>{const y=st[i+1];if(!y)return;if(y.img){const p=new Image();p.src=y.img;}if(snd&&y.vo)pre.src=botU('/vo/'+y.vo);};
+  const showUI=()=>{o.classList.remove('hid');clearTimeout(hideT);if(auto)hideT=setTimeout(()=>o.classList.add('hid'),3000);};
+  function setImg(x){const a=ims[cur];if(x.img){$o('.ph').textContent='';if(a.getAttribute('src')===x.img)return;cur^=1;const b=ims[cur];b.className='';b.onload=()=>{void b.offsetWidth;b.className='on '+(Math.random()<.5?'kb':'kb2');a.classList.remove('on');};b.src=x.img;}else{ims.forEach(e=>e.classList.remove('on'));$o('.ph').textContent='⏳ ภาพยังไม่เสร็จ · '+x.ph;}}
+  function show(){const x=st[i];setImg(x);
     const sb=$o('.sub'),th=x.who[0]==='~';sb.className='sub'+(x.sx?' sx':x.who?(th?' tk':''):' nv');
-    const ws=seg(x.t),wh=ws.map((w,k)=>`<span class="w o" data-k="${k}">${esc(w)}</span>`).join('');
+    const ws=seg(x.t),wh=ws.map((w,k)=>`<span class="w o">${esc(w)}</span>`).join('');
     sb.innerHTML=!x.t?'':!x.who?wh:th?`(${esc(x.who.slice(1))} ในใจ) ${wh}`:`<b>${esc(x.who)}:</b> ${wh}`;
     const spans=[...sb.querySelectorAll('.w')],hl=f=>{const c=Math.ceil(spans.length*Math.min(1,Math.max(0,f)));spans.forEach((e,k)=>e.classList.toggle('o',k>=c));};
-    clearInterval(kt);if(x.sx||!x.t)hl(1);else{const t0=Date.now();kt=setInterval(()=>{if(waitAu&&au.duration&&isFinite(au.duration))hl((au.currentTime+0.15)/au.duration);else if(!waitAu)hl((Date.now()-t0)/Math.max(800,dur(x)-700));},80);}
-    $o('.f1').textContent=x.fx[0];$o('.f2').textContent=x.fx[1];$o('.pg').style.width=((i+1)/st.length*100)+'%';$o('[data-n]').textContent=`ตอน ${n} · ${i+1}/${st.length}`;
-    clearTimeout(tm);waitAu=sayVo(x);const nx=()=>{if(i<st.length-1){i++;show();}else{auto=false;$o('[data-a]').textContent='▶ เล่นเอง';}};
-    if(auto){if(waitAu){au.onended=()=>{if(auto)tm=setTimeout(nx,450);};au.onerror=()=>{if(auto)tm=setTimeout(nx,dur(x));};}else tm=setTimeout(nx,dur(x));}}
-  function go(d){i=Math.max(0,Math.min(st.length-1,i+d));show();}
-  function close(){clearTimeout(tm);clearInterval(kt);au.pause();try{const d=document;if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);}catch(x){}document.removeEventListener('keydown',kd);o.remove();}
-  const kd=e=>{if(e.key==='ArrowRight'||e.key===' ')go(1);else if(e.key==='ArrowLeft')go(-1);else if(e.key==='Escape')close();};document.addEventListener('keydown',kd);
-  o.onclick=e=>{if(e.target.closest('[data-x]'))return close();if(e.target.closest('[data-fs]')){const d=document,fe=d.fullscreenElement||d.webkitFullscreenElement;try{if(fe)(d.exitFullscreen||d.webkitExitFullscreen).call(d);else (o.requestFullscreen||o.webkitRequestFullscreen).call(o);}catch(x){}return;} /* iPad: เต็มจอ ซ่อนแถบเบราว์เซอร์ */if(e.target.closest('[data-snd]')){snd=!snd;localStorage.setItem('ss_snd',snd?'1':'0');e.target.textContent=snd?'🔊 เสียงพากย์':'🔇 ปิดเสียง';if(!snd)au.pause();return;}if(e.target.closest('.sub')){sayVo(st[i]);return;} /* แตะซับ = ฟังเสียงบรรทัดนี้อีกครั้ง */if(e.target.closest('[data-a]')){auto=!auto;e.target.textContent=auto?'⏸ หยุด':'▶ เล่นเอง';show();return;}if(e.target.closest('.bar'))return;go(e.clientX<window.innerWidth/3?-1:1);};
-  show();}
+    $o('.f1').textContent=x.fx[0];$o('.f2').textContent=x.fx[1];upT();
+    clearInterval(kt);clearTimeout(tm);au.pause();
+    if(!auto){hl(1);return;}
+    waitAu=sayVo(x);preload();
+    if(x.sx||!x.t)hl(1);else{const t0=Date.now();kt=setInterval(()=>{if(waitAu&&au.duration&&isFinite(au.duration))hl((au.currentTime+0.15)/au.duration);else if(!waitAu)hl((Date.now()-t0)/Math.max(800,dur(x)-700));},80);}
+    const nx=()=>{if(i<st.length-1){i++;show();}else{setPlay(false);hl(1);}};
+    if(waitAu){au.onended=()=>{if(auto)tm=setTimeout(nx,450);};au.onerror=()=>{stt('⚠️ โหลดเสียงไม่ได้');if(auto)tm=setTimeout(nx,dur(x));};}else tm=setTimeout(nx,dur(x));}
+  function setPlay(p){auto=p;started=started||p;$o('[data-a]').textContent=p?'⏸':'▶';$o('.big').style.display=p?'none':'flex';show();showUI();}
+  function go(d){i=Math.max(0,Math.min(st.length-1,i+d));show();showUI();}
+  function close(){clearTimeout(tm);clearInterval(kt);clearTimeout(hideT);au.pause();try{const d=document;if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);}catch(x){}document.removeEventListener('keydown',kd);o.remove();}
+  const kd=e=>{if(e.key===' '){e.preventDefault();setPlay(!auto);}else if(e.key==='ArrowRight')go(1);else if(e.key==='ArrowLeft')go(-1);else if(e.key==='Escape')close();};document.addEventListener('keydown',kd);
+  sk.oninput=()=>{i=+sk.value;upT();};sk.onchange=()=>{i=+sk.value;show();showUI();};
+  o.onclick=e=>{const c=s=>e.target.closest(s);
+    if(c('[data-x]'))return close();
+    if(c('[data-fs]')){const d=document,fe=d.fullscreenElement||d.webkitFullscreenElement;try{if(fe)(d.exitFullscreen||d.webkitExitFullscreen).call(d);else (o.requestFullscreen||o.webkitRequestFullscreen).call(o);}catch(x){}return;}
+    if(c('[data-snd]')){snd=!snd;localStorage.setItem('ss_snd',snd?'1':'0');sndT();if(!snd)au.pause();else if(auto)show();return;}
+    if(c('[data-a]'))return setPlay(!auto);if(c('[data-p]'))return go(-1);if(c('[data-nx]'))return go(1);
+    if(c('.sub')&&!auto){sayVo(st[i]);return;} /* หยุดอยู่ แตะซับ = ฟังเสียงบรรทัดนี้ */
+    if(c('.ctl')||c('.top'))return;
+    if(o.classList.contains('hid')){showUI();return;} /* แตะจอตอนเล่น = โชว์ปุ่มก่อน */
+    setPlay(!auto);};
+  o.onmousemove=()=>{if(auto)showUI();};
+  show();showUI();}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&window._needLoad){window._needLoad=0;load();}}); /* ดึงข้อมูลต่อเมื่อกลับมาเปิดหน้านี้ ไม่ดึงทิ้งไว้ตอนสลับแท็บ */
 // หลอด % โควตาอ่านฐานข้อมูลวันนี้ แยกตามที่มา + ประเมินว่าทำต่อ/ทำเพิ่มจะใช้กี่ %
 const MTAG=[[/^web:vcastep:sb/,'หน้าสตูดิโอ · สตอรีบอร์ด','#8b7cf6'],[/^web:vcastep:(lib|training|xl_)/,'หน้าสตูดิโอ · LoRA','#b49cff'],[/^web:(vcastep:get|vcastep$|anime)/,'หน้าสตูดิโอ · ข้อมูลเรื่อง/ตอน','#c9bfff'],[/^web:img/,'เปิดดูภาพ','#e0d8ff'],[/^web:/,'หน้าเว็บ · อื่นๆ','#ddd'],
