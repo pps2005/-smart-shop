@@ -3880,12 +3880,15 @@ async function castApi(req, env, url, body) {
         const supa = ((await env.DB.prepare("SELECT COALESCE(SUM(size),0) n FROM loras WHERE status IN ('ready','old') AND size>0").first()) || {}).n || 0;
         const resetD = new Date(Date.parse(dy + 'T00:00:00Z') + 86400000).getTime(), resetW = Date.parse(wk + 'T00:00:00Z') + 7 * 86400000;
         const helpers = (await env.DB.prepare('SELECT name,n,day FROM fluxkeys WHERE on_=1').all().catch(() => ({ results: [] }))).results || [];
+        await helperSchema(env); const hk = {}; for (const r of (await env.DB.prepare("SELECT k,v FROM qmeter WHERE day=? AND k LIKE 'kgh:h%'").bind(wk).all().catch(() => ({ results: [] }))).results || []) hk[r.k] = +r.v;
+        const hgs = ((await env.DB.prepare("SELECT id,name,kstat,kpushed,kerr FROM helpers WHERE on_=1 AND COALESCE(kuser,'')<>'' ORDER BY id").all().catch(() => ({ results: [] }))).results || []).map(h => { const run = /running|starting|queued/.test(String(h.kstat || '')) && +h.kpushed ? Math.min(12, (now - +h.kpushed) / 3600000) : 0, full = /quota|limit/i.test(String(h.kerr || '')); return { k: 'kgh' + h.id, name: 'Kaggle GPU · ผู้ช่วย ' + h.name, used: full ? 30 : (hk['kgh:h' + h.id] || 0) + run, cap: 30, unit: 'ชม.', reset: resetW, est: 1, full, note: run ? `เครื่องกำลังทำงาน (รอบนี้ ${run.toFixed(1)} ชม.)` : h.kerr ? '⚠️ ' + String(h.kerr).slice(0, 80) : 'ว่าง รอคิวงานเยอะพอค่อยเปิดเอง' }; });
         return json({ ok: true, now, items: [
           { k: 'd1r', name: 'ฐานข้อมูล · อ่าน', used: +S9[readDay()] || 0, cap: READ_CAP, unit: 'แถว', reset: resetD, note: 'เต็มแล้วเว็บล่ม · ดูรายละเอียดที่หลอดด้านบน' },
           { k: 'd1w', name: 'ฐานข้อมูล · เขียน', used: Q.dw || 0, cap: 100000, unit: 'แถว', reset: resetD, est: 1 },
           { k: 'req', name: 'คำขอเข้าบอท (หน้าเว็บ + Kaggle)', used: Q.req || 0, cap: 100000, unit: 'ครั้ง', reset: resetD },
           { k: 'ai', name: 'Cloudflare AI (วาดสำรอง + เขียนบท)', used: Q.nu_full ? Math.max(10000, Q.nu || 0) : (Q.nu || 0), cap: 10000, unit: 'neurons', reset: resetD, est: 1, full: !!Q.nu_full, note: `วาด ${Q.img || 0} ภาพ · เรียก AI เขียนบท ${Q.llm || 0} ครั้ง${helpers.length ? ' · บัญชีผู้ช่วย ' + helpers.map(h => h.name + ' ' + (h.day === new Date(now + 7 * 3600000).toISOString().slice(0, 10) ? h.n || 0 : 0) + ' ภาพ').join(', ') : ''}` },
-          { k: 'kg', name: 'Kaggle GPU', used: kFull ? Math.max(30, kgh) : kgh, cap: 30, unit: 'ชม.', reset: resetW, est: 1, full: kFull, note: kRun ? `เครื่องกำลังทำงาน (รอบนี้ ${kRun.toFixed(1)} ชม.)` : '' },
+          { k: 'kg', name: 'Kaggle GPU · บัญชีหลัก', used: kFull ? Math.max(30, kgh) : kgh, cap: 30, unit: 'ชม.', reset: resetW, est: 1, full: kFull, note: kRun ? `เครื่องกำลังทำงาน (รอบนี้ ${kRun.toFixed(1)} ชม.)` : '' },
+          ...hgs,
           { k: 'supa', name: 'Supabase · ไฟล์ LoRA', used: Math.round(supa / 1048576), cap: 1024, unit: 'MB', reset: 0 },
           { k: 'd1s', name: 'ฐานข้อมูล · พื้นที่เก็บ', used: Math.round((Q.dbsize || 0) / 1048576), cap: 5120, unit: 'MB', reset: 0 },
         ] });
