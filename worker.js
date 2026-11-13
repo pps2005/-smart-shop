@@ -634,7 +634,7 @@ async function animeSchema(env) {
   await env.DB.prepare('ALTER TABLE shots ADD COLUMN say TEXT').run().catch(() => { });
   await env.DB.prepare('ALTER TABLE shots ADD COLUMN chain INTEGER DEFAULT 0').run().catch(() => { });
   for (const q of ['ALTER TABLE shots ADD COLUMN loc TEXT', "ALTER TABLE chars ADD COLUMN kind TEXT DEFAULT 'char'", 'ALTER TABLE chars ADD COLUMN story TEXT']) await env.DB.prepare(q).run().catch(() => { });
-  await env.DB.batch(['shots(script_id)', 'shots(kproj)', 'scenes(series_id)', 'lchunks(lid)'].map((x, i) => env.DB.prepare(`CREATE INDEX IF NOT EXISTS ix_b${i} ON ${x}`))).catch(() => { });
+  await env.DB.batch(['shots(script_id)', 'shots(kproj)', 'scenes(series_id)', 'lchunks(lid)', 'loras(char_id)', 'aud_cands(kept)'].map((x, i) => env.DB.prepare(`CREATE INDEX IF NOT EXISTS ix_b${i} ON ${x}`))).catch(() => { });
   animeReady = true;
 }
 // เทรน LoRA ตัวละครอัตโนมัติ: ภาพอ้างอิงครบและไม่มีงานค้าง → เข้าคิวเทรนบน Kaggle (ใช้ภาพที่ติดดาว ถ้าเลือกไว้ ≥8 ภาพ ไม่งั้นใช้ทุกภาพ) · ปิดได้ที่ settings.auto_lora = 0
@@ -1083,7 +1083,7 @@ async function animeApi(env, b) {
     const only = Array.isArray(b.ids) ? new Set(b.ids.map(Number)) : null;
     const LM = await shotLoraMap(env, sc.series_id);
     const srK = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(sc.series_id).first(), planK = srK ? await readPlan(env, srK.title) : null, ROLES = (planK && planK.roles) || [], LOOKS = planK ? await roleLooks(env, s, srK.title, planK) : {};
-    const hv = new Set((await env.DB.prepare('SELECT DISTINCT project FROM images WHERE project LIKE ?').bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
+    const hv = new Set((await env.DB.prepare('SELECT DISTINCT project FROM images WHERE project >= ? AND project < ?').bind(`ฉาก${+b.script_id}·`, `ฉาก${+b.script_id}·\uffff`).all()).results.map(x => x.project));
     const pd = new Set((await env.DB.prepare("SELECT DISTINCT project FROM jobs WHERE project LIKE ? AND status IN ('queued','running','kaggle')").bind(`ฉาก${+b.script_id}·%`).all()).results.map(x => x.project));
     const st = []; let n = 0;
     const seedOf = {}; { let head = null; for (const [i, sh] of rows.entries()) { if (!(+sh.chain && head)) head = sh; if (+sh.chain || +((rows[i + 1] || {}).chain)) seedOf[sh.id] = 100000 + head.id * 7; } } // ชุดท่าต่อเนื่อง: ใช้ seed เดียวกัน ให้ฉากหลัง/มุมกล้องออกมาใกล้กันที่สุด
@@ -1151,7 +1151,7 @@ async function animeApi(env, b) {
     for (const e of rows) {
       if (!e.script_id) continue; const ep = 'a' + e.script_id;
       e.tot = (await env.DB.prepare('SELECT COUNT(*) n FROM shots WHERE script_id=?').bind(e.script_id).first()).n;
-      e.img = (await env.DB.prepare('SELECT COUNT(DISTINCT project) n FROM images WHERE project LIKE ?').bind(`ฉาก${e.script_id}·%`).first()).n;
+      e.img = (await env.DB.prepare('SELECT COUNT(DISTINCT project) n FROM images WHERE project >= ? AND project < ?').bind(`ฉาก${e.script_id}·`, `ฉาก${e.script_id}·\uffff`).first()).n;
       e.vid = (await env.DB.prepare("SELECT COUNT(DISTINCT shot) n FROM videos WHERE ep=? AND shot<>'final'").bind(ep).first()).n;
       e.final = ((await env.DB.prepare("SELECT MAX(id) id FROM videos WHERE ep=? AND shot='final'").bind(ep).first()) || {}).id || 0;
     }
@@ -3759,7 +3759,7 @@ async function castApi(req, env, url, body) {
         for (const c of cs) {
           const R = AUD_ROLES.find(x => x.key === c.role); c.g = R ? (/woman/.test(R.g) ? 'f' : 'm') : ''; c.lora = '';
           if (+c.char_id) { const l = await env.DB.prepare("SELECT status,error FROM loras WHERE char_id=? AND status<>'old' ORDER BY id DESC LIMIT 1").bind(c.char_id).first(); c.lora = l ? l.status : 'none'; c.lora_err = l && l.status === 'failed' ? String(l.error || '').slice(-400) : ''; }
-          const fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project LIKE ? AND scene=1').bind(`ออดิชัน·${c.role}·${c.id}·%`).first(); c.face = (fr && fr.id) || 0;
+          const pf = `ออดิชัน·${c.role}·${c.id}·`, fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project >= ? AND project < ? AND scene=1').bind(pf, pf + '\uffff').first(); c.face = (fr && fr.id) || 0; // ช่วงแทน LIKE ให้ใช้ดัชนีได้ (เดิมสแกนภาพทั้งตารางต่อคน = ~18,000 แถวต่อครั้ง)
         }
         const epst = (await rd('epst:' + story)) || {}, sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first();
         if (sr) for (const [no, v] of Object.entries(epst)) {
@@ -3769,7 +3769,7 @@ async function castApi(req, env, url, body) {
             if (+e.fin) g.fin++;
             if (!e.script_id) continue; g.wr++;
             g.tot += (await env.DB.prepare('SELECT COUNT(*) n FROM shots WHERE script_id=?').bind(e.script_id).first()).n;
-            g.img += (await env.DB.prepare('SELECT COUNT(DISTINCT project) n FROM images WHERE project LIKE ?').bind(`ฉาก${e.script_id}·%`).first()).n;
+            g.img += (await env.DB.prepare('SELECT COUNT(DISTINCT project) n FROM images WHERE project >= ? AND project < ?').bind(`ฉาก${e.script_id}·`, `ฉาก${e.script_id}·\uffff`).first()).n;
             g.vid += (await env.DB.prepare("SELECT COUNT(DISTINCT shot) n FROM videos WHERE ep=? AND shot<>'final'").bind('a' + e.script_id).first()).n;
           }
           v.prog = g;
@@ -3795,7 +3795,7 @@ async function castApi(req, env, url, body) {
       if (act === 'lib') { // คลัง LoRA: เฉพาะตัวที่เทรนเสร็จแล้ว (status=ready) ของนักแสดงในคลัง + ใช้เป็นบทไหนอยู่ + ภาพทดสอบ + น้ำหนักต่อบท
         const rows = (await env.DB.prepare("SELECT l.id lid, l.char_id, l.size, l.created, a.id cand, a.name, a.role, a.cast_role, a.cast_story FROM loras l JOIN aud_cands a ON a.char_id=l.char_id WHERE l.status='ready' AND l.id=(SELECT MAX(x.id) FROM loras x WHERE x.char_id=l.char_id AND x.status='ready') ORDER BY l.id DESC").all()).results;
         for (const c of rows) {
-          const fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project LIKE ? AND scene=1').bind(`ออดิชัน·${c.role}·${c.cand}·%`).first(); c.face = (fr && fr.id) || 0;
+          const fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project >= ? AND project < ? AND scene=1').bind(`ออดิชัน·${c.role}·${c.cand}·`, `ออดิชัน·${c.role}·${c.cand}·\uffff`).first(); c.face = (fr && fr.id) || 0;
           const tp = 'ทดสอบLoRA·' + c.lid, ti = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project=?').bind(tp).first(), tj = await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(tp).first();
           c.test = (ti && ti.id) || 0; c.testing = !!(tj && tj.n);
         }
