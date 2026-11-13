@@ -1601,7 +1601,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 13 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 13 ? 1 : 0, kv0 < 14 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -1668,9 +1668,27 @@ async function vRoutes(req, env, url, ctx) {
       await env.DB.prepare('INSERT OR REPLACE INTO voices (shot,line,data,mime,created) VALUES (?,?,?,?,?)').bind(+url.searchParams.get('shot'), +url.searchParams.get('line'), bytesToB64(buf), 'audio/mp4', Date.now()).run();
       return json({ ok: true });
     }
+    if (p.startsWith('/k/song/')) { // เพลงจาก ACE-Step (ก่อน/หลังเทรน LoRA เสียงร้อง) → เก็บเป็นไฟล์เสียงในคลังเสียง
+      const j = await env.DB.prepare("SELECT id,opt FROM vjobs WHERE id=? AND kind='song'").bind(id).first(); if (!j) return json({ error: 'no job' }, 404);
+      const buf = new Uint8Array(await req.arrayBuffer()); if (buf.length < 2000) return json({ error: 'ไฟล์เพลงเล็กผิดปกติ' }, 400);
+      const i = +url.searchParams.get('i') || 0, tag = url.searchParams.get('tag') === 'lora' ? 'lora' : 'base', shot = -(100000 + id * 10 + i + (tag === 'lora' ? 5 : 0));
+      await env.DB.prepare('INSERT OR REPLACE INTO voices (shot,line,data,mime,created) VALUES (?,0,?,?,?)').bind(shot, bytesToB64(buf), 'audio/mp4', Date.now()).run();
+      const v = await env.DB.prepare('SELECT id FROM voices WHERE shot=? AND line=0').bind(shot).first();
+      let o = {}; try { o = JSON.parse(j.opt || '{}'); } catch { }
+      const L = JSON.parse((await getSettings(env)).songs || '[]'); L.push({ vid: v.id, job: id, i, tag, title: ((o.songs || [])[i] || {}).title || 'เพลง ' + (i + 1), story: o.story || '', at: Date.now() }); await setSetting(env, 'songs', JSON.stringify(L.slice(-40)));
+      return json({ ok: true });
+    }
+    if (p.startsWith('/k/sblob/')) { // ไฟล์ LoRA เสียงร้อง → Supabase Storage (ท่อนละ ~20 MB)
+      const j = await env.DB.prepare("SELECT id FROM vjobs WHERE id=? AND kind='song'").bind(id).first(); if (!j) return json({ error: 'no job' }, 404);
+      const part = +url.searchParams.get('part') || 0, of = +url.searchParams.get('of') || 1, r = await supa(s, 'POST', `songlora_${id}_${part}`, new Uint8Array(await req.arrayBuffer()));
+      if (!r || !r.ok) return json({ error: 'เก็บไฟล์ไม่สำเร็จ ' + (r ? r.status : 'off') }, 502);
+      if (part + 1 >= of) await setSetting(env, 'songlora', JSON.stringify({ job: id, of, at: Date.now() }));
+      return json({ ok: true });
+    }
     if (p.startsWith('/k/done/')) {
       const j = await env.DB.prepare('SELECT * FROM vjobs WHERE id=?').bind(id).first();
       if (!j) return json({ error: 'no job' }, 404);
+      if (j.kind === 'song') { await env.DB.prepare('DELETE FROM vjobs WHERE id=?').bind(id).run(); return json({ ok: true }); }
       if (j.kind === 'tts') { await env.DB.prepare('DELETE FROM vjobs WHERE id=?').bind(id).run(); return json({ ok: true }); }
       if (j.kind === 'lora') { await env.DB.prepare("UPDATE vjobs SET status='done' WHERE id=?").bind(id).run(); return json({ ok: true }); }
       const buf = new Uint8Array(await req.arrayBuffer());
@@ -4233,7 +4251,138 @@ def prog(jid, step, total, tail):
         pass
 
 
+# ---------- เพลง (kind=song): ACE-Step 1.5 (MIT) · เทรน LoRA เสียงร้องญี่ปุ่นจาก PJS corpus (CC BY-SA 4.0 ใช้เชิงพาณิชย์ได้) ----------
+#   opt.train=1: ดาวน์โหลด PJS → เทรน LoRA → เก็บไฟล์ขึ้น Supabase · แล้วสร้างเพลงทุกเพลงทั้งแบบเดิมและแบบใช้ LoRA ให้ผู้ใช้ฟังเทียบ
+#   ติดตั้งใน venv แยก (ไม่ไปทับ torch ของ ComfyUI)
+ACE = None
+
+
+def ace_setup():
+    global ACE
+    if ACE:
+        return ACE
+    d = os.path.join(ROOT, "ace")
+    py = os.path.join(d, "venv", "bin", "python")
+    if not os.path.exists(py):
+        log("กำลังติดตั้ง ACE-Step 1.5 (ครั้งแรกประมาณ 10–15 นาที)")
+        if not os.path.isdir(os.path.join(d, "repo")):
+            sh("git clone --depth 1 https://github.com/ace-step/ACE-Step-1.5 " + os.path.join(d, "repo"))
+        sh("python3 -m venv --system-site-packages " + os.path.join(d, "venv"))
+        sh('"%s" -m pip install -q -e "%s"' % (py, os.path.join(d, "repo")), check=False)
+        sh('"%s" -m pip install -q gdown huggingface_hub soundfile' % py, check=False)
+    ck = os.path.join(d, "repo", "checkpoints")
+    if not os.path.isdir(ck) or len(os.listdir(ck)) < 2:
+        log("กำลังโหลดโมเดลเพลง ACE-Step 1.5")
+        sh('"%s" -c "from huggingface_hub import snapshot_download as s; s(\'ACE-Step/Ace-Step1.5\', local_dir=\'%s\')"' % (py, ck))
+    ACE = (d, py, ck)
+    return ACE
+
+
+GEN_PY = r"""
+import sys, json, os, glob, shutil
+cfg = json.load(open(sys.argv[1]))
+repo, out = cfg['repo'], cfg['out']
+os.chdir(repo); sys.path.insert(0, repo)
+from acestep.handler import AceStepHandler
+from acestep.llm_inference import LLMHandler
+from acestep.inference import GenerationParams, GenerationConfig, generate_music
+dit = AceStepHandler()
+dit.initialize_service(project_root=repo, config_path='acestep-v15-turbo', device='cuda')
+llm = LLMHandler()
+llm.initialize(checkpoint_dir=os.path.join(repo, 'checkpoints'), lm_model_path=cfg.get('lm', 'acestep-5Hz-lm-1.7B'), backend='pt', device='cuda')
+res = []
+for tag, lora in (('base', None), ('lora', cfg.get('lora'))):
+    if tag == 'lora':
+        if not lora:
+            continue
+        dit.add_lora(lora_path=lora, adapter_name='jp')
+    for i, s in enumerate(cfg['songs']):
+        d = os.path.join(out, '%s_%d' % (tag, i)); os.makedirs(d, exist_ok=True)
+        cap = s['caption'] + ((', ' + cfg.get('trigger')) if tag == 'lora' and cfg.get('trigger') else '')
+        p = GenerationParams(task_type='text2music', caption=cap, lyrics=s['lyrics'], bpm=s.get('bpm'), keyscale=s.get('key', ''), timesignature='4', vocal_language='ja', duration=float(s.get('dur', 90)))
+        try:
+            generate_music(dit, llm, p, GenerationConfig(), save_dir=d)
+        except Exception as e:
+            print('GENFAIL', tag, i, str(e)[:300], flush=True); continue
+        f = sorted(glob.glob(os.path.join(d, '**', '*.*'), recursive=True), key=os.path.getsize)
+        f = [x for x in f if x.lower().endswith(('.wav', '.flac', '.mp3', '.ogg'))]
+        if f:
+            res.append({'tag': tag, 'i': i, 'file': f[-1]})
+json.dump(res, open(os.path.join(out, 'result.json'), 'w'))
+"""
+
+
+def song_job(j, port):
+    opt = j.get("opt") or {}
+    t0 = time.time()
+    comfy_free(port)
+    d, py, ck = ace_setup()
+    repo = os.path.join(d, "repo")
+    jid = "s%s" % j["id"]
+    work_d = os.path.join(ROOT, jid)
+    os.makedirs(work_d, exist_ok=True)
+    lora = None
+    trig = "xiress_jp_vocal"
+    if opt.get("train"):
+        data = os.path.join(d, "pjs")
+        if not os.path.isdir(data):
+            log("กำลังดาวน์โหลดคลังเสียงร้อง PJS (CC BY-SA 4.0)")
+            zp = os.path.join(d, "pjs.zip")
+            sh('"%s" -m gdown --id 1hPHwOkSe2Vnq6hXrhVtzNskJjVMQmvN_ -O "%s"' % (py, zp))
+            sh('cd "%s" && unzip -q -o "%s" -d pjs' % (d, zp))
+        aud = os.path.join(work_d, "audio")
+        os.makedirs(aud, exist_ok=True)
+        n = 0
+        for w in sorted(glob.glob(os.path.join(data, "**", "*song*.wav"), recursive=True)):
+            b = os.path.splitext(os.path.basename(w))[0]
+            shutil.copy(w, os.path.join(aud, b + ".wav"))
+            txt = [t for t in glob.glob(os.path.join(os.path.dirname(w), "*.txt")) if "song" in os.path.basename(t) or len(glob.glob(os.path.join(os.path.dirname(w), "*.txt"))) == 1]
+            if txt:
+                try:
+                    shutil.copy(txt[0], os.path.join(aud, b + ".txt"))
+                except Exception:
+                    pass
+            n += 1
+        log("เตรียมข้อมูลเสียงร้อง %d เพลง" % n)
+        if n < 5:
+            raise RuntimeError("หาไฟล์เสียงร้องใน PJS ไม่เจอ (%d)" % n)
+        ten, outl = os.path.join(work_d, "tensors"), os.path.join(work_d, "lora")
+        sh('cd "%s" && "%s" train.py fixed --checkpoint-dir "%s" --model-variant turbo --preprocess --audio-dir "%s" --tensor-output "%s"' % (repo, py, ck, aud, ten))
+        log("เริ่มเทรน LoRA เสียงร้องญี่ปุ่น (%d รอบ)" % int(opt.get("epochs") or 60))
+        sh('cd "%s" && timeout 10800 "%s" train.py fixed --checkpoint-dir "%s" --model-variant turbo --dataset-dir "%s" --output-dir "%s" --epochs %d --rank %d' % (repo, py, ck, ten, outl, int(opt.get("epochs") or 60), int(opt.get("rank") or 32)), check=False)
+        cands = sorted(glob.glob(os.path.join(outl, "**", "*.safetensors"), recursive=True), key=os.path.getmtime)
+        if cands:
+            lora = cands[-1]
+            log("เทรน LoRA เสร็จ: %s (%.0f MB)" % (os.path.basename(lora), os.path.getsize(lora) / 1e6))
+            try:  # เก็บไฟล์ LoRA ขึ้น Supabase (ท่อนละ 20 MB)
+                raw = open(lora, "rb").read()
+                parts = [raw[i:i + 20000000] for i in range(0, len(raw), 20000000)]
+                for k, part in enumerate(parts):
+                    call("/k/sblob/%s?name=songlora&part=%d&of=%d" % (j["id"], k, len(parts)), raw=part, timeout=600)
+            except Exception as e:
+                log("เก็บไฟล์ LoRA เพลงไม่สำเร็จ: %s" % str(e)[:160])
+        else:
+            log("เทรน LoRA ไม่สำเร็จ จะสร้างเพลงแบบเดิมให้ก่อน")
+    cfgp = os.path.join(work_d, "cfg.json")
+    gp = os.path.join(work_d, "gen.py")
+    open(gp, "w").write(GEN_PY)
+    json.dump({"repo": repo, "out": os.path.join(work_d, "out"), "songs": opt.get("songs") or [], "lora": lora, "trigger": trig}, open(cfgp, "w"), ensure_ascii=False)
+    log("กำลังสร้างเพลง %d เพลง%s" % (len(opt.get("songs") or []), " (เทียบ ก่อน/หลังเทรน)" if lora else ""))
+    sh('cd "%s" && "%s" "%s" "%s"' % (repo, py, gp, cfgp))
+    res = json.load(open(os.path.join(work_d, "out", "result.json")))
+    for r in res:
+        m4a = os.path.join(work_d, "%s_%d.m4a" % (r["tag"], r["i"]))
+        sh('"%s" -y -loglevel error -i "%s" -af "loudnorm=I=-14:TP=-1.5" -c:a aac -b:a 64k -ac 2 "%s"' % (ffmpeg_bin(), r["file"], m4a))
+        call("/k/song/%s?i=%d&tag=%s" % (j["id"], r["i"], r["tag"]), raw=open(m4a, "rb").read(), timeout=300)
+    log("ส่งเพลงแล้ว %d ไฟล์" % len(res))
+    fin = os.path.join(work_d, "done.txt")
+    open(fin, "w").write("ok %d" % len(res))
+    return fin, int(time.time() - t0), 0, 0
+
+
 def work(job, port):
+    if job.get("kind") == "song":
+        return song_job(job, port)
     if job.get("kind") == "lora":
         return train_lora(job, port)
     if job.get("kind") == "tts":
@@ -4273,7 +4422,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=13" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=14" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
@@ -4822,6 +4971,12 @@ async function castApi(req, env, url, body) {
         if (!key) return json({ error: 'ไม่พบบท' }, 400);
         m[key] = v; await setSetting(env, 'lw:' + story, JSON.stringify(m)); return json({ ok: true, w: v });
       }
+      if (act === 'songs') { // เพลงที่สร้างแล้ว + เพลงปิดที่เลือก + งานเพลงที่ค้าง
+        const S = await getSettings(env); let L = []; try { L = JSON.parse(S.songs || '[]'); } catch { }
+        const q = (await env.DB.prepare("SELECT id,status,started FROM vjobs WHERE kind='song' AND status IN ('queued','running')").all()).results;
+        return json({ ok: true, songs: L.filter(x => !x.story || x.story === story), pick: +(await rd('ending_song:' + story)) || 0, queue: q, lora: S.songlora ? JSON.parse(S.songlora) : null });
+      }
+      if (act === 'song_pick') { await setSetting(env, 'ending_song:' + story, JSON.stringify(+b.vid || 0)); return json({ ok: true }); }
       if (act === 'refs') { // แผ่นอ้างอิงตัวละคร (ปกติ + หน้าตลก): รายการภาพ + ที่อนุมัติแล้ว + คิวที่ค้าง
         const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project LIKE 'อ้างอิง·%' ORDER BY id").all()).results;
         const q = (await env.DB.prepare("SELECT project,COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND project LIKE 'อ้างอิง·%' GROUP BY project").all()).results;
@@ -4852,7 +5007,7 @@ async function castApi(req, env, url, body) {
         if (b.cast && typeof b.cast === 'object') await setSetting(env, 'vcast:' + story, JSON.stringify(b.cast));
         const smp = (await env.DB.prepare('SELECT shot,id FROM voices WHERE shot<0 AND shot>-100').all()).results, sm = {}; for (const r of smp) sm[VV_VOICES[-r.shot - 1] ? VV_VOICES[-r.shot - 1][0] : r.shot] = r.id;
         const tv = (await env.DB.prepare('SELECT shot,id FROM voices WHERE shot<=-200 AND shot>-400 AND line=0').all()).results, ti = {}; for (const r of tv) ti[-r.shot - 200] = r.id; // 0 = ชื่อเรื่อง · n = ชื่อตอน n
-        return json({ ok: true, cast: (await rd('vcast:' + story)) || VCAST_DEFAULT, voices: VV_VOICES, samples: sm, titles: ti, epja: (await rd('eptitle_ja:' + story)) || {}, seriesja: (await rd('series_ja:' + story)) || '' });
+        return json({ ok: true, ending: +(await rd('ending_song:' + story)) || 0, cast: (await rd('vcast:' + story)) || VCAST_DEFAULT, voices: VV_VOICES, samples: sm, titles: ti, epja: (await rd('eptitle_ja:' + story)) || {}, seriesja: (await rd('series_ja:' + story)) || '' });
       }
       if (act === 'vo_samples') { // ทำเสียงตัวอย่างของทุกเสียงให้ฟังก่อนเลือก (เครื่อง CPU ฟรี)
         const lines = [], cast = {}; VV_VOICES.forEach(([sp], i) => { cast['_s' + i] = { sp, st: 'ノーマル', speed: 0.95 }; lines.push({ shot: -(i + 1), line: 0, who: '', nv: '_s' + i, ja: VV_SAMPLE, emo: 'n' }); });
