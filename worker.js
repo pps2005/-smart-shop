@@ -653,8 +653,8 @@ function s3Opt(s3) { // say.s3 = {loc, cam, act:[[ชื่อ, จุดยื�
   if (!cam && /^(close|side):/.test(s3.cam || '')) { const [k, sp, ...m] = s3.cam.split(':'), P = S.spots[sp]; if (!P) return null; const [x, z, pose, f] = P, h = { sit: 1.18, floor: .8, tiny: .62, bow: .9 }[pose] || 1.58, low = m.includes('low');
     cam = k === 'close' ? { p: [x + .15, h - (low ? .35 : .02), z + 1.05 * f], l: [x, h + (low ? .12 : -.04), z], fov: 42 } : { p: [x + 1.15, h - (low ? .35 : 0), z + .1 * f], l: [x - .3, h + (low ? .1 : -.05), z + .05 * f], fov: 44 }; }
   if (!cam) return null;
-  const act = []; for (const [, sp] of (s3.act || [])) { const P = S.spots[sp]; if (P) act.push(...s3Actor(P[0], P[1], P[2], P[3])); }
-  return { loc: s3.loc, camName: s3.cam, cam, boxes: S.boxes, act };
+  const act = [], actn = [], actc = []; for (const [nm, sp] of (s3.act || [])) { const P = S.spots[sp]; if (P) { const b = s3Actor(P[0], P[1], P[2], P[3]); act.push(...b); actn.push(nm); actc.push(b.length); } }
+  return { loc: s3.loc, camName: s3.cam, cam, boxes: S.boxes, act, actn, actc };
 }
 function hyOpt(en, names, s) {
   let HT = HY_TAGS; try { HT = { ...HY_TAGS, ...JSON.parse(s.hytags || '{}') }; } catch { }
@@ -1308,7 +1308,13 @@ async function bridgeImg(env, s) {
     const npExp = !draft || /chibi/i.test(shEn) || /only (his|her|the two) hands?|hand(s)? (is|are) visible/i.test(shEn) ? null : /No people in the picture/.test(shEn) ? 0 : /Exactly one person/.test(shEn) ? 1 : /Exactly two people/.test(shEn) ? 2 : null; // จำนวนคนที่บทกำหนด ให้เครื่องตรวจภาพนับเทียบ
     const plushBad = draft && /talisman archive office/.test(shEn) && !/plush toys/.test(shEn) ? ['a person holding a teddy bear or stuffed toy', 'stuffed toys lying on the floor'] : [];
     let shChars = [], s3 = null; if (hyOn) { const cr = await env.DB.prepare('SELECT chars,say FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { shChars = JSON.parse((cr && cr.chars) || '[]'); } catch { shChars = []; } try { const sy = JSON.parse((cr && cr.say) || '{}'); if (sy.s3 && s.img_3d !== '0') s3 = s3Opt(sy.s3); } catch { s3 = null; } }
-    const opt = { ...(hyOn ? { hy: hyOpt(shEn, shChars, s) } : {}), ...(s3 ? { s3 } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: s3 ? 's3d' : eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
+    let hyO = hyOn ? hyOpt(shEn, shChars, s) : null;
+    if (hyO && s.self_url) { // ภาพอ้างอิงตัวละครที่ผู้ใช้อนุมัติ (ปกติ / หน้าตลกในช่องตลก) → ลิงก์มีลายเซ็นให้เครื่อง Kaggle ดึง
+      const REF = {}; for (const k of Object.keys(s)) if (k.startsWith('charref:')) { try { Object.assign(REF, JSON.parse(s[k] || '{}')); } catch { } }
+      const gag = /chibi|comedic|gag|meme|deadpan|super-deformed/i.test(shEn);
+      for (const c of hyO.chars) { const R = REF[c.n]; if (!R) continue; const id = gag && (R.g || []).length ? R.g[(j.id || 0) % R.g.length] : R.n; if (id) { c.ref = s.self_url + '/vi/' + id + '?s=' + await vvSig(env, 'i' + id); c.rw = gag ? 0.45 : 0.6; } }
+    }
+    const opt = { ...(hyOn ? { hy: hyO } : {}), ...(s3 ? { s3 } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: s3 ? 's3d' : eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: noChar ? '[[STYLE]]' : j.prompt }, s, noChar ? shEn : /chr\d+x/.test(String(j.prompt || '')) ? shEn : '', { nochar: noChar , color: hyOn }) : withStyle(j.prompt, s)).slice(0, 4000), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -1587,7 +1593,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 12 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 13 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -2087,6 +2093,8 @@ def setup():
         sh("git clone --depth 1 https://github.com/comfyanonymous/ComfyUI " + COMFY)
         sh("git clone --depth 1 https://github.com/city96/ComfyUI-GGUF " + COMFY + "/custom_nodes/ComfyUI-GGUF")
         sh("git clone --depth 1 https://github.com/Fannovel16/ComfyUI-Frame-Interpolation " + COMFY + "/custom_nodes/ComfyUI-Frame-Interpolation", check=False)
+    if not os.path.isdir(COMFY + "/custom_nodes/ComfyUI_IPAdapter_plus"):  # ป้อนภาพอ้างอิงตัวละครตอนวาด (IP-Adapter)
+        sh("git clone --depth 1 https://github.com/cubiq/ComfyUI_IPAdapter_plus " + COMFY + "/custom_nodes/ComfyUI_IPAdapter_plus", check=False)
     req = open(COMFY + "/requirements.txt").read().splitlines()
     keep = [r for r in req if r.strip() and not r.strip().startswith("#") and not r.split("=")[0].split(">")[0].split("<")[0].strip().lower() in ("torch", "torchvision", "torchaudio")]
     open("/tmp/req.txt", "w").write("\n".join(keep) + "\ngguf\nhuggingface_hub\n")
@@ -3297,7 +3305,66 @@ def render3d(boxes, cam, W, H):
     e[:, 1:] |= np.abs(z2[:, 1:] - z2[:, :-1]) > 0.06 * np.minimum(z2[:, 1:], z2[:, :-1])
     e[1:, :] |= np.abs(z2[1:, :] - z2[:-1, :]) > 0.06 * np.minimum(z2[1:, :], z2[:-1, :])
     e2 = e.copy(); e2[1:, :] |= e[:-1, :]; e2[:, 1:] |= e[:, :-1]
+    render3d.bid = np.where(FID >= 0, FID // 6, -1)  # ดัชนีกล่องที่เห็นในแต่ละพิกเซล (ทำหน้ากากตัวละคร)
     return (dep * 255).astype(np.uint8), (e2 * 255).astype(np.uint8)
+
+
+IPA_FILES = (("ipadapter", "h94/IP-Adapter", "sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors", "ip-adapter-plus_sdxl_vit-h.safetensors"),
+             ("clip_vision", "h94/IP-Adapter", "models/image_encoder/model.safetensors", "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"))
+
+
+def ensure_ipa():
+    # IP-Adapter Plus SDXL (h94, Apache-2.0) + ตัวเข้ารหัสภาพ ViT-H · ใช้ไม่ได้ = ข้าม (วาดแบบไม่มีภาพอ้างอิง)
+    if M.get("ipa") or M.get("noipa"):
+        return bool(M.get("ipa"))
+    if not os.path.isdir(os.path.join(COMFY, "custom_nodes", "ComfyUI_IPAdapter_plus")):
+        M["noipa"] = 1
+        log("ยังไม่มีตัวป้อนภาพอ้างอิง (IP-Adapter) ในเครื่องรอบนี้ — รอบหน้าจะติดตั้งให้")
+        return False
+    with LOCK:
+        try:
+            fetch(list(IPA_FILES))
+            M["ipa"] = IPA_FILES[0][3]
+            M["clipv"] = IPA_FILES[1][3]
+            log("ตัวป้อนภาพอ้างอิงตัวละคร (IP-Adapter) พร้อม")
+        except Exception as e:
+            M["noipa"] = 1
+            log("โหลด IP-Adapter ไม่ได้: %s" % str(e)[:160])
+    return bool(M.get("ipa"))
+
+
+def get_ref(url, jid, k):
+    # ดึงภาพอ้างอิงที่ผู้ใช้อนุมัติ (ลิงก์มีลายเซ็นจากเว็บ) ลงโฟลเดอร์ input ของ ComfyUI
+    nm = "%s_ref%d.png" % (jid, k)
+    try:
+        from PIL import Image
+        import io
+        req = urllib.request.Request(url, headers=UA)
+        with urllib.request.urlopen(req, timeout=120) as r:
+            Image.open(io.BytesIO(r.read())).convert("RGB").save(os.path.join(COMFY, "input", nm))
+        return nm
+    except Exception as e:
+        log("ดึงภาพอ้างอิงไม่ได้: %s" % str(e)[:120])
+        return None
+
+
+def add_ipa(wf, model_ref, refs, final_node):
+    # refs = [(ชื่อไฟล์ภาพอ้างอิง, ชื่อไฟล์หน้ากากหรือ None, น้ำหนัก)] → ต่อโมเดลผ่าน IPAdapterAdvanced ทีละตัว
+    if not refs:
+        return wf
+    wf["40"] = {"class_type": "IPAdapterModelLoader", "inputs": {"ipadapter_file": M["ipa"]}}
+    wf["41"] = {"class_type": "CLIPVisionLoader", "inputs": {"clip_name": M["clipv"]}}
+    pm = model_ref
+    for i, (img, mask, w) in enumerate(refs):
+        a, b, c = str(50 + i * 3), str(51 + i * 3), str(52 + i * 3)
+        wf[a] = {"class_type": "LoadImage", "inputs": {"image": img}}
+        wf[c] = {"class_type": "IPAdapterAdvanced", "inputs": {"model": pm, "ipadapter": ["40", 0], "image": [a, 0], "weight": w, "weight_type": "linear", "combine_embeds": "concat", "start_at": 0.0, "end_at": 1.0, "embeds_scaling": "V only", "clip_vision": ["41", 0]}}
+        if mask:
+            wf[b] = {"class_type": "LoadImageMask", "inputs": {"image": mask, "channel": "red"}}
+            wf[c]["inputs"]["attn_mask"] = [b, 0]
+        pm = [c, 0]
+    wf[final_node]["inputs"]["model"] = pm
+    return wf
 
 
 def wf_sdxl_s3d(dep_name, lin_name, pos, neg, seed, prefix, W, H, sd, sl, batch=2):
@@ -3344,19 +3411,49 @@ def gen_s3d(j, port=8188):
     qc = opt.get("qc") or [j.get("prompt") or ""]
     # 1) เรนเดอร์ฉาก 3D: ความลึก (ฉาก + หุ่นคน) · เส้นโครง (เฉพาะฉาก ไม่ใส่หุ่น — ไม่ให้คนออกมาเหลี่ยมเป็นกล่อง)
     dep, _ = render3d((s3.get("boxes") or []) + (s3.get("act") or []), s3["cam"], W // 2, H // 2)
+    bid = render3d.bid
     _, lin = render3d(s3.get("boxes") or [], s3["cam"], W // 2, H // 2)
     os.makedirs(os.path.join(COMFY, "input"), exist_ok=True)
     dn, ln = "%s_dep.png" % jid, "%s_lin.png" % jid
     Image.fromarray(dep).convert("RGB").resize((W, H), Image.BILINEAR).save(os.path.join(COMFY, "input", dn))
     Image.fromarray(lin).convert("RGB").resize((W, H), Image.NEAREST).save(os.path.join(COMFY, "input", ln))
     log("ภาพ %s: เรนเดอร์ฉาก 3D %s มุม %s" % (jid, s3.get("loc", "?"), s3.get("camName", "?")))
+    # ภาพอ้างอิงตัวละครที่ผู้ใช้อนุมัติ → ป้อนเฉพาะบริเวณของตัวละครนั้น (หน้ากากจากหุ่นในฉาก 3D)
+    refs = []
+    if any(c.get("ref") for c in chars) and ensure_ipa():
+        import numpy as np
+        from PIL import ImageFilter
+        nset, k0 = len(s3.get("boxes") or []), 0
+        for ai, (nm, nb) in enumerate(zip(s3.get("actn") or [], s3.get("actc") or [])):
+            c = next((x for x in chars if x.get("n") == nm), None)
+            if c and c.get("ref"):
+                mk = np.isin(bid, list(range(nset + k0, nset + k0 + nb)))
+                if mk.any():
+                    rimg = get_ref(c["ref"], jid, ai)
+                    if rimg:
+                        mn = "%s_mk%d.png" % (jid, ai)
+                        Image.fromarray((mk * 255).astype("uint8")).filter(ImageFilter.MaxFilter(15)).resize((W, H), Image.BILINEAR).convert("RGB").save(os.path.join(COMFY, "input", mn))
+                        refs.append((rimg, mn, float(c.get("rw") or 0.6)))
+            k0 += nb
+        if refs:
+            log("ภาพ %s: ใช้ภาพอ้างอิงตัวละคร %d ตัว" % (jid, len(refs)))
     # 2) SDXL วาดทั้งภาพตามฉาก 3D · ตรวจจำนวนคน + ตัวตน + ภาพเพี้ยน · ไม่ผ่านวาดใหม่อีกรอบ
     pos = IMG_POS + style + ", " + (hy.get("all") or "")
     sd, sl = float(s3.get("sd") or 0.7), float(s3.get("sl") or 0.55)
     pick, tmp = None, []
     for rd in range(2):
         pf = "img%sS%d" % (jid, rd)
-        outs = comfy_go(wf_sdxl_s3d(dn, ln, pos, neg, seed + rd * 131, pf, W, H, sd, sl, 2), pf, port)
+        wf = wf_sdxl_s3d(dn, ln, pos, neg, seed + rd * 131, pf, W, H, sd, sl, 2)
+        if refs:
+            add_ipa(wf, ["1", 0], refs, "5")
+        try:
+            outs = comfy_go(wf, pf, port)
+        except RuntimeError as e:
+            if not refs:
+                raise
+            log("ใช้ภาพอ้างอิงไม่ได้รอบนี้ วาดแบบไม่มีภาพอ้างอิง: %s" % str(e)[:160])
+            refs, M["noipa"] = [], 1
+            outs = comfy_go(wf_sdxl_s3d(dn, ln, pos, neg, seed + rd * 131, pf, W, H, sd, sl, 2), pf, port)
         tmp += outs
         scs, _ = clip_scores(outs, qc)
         for k, pth in enumerate(outs):
@@ -4168,7 +4265,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=12" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=13" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
