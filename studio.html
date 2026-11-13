@@ -171,7 +171,9 @@ const api=(act,o)=>botApi('/api/vcastep',{story:ST.story,act,...(o||{})});
 const tierOf=r=>r.tier||(r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'main':'support'),live=r=>r.g!=='x'&&tierOf(r)!=='none';
 const castOf=k=>ST.cands.find(c=>c.cast_role===k&&c.cast_story===ST.story);
 async function load(){
-  clearTimeout(POLL);window._staleAt=0;window._staleErr='';if(document.hidden){window._needLoad=1;return;}if(!botCfg().url||!ST.story){render();return;}
+  clearTimeout(POLL);window._staleAt=0;window._staleErr='';if(document.hidden){window._needLoad=1;return;}
+  if(botCfg().url&&!ST.story){try{const r=await botApi('/api/anime',{act:'series_list'});const L=(r.series||[]).map(x=>x.title).filter(Boolean);if(L.length){ST.story=L[0];localStorage.setItem('ss_story',ST.story);}}catch(e){}} /* เครื่องใหม่ (เช่น iPad) ยังไม่เคยเลือกเรื่อง: ใช้เรื่องล่าสุดในบอท */
+  if(!botCfg().url||!ST.story){render();return;}
   try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;if(r.kind)ST.kind=r.kind;ST.reads=+r.reads||0;ST.meter=r.meter||null;ST.boost=+r.boost||0;ST.err='';}catch(e){ST.err=botErr(e);}
   {const lv=ST.meter?ST.meter.total/ST.meter.cap:(ST.reads||0)/100;ST.save=ST.force?0:lv>=0.95?3:lv>=0.9?2:lv>=0.85?1:0;ST.force=0;} /* 85% ขึ้นไป: หน้าเว็บประหยัดการอ่านเพื่อไม่ให้ล่ม */
   const cached=(act,o)=>ST.save?snapGet('/api/vcastep',{story:ST.story,act,...(o||{})}):null;
