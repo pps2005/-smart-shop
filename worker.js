@@ -571,33 +571,40 @@ function legacyFix(p) {
   return p;
 }
 // ตัวสำรอง (Flux) วาดช่องสตอรีบอร์ด: ใช้ LoRA ไม่ได้ → ตัดคำกระตุ้น LoRA ทิ้ง และย้ายลายเส้นไว้ "ต้นคำสั่ง" (อยู่ท้ายแล้ว Flux ไม่ค่อยทำตาม ภาพออกโทนอุ่นเงานุ่ม)
-function fluxDraft(job, s, shEn) {
+function fluxDraft(job, s, shEn, fl) {
   const p = String(job.prompt || '');
   if (!String(job.project || '').startsWith('ฉาก') || !p.includes('[[STYLE]]')) return withStyle(p, s);
   // มีคำกระตุ้น LoRA = คำสั่งพ่วงชุดประจำตัวของตัวละครมาด้วย (เช่น ฮู้ดดำของริน) ซึ่งทับชุดที่ช่องนั้นระบุ → ใช้เฉพาะจำนวนคน + คำบรรยายของช่อง
-  const body = shEn && /chr\d+x/.test(p) ? p.split(/chr\d+x/)[0] + shEn : p.replace(/chr\d+x,?\s*/g, '').replace(/,?\s*\[\[STYLE\]\]/, '');
+  const body = fl && fl.nochar && shEn ? shEn : shEn && /chr\d+x/.test(p) ? p.split(/chr\d+x/)[0] + shEn : p.replace(/chr\d+x,?\s*/g, '').replace(/,?\s*\[\[STYLE\]\]/, '');
   // Flux ไม่ค่อยทำตามแท็กอายุ ต้องบอกเป็นประโยค (เจอจริง: ป้าฮานะ 61 ออกมาเป็นสาว)
   const age = /\b(old woman|old man|middle-aged)/.test(p) ? 'Every character is drawn youthful and attractive, looking much younger than their real age, smooth faces without wrinkles' : ''; // ผู้ใช้สั่ง: ทุกตัวดูหนุ่มสาว อายุเยอะให้สวย/หล่อกว่าวัย
   // ภาพร่างสตอรีบอร์ด = มังงะขาวดำตัดเส้นหมึก (ผู้ใช้เลือก): ไม่มีสี/แสงให้แกว่งข้ามช่อง · ตั้ง settings draft_style เพื่อเปลี่ยนได้
-  const st = String(s.draft_style || '').trim() || 'professional black and white manga panel, clean consistent fine-pen line art with controlled line weight and precise contours, light dot screentone and controlled hatching for shading. Characters: hair drawn as fine separate strands, detailed expressive eyes with highlights, natural clothing folds and fabric texture, correct hand anatomy with five well-shaped fingers, small accessories drawn clearly. Environment: real architecture and furniture with surface textures (wood grain, paper, metal, glass, plush fur), small props that fit the place, clear foreground, midground and background with correct perspective and depth, contact shadows and cast shadows under people and objects. Clean and readable, not cluttered, every character in the same delicate manga style with slender anime proportions, no color, no text, no speech bubbles';
+  const st = String(s.draft_style || '').trim() || 'professional black and white manga panel, clean consistent fine-pen line art with controlled line weight and precise contours, light dot screentone and controlled hatching for shading. Characters: hair drawn as fine separate strands, detailed expressive eyes with highlights, natural clothing folds and fabric texture, correct hand anatomy with five well-shaped fingers, small accessories drawn clearly. Environment: real architecture and furniture with surface textures (wood grain, paper, metal, glass, plush fur), small props that fit the place, clear foreground, midground and background with correct perspective and depth, contact shadows and cast shadows under people and objects. Any paper, ledger, book, sign or talisman shows only simple wavy lines or blank areas instead of writing. Clean and readable, not cluttered, people (only those the scene describes) drawn in a delicate manga style with slender anime proportions, no color, no text, no speech bubbles';
   const mono = body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/, a tired gentle face/gi, ', a gentle face').replace(/\ba plain /gi, 'a ').replace(/\b(mature male|middle-aged man|mature female|middle-aged woman|old woman|old man),\s*/gi, '').replace(/ {2,}/g, ' ');
-  return `${draftCam(mono)}. ${age ? age + '. ' : ''}Scene: ${mono}. Style: ${st}. The setting is always fully drawn behind the characters with complete background detail, never a blank or plain background. Strictly black ink on white paper, grayscale only.`; // มุมกล้อง + เนื้อเรื่องมาก่อนลายเส้น (ตัวเข้ารหัส CLIP อ่านแค่ ~77 โทเคนแรก — เดิมลายเส้นมาก่อน มุมกล้องเลยหลุด ได้แต่หน้าตรง)
+  const who = fl && fl.nochar ? (/\bhands?\b|fingers/.test(mono) ? 'Only the hands described are visible, no full person and nobody else in the picture. ' : /pedestrian|passersby|customers|crowd|clerks|people/.test(mono) ? 'No main characters: only the tiny distant figures the scene mentions. ' : /demon|creature|spirit|figure|silhouette|child/.test(mono) ? 'No other people except what the scene describes. ' : 'No people at all in this panel, only the place and objects. ') : ''; // ช่องไม่มีตัวละคร: กัน AI เติมคนแปลกหน้า (เจอจริง: เด็กนักเรียนโผล่หน้าหอระฆัง)
+  return `${draftCam(mono, fl && fl.nochar)}. ${who}${age ? age + '. ' : ''}Scene: ${mono}. Style: ${st}. The setting is always fully drawn behind the characters with complete background detail, never a blank or plain background. Strictly black ink on white paper, grayscale only.`; // มุมกล้อง + เนื้อเรื่องมาก่อนลายเส้น (ตัวเข้ารหัส CLIP อ่านแค่ ~77 โทเคนแรก — เดิมลายเส้นมาก่อน มุมกล้องเลยหลุด ได้แต่หน้าตรง)
 }
 // มุมกล้องของช่อง → ประโยคบังคับท่า/มุม (Flux ชอบวาดคนหันหน้าตรงมองกล้องถ้าไม่สั่งชัด)
-function draftCam(en) {
+function draftCam(en, nochar) {
   const e = String(en || '').toLowerCase(), c = [];
+  if (/worm's-eye/.test(e)) c.push("worm's-eye view looking almost straight up, strong perspective");
+  if (/bird's-eye/.test(e)) c.push("bird's-eye view looking straight down from high above");
+  if (/\bpov\b|point of view/.test(e)) c.push('first-person point of view shot');
+  if (/dutch/.test(e)) c.push('tilted dutch angle');
   if (/over-the-shoulder/.test(e)) c.push('over-the-shoulder shot, one character seen from behind in the foreground');
   if (/back view|from behind|walking away/.test(e)) c.push('character seen from behind, back to the viewer');
   if (/side view|from the side|profile|side shot/.test(e)) c.push('side profile view, character facing sideways');
-  if (/low angle/.test(e)) c.push('dramatic low-angle shot looking up from the ground');
-  if (/high angle|from above|from high above|top-down/.test(e)) c.push('high-angle shot looking down from above');
+  if (/low[- ]angle/.test(e)) c.push('dramatic low-angle shot looking up from the ground');
+  if (/high[- ]angle|from above|from high above|top-down/.test(e)) c.push('high-angle shot looking down from above');
   if (/extreme close-up/.test(e)) c.push('extreme close-up filling the frame');
   else if (/close-up/.test(e)) c.push('close-up framing');
-  if (/two-shot|face to face/.test(e)) c.push('two characters interacting with each other, facing each other, not facing the viewer');
-  if (/wide shot|establishing/.test(e)) c.push('wide shot, the place fills the frame, characters small in the scene');
+  if (/medium shot|medium two-shot/.test(e)) c.push('medium shot, waist-up framing');
+  if (/two-shot|face to face|face-to-face/.test(e)) c.push('two characters interacting with each other, facing each other, not facing the viewer');
+  if (/wide shot|establishing|panoram|street-level/.test(e)) c.push(nochar ? 'wide shot, the place fills the frame' : 'wide shot, the place fills the frame, characters small in the scene');
   if (/dynamic|running|leaping|swinging|throwing|jumping|fighting|lunging/.test(e)) c.push('dynamic action pose with motion lines, diagonal composition');
-  if (/insert shot/.test(e)) c.push('insert shot of the object, no character faces');
-  if (!/back view|from behind|side|profile|over-the-shoulder|insert shot|wide shot|establishing/.test(e)) c.push('three-quarter view, the character is busy with the action and looking away from the viewer, candid moment, not posing for the camera');
+  if (/insert/.test(e)) c.push('insert shot of the object, no character faces');
+  if (!nochar && !/back view|from behind|side view|from the side|profile|over-the-shoulder|insert|wide shot|establishing|pov|only (his|her|the two) hand/.test(e)) c.push('three-quarter view, the character is busy with the action and looking away from the viewer, candid moment, not posing for the camera');
+  if (!c.length) c.push(nochar ? 'the place and objects only' : 'three-quarter view, candid moment');
   return 'Manga panel. Camera: ' + c.join(', ');
 }
 function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
@@ -1224,13 +1231,13 @@ async function bridgeImg(env, s) {
     if (String(j.project).startsWith('ทดสอบLoRA·')) lo = [{ id: +String(j.project).split('·')[1] || 0, w: 0.8 }];
     // สตอรีบอร์ดช่วงร่าง (sb_draft ≠ 0): วาดเป็นมังงะขาวดำด้วย FLUX.1-dev บน Kaggle (ไม่ใช้ LoRA) ลายเส้นเดียวกับตัวสำรอง แต่ละเอียดกว่า · ปิดร่างด้วย sb_draft=0 เมื่อจะวาดจริงเป็นสี + LoRA
     const draft = String(j.project).startsWith('ฉาก') && s.sb_draft !== '0';
-    let shEn = '', shLoc = ''; if (draft) { const shr = await env.DB.prepare('SELECT en,loc FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; shLoc = shr ? String(shr.loc || '') : ''; lo = []; }
+    let shEn = '', shLoc = '', noChar = false; if (draft) { const shr = await env.DB.prepare('SELECT en,loc,chars FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; shLoc = shr ? String(shr.loc || '') : ''; noChar = !!shr && !/[^\[\]\s]/.test(String(shr.chars || '[]')); lo = []; }
     // ภาพร่าง: สถานที่เดียวกันใช้ seed ชุดเดียวกัน (ฉากหลัง/ลายเส้นใกล้กันขึ้น) + วาด 2 แบบแล้วให้ CLIP ตรวจเลือกภาพที่ตรงบทและฉากหลังครบที่สุด
     const locSeed = shLoc ? [...shLoc].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 2000000000 + 1 : 0;
     const eg = draft ? 'dev' : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
-    const opt = { ...(draft ? { gray: 1, takes: +s.draft_takes || 2, qc: [(shLoc ? shEn.replace(/^[^,]*,[^,]*,[^,]*,\s*/, '') : shEn).slice(0, 220), 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
+    const opt = { ...(draft ? { gray: 1, takes: +s.draft_takes || 2, ...(noChar ? { qneg: ['a person standing in the foreground'] } : {}), qc: [shEn.split(', setting:')[0].slice(0, 220), 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
-      .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: j.prompt }, s, /chr\d+x/.test(String(j.prompt || '')) ? shEn : '') : withStyle(j.prompt, s)).slice(0, 1800), now, JSON.stringify(opt)));
+      .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: noChar ? '[[STYLE]]' : j.prompt }, s, noChar ? shEn : /chr\d+x/.test(String(j.prompt || '')) ? shEn : '', { nochar: noChar }) : withStyle(j.prompt, s)).slice(0, 1800), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
   }
   await env.DB.batch(st);
@@ -2604,12 +2611,13 @@ def ensure_lora(lid):
 
 
 _CLIP = None
+_QNEG = []
 
 
 def clip_pick(paths, pos):
     # ตรวจคุณภาพภาพ (Visual QC): ให้คะแนน = ตรงกับบท/ฉากหลังครบ − ฉากว่าง/เบลอ/มือผิดรูป/มีสี/มีตัวหนังสือ แล้วเลือกภาพคะแนนสูงสุด
     global _CLIP
-    neg = ["an empty blank white background", "a blurry messy unfinished sketch", "deformed hands with extra fingers", "a colored illustration", "text, letters and speech bubbles", "a cluttered noisy image"]
+    neg = ["an empty blank white background", "a blurry messy unfinished sketch", "deformed hands with extra fingers", "a colored illustration", "text, letters and speech bubbles", "a cluttered noisy image", "a schoolgirl in a school uniform", "extra strangers who do not belong in the scene"] + list(_QNEG)
     try:
         import torch
         from PIL import Image
@@ -2698,6 +2706,7 @@ def gen_image(j, port=8188):
     from PIL import Image
     pick = len(outs) - 1
     if takes > 1 and len(outs) > 1:
+        _QNEG[:] = opt.get("qneg") or []
         pick, info = clip_pick(outs[-takes:], opt.get("qc") or [j.get("prompt") or ""])
         pick = len(outs) - takes + pick
         log("ภาพ %s: วาด %d แบบ ตรวจด้วย CLIP เลือกแบบที่ %d (%s)" % (jid, takes, pick - (len(outs) - takes) + 1, info))
