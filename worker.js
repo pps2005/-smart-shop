@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'voice-3';
+const BOT_VER = 'draft-k-1';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
@@ -1189,7 +1189,10 @@ async function kImgOn(env, s, now) {
   if ((s.img_engine || 'auto') === 'flux') return false;
   kEnv(env, s);
   if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return false;
-  if (now < (+s.k_pause || 0)) return false; // โควตา GPU Kaggle สัปดาห์นี้หมด → ให้ Flux ทำไปก่อน
+  if (now < (+s.k_pause || 0)) { // โควตา GPU บัญชีหลักหมด: ถ้ามีผู้ช่วยรันอัตโนมัติพร้อม ยังส่งงานภาพไป Kaggle ได้ (เครื่องผู้ช่วยทำ) ไม่งั้นให้ Flux ทำ
+    const h = await env.DB.prepare("SELECT COUNT(*) n FROM helpers WHERE on_=1 AND COALESCE(kuser,'')<>'' AND COALESCE(kpause,0)<?").bind(now).first().catch(() => null);
+    return !!(h && h.n);
+  }
   return true;
 }
 async function bridgeImg(env, s) {
@@ -1200,10 +1203,13 @@ async function bridgeImg(env, s) {
     let lo = [];
     if (String(j.project).startsWith('ฉาก')) { const sh = await env.DB.prepare('SELECT loras FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { lo = JSON.parse((sh && sh.loras) || '[]'); } catch { lo = []; } }
     if (String(j.project).startsWith('ทดสอบLoRA·')) lo = [{ id: +String(j.project).split('·')[1] || 0, w: 0.8 }];
-    const eg = lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
+    // สตอรีบอร์ดช่วงร่าง (sb_draft ≠ 0): วาดเป็นมังงะขาวดำด้วย FLUX.1-dev บน Kaggle (ไม่ใช้ LoRA) ลายเส้นเดียวกับตัวสำรอง แต่ละเอียดกว่า · ปิดร่างด้วย sb_draft=0 เมื่อจะวาดจริงเป็นสี + LoRA
+    const draft = String(j.project).startsWith('ฉาก') && s.sb_draft !== '0';
+    let shEn = ''; if (draft) { const shr = await env.DB.prepare('SELECT en FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; lo = []; }
+    const eg = draft ? 'dev' : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
     const opt = { jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
-      .bind(j.project, '', String(j.scene), withStyle(j.prompt, s).slice(0, 1800), now, JSON.stringify(opt)));
+      .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: j.prompt }, s, /chr\d+x/.test(String(j.prompt || '')) ? shEn : '') : withStyle(j.prompt, s)).slice(0, 1800), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
   }
   await env.DB.batch(st);
