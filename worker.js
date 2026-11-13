@@ -661,7 +661,7 @@ function hyOpt(en, names, s) {
     pose: /from behind|back view|back to the viewer/.test(lo) ? 'from behind' : /side view|profile/.test(lo) ? 'from side' : '',
     all: [cntT, chars.map(c => c.tags.replace(/^(chibi, )?\d?(boy|girl|1boy|1girl), /, '$1')).join(', '), place, litT, 'consistent lighting, full color', plush].filter(Boolean).join(', ').slice(0, 900),
     neg: (() => { const T = chars.map(c => c.tags).join(', ').toLowerCase(), N = ['monochrome, greyscale, sketch, english text, japanese text, letters, logo, watermark, school uniform, serafuku, floating objects, multicolored hair, streaked hair, colored inner hair', ...chars.map(c => c.neg || '')].join(', ').split(',').map(x => x.trim()).filter(x => x && !T.includes(x.toLowerCase())); return [...new Set(N)].join(', '); })(), // คำห้ามของตัวละครหนึ่งที่ชนกับชุด/ผมของอีกตัวในช่องเดียวกันถูกตัดออก
-    props: plush ? { 88: 'small cute plush toy, stuffed animal' } : {}, dc: 0.62,
+    props: plush ? { 88: 'small cute plush toy, stuffed animal' } : {}, dc: 0.62, dn: 1.0, cs: 0.75, // SDXL วาดจากศูนย์ทั้งภาพ ใช้แค่เส้นโครงของ FLUX (ไม่เอาสี/ลายเส้น FLUX ปน → สไตล์ไม่แกว่ง ชุดไม่เพี้ยนตามแบบร่าง)
     ...(plush ? { plush: ['long-eared white rabbit plush toy', 'brown teddy bear plush toy', 'grey seal plush toy, round seal', 'small cat plush toy', 'yellow chick plush toy, baby bird'] } : {}),
   };
 }
