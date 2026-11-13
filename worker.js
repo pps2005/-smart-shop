@@ -1516,7 +1516,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0).first(); // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -3397,7 +3397,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=7" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=8" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
