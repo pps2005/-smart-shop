@@ -244,7 +244,7 @@ function playEp(n){const sb=ST.sbs[n];if(!sb)return;const st=[],say=v=>{try{cons
     return `<div class="ct"><div class="cs"><div class="m" style="font-family:'Noto Serif JP',serif;font-weight:900;font-size:2.2em;letter-spacing:.12em">私が恋した理由</div><div style="font-family:Mitr,sans-serif;color:#ffe3a3">${esc(SER||'สาเหตุที่ฉันรัก')}</div><div style="margin-top:.6em;font-family:'Noto Serif JP',serif">第${n}話　${esc(E.title||'')}</div></div>
       ${sec('キャスト · นักพากย์',rows)}${sec('ナレーション · ผู้บรรยาย',nr)}
       ${sec('音声 · เสียงพากย์',[['เสียงสังเคราะห์','VOICEVOX'],...allv.map(v=>['',v])])}
-      ${sec('映像 · ภาพ',[['ภาพสตอรีบอร์ด','AI (FLUX.1 [dev])'],['ตัวอักษรและซับ','สร้างด้วยระบบในเว็บ']])}
+      ${sec('映像 · ภาพ',[['ภาพสตอรีบอร์ด','AI · FLUX.1 [schnell] (Apache-2.0)'],['ตัวอักษรและซับ','สร้างด้วยระบบในเว็บ']])}
       ${sec('音楽 · ดนตรีและเสียงประกอบ',[['ดนตรีปิด / ดนตรีประกอบ','สร้างสดด้วย Web Audio'],['เสียงประกอบ / บรรยากาศ','สร้างสดด้วย Web Audio']])}
       ${sec('制作 · สร้างโดย',[['สตูดิโอ','SMART SHOP AI Studio']])}
       <div class="cs" style="margin-top:3em"><div style="font-family:'Noto Serif JP',serif;font-size:1.8em;letter-spacing:.3em">つづく</div><div style="font-family:Mitr,sans-serif;color:#ccc">โปรดติดตามตอนต่อไป</div></div></div>`;}

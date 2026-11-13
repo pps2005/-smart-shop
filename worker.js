@@ -618,15 +618,17 @@ async function autoFill(env, s) {
 // ---- ภาพอนิเมะด้วย SDXL / FLUX.1-dev บน Kaggle (ฟรี ไม่กินโควตา Cloudflare) · Flux เป็นตัวสำรองเมื่อ Kaggle ใช้ไม่ได้ ----
 // เลือกเอนจินภาพต่องาน: img_engine = auto | sdxl | dev | flux(Cloudflare schnell) · ค่าเก่า 'kaggle' = auto
 // auto: งานของ/ชุด/สัตว์/อาวุธ/ฉากในคลัง → FLUX.1-dev (auto_obj_engine) · งานตัวละคร/ฉากอนิเมะ → SDXL (auto_char_engine) · ตั้งสลับได้
+// FLUX ที่ใช้หารายได้ได้: FLUX.1-schnell (Apache-2.0) เป็นค่าเริ่มต้น · FLUX.1-dev ห้ามใช้เชิงพาณิชย์ — ใช้ได้เฉพาะเมื่อตั้ง settings img_commercial='0'
+function fluxEng(s) { return s && s.img_commercial === '0' ? 'dev' : 'schnell'; }
 function imgEngineFor(j, s) {
   const e = String((s && s.img_engine) || 'auto');
-  if (e === 'sdxl' || e === 'dev') return e;
+  if (e === 'sdxl') return e; if (e === 'dev' || e === 'schnell') return fluxEng(s);
   if (j && j.eng === 'sdxl') return 'sdxl'; // ช็อตร่างที่มีตัวละครแต่ยังไม่มี LoRA: ใช้ SDXL อนิเมะ ให้ลายเส้นตรงกับของจริง
   const p = String((j && j.prompt) || ''), pr = String((j && j.project) || '');
-  if (pr.startsWith('ฉาก') && !/chr\d+x/.test(p)) return 'dev'; // ช็อตฉาก/บรรยากาศไม่มีตัวละคร → FLUX.1-dev · ช็อตมีตัวละคร → SDXL + LoRA
+  if (pr.startsWith('ฉาก') && !/chr\d+x/.test(p)) return fluxEng(s); // ช็อตฉาก/บรรยากาศไม่มีตัวละคร → FLUX.1-dev · ช็อตมีตัวละคร → SDXL + LoRA
   const obj = pr.startsWith('คลัง·') || p.includes('[[STYLE_OBJ]]') || p.includes('[[STYLE_ENV]]') ||
     /plain soft background|single object|creature design|dress form|faceless mannequin|environment element design|product design sheet/.test(p);
-  return obj ? (s.auto_obj_engine === 'sdxl' ? 'sdxl' : 'dev') : (s.auto_char_engine === 'dev' ? 'dev' : 'sdxl');
+  return obj ? (s.auto_obj_engine === 'sdxl' ? 'sdxl' : fluxEng(s)) : (s.auto_char_engine === 'dev' ? fluxEng(s) : 'sdxl');
 }
 // ===== เวอร์ชันเรียบ: ซีรีส์ → บท (AI เสนอ/สั่งแก้) → (ต่อไป: ตัวละคร LoRA → ซีน → ตอน) =====
 const SCRIPT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'; // เปลี่ยนได้ที่ settings.script_model (ชื่อโมเดล Workers AI)
@@ -1234,8 +1236,8 @@ async function bridgeImg(env, s) {
     let shEn = '', shLoc = '', noChar = false; if (draft) { const shr = await env.DB.prepare('SELECT en,loc,chars FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; shLoc = shr ? String(shr.loc || '') : ''; noChar = !!shr && !/[^\[\]\s]/.test(String(shr.chars || '[]')); lo = []; }
     // ภาพร่าง: สถานที่เดียวกันใช้ seed ชุดเดียวกัน (ฉากหลัง/ลายเส้นใกล้กันขึ้น) + วาด 2 แบบแล้วให้ CLIP ตรวจเลือกภาพที่ตรงบทและฉากหลังครบที่สุด
     const locSeed = shLoc ? [...shLoc].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 2000000000 + 1 : 0;
-    const eg = draft ? 'dev' : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
-    const opt = { ...(draft ? { gray: 1, takes: +s.draft_takes || 2, ...(noChar ? { qneg: ['a person standing in the foreground'] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
+    const eg = draft ? fluxEng(s) : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
+    const opt = { ...(draft ? { gray: 1, takes: +s.draft_takes || 2, ...(noChar ? { qneg: ['a person standing in the foreground'] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: noChar ? '[[STYLE]]' : j.prompt }, s, noChar ? shEn : /chr\d+x/.test(String(j.prompt || '')) ? shEn : '', { nochar: noChar }) : withStyle(j.prompt, s)).slice(0, 4000), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -2519,6 +2521,7 @@ IMG_POS = "masterpiece, high score, great score, absurdres, "
 IMG_NEG = "crowd, 4girls, 5girls, 6+girls, 4boys, 6+boys, clone, identical faces, multiple views, collage, grid, split screen, comic panels, character sheet, reference sheet, turnaround, lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry"
 IMG_QUANTS = ["Q5_K_S", "Q4_K_S", "Q4_0", "Q8_0"]
 FLUX_REPO = "city96/FLUX.1-dev-gguf"
+FLUX_S_REPO = "city96/FLUX.1-schnell-gguf"  # Apache-2.0: ใช้หารายได้ได้
 FLUX_TE = "comfyanonymous/flux_text_encoders"
 FLUX_VAES = [("black-forest-labs/FLUX.1-schnell", "ae.safetensors"), ("Comfy-Org/Lumina_Image_2.0_Repackaged", "split_files/vae/ae.safetensors"), ("black-forest-labs/FLUX.1-dev", "ae.safetensors")]
 FLUX_GUIDANCE = 3.5
@@ -2552,16 +2555,17 @@ def ensure_sdxl(model_spec=""):
     log("โมเดลภาพ SDXL พร้อม: " + got)
 
 
-def ensure_flux(model_spec="", quant=""):
-    if M.get("flux"):
+def ensure_flux(model_spec="", quant="", schnell=False):
+    key = "flux_s" if schnell else "flux"
+    if M.get(key):
         return
-    log("กำลังโหลดโมเดลภาพ FLUX.1-dev (ครั้งแรกประมาณ 5–10 นาที)")
+    log("กำลังโหลดโมเดลภาพ %s (ครั้งแรกประมาณ 5–10 นาที)" % ("FLUX.1-schnell" if schnell else "FLUX.1-dev"))
     cands = []
-    if model_spec and "::" in model_spec and model_spec.strip().lower().endswith(".gguf"):
+    if model_spec and "::" in model_spec and model_spec.strip().lower().endswith(".gguf") and (("schnell" in model_spec.lower()) == schnell):
         r, f = model_spec.split("::", 1)
         cands.append((r.strip(), f.strip()))
     qs = ([quant] if quant else []) + [x for x in IMG_QUANTS if x != quant]
-    cands += [(FLUX_REPO, "flux1-dev-%s.gguf" % x) for x in qs]
+    cands += [(FLUX_S_REPO, "flux1-schnell-%s.gguf" % x) for x in qs] if schnell else [(FLUX_REPO, "flux1-dev-%s.gguf" % x) for x in qs]
     got = None
     for repo, f in cands:
         try:
@@ -2584,8 +2588,8 @@ def ensure_flux(model_spec="", quant=""):
     if not vae:
         raise RuntimeError("โหลด VAE ของ FLUX ไม่สำเร็จ")
     M["fluxvae"] = vae
-    M["flux"] = got
-    log("โมเดลภาพ FLUX.1-dev พร้อม: " + got)
+    M[key] = got
+    log("โมเดลภาพ FLUX พร้อม: " + got)
 
 
 def ensure_image(engine="dev", model_spec="", quant=""):
@@ -2593,7 +2597,7 @@ def ensure_image(engine="dev", model_spec="", quant=""):
         if engine == "sdxl":
             ensure_sdxl(model_spec)
         else:
-            ensure_flux(model_spec, quant)
+            ensure_flux(model_spec, quant, engine == "schnell")
 
 
 def ensure_lora(lid):
@@ -2648,13 +2652,15 @@ def clip_pick(paths, pos):
 
 def gen_image(j, port=8188):
     opt = j.get("opt") or {}
-    engine = "sdxl" if opt.get("engine") == "sdxl" else "dev"
+    engine = opt.get("engine") if opt.get("engine") in ("sdxl", "schnell") else "dev"
     ensure_image(engine, opt.get("model") or "", opt.get("quant") or "")
     q = 8 if engine == "sdxl" else 16
     W = max(512, min(1536, int(opt.get("w") or 1024))) // q * q
     H = max(512, min(1536, int(opt.get("h") or 1024))) // q * q
     if engine == "sdxl":
         steps = max(10, min(50, int(opt.get("steps") or 26)))
+    elif engine == "schnell":
+        steps = max(4, min(8, int(opt.get("steps") or 6)))  # schnell: 4–8 ขั้นพอ
     else:
         steps = max(16, min(30, int(opt.get("steps") or 24)))
     seed = int(opt.get("seed") or 0) or (int(opt.get("seedLoc") or 0) * 1000 + int(opt.get("jobId") or 0) % 1000 if opt.get("seedLoc") else 0) or random.randint(1, 2 ** 31)
@@ -2683,7 +2689,7 @@ def gen_image(j, port=8188):
         wf["5"]["inputs"]["model"] = pm
     else:
         wf = {
-            "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["flux"]}},
+            "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["flux_s" if engine == "schnell" else "flux"]}},
             "2": {"class_type": "DualCLIPLoader", "inputs": {"clip_name1": "t5xxl_fp8_e4m3fn.safetensors", "clip_name2": "clip_l.safetensors", "type": "flux"}},
             "3": {"class_type": "VAELoader", "inputs": {"vae_name": M["fluxvae"]}},
             "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": (j.get("prompt") or "")}},
