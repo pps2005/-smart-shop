@@ -1222,7 +1222,7 @@ async function bridgeImg(env, s) {
     const draft = String(j.project).startsWith('ฉาก') && s.sb_draft !== '0';
     let shEn = ''; if (draft) { const shr = await env.DB.prepare('SELECT en FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; lo = []; }
     const eg = draft ? 'dev' : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
-    const opt = { ...(draft ? { gray: 1 } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '', quant: s.img_quant || '', loras: lo };
+    const opt = { ...(draft ? { gray: 1 } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: j.prompt }, s, /chr\d+x/.test(String(j.prompt || '')) ? shEn : '') : withStyle(j.prompt, s)).slice(0, 1800), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
