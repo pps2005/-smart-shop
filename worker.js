@@ -643,6 +643,7 @@ function s3Actor(x, z, pose, face) { // หุ่นคนแบบกล่อ�
   if (pose === 'sit') return [bx(x - .24, .47, z - .16 * f, x + .24, 1.05, z + .08 * f), bx(x - .11, 1.05, z - .1 * f, x + .11, 1.32, z + .1 * f), bx(x - .2, .45, z, x + .2, .6, z + .45 * f), bx(x - .18, 0, z + .38 * f, x + .18, .45, z + .5 * f)];
   if (pose === 'bow') return [bx(x - .18, 0, z - .12, x + .18, .9, z + .12), bx(x - .24, .85, z, x + .24, 1.15, z + .6 * f), bx(x - .11, .7, z + .55 * f, x + .11, .95, z + .78 * f)];
   if (pose === 'floor') return [bx(x - .3, 0, z - .4, x + .3, .65, z + .4), bx(x - .11, .65, z - .1, x + .11, .9, z + .1)];
+  if (pose === 'tall') return [bx(x - .14, 0, z - .08, x + .14, 1.2, z + .08), bx(x - .18, 1.2, z - .1, x + .18, 1.95, z + .1), bx(x - .1, 1.95, z - .1, x + .1, 2.2, z + .1)];
   if (pose === 'tiny') return [bx(x - .15, .47, z - .15, x + .15, .78, z + .15)];
   return [bx(x - .18, 0, z - .12, x + .18, .86, z + .12), bx(x - .24, .86, z - .14, x + .24, 1.46, z + .14), bx(x - .11, 1.46, z - .11, x + .11, 1.73, z + .11)];
 }
@@ -3261,8 +3262,8 @@ def render3d(boxes, cam, W, H):
     p = np.array(cam["p"], float); l = np.array(cam["l"], float)
     f = l - p; f /= np.linalg.norm(f)
     up = np.array([0.0, 1.0, 0.0])
-    r = np.cross(f, up); r /= (np.linalg.norm(r) + 1e-9)
-    u = np.cross(r, f)
+    r = np.cross(up, f); r /= (np.linalg.norm(r) + 1e-9)  # แกน +x = ขวาของภาพ
+    u = np.cross(f, r)
     th = np.tan(np.radians(float(cam.get("fov", 55))) / 2)
     ys, xs = np.mgrid[0:H, 0:W]
     sx = (2 * (xs + 0.5) / W - 1) * th * W / H
