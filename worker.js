@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'voice-2';
+const BOT_VER = 'voice-3';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
@@ -1816,6 +1816,7 @@ async function helperKTick(env) {
     if (/^error 401/.test(status)) { await env.DB.prepare("UPDATE helpers SET kstat=?, kerr='API ของ Kaggle ใช้ไม่ได้ (token ผิดหรือหมดอายุ)', kpause=? WHERE id=?").bind(status, now + 6 * 3600000, h.id).run(); continue; }
     await env.DB.prepare('UPDATE helpers SET kstat=? WHERE id=?').bind(status, h.id).run();
     if (launched || now < (+h.kpause || 0) || now - (+h.kpushed || 0) < 5 * 60000) continue;
+    if (/starting/.test(String(h.kstat || '')) && status === 'none' && now - (+h.kpushed || 0) < 40 * 60000) { await env.DB.prepare('UPDATE helpers SET kstat=? WHERE id=?').bind('starting', h.id).run(); continue; } // เพิ่งสั่งเปิด แต่ยังหาเครื่องไม่เจอ: รอก่อน ไม่สั่งซ้ำ (กันเปลืองโควตาผู้ช่วย)
     // เปิดเครื่องผู้ช่วยเมื่อคุ้ม: คิวเยอะ (เครื่องหลักทำอยู่แล้วยังเหลือเยอะ) หรือเครื่องหลักหมดโควตา — คิวน้อยไม่เปิด เพราะเปิดเครื่องแต่ละรอบเสียเวลาโหลดโมเดล ~15 นาที
     if (!(q >= (mainPaused ? 1 : mainBusy ? 4 : 8))) continue;
     if (!S.self_url) continue;
@@ -1825,7 +1826,7 @@ async function helperKTick(env) {
     if (/40[13]/.test(err)) err = 'Kaggle ไม่ยอมให้เปิดเครื่อง: ชื่อผู้ใช้ไม่ตรงกับเจ้าของ key หรือ key ผิด/หมดอายุ (' + err.slice(0, 120) + ')';
     else if (/phone|verif/i.test(err)) err = 'บัญชีนี้ยังไม่ได้ยืนยันเบอร์โทรใน Kaggle จึงใช้ GPU ไม่ได้ (' + err.slice(0, 120) + ')';
     await env.DB.prepare('UPDATE helpers SET kpushed=?, kerr=?, kstat=?, kpause=? WHERE id=?').bind(now, String(err).slice(0, 300), err ? 'error' : 'starting', err ? now + (/quota|limit|exceed/i.test(err) ? 6 : 1) * 3600000 : 0, h.id).run();
-    if (!err) launched = 1;
+    if (!err) { launched = 1; const mu = String((push.j && (push.j.url || push.j.ref)) || '').match(/\/code\/([^/]+)\//); if (mu && mu[1] && mu[1].toLowerCase() !== he.KAGGLE_USERNAME.toLowerCase()) await env.DB.prepare('UPDATE helpers SET kuser=? WHERE id=?').bind(mu[1], h.id).run(); } // ชื่อผู้ใช้ที่กรอกผิด: แก้เป็นชื่อจริงจากคำตอบของ Kaggle
   }
   return { ok: true, launched };
 }
@@ -3864,7 +3865,8 @@ async function castApi(req, env, url, body) {
           let ku = String(b.kuser || '').trim().replace(/^@/, ''), kk = String(b.kkey || '').trim();
           try { const jj = JSON.parse(kk); if (jj && jj.key) { kk = String(jj.key); ku = ku || String(jj.username || ''); } } catch (e) { } // วางทั้งไฟล์ kaggle.json ก็ได้
           if (!ku || kk.length < 20) return json({ error: 'ใส่ชื่อผู้ใช้ Kaggle และ API key ให้ครบ' }, 400);
-          const t = await kFetch({ KAGGLE_USERNAME: ku, KAGGLE_KEY: kk }, `/kernels/list?user=${encodeURIComponent(ku)}&pageSize=1`);
+          const t = await kFetch({ KAGGLE_USERNAME: ku, KAGGLE_KEY: kk }, `/kernels/list?mine=true&pageSize=20`);
+          { const own = (Array.isArray(t.j) ? t.j : []).map(k => String(k.ref || '').split('/')[0]).find(Boolean); if (own && own.toLowerCase() !== ku.toLowerCase()) ku = own; } // ถ้าบัญชีมีโน้ตบุ๊กอยู่แล้ว ใช้ชื่อเจ้าของจริง
           if (t.status === 401 || t.status === 403) return json({ error: 'Kaggle ไม่รับ API key นี้ (ชื่อผู้ใช้หรือ key ไม่ถูก)' }, 400);
           await env.DB.prepare("UPDATE helpers SET kuser=?, kkey=?, kerr='', kpause=0, on_=1 WHERE id=?").bind(ku, kk, +b.setk).run();
         }
