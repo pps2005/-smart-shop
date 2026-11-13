@@ -393,7 +393,7 @@ async function xlNew(env, story, kind, name, desc) {
 async function sbRedrawTick(env, s) {
   if (!s.sb_redraw) return;
   const [story, epS, mode] = String(s.sb_redraw).split('|'); // ตัวที่สาม 'all' = วาดใหม่ทุกช่องรวมฉากหลัง
-  await env.DB.prepare("DELETE FROM settings WHERE key='sb_redraw'").run();
+  const cl = await env.DB.prepare("DELETE FROM settings WHERE key='sb_redraw' AND value=?").bind(String(s.sb_redraw)).run(); if (!cl.meta || !cl.meta.changes) return; // จองงานแบบอะตอม: กันรอบที่ทำงานซ้อนกันทำซ้ำ
   const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!sr) return;
   const scs = (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +epS).all()).results;
   for (const sc of scs) { if (!sc.script_id) continue;
@@ -408,7 +408,7 @@ async function sbImportTick(env, s) {
   if (!s.sb_import) return;
   await animeSchema(env);
   const [story, epS] = String(s.sb_import).split('|'), ep = +epS, D = (SBX[story] || {})[String(ep)];
-  await env.DB.prepare("DELETE FROM settings WHERE key='sb_import'").run();
+  const cl = await env.DB.prepare("DELETE FROM settings WHERE key='sb_import' AND value=?").bind(String(s.sb_import)).run(); if (!cl.meta || !cl.meta.changes) return; // จองงานแบบอะตอม: เคยนำเข้าซ้อน 2 รอบจนช่องซ้ำ
   const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!D || !sr) return;
   for (const [sc, list] of Object.entries(D)) {
     const e = await env.DB.prepare('SELECT id,script_id FROM scenes WHERE series_id=? AND ep=? AND sc=?').bind(sr.id, ep, +sc).first(); if (!e || !e.script_id) continue;
