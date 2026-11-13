@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'voice-1';
+const BOT_VER = 'voice-2';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
@@ -1810,10 +1810,10 @@ async function helperKTick(env) {
     if (now - (+h.kchecked || 0) < 120000) continue;
     await env.DB.prepare('UPDATE helpers SET kchecked=? WHERE id=?').bind(now, h.id).run();
     const he = hEnv(h), st = await kFetch(he, `/kernels/status?userName=${encodeURIComponent(he.KAGGLE_USERNAME)}&kernelSlug=${KSLUG}`);
-    const status = String((st.j && st.j.status) || (st.ok ? '' : st.status === 404 ? 'none' : 'error ' + st.status)).toLowerCase();
+    const status = String((st.j && st.j.status) || (st.ok ? '' : (st.status === 404 || st.status === 403) ? 'none' : 'error ' + st.status)).toLowerCase(); // 403/404 = ยังไม่เคยมีเครื่องของเราในบัญชีนี้ (ครั้งแรก) ไม่ใช่ key เสีย — key เสียจริงจะรู้ตอนสั่งเปิดเครื่อง
     if (/running|starting|queued/.test(String(h.kstat || '')) && !/running|queued/.test(status) && +h.kpushed) await qadd(env, 'kgh:h' + h.id, Math.min(12, (now - +h.kpushed) / 3600000), kgWeek(+h.kpushed));
     if (/running|queued/.test(status)) { await env.DB.prepare('UPDATE helpers SET kstat=? WHERE id=?').bind(status, h.id).run(); continue; }
-    if (/^error 40[13]/.test(status)) { await env.DB.prepare("UPDATE helpers SET kstat=?, kerr='API ของ Kaggle ใช้ไม่ได้ (token ผิดหรือหมดอายุ)', kpause=? WHERE id=?").bind(status, now + 6 * 3600000, h.id).run(); continue; }
+    if (/^error 401/.test(status)) { await env.DB.prepare("UPDATE helpers SET kstat=?, kerr='API ของ Kaggle ใช้ไม่ได้ (token ผิดหรือหมดอายุ)', kpause=? WHERE id=?").bind(status, now + 6 * 3600000, h.id).run(); continue; }
     await env.DB.prepare('UPDATE helpers SET kstat=? WHERE id=?').bind(status, h.id).run();
     if (launched || now < (+h.kpause || 0) || now - (+h.kpushed || 0) < 5 * 60000) continue;
     // เปิดเครื่องผู้ช่วยเมื่อคุ้ม: คิวเยอะ (เครื่องหลักทำอยู่แล้วยังเหลือเยอะ) หรือเครื่องหลักหมดโควตา — คิวน้อยไม่เปิด เพราะเปิดเครื่องแต่ละรอบเสียเวลาโหลดโมเดล ~15 นาที
@@ -1821,7 +1821,9 @@ async function helperKTick(env) {
     if (!S.self_url) continue;
     const text = KAGGLE_PY.replace('__API__', S.self_url).replace('__TOKEN__', h.key).replace('__MAXH__', '11').replace('__QUANT__', S.k_quant || 'Q4_K_M').replace('__CPU__', '0');
     const push = await kFetch(he, '/kernels/push', { method: 'POST', body: JSON.stringify({ slug: `${he.KAGGLE_USERNAME}/${KSLUG}`, newTitle: KSLUG, text, language: 'python', kernelType: 'script', isPrivate: true, enableGpu: true, enableTpu: false, enableInternet: true, machineShape: 'NvidiaTeslaT4', datasetDataSources: [], competitionDataSources: [], kernelDataSources: [], modelDataSources: [], categoryIds: [] }) });
-    const err = !push.ok ? `Kaggle ${push.status}: ${JSON.stringify(push.j).slice(0, 200)}` : (push.j && (push.j.error || push.j.errorMessage)) || '';
+    let err = !push.ok ? `Kaggle ${push.status}: ${JSON.stringify(push.j).slice(0, 200)}` : (push.j && (push.j.error || push.j.errorMessage)) || '';
+    if (/40[13]/.test(err)) err = 'Kaggle ไม่ยอมให้เปิดเครื่อง: ชื่อผู้ใช้ไม่ตรงกับเจ้าของ key หรือ key ผิด/หมดอายุ (' + err.slice(0, 120) + ')';
+    else if (/phone|verif/i.test(err)) err = 'บัญชีนี้ยังไม่ได้ยืนยันเบอร์โทรใน Kaggle จึงใช้ GPU ไม่ได้ (' + err.slice(0, 120) + ')';
     await env.DB.prepare('UPDATE helpers SET kpushed=?, kerr=?, kstat=?, kpause=? WHERE id=?').bind(now, String(err).slice(0, 300), err ? 'error' : 'starting', err ? now + (/quota|limit|exceed/i.test(err) ? 6 : 1) * 3600000 : 0, h.id).run();
     if (!err) launched = 1;
   }
