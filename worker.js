@@ -1237,7 +1237,9 @@ async function bridgeImg(env, s) {
     // ภาพร่าง: สถานที่เดียวกันใช้ seed ชุดเดียวกัน (ฉากหลัง/ลายเส้นใกล้กันขึ้น) + วาด 2 แบบแล้วให้ CLIP ตรวจเลือกภาพที่ตรงบทและฉากหลังครบที่สุด
     const locSeed = shLoc ? [...shLoc].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 2000000000 + 1 : 0;
     const eg = draft ? fluxEng(s) : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
-    const opt = { ...(draft ? { gray: 1, takes: +s.draft_takes || 2, ...(noChar ? { qneg: ['a person standing in the foreground'] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
+    const npExp = !draft || /chibi/i.test(shEn) || /only (his|her|the two) hands?|hand(s)? (is|are) visible/i.test(shEn) ? null : /No people in the picture/.test(shEn) ? 0 : /Exactly one person/.test(shEn) ? 1 : /Exactly two people/.test(shEn) ? 2 : null; // จำนวนคนที่บทกำหนด ให้เครื่องตรวจภาพนับเทียบ
+    const plushBad = draft && /talisman archive office/.test(shEn) && !/plush toys/.test(shEn) ? ['a person holding a teddy bear or stuffed toy', 'stuffed toys lying on the floor'] : [];
+    const opt = { ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { gray: 1, takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: noChar ? '[[STYLE]]' : j.prompt }, s, noChar ? shEn : /chr\d+x/.test(String(j.prompt || '')) ? shEn : '', { nochar: noChar }) : withStyle(j.prompt, s)).slice(0, 4000), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -2679,6 +2681,55 @@ def clip_pick(paths, pos):
         return len(paths) - 1, "ตรวจไม่ได้: %s" % str(e)[:120]
 
 
+def clip_scores(paths, pos):
+    # คะแนน CLIP ของทุกภาพ (ตรงบท − ภาพเสีย)
+    global _CLIP
+    neg = ["an empty blank white background", "a blurry messy unfinished sketch", "deformed hands with extra fingers", "a colored illustration", "text, letters and speech bubbles", "a cluttered noisy image", "a schoolgirl in a school uniform", "extra strangers who do not belong in the scene", "two copies of the same person side by side", "a person with two heads", "signs and posters with writing"] + list(_QNEG)
+    try:
+        import torch
+        from PIL import Image
+        from transformers import CLIPModel, CLIPProcessor
+        if _CLIP is None:
+            nm = "openai/clip-vit-base-patch32"
+            _CLIP = (CLIPModel.from_pretrained(nm).eval(), CLIPProcessor.from_pretrained(nm))
+        m, pr = _CLIP
+        ims = [Image.open(x).convert("RGB") for x in paths]
+        tx = [str(t)[:300] for t in pos if t] + neg
+        inp = pr(text=tx, images=ims, return_tensors="pt", padding=True, truncation=True)
+        with torch.no_grad():
+            lg = m(**inp).logits_per_image
+        npos = len(tx) - len(neg)
+        sc = lg[:, :npos].mean(1) - lg[:, npos:].mean(1) * 0.5
+        return [float(v) for v in sc], ""
+    except Exception as e:
+        log("ตรวจด้วย CLIP ไม่ได้: %s" % str(e)[:120])
+        return [], str(e)[:120]
+
+
+_DET = None
+
+
+def person_count(path):
+    # นับคนในภาพด้วย Faster R-CNN (torchvision, ฟรี) บน CPU · ใช้ไม่ได้คืน None = ข้ามการนับ
+    global _DET
+    try:
+        import torch
+        import torchvision
+        from PIL import Image
+        if _DET is None:
+            w = torchvision.models.detection.FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
+            _DET = (torchvision.models.detection.fasterrcnn_resnet50_fpn_v2(weights=w, box_score_thresh=0.5).eval(), w.transforms())
+        m, tf = _DET
+        im = Image.open(path).convert("RGB")
+        im.thumbnail((896, 896))
+        with torch.no_grad():
+            r = m([tf(im)])[0]
+        return int(((r["labels"] == 1) & (r["scores"] >= 0.7)).sum())
+    except Exception as e:
+        log("นับคนในภาพไม่ได้: %s" % str(e)[:120])
+        return None
+
+
 def gen_image(j, port=8188):
     opt = j.get("opt") or {}
     engine = opt.get("engine") if opt.get("engine") in ("sdxl", "schnell") else "dev"
@@ -2730,28 +2781,58 @@ def gen_image(j, port=8188):
             "10": {"class_type": "SaveImage", "inputs": {"images": ["9", 0], "filename_prefix": "img%s" % jid}},
         }
     t0 = time.time()
-    pid = comfy("/prompt", {"prompt": wf, "client_id": "bot"}, port=port)["prompt_id"]
-    while True:
-        time.sleep(2)
-        h = comfy("/history/" + pid, port=port)
-        if pid in h:
-            st = h[pid].get("status", {})
-            if st.get("status_str") == "error":
-                msgs = [m for m in st.get("messages", []) if m[0] == "execution_error"]
-                raise RuntimeError("เจนภาพไม่สำเร็จ: " + json.dumps(msgs)[:500])
-            break
-        if time.time() - t0 > 900:
-            raise RuntimeError("เจนภาพนานเกิน 15 นาที")
-    outs = sorted(glob.glob(os.path.join(COMFY, "output", "**", "img%s_*" % jid), recursive=True))
-    if not outs:
-        raise RuntimeError("ไม่มีไฟล์ภาพออกมา")
+    sk = [k for k in wf if wf[k]["class_type"] == "SaveImage"][0]
+    kk = "5" if engine == "sdxl" else "8"
+
+    def run_once(sd, tag):
+        wf[kk]["inputs"]["seed"] = sd
+        wf[sk]["inputs"]["filename_prefix"] = "img%s%s" % (jid, tag)
+        t1 = time.time()
+        pid = comfy("/prompt", {"prompt": wf, "client_id": "bot"}, port=port)["prompt_id"]
+        while True:
+            time.sleep(2)
+            h = comfy("/history/" + pid, port=port)
+            if pid in h:
+                st = h[pid].get("status", {})
+                if st.get("status_str") == "error":
+                    msgs = [m for m in st.get("messages", []) if m[0] == "execution_error"]
+                    raise RuntimeError("เจนภาพไม่สำเร็จ: " + json.dumps(msgs)[:500])
+                break
+            if time.time() - t1 > 900:
+                raise RuntimeError("เจนภาพนานเกิน 15 นาที")
+        return sorted(glob.glob(os.path.join(COMFY, "output", "**", "img%s%s_*" % (jid, tag)), recursive=True))
+
     from PIL import Image
-    pick = len(outs) - 1
-    if takes > 1 and len(outs) > 1:
+    # ตรวจภาพอัตโนมัติ (Visual QC): ทุกแบบที่วาด → (1) นับคนในภาพด้วยตัวตรวจจับคน เทียบจำนวนที่บทกำหนด (กันคนซ้ำ/คนแปลกหน้าโผล่)
+    # (2) CLIP ให้คะแนนตรงบท − ภาพเสีย · ถ้าไม่มีแบบไหนผ่าน วาดใหม่ทันทีด้วย seed ใหม่ (สูงสุด 3 รอบ) แล้วใช้แบบที่ดีที่สุด
+    exp = opt.get("np")
+    exp = None if exp is None or exp == "" else int(exp)
+    rounds = 3 if takes > 1 else 1
+    outs_all, best_ok, best_any = [], None, None
+    for rd in range(rounds):
+        outs = run_once(seed + rd * 7919, "r%d" % rd)
+        if not outs:
+            raise RuntimeError("ไม่มีไฟล์ภาพออกมา")
+        outs_all += outs
+        if takes <= 1:
+            best_any = (0.0, outs[-1])
+            break
         _QNEG[:] = opt.get("qneg") or []
-        pick, info = clip_pick(outs[-takes:], opt.get("qc") or [j.get("prompt") or ""])
-        pick = len(outs) - takes + pick
-        log("ภาพ %s: วาด %d แบบ ตรวจด้วย CLIP เลือกแบบที่ %d (%s)" % (jid, takes, pick - (len(outs) - takes) + 1, info))
+        scs, info = clip_scores(outs, opt.get("qc") or [j.get("prompt") or ""])
+        for k, pth in enumerate(outs):
+            sc = scs[k] if k < len(scs) else 0.0
+            cnt = person_count(pth) if exp is not None else None
+            bad = cnt is not None and ((exp == 0 and cnt >= 1) or (exp > 0 and cnt > exp))
+            log("ภาพ %s รอบ %d แบบ %d: คะแนน %.1f · คนในภาพ %s/%s %s" % (jid, rd + 1, k + 1, sc, "-" if cnt is None else cnt, "-" if exp is None else exp, "ไม่ผ่าน" if bad else "ผ่าน"))
+            if best_any is None or sc > best_any[0]:
+                best_any = (sc, pth)
+            if not bad and (best_ok is None or sc > best_ok[0]):
+                best_ok = (sc, pth)
+        if best_ok:
+            break
+        log(("ภาพ %s: ไม่มีแบบไหนผ่านการตรวจ วาดใหม่รอบที่ %d" % (jid, rd + 2)) if rd + 1 < rounds else ("ภาพ %s: ตรวจไม่ผ่านครบ %d รอบ ใช้แบบที่คะแนนดีที่สุด" % (jid, rounds)))
+    outs = outs_all
+    pick = outs.index((best_ok or best_any)[1])
     im = Image.open(outs[pick]).convert("RGB")
     if (j.get("opt") or {}).get("gray"):
         im = im.convert("L").convert("RGB")  # สตอรีบอร์ดร่าง: บังคับขาวดำ กันสีหลุด
