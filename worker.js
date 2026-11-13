@@ -584,13 +584,13 @@ function fluxDraft(job, s, shEn, fl) {
   // ภาพร่างสตอรีบอร์ด = มังงะขาวดำตัดเส้นหมึก (ผู้ใช้เลือก): ไม่มีสี/แสงให้แกว่งข้ามช่อง · ตั้ง settings draft_style เพื่อเปลี่ยนได้
   const st = String(s.draft_style || '').trim() || 'professional black and white manga panel, clean consistent fine-pen line art with controlled line weight and precise contours, light dot screentone and controlled hatching for shading. Characters: hair drawn as fine separate strands, detailed expressive eyes with highlights, natural clothing folds and fabric texture, correct hand anatomy with five well-shaped fingers, small accessories drawn clearly. Environment: real architecture and furniture with surface textures (wood grain, paper, metal, glass, plush fur), small props that fit the place, clear foreground, midground and background with correct perspective and depth, contact shadows and cast shadows under people and objects. Any paper, ledger, book, sign or talisman shows only simple wavy lines or blank areas instead of writing. Clean and readable, not cluttered, people (only those the scene describes) drawn in a delicate manga style with slender anime proportions, no color, no text, no speech bubbles';
   const col = !!(fl && fl.color); // ภาพสี (แบบผสม): คงสีในบท ไม่ตัดออก
-  const mono = col ? body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/ {2,}/g, ' ') : body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/, a tired gentle face/gi, ', a gentle face').replace(/\ba plain /gi, 'a ').replace(/\b(mature male|middle-aged man|mature female|middle-aged woman|old woman|old man),\s*/gi, '').replace(/ {2,}/g, ' ');
+  const mono = col ? body.replace(/\bmanga\b/gi, 'anime').replace(/,?\s*single cinematic illustration/, '').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/ {2,}/g, ' ') : body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/, a tired gentle face/gi, ', a gentle face').replace(/\ba plain /gi, 'a ').replace(/\b(mature male|middle-aged man|mature female|middle-aged woman|old woman|old man),\s*/gi, '').replace(/ {2,}/g, ' ');
   const who = fl && fl.nochar ? (/\bhands?\b|fingers/.test(mono) ? 'Only the hands described are visible, no full person and nobody else in the picture. ' : /pedestrian|passersby|customers|crowd|clerks|people/.test(mono) ? 'No main characters: only the tiny distant figures the scene mentions. ' : /demon|creature|spirit|figure|silhouette|child/.test(mono) ? 'No other people except what the scene describes. ' : 'No people at all in this panel, only the place and objects. ') : ''; // ช่องไม่มีตัวละคร: กัน AI เติมคนแปลกหน้า (เจอจริง: เด็กนักเรียนโผล่หน้าหอระฆัง)
-  if (col) return `${draftCam(mono, fl && fl.nochar)}. ${who}${age ? age + '. ' : ''}Scene: ${mono}. Style: ${HY_FLUX_STYLE} The setting is always fully drawn behind the characters with complete background detail, never a blank or plain background.`;
+  if (col) return `${draftCam(mono, fl && fl.nochar, true)}. ${who}${age ? age + '. ' : ''}Scene: ${mono}. Style: ${HY_FLUX_STYLE} The setting is always fully drawn behind the characters with complete background detail, never a blank or plain background.`;
   return `${draftCam(mono, fl && fl.nochar)}. ${who}${age ? age + '. ' : ''}Scene: ${mono}. Style: ${st}. The setting is always fully drawn behind the characters with complete background detail, never a blank or plain background. Strictly black ink on white paper, grayscale only.`; // มุมกล้อง + เนื้อเรื่องมาก่อนลายเส้น (ตัวเข้ารหัส CLIP อ่านแค่ ~77 โทเคนแรก — เดิมลายเส้นมาก่อน มุมกล้องเลยหลุด ได้แต่หน้าตรง)
 }
 // มุมกล้องของช่อง → ประโยคบังคับท่า/มุม (Flux ชอบวาดคนหันหน้าตรงมองกล้องถ้าไม่สั่งชัด)
-function draftCam(en, nochar) {
+function draftCam(en, nochar, col) {
   const e = String(en || '').toLowerCase(), c = [];
   if (/worm's-eye/.test(e)) c.push("worm's-eye view looking almost straight up, strong perspective");
   if (/bird's-eye/.test(e)) c.push("bird's-eye view looking straight down from high above");
@@ -610,7 +610,7 @@ function draftCam(en, nochar) {
   if (/insert/.test(e)) c.push('insert shot of the object, no character faces');
   if (!nochar && !/back view|from behind|side view|from the side|profile|over-the-shoulder|insert|wide shot|establishing|pov|only (his|her|the two) hand/.test(e)) c.push('three-quarter view, the character is busy with the action and looking away from the viewer, candid moment, not posing for the camera');
   if (!c.length) c.push(nochar ? 'the place and objects only' : 'three-quarter view, candid moment');
-  return 'Manga panel. Camera: ' + c.join(', ');
+  return (col ? 'Full colour anime key frame, not black and white. Camera: ' : 'Manga panel. Camera: ') + c.join(', ');
 }
 function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
 // เจนต่อเนื่อง: คิวว่างเมื่อไร เติมผู้สมัครออดิชันใหม่เอง (สลับบท) — เอาไว้ให้ได้ภาพมากพอเลือกทำ LoRA
@@ -631,7 +631,7 @@ const HY_TAGS = { // แท็กประจำตัว (SDXL) — แก้�
   'โทวะ': { tags: '1boy, adult, young man, handsome, black hair, messy hair, ahoge, round eyewear, thin glasses, mole under eye, white shirt, collared shirt, sleeves rolled up, loose necktie, dark necktie, grey sweater vest, black pants', desc: 'a young man with messy black hair and round glasses in a grey knit vest and loose necktie' },
   'ริน': { tags: '1girl, adult, young woman, beautiful, red hair, long hair, high ponytail, sharp eyes, oversized black hoodie, black shorts, black pantyhose, sneakers', desc: 'a young woman with a long red ponytail in an oversized black hoodie and black tights' },
   'ริน_d': { tags: '1girl, adult, young woman, beautiful, red hair, braided bun, low bun, large round eyewear, white apron, cream blouse, smile', desc: 'a young woman with a red braided bun, big round glasses and a white bakery apron' },
-  'มิโอะ': { tags: '1girl, adult, young woman, office lady, brown hair, short bob, blunt bangs, rabbit hair ornament, half-closed eyes, white blouse, long sleeves, dark cardigan, long skirt', desc: 'a young office woman with a short brown bob, blunt bangs and a rabbit hair clip' },
+  'มิโอะ': { neg: 'sweater vest, vest, school uniform, pleated skirt, necktie', tags: '1girl, adult, young woman, office lady, brown hair, short bob, blunt bangs, rabbit hair ornament, half-closed eyes, white blouse, long sleeves, open dark cardigan, long skirt', desc: 'a young office woman with a short brown bob, blunt bangs and a rabbit hair clip' },
   'หัวหน้าซาเอกิ': { tags: '1girl, mature female, beautiful, black hair, short bob, streaked hair, silver streak, drop earrings, black pantsuit, formal suit, black jacket, black pants, high collar blouse', desc: 'an elegant woman with a black bob with one silver streak in a black pantsuit' },
   'ป้าฮานะ': { tags: '1girl, mature female, beautiful, youthful, grey hair, hair bun, sharp eyes, white apron, flour on clothes', desc: 'a youthful pretty woman baker with grey hair in a bun and a white apron' },
   'ไค': { tags: '1boy, adult, young man, handsome, blonde hair, short hair, spiky hair, scar on eyebrow, open jacket, courier jacket, large backpack, grin', desc: 'a young man with spiky blond hair in an open courier jacket with a big backpack' },
@@ -642,24 +642,26 @@ function hyOpt(en, names, s) {
   const e = String(en || ''), lo = e.toLowerCase();
   const day = /braided low bun|bakery apron/.test(lo); // รินตอนกลางวัน (พนักงานร้านขนมปัง)
   const chars = [];
-  for (const n of names || []) { const t = HT[n === 'ริน' && day ? 'ริน_d' : n]; if (t) chars.push({ n, p: t.o ? 0 : 1, tags: t.tags, desc: t.desc }); }
+  for (const n of names || []) { const t = HT[n === 'ริน' && day ? 'ริน_d' : n]; if (t) chars.push({ n, p: t.o ? 0 : 1, tags: t.tags, desc: t.desc, ...(t.neg ? { neg: t.neg } : {}) }); }
   const chibi = /chibi/.test(lo), hands = /only (his|her|the two) hands?|hand(s)? (is|are) visible/.test(lo);
   if (chibi) for (const c of chars) c.tags = 'chibi, ' + c.tags;
   if (hands) for (const c of chars) c.p = 0; // ช่องเห็นแค่มือ: ไม่วาดทั้งตัว
   // ฉากเปล่า: มุมกล้อง + ส่วน Setting/Lighting ของบท
   const set = (e.match(/Setting:\s*([^]*?)(?=\s(?:Lighting|Effects):|\sAll papers|$)/) || [])[1] || '';
   const lit = (e.match(/Lighting:\s*([^.]*)\./) || [])[1] || '';
-  const bg = `${draftCam(e, true)}. No people at all, an empty place with nobody in it. Place: ${set.replace(/;?\s*drawn behind (him|her|them)\.?/gi, '').trim()}${lit ? '. Lighting: ' + lit : ''}. Style: ${HY_FLUX_STYLE}`;
+  const bg = `${draftCam(e, true, true)}. No people at all, an empty place with nobody in it. Place: ${set.replace(/;?\s*drawn behind (him|her|them)\.?/gi, '').trim()}${lit ? '. Lighting: ' + lit : ''}. Style: ${HY_FLUX_STYLE}`;
   const contact = /\b(sits?|sitting|seated|bench|desk|holds?|holding|hands? (him|her)|pulls?|pulling|hug|lean(s|ing)?|carr(y|ies|ying)|grab|tug|bites?|touch|shoulder|lying|kneel|crouch|on the floor|chair)\b/.test(lo);
   const place = /archive office/.test(lo) ? 'indoors, office, filing cabinet, wooden floor, arched window, ceiling lamp' : /vending machine/.test(lo) ? 'outdoors, night, alley, gravel, brick wall, vending machine, bench, street lamp' : /storage aisle/.test(lo) ? 'indoors, storage room, shelves, dark, light bulb' : /bakery/.test(lo) ? 'indoors, bakery, bread, counter, sunlight' : /outside the city barrier|floating rock/.test(lo) ? 'outdoors, night, starry sky, floating island, dark mist' : /town|street|roof/.test(lo) ? 'outdoors, town, street, japanese architecture, lantern' : '';
   const pc = chars.filter(c => c.p), cnt = pc.length ? [pc.filter(c => /1girl/.test(c.tags)).length, pc.filter(c => /1boy/.test(c.tags)).length] : [0, 0];
   const cntT = pc.length ? [cnt[1] ? cnt[1] + 'boy' + (cnt[1] > 1 ? 's' : '') : '', cnt[0] ? cnt[0] + 'girl' + (cnt[0] > 1 ? 's' : '') : ''].filter(Boolean).join(', ') : (hands ? 'hands, close-up' : 'no humans, scenery');
-  const plush = /plush toys/.test(lo) ? 'small plush toys: rabbit, teddy bear, seal, cat, chick' : '';
+  const plush = /plush toys/.test(lo) ? 'row of five small plush toys, rabbit plush, teddy bear, seal plush, cat plush, chick plush' : '';
+  const L = lit.toLowerCase(), litT = /night|moon|lamp|glow/.test(L) ? 'night, dark, lamp light' : /dim|flicker|dark/.test(L) ? 'dim lighting' : /afternoon|sunset|evening|dusk|golden/.test(L) ? 'afternoon, warm sunlight, golden hour' : /morning|dawn/.test(L) ? 'morning, soft sunlight' : /sun|window|day|bright/.test(L) ? 'daylight, sunlight' : '';
   return {
     chars, bg, mode: contact || chibi || hands ? 'over' : 'comp', style: s.hy_style || HY_SDXL_STYLE,
     pose: /from behind|back view|back to the viewer/.test(lo) ? 'from behind' : /side view|profile/.test(lo) ? 'from side' : '',
-    all: [cntT, chars.map(c => c.tags.replace(/^(chibi, )?\d?(boy|girl|1boy|1girl), /, '$1')).join(', '), place, plush].filter(Boolean).join(', ').slice(0, 900),
-    props: plush ? { 88: 'small cute plush toy, stuffed animal' } : {},
+    all: [cntT, chars.map(c => c.tags.replace(/^(chibi, )?\d?(boy|girl|1boy|1girl), /, '$1')).join(', '), place, litT, 'consistent lighting, full color', plush].filter(Boolean).join(', ').slice(0, 900),
+    props: plush ? { 88: 'small cute plush toy, stuffed animal' } : {}, dc: 0.62,
+    ...(plush ? { plush: ['long-eared white rabbit plush toy', 'brown teddy bear plush toy', 'grey seal plush toy, round seal', 'small cat plush toy', 'yellow chick plush toy, baby bird'] } : {}),
   };
 }
 function fluxEng(s) { return s && s.img_commercial === '0' ? 'dev' : 'schnell'; }
@@ -1565,7 +1567,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR json_extract(opt,'$.engine') IS NOT 'hybrid') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 9 ? 1 : 0).first(); // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR json_extract(opt,'$.engine') IS NOT 'hybrid') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 10 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -3008,7 +3010,7 @@ def gen_hybrid(j, port=8188):
     for i, b in enumerate(persons):
         c = pc[who[i]] if 0 <= who[i] < len(pc) else {}
         pos = IMG_POS + style + ", " + (c.get("tags") or "1person") + ", solo, " + (hy.get("pose") or "")
-        r, (X0, Y0) = hy_refine(A, b[1], pos, neg, seed + 101 + i, float(hy.get("dc") or 0.55), "img%sP%d" % (jid, i), port, c.get("loras"))
+        r, (X0, Y0) = hy_refine(A, b[1], pos, neg + (", " + c["neg"] if c.get("neg") else ""), seed + 101 + i, float(hy.get("dc") or 0.55), "img%sP%d" % (jid, i), port, c.get("loras"))
         mk = None
         if B is not None:
             cut = cutout(r)
@@ -3029,7 +3031,15 @@ def gen_hybrid(j, port=8188):
     base.save(tp)
     props = hy.get("props") or {}
     k = 0
-    for lb, bx, sc in detect_boxes(tp, 0.5):
+    found = detect_boxes(tp, 0.5)
+    pl = hy.get("plush") or []
+    if pl:  # ตุ๊กตาบนโต๊ะ: เรียงซ้าย→ขวา แล้ววาดแต่ละตัวตามชนิดที่บทกำหนด (กันได้ตัวซ้ำ/ขาดแมวน้ำ)
+        pb = sorted([b for b in found if b[0] in (15, 16, 17, 18, 88) and (b[1][2] - b[1][0]) * (b[1][3] - b[1][1]) < W * H * 0.05], key=lambda b: b[1][0])[:len(pl)]
+        for i, (lb, bx, sc) in enumerate(pb):
+            r, xy = hy_refine(base, bx, IMG_POS + style + ", " + pl[i] + ", no humans, solo, detailed", neg, seed + 401 + i, 0.6, "img%sU%d" % (jid, i), port, None, 0.3)
+            base.paste(r, xy, soft_mask(r.size, 0.15, 0.08))
+        found = [b for b in found if b not in pb]
+    for lb, bx, sc in found:
         if lb == 1 or k >= 5:
             continue
         t = props.get(str(lb)) or HY_PROPS.get(lb)
@@ -3842,7 +3852,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=9" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=10" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
