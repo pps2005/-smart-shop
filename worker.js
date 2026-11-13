@@ -1344,6 +1344,11 @@ async function tick(env, force) {
   if (s.supa_test === '1') await supaSelfTest(env, s);
   await sbImportTick(env, s).catch(() => { });
   await sbRedrawTick(env, s).catch(() => { });
+  if (s.lora_purge) { // ลบ LoRA ชุดเก่า (ไฟล์ใน Supabase + แถวในฐานข้อมูล) ตามที่ผู้ใช้สั่ง — ทีละ 4 ตัวต่อรอบ
+    const ids = String(s.lora_purge).split(',').map(Number).filter(Boolean), now4 = ids.slice(0, 4);
+    for (const id of now4) { await supaDelLora(env, id).catch(() => { }); await env.DB.batch([env.DB.prepare('DELETE FROM lchunks WHERE lid=?').bind(id), env.DB.prepare('DELETE FROM loras WHERE id=?').bind(id), env.DB.prepare("DELETE FROM settings WHERE key=?").bind('lparts:' + id)]).catch(() => { }); }
+    await setSetting(env, 'lora_purge', ids.slice(4).join(','));
+  }
   if (s.design_cast) { await env.DB.prepare("DELETE FROM settings WHERE key='design_cast'").run(); await designCast(env, s, String(s.design_cast)).catch(() => { }); }
   await restyleTick(tagged(env, 'bg:lora'), s).catch(() => { });
   await xlTick(tagged(env, 'bg:lora')).catch(() => { });
@@ -4804,7 +4809,7 @@ async function castApi(req, env, url, body) {
       if (act === 'refs') { // แผ่นอ้างอิงตัวละคร (ปกติ + หน้าตลก): รายการภาพ + ที่อนุมัติแล้ว + คิวที่ค้าง
         const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project LIKE 'อ้างอิง·%' ORDER BY id").all()).results;
         const q = (await env.DB.prepare("SELECT project,COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND project LIKE 'อ้างอิง·%' GROUP BY project").all()).results;
-        return json({ ok: true, imgs: im, queued: q, ok_: (await rd('charref:' + story)) || {}, names: Object.keys(HY_TAGS).filter(n => n !== 'ริน_d') });
+        return json({ ok: true, imgs: im, queued: q, ok_: (await rd('charref:' + story)) || {}, names: [...new Set([...Object.keys(HY_TAGS).filter(n => n !== 'ริน_d'), ...im.map(x => String(x.project).split('·')[1])])] });
       }
       if (act === 'ref_ok') { // อนุมัติภาพอ้างอิง: {name, kind:'n'|'g', id, on}
         const cur = (await rd('charref:' + story)) || {}, nm = String(b.name || ''), k = b.kind === 'g' ? 'g' : 'n'; cur[nm] = cur[nm] || { n: 0, g: [] };
