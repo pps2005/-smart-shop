@@ -246,6 +246,9 @@ async function dl(id,name){try{toast('กำลังโหลดไฟล์…
 function bestEp(){const q=ST.qc;if(!q||!q.eps)return 0;const c=q.eps.filter(E=>E.final&&!E.fixing&&!E.bad);if(!c.length)return 0;c.sort((a,b)=>(b.avg==null?50:b.avg)-(a.avg==null?50:a.avg));return c[0].no;}
 /* ---------- หน้าจอ ---------- */
 function render(){const A=$('#app');
+  /* ช่องกรอกในการ์ด (key ผู้ช่วย ฯลฯ): ระหว่างพิมพ์ ไม่วาดหน้าใหม่ทับ · ค่าที่พิมพ์ค้างไว้คงอยู่หลังวาดใหม่ */
+  {const ae=document.activeElement;if(ae&&A.contains(ae)&&ae.tagName==='INPUT'&&ae.closest('[data-hcard]')&&!window._forceRender){clearTimeout(window._rdT);window._rdT=setTimeout(render,4000);return;}window._forceRender=0;
+   window._keep=window._keep||{};A.querySelectorAll('[data-hcard] input').forEach(x=>{const k=[...x.attributes].filter(a=>a.name.startsWith('data-')).map(a=>a.name+'='+a.value).join('&');if(k)window._keep[k]=x.value;});}
   if(!botCfg().url||ST.editBot){A.innerHTML=`<div class="c"><h2>🔌 เชื่อมบอท${botCfg().url?'ใหม่':''}</h2><div class="mu">ใส่ลิงก์บอท (Worker ที่ deploy ล่าสุด) กับรหัสผ่าน เก็บในเครื่องนี้</div><input type="text" id="bu" placeholder="https://...workers.dev" value="${esc(botCfg().url||'')}"><input type="password" id="bk" placeholder="รหัสผ่านบอท"><button class="on" id="bs">บันทึกและเชื่อม</button><button id="bt0">🧪 ทดสอบ</button>${botCfg().url?'<button id="bc">ยกเลิก</button>':''}<div id="bt" class="mu" style="margin-top:6px;white-space:pre-wrap"></div></div>`;
     $('#bt0').onclick=async()=>{const o=$('#bt');o.textContent='⏳ กำลังทดสอบ…';const r=await testBot($('#bu').value,$('#bk').value);o.textContent=r.m;};
     $('#bs').onclick=()=>{localStorage.setItem('ss_imgbot',JSON.stringify({url:$('#bu').value.trim(),key:$('#bk').value}));ST.editBot=false;ST.err='';load();};
@@ -338,6 +341,7 @@ function render(){const A=$('#app');
       <div class="mu" style="margin-top:8px">ตอนนี้วิดีโอยังไม่มีเสียงพากย์ ซับ และเพลง ต้องใส่ในแอปตัดต่อก่อนอัปโหลด</div></div>`;}
   }
   A.innerHTML=h;bindTabs(A);
+  if(window._keep)A.querySelectorAll('[data-hcard] input').forEach(x=>{const k=[...x.attributes].filter(a=>a.name.startsWith('data-')).map(a=>a.name+'='+a.value).join('&');if(window._keep[k])x.value=window._keep[k];});
   A.querySelectorAll('[data-sty]').forEach(b=>b.onclick=()=>setSty(b.dataset.sty));
   A.querySelectorAll('[data-asp]').forEach(b=>b.onclick=()=>setAsp(b.dataset.asp));
   A.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>pickBest(+b.dataset.pick));
@@ -352,7 +356,7 @@ function render(){const A=$('#app');
   A.querySelectorAll('[data-boost]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('boost',{hours:+b.dataset.boost});ST.boost=+r.until||0;toast(r.until?'⚡ เร่งแล้ว':'หยุดเร่งแล้ว');}catch(e){toast(botErr(e));}render();});
   {const hc=A.querySelector('[data-hcard]');if(hc)hc.ontoggle=async()=>{ST.hOpen=hc.open;if(hc.open&&!ST.helpers){try{ST.helpers=(await api('helpers')).items||[];}catch(e){ST.helpers=[];toast(botErr(e));}render();}};}
   A.querySelectorAll('[data-hset]').forEach(b=>b.onclick=async()=>{const [id,on]=b.dataset.hset.split('|');b.disabled=true;try{ST.helpers=(await api('helpers',{set:+id,on:+on})).items||[];toast(+on?'เปิดสิทธิ์แล้ว':'ปิดสิทธิ์แล้ว');}catch(e){toast(botErr(e));}render();});
-  const hcall=async(o,msg)=>{try{ST.helpers=(await api('helpers',o)).items||[];if(msg)toast(msg);}catch(e){toast(botErr(e));}render();};
+  const hcall=async(o,msg)=>{let ok=0;try{ST.helpers=(await api('helpers',o)).items||[];ok=1;if(msg)toast(msg);}catch(e){toast('❌ '+botErr(e));}if(ok)window._keep={};window._forceRender=1;if(document.activeElement)document.activeElement.blur();render();};
   A.querySelectorAll('[data-hsetk]').forEach(b=>b.onclick=()=>{const id=b.dataset.hsetk,u=A.querySelector(`[data-hku="${id}"]`).value,k=A.querySelector(`[data-hkk="${id}"]`).value;b.disabled=true;b.textContent='⏳ กำลังตรวจกับ Kaggle…';hcall({setk:+id,kuser:u,kkey:k},'ผูกแล้ว ระบบจะเปิดเครื่องผู้ช่วยเองเมื่อคิวเยอะ');});
   A.querySelectorAll('[data-hunk]').forEach(b=>b.onclick=()=>{b.disabled=true;hcall({unk:+b.dataset.hunk},'ยกเลิกการผูกแล้ว');});
   {const ab=A.querySelector('[data-haddb]');if(ab)ab.onclick=()=>{const n=A.querySelector('[data-hadd]').value.trim();if(!n)return toast('ใส่ชื่อก่อน');ab.disabled=true;hcall({add:n},'เพิ่มผู้ช่วยแล้ว');};}
