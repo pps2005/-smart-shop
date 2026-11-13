@@ -1312,7 +1312,8 @@ async function bridgeImg(env, s) {
     let shChars = [], s3 = null; if (hyOn) { const cr = await env.DB.prepare('SELECT chars,say FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { shChars = JSON.parse((cr && cr.chars) || '[]'); } catch { shChars = []; } try { const sy = JSON.parse((cr && cr.say) || '{}'); if (sy.s3 && s.img_3d !== '0') s3 = s3Opt(sy.s3); } catch { s3 = null; } }
     let hyO = hyOn ? hyOpt(shEn, shChars, s) : null;
     if (hyO && s.self_url) { // ภาพอ้างอิงตัวละครที่ผู้ใช้อนุมัติ (ปกติ / หน้าตลกในช่องตลก) → ลิงก์มีลายเซ็นให้เครื่อง Kaggle ดึง
-      const REF = {}; for (const k of Object.keys(s)) if (k.startsWith('charref:')) { try { Object.assign(REF, JSON.parse(s[k] || '{}')); } catch { } }
+      const LIB = {}, MAP = {}, REF = {}; for (const k of Object.keys(s)) { try { if (k.startsWith('charref:')) Object.assign(LIB, JSON.parse(s[k] || '{}')); if (k.startsWith('refmap:')) Object.assign(MAP, JSON.parse(s[k] || '{}')); } catch { } }
+      for (const [lib, v] of Object.entries(LIB)) { const role = lib in MAP ? MAP[lib] : lib; if (role && !(role in REF && MAP[lib] === undefined)) REF[role] = v; } // ตัวละครในคลังที่ผู้ใช้จับคู่กับบท (ค่าเริ่มต้น = ชื่อเดียวกัน)
       const gag = /chibi|comedic|gag|meme|deadpan|super-deformed/i.test(shEn);
       for (const c of hyO.chars) { const R = REF[c.n]; if (!R) continue; const id = gag && (R.g || []).length ? R.g[(j.id || 0) % R.g.length] : R.n; if (id) { c.ref = s.self_url + '/vi/' + id + '?s=' + await vvSig(env, 'i' + id); c.rw = gag ? 0.45 : 0.6; } }
     }
@@ -4809,7 +4810,10 @@ async function castApi(req, env, url, body) {
       if (act === 'refs') { // แผ่นอ้างอิงตัวละคร (ปกติ + หน้าตลก): รายการภาพ + ที่อนุมัติแล้ว + คิวที่ค้าง
         const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project LIKE 'อ้างอิง·%' ORDER BY id").all()).results;
         const q = (await env.DB.prepare("SELECT project,COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND project LIKE 'อ้างอิง·%' GROUP BY project").all()).results;
-        return json({ ok: true, imgs: im, queued: q, ok_: (await rd('charref:' + story)) || {}, names: [...new Set([...Object.keys(HY_TAGS).filter(n => n !== 'ริน_d'), ...im.map(x => String(x.project).split('·')[1])])] });
+        return json({ ok: true, imgs: im, queued: q, ok_: (await rd('charref:' + story)) || {}, map: (await rd('refmap:' + story)) || {}, roles: Object.keys(HY_TAGS).filter(n => n !== 'ริน_d'), names: [...new Set([...Object.keys(HY_TAGS).filter(n => n !== 'ริน_d'), ...im.map(x => String(x.project).split('·')[1])])] });
+      }
+      if (act === 'ref_map') { // ตัวละครในคลัง → ใช้เป็นบทไหน ('' = ไม่ใช้ในเรื่องนี้)
+        const m = (await rd('refmap:' + story)) || {}; m[String(b.lib || '')] = String(b.role ?? ''); await setSetting(env, 'refmap:' + story, JSON.stringify(m)); return json({ ok: true, map: m });
       }
       if (act === 'ref_ok') { // อนุมัติภาพอ้างอิง: {name, kind:'n'|'g', id, on}
         const cur = (await rd('charref:' + story)) || {}, nm = String(b.name || ''), k = b.kind === 'g' ? 'g' : 'n'; cur[nm] = cur[nm] || { n: 0, g: [] };
