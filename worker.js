@@ -412,8 +412,8 @@ async function sbImportTick(env, s) {
     const sid = e.script_id, old = (await env.DB.prepare('SELECT kproj FROM shots WHERE script_id=?').bind(sid).all()).results, st = [];
     for (const o of old) st.push(env.DB.prepare('DELETE FROM images WHERE project=?').bind(o.kproj), env.DB.prepare("DELETE FROM jobs WHERE project=?").bind(o.kproj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'").bind(o.kproj));
     st.push(env.DB.prepare('DELETE FROM shots WHERE script_id=?').bind(sid));
-    list.forEach((x, i) => { const ls = (x.lines || []).map(l => ({ who: String(l.who || ''), say: String(l.say || ''), ...(l.ja ? { ja: String(l.ja) } : {}), ...(l.emo ? { emo: String(l.emo) } : {}) })); // ja/emo = บทพากย์ญี่ปุ่น + อารมณ์
-      st.push(env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,0,?,?,?,?,?,?,?,?)').bind(sid, i + 1, String(x.th || ''), String(x.en || '').slice(0, 600), JSON.stringify(x.chars || []), `ฉาก${sid}·${i + 1}`, Date.now(), JSON.stringify({ who: ls[0] ? ls[0].who : '', say: ls[0] ? ls[0].say : '', lines: ls, ...(x.think ? { think: x.think } : {}), ...(x.ono ? { ono: x.ono } : {}) }), x.chain ? 1 : 0, x.loc || null)); });
+    list.forEach((x, i) => { const ls = (x.lines || []).map(l => ({ who: String(l.who || ''), say: String(l.say || ''), ...(l.ja ? { ja: String(l.ja) } : {}), ...(l.emo ? { emo: String(l.emo) } : {}), ...(l.nv ? { nv: String(l.nv) } : {}) })); // ja/emo = บทพากย์ญี่ปุ่น + อารมณ์
+      st.push(env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,0,?,?,?,?,?,?,?,?)').bind(sid, i + 1, String(x.th || ''), String(x.en || '').slice(0, 600), JSON.stringify(x.chars || []), `ฉาก${sid}·${i + 1}`, Date.now(), JSON.stringify({ who: ls[0] ? ls[0].who : '', say: ls[0] ? ls[0].say : '', lines: ls, ...(x.think ? { think: x.think } : {}), ...(x.ono ? { ono: x.ono } : {}), ...(x.thinkTh ? { thinkTh: x.thinkTh } : {}), ...(x.onoTh ? { onoTh: x.onoTh } : {}) }), x.chain ? 1 : 0, x.loc || null)); });
     for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20));
     await env.DB.prepare('UPDATE scenes SET sb=-1, fin=0, auto=1 WHERE id=?').bind(e.id).run();
     await setSetting(env, 'sbfix:' + sid, '0,0'); await setSetting(env, 'sbsay:' + sid, 'hand');
@@ -1758,6 +1758,7 @@ async function vvSig(env, id) {
 // ---- ผังเสียงพากย์เริ่มต้น (VOICEVOX ฟรี ใส่เครดิต "VOICEVOX:ชื่อ") · sp = ชื่อต้นเสียง, st = สไตล์, speed/pitch/into/vol = ปรับเสียง, emo = สไตล์ตามอารมณ์เฉพาะตัว ----
 const VCAST_DEFAULT = {
   narrator: { sp: '雨晴はう', st: 'ノーマル', speed: 0.95, pitch: 0, into: 1.0 },
+  narrator2: { sp: '青山龍星', st: 'ノーマル', speed: 0.9, pitch: -0.02, into: 0.9 }, // ผู้เล่าชาย ใช้ช่วงกลางคืน/ฉากสู้ (บรรทัดที่ nv='narrator2')
   'โทวะ': { sp: '玄野武宏', st: 'ノーマル', speed: 1.0, pitch: 0, into: 1.15 },
   'ริน': { sp: '九州そら', st: 'ノーマル', speed: 0.95, pitch: -0.03, into: 0.85, emo: { d: { st: 'あまあま', pitch: 0.03, into: 1.25, speed: 1.05 }, t: { st: 'ツンツン' } } },
   'มิโอะ': { sp: '冥鳴ひまり', st: 'ノーマル', speed: 1.0, pitch: 0, into: 0.55 },
@@ -2258,7 +2259,7 @@ def tts_job(j):
         who = str(ln.get("who") or "")
         name = who.lstrip("~")
         g = ln.get("g") or ""
-        c = cast.get("narrator") if not who else cast.get(name) or (cast.get("_x") if g == "x" else cast.get("_f") if g == "f" else cast.get("_m")) or {}
+        c = (cast.get(ln.get("nv")) or cast.get("narrator")) if not who else cast.get(name) or (cast.get("_x") if g == "x" else cast.get("_f") if g == "f" else cast.get("_m")) or {}
         emo = ln.get("emo") or "n"
         c = dict(c, **((c.get("emo") or {}).get(emo) or {}))
         sid, spn = vv_style(c.get("sp"), c.get("st"), emo if emo not in ("n", "d") else "")
@@ -3850,7 +3851,7 @@ async function castApi(req, env, url, body) {
         for (const sc of scs) { if (!sc.script_id) continue;
           const rows = (await env.DB.prepare("SELECT s.id,s.say,(SELECT group_concat(v.line) FROM voices v WHERE v.shot=s.id) have FROM shots s WHERE s.script_id=? ORDER BY s.idx").bind(sc.script_id).all()).results, L = [];
           for (const r of rows) { let y = {}; try { y = JSON.parse(r.say || '{}'); } catch (e) { } const hv = new Set(String(r.have || '').split(',').filter(Boolean).map(Number));
-            (y.lines || []).forEach((l, i) => { if (!l.ja || (!b.redo && hv.has(i))) return; const w = String(l.who || ''), nm = w.replace(/^~/, ''); L.push({ shot: r.id, line: i, who: w, ja: String(l.ja).slice(0, 300), emo: String(l.emo || 'n'), g: G[nm] || '' }); }); }
+            (y.lines || []).forEach((l, i) => { if (!l.ja || (!b.redo && hv.has(i))) return; const w = String(l.who || ''), nm = w.replace(/^~/, ''); L.push({ shot: r.id, line: i, who: w, ja: String(l.ja).slice(0, 300), emo: String(l.emo || 'n'), g: G[nm] || '', ...(l.nv ? { nv: String(l.nv) } : {}) }); }); }
           for (let k = 0; k < L.length; k += 80) { const part = L.slice(k, k + 80);
             await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind('เสียงพากย์·' + story + '·ตอน' + (+b.ep), 'v' + sc.script_id, Date.now(), JSON.stringify({ lines: part, cast })).run(); nj++; nl += part.length; } }
         return json({ ok: true, jobs: nj, lines: nl });
