@@ -1,263 +1,669 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#4f46e5">
-<title>Xiress</title>
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Xiress Studio</title><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="Xiress Studio">
 <style>
-:root{--bg:#f4f6fb;--card:#fff;--text:#0f172a;--mute:#64748b;--line:#e5e9f2;--pri:#4f46e5;--pri2:#7c3aed;--green:#16a34a;--blue:#2563eb;--red:#dc2626;--black:#1f2937}
-[data-theme=dark]{--bg:#0b1020;--card:#151b2e;--text:#e8ecf6;--mute:#94a3b8;--line:#243049;--black:#94a3b8}
-*{box-sizing:border-box;margin:0}
-body{font-family:system-ui,-apple-system,"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
-input,select,textarea{font:inherit;font-size:16px;color:var(--text)}
-svg{display:block}
-#splash{position:fixed;inset:0;z-index:300;background:linear-gradient(135deg,var(--pri),var(--pri2));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;transition:opacity .4s}
-#splash.hide{opacity:0;pointer-events:none}
-#splash .sl{font-size:4rem;animation:pop 1s ease infinite alternate}
-#splash .ld{width:140px;height:4px;border-radius:4px;background:rgba(255,255,255,.3);margin-top:22px;overflow:hidden}
-#splash .ld i{display:block;height:100%;background:#fff;animation:ld 1.5s ease forwards}
-@keyframes pop{from{transform:scale(.92)}to{transform:scale(1.08)}}
-@keyframes ld{from{width:0}to{width:100%}}
-.top{position:sticky;top:0;z-index:5;background:linear-gradient(135deg,var(--pri),var(--pri2));padding:calc(10px + env(safe-area-inset-top,0px)) 14px 12px;color:#fff}
-.tr{display:flex;align-items:center;justify-content:space-between}
-.logo{font-weight:800;font-size:1.1rem}
-.ba{display:flex;gap:8px}
-.ic{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.2);display:grid;place-items:center;color:#fff}
-#sw{margin-top:10px}
-#sw input{width:100%;border:0;border-radius:12px;padding:11px 14px;background:#fff;color:#0f172a;outline:0}
-main{padding:14px 14px calc(100px + env(safe-area-inset-bottom,0px));max-width:1100px;margin:auto}
-h2{font-size:1.2rem;margin:4px 0 12px}h3{font-size:1rem;margin-bottom:10px}
-small{color:var(--mute)}
-.cats,.chips{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:none}
-.cats::-webkit-scrollbar,.chips::-webkit-scrollbar{display:none}
-.cat{flex:0 0 66px;text-align:center;font-size:.72rem;color:var(--mute)}
-.cat span{display:grid;place-items:center;line-height:1;font-size:1.6rem;width:56px;height:56px;margin:0 auto 4px;border-radius:18px;background:var(--card);border:2px solid var(--line)}
-.cat.on{color:var(--pri);font-weight:700}.cat.on span{border-color:var(--pri)}
-.chip{flex:0 0 auto;padding:7px 13px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:.8rem;display:flex;align-items:center;gap:6px}
-.chip.on{background:var(--pri);color:#fff;border-color:var(--pri)}
-.dt{display:inline-block;width:11px;height:11px;border-radius:50%;flex:0 0 11px}
-.pg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.pc{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-align:left;width:100%;display:block}
-.im{position:relative;aspect-ratio:1;display:grid;place-items:center;background:linear-gradient(135deg,rgba(79,70,229,.12),rgba(124,58,237,.12));overflow:hidden}
-.im img,.th img{width:100%;height:100%;object-fit:cover}
-.em{font-size:3.4rem;line-height:1;display:grid;place-items:center}
-.im .dt{position:absolute;top:8px;right:8px;border:2px solid #fff;width:15px;height:15px}
-.pi{padding:9px 10px 11px}.pn{font-size:.85rem;line-height:1.3;height:2.2em;overflow:hidden}
-.pr{color:var(--pri);font-weight:800;font-size:1.05rem;margin-top:4px}
-.pm{display:flex;justify-content:space-between;font-size:.7rem;color:var(--mute);margin-top:4px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
-.grid .card{margin:0}.card .v{display:block;font-size:1.3rem;margin-top:3px}
-.row{display:flex;align-items:center;gap:10px;padding:8px 0}
-.row .gr{flex:1;font-size:.9rem}
-.th{width:48px;height:48px;border-radius:12px;overflow:hidden;display:grid;place-items:center;background:var(--bg);flex:0 0 48px}.th .em{font-size:1.7rem}
-.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:.88rem}
-.kv span:first-child{color:var(--mute)}.kv span:last-child{text-align:right}
-.note{background:var(--card);border:1px dashed var(--line);border-radius:16px;padding:12px;color:var(--mute);font-size:.85rem}
-.empty{text-align:center;padding:40px 16px;color:var(--mute);grid-column:1/-1}
-.fab{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;display:grid;place-items:center;box-shadow:0 8px 20px rgba(79,70,229,.45);z-index:6}
-.bot{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));z-index:6}
-.bot button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:.72rem;color:var(--mute)}
-.bot .on{color:var(--pri);font-weight:700}
-.side{display:none}
-.sheet{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20;display:none;align-items:flex-end}
-.sheet.show{display:flex}
-.sheet>div{background:var(--card);width:100%;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(24px + env(safe-area-inset-bottom,0px))}
-.sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.sh h2{margin:0}
-.x{width:36px;height:36px;border-radius:50%;background:var(--bg);display:grid;place-items:center}
-.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;font-weight:700;margin-top:10px}
-.btn.o{background:var(--bg);color:var(--text);border:1px solid var(--line)}.btn:disabled{opacity:.6}
-.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-label{display:block;font-size:.8rem;color:var(--mute);margin-bottom:10px}
-label input,label select,label textarea,.two input{width:100%;margin-top:4px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);outline:0}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
-.lq{display:grid;grid-template-columns:1fr 1fr;gap:8px}.lq label{margin:0}
-.lk{color:var(--red);font-size:.8rem;margin-top:8px}
-.ph{display:grid;place-items:center;aspect-ratio:2/1;border:2px dashed var(--line);border-radius:16px;color:var(--mute);margin-bottom:12px;overflow:hidden;gap:4px;align-content:center}
-.ph img{width:100%;height:100%;object-fit:cover}
-.err{color:var(--red);font-size:.85rem;min-height:1.2em}
-.qrb{text-align:center}.qrb img{width:230px;max-width:70%;image-rendering:pixelated;border-radius:8px;background:#fff;padding:6px}
-#toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:12px;font-size:.85rem;z-index:400;display:none}
-#pa{display:none}
-@media print{body>*{display:none!important}body>#pa{display:block!important;text-align:center;padding:10mm}#pa img{image-rendering:pixelated}}
-@media(min-width:600px){.pg{grid-template-columns:repeat(3,1fr)}.sheet{align-items:center;justify-content:center}.sheet>div{max-width:480px;border-radius:22px}}
-@media(min-width:900px){
- .bot{display:none}.pg{grid-template-columns:repeat(4,1fr)}.fab{bottom:24px}
- .side{display:block;position:fixed;top:0;bottom:0;left:0;width:220px;background:var(--card);border-right:1px solid var(--line);padding:20px 12px;z-index:7}
- .side .logo{display:block;padding:0 10px 18px;font-size:1.25rem;color:var(--pri)}
- .side button{display:flex;gap:10px;align-items:center;width:100%;padding:12px;border-radius:12px;margin-bottom:4px;color:var(--mute)}
- .side .on{background:var(--bg);color:var(--pri);font-weight:700}
- .top,main{margin-left:220px}main{max-width:none}
-}
-</style>
-</head>
-<body>
-<div id="splash"><div class="sl">🛍️</div><b style="font-size:1.6rem;margin-top:10px">Xiress</b><div class="ld"><i></i></div></div>
-<nav class="side" id="side"></nav>
-<header class="top">
- <div class="tr"><span class="logo">Xiress</span><span class="ba"><button class="ic" id="theme" data-a="theme" aria-label="สลับธีม"></button><button class="ic" id="out" data-a="logout" aria-label="ออกจากระบบ"></button></span></div>
- <div id="sw"><input id="q" placeholder="ค้นหาชื่อสินค้าหรือรหัส เช่น PAN-001" autocomplete="off"></div>
-</header>
-<main id="view"></main>
-<nav class="bot" id="bot"></nav>
-<div class="sheet" id="sheet"><div id="sbody"></div></div>
-<div id="pa"></div><div id="toast"></div>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+:root{color-scheme:light;--bg:#faf9fe;--fg:#1c1c24;--card:#fff;--mu:#6b6980;--ac:#7c5cff;--ac2:#ff7aa8;--ok:#1a9d5c;--warn:#c77700;--bad:#d33;--bd:#ddd9ee}
+*{box-sizing:border-box}body{margin:0;padding:14px;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom));background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans Thai",sans-serif;max-width:720px;margin:auto}
+h1{font-size:22px;margin:4px 0}h2{font-size:17px;margin:0 0 6px}small,.mu{color:var(--mu);font-size:13px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:12px 0;box-shadow:0 1px 6px #7c5cff12}
+button{font:inherit;border:1px solid var(--bd);background:transparent;color:var(--fg);padding:9px 13px;border-radius:10px;margin:3px 4px 3px 0}
+button.on{background:var(--ac);border-color:var(--ac);color:#fff}button:disabled{opacity:.45}
+button.go{width:100%;padding:16px;font-size:17px;font-weight:600;border:0;color:#fff;background:linear-gradient(135deg,var(--ac2),var(--ac))}
+input[type=text],input[type=password]{width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);background:#fff;color:var(--fg);font:inherit;margin:4px 0}
+.drop{border:2px dashed var(--ac);border-radius:16px;padding:34px 14px;text-align:center;font-size:17px}.drop.over{background:#7c5cff1a}
+.sm{font-size:13px;padding:5px 10px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.sp{justify-content:space-between}
+.it{padding:10px 0;border-top:1px solid var(--bd)}.it:first-child{border-top:0}
+.bar{height:8px;border-radius:6px;background:var(--bd);overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ac2),var(--ac))}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+#toast{position:fixed;left:12px;right:12px;bottom:max(14px,env(safe-area-inset-bottom));background:#222;color:#fff;padding:12px 14px;border-radius:12px;display:none;z-index:9;font-size:14px}
+.kd{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.kd button{margin:0;padding:12px 2px;text-align:center}.kd button b{display:block;font-size:26px;line-height:1.2}
+.sbg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.sbg>div{border:1px solid var(--bd);border-radius:10px;overflow:hidden;background:#fff;display:flex;flex-direction:column}.sbg img,.sbg .ph{width:100%;display:block;background:#eeeaf8}.sbg .ph{aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;font-size:22px}
+.sbg .tx{font-size:11px;line-height:1.35;padding:4px 6px;color:var(--mu);flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.sbg button{margin:0;border:0;border-top:1px solid var(--bd);border-radius:0;font-size:13px;padding:7px 0;width:100%}
+.sbb{display:flex}.sbb button:last-child{flex:0 0 38px;border-left:1px solid var(--bd)}
+.wt{margin:12px -14px;background:#fff;padding-bottom:6px}.wth{padding:14px;font-size:18px;border-top:3px solid var(--ac);border-bottom:1px solid var(--bd);margin-bottom:18px}.wp{position:relative;margin:0 0 30px}.wp .im{position:relative}.wp img{width:100%;display:block}.wp .ph{aspect-ratio:16/9;background:#eeeaf8;display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:13px;padding:10px;text-align:center}
+.bb{position:relative;width:fit-content;max-width:80%;margin:8px 16px;padding:10px 15px;border:2px solid #1c1c24;border-radius:22px;background:#fff;font-size:15.5px;line-height:1.42;color:#1c1c24}.bb b{display:block;font-size:11.5px;color:var(--ac);margin-bottom:1px}
+.bb.r{margin-left:auto}.bb::before{content:'';position:absolute;top:-11px;left:24px;border:6px solid transparent;border-bottom-color:#1c1c24;border-top:0;border-bottom-width:11px}.bb.r::before{left:auto;right:24px}.im+.bb{margin-top:-14px}
+.dir{margin:6px 18px;font-size:12.5px;color:#555;line-height:1.55}.dir summary{cursor:pointer;color:#6b5fd0}.dir b{color:#333;font-weight:600}.sbdraft .wp img,.sbdraft #anp .fr img,.sbdraft .sbimg{filter:grayscale(1) contrast(1.05)}.nv{margin:10px 18px;font-size:15px;line-height:1.7;color:#2a2a35;font-style:italic;font-family:Georgia,'Sarabun',serif}.tk{margin:8px 18px 8px 34px;font-size:14.5px;line-height:1.6;color:#4a4a5a;font-style:italic}.tk b{display:block;font-size:11.5px;color:#8a7fc8;font-style:normal}.nr{width:fit-content;max-width:88%;margin:8px 16px;padding:7px 11px;border:1.5px solid #1c1c24;background:#fff8dc;font-size:14px;line-height:1.4;color:#1c1c24}
+.fx1,.fx2{position:absolute;font-weight:800;-webkit-text-stroke:3px #fff;paint-order:stroke fill;pointer-events:none;line-height:1.1}.fx1{top:6%;left:5%;color:#ff4fa3;font-size:17px;transform:rotate(-7deg);max-width:55%}.fx2{top:8%;right:5%;color:#2f8cff;font-size:27px;transform:rotate(9deg)}
+.stp{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--ac);color:#fff;font-size:14px;margin-right:6px}
+a.btn{display:inline-block;text-decoration:none;border:1px solid var(--bd);color:var(--fg);padding:9px 13px;border-radius:10px;margin:3px 4px 3px 0}
+</style></head><body>
+<h1>🎬 Xiress Studio</h1><div class="mu">เลือกประเภทงาน → ใส่บทและเลือก LoRA → ดูสตอรีบอร์ด 1 ตอนก่อน แล้วค่อยสั่งทำทั้งตอน</div>
+<div id="app"></div><div id="toast"></div>
 <script>
-const I={search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',back:'<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',cam:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',box:'<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',grid:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',chart:'<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',menu:'<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',cart:'<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',dollar:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',trend:'<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',chat:'<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',sliders:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',sun:'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>',dl:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',print:'<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',pin:'<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',qr:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v3M17 20h4"/>',img:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>'};
-const ic=(n,s=22)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
-const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=n=>Number(n||0).toLocaleString('th-TH');
-const E={SHI:'👕',PAN:'👖',BAG:'👜',SHO:'👟',HAT:'🧢',SOC:'🧦',ACC:'💍',TOY:'🧸',OTH:'📦'};
-const ST={green:'พร้อมขาย',blue:'สำรอง',red:'เสีย',black:'หมด'};
-const M=[{id:'prod',i:'box',t:'สินค้า'},{id:'stock',i:'grid',t:'คลัง'},{id:'dash',i:'chart',t:'Dashboard'},{id:'sell',i:'cart',t:'ขายสินค้า',p:4},{id:'acc',i:'dollar',t:'บัญชี',p:5},{id:'rep',i:'trend',t:'รายงาน',p:5},{id:'ai',i:'chat',t:'AI Assistant',p:6},{id:'set',i:'sliders',t:'ตั้งค่า',p:3}];
-const S={sb:null,uid:null,ready:false,cats:[],locs:[],prods:[],imgs:{},cur:'prod',cat:'',stf:'all',loc:'all',q:''};
-const vq=v=>(v.stock_levels||[]).reduce((a,s)=>a+s.qty,0);
-const pq=p=>(p.variants||[]).reduce((a,v)=>a+vq(v),0);
-const lq=(v,id)=>((v.stock_levels||[]).find(s=>s.location_id===id)||{qty:0}).qty;
-const vname=v=>[v.size,v.pattern].filter(Boolean).join(' · ')||'ไม่ระบุไซส์/ลาย';
-const thumb=p=>S.imgs[p.image_path]?`<img src="${S.imgs[p.image_path]}" alt="">`:`<span class="em">${E[p.categories&&p.categories.prefix]||'📦'}</span>`;
-function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',2600)}
-function openSheet(h){$('sbody').innerHTML=h;$('sheet').classList.add('show')}
-function closeSheet(){$('sheet').classList.remove('show')}
-const head=t=>`<div class="sh"><h2>${t}</h2><button class="x" data-a="close" aria-label="ปิด">${ic('x',18)}</button></div>`;
-
+const $=s=>document.querySelector(s),esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// ตัวเล่นแบบอนิเมะ: ภาพ 16:9 เต็มจอ ซับขึ้นทีละบรรทัด (บทเล่า = ตัวเอียง · บทพูด = ชื่อ: ข้อความ · ในใจ = วงเล็บ) แตะขวา/ล่าง = ถัดไป แตะซ้าย = ย้อน
+/* ===== เสียงในตัวเล่นอนิเมะ: เสียงประกอบ/บรรยากาศ/ดนตรี สร้างสดด้วย WebAudio (ฟรี ไม่มีลิขสิทธิ์) + ผสมเสียง (ลดดนตรีตอนมีคนพูด) ===== */
+function showQc(R,C,n){const o=document.createElement('div');o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:flex;align-items:flex-end;justify-content:center';
+  const sev={สูง:'#d33',กลาง:'#e90',ต่ำ:'#888'},rows=(R&&R.items)||[];
+  o.innerHTML=`<div style="background:#fff;max-width:760px;width:100%;max-height:85vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 18px calc(16px + env(safe-area-inset-bottom));font-size:14.5px;line-height:1.55"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">📋 ตรวจความต่อเนื่อง ตอน ${n}</b><button data-c>ปิด</button></div>
+  ${R?`<div class="mu" style="margin:4px 0 10px">ตรวจ ${R.panels} ช่อง · ${esc(R.at||'')} · ต้องแก้ ${rows.filter(x=>x.status!=='แก้แล้ว').length} · แก้แล้ว ${rows.filter(x=>x.status==='แก้แล้ว').length}</div>
+  ${(R.checks||[]).map(c=>`<div>${c.ok?'✅':'⚠️'} ${esc(c.name)}</div>`).join('')}
+  <div style="margin-top:10px">${rows.map(x=>`<div style="border-left:4px solid ${sev[x.sev]||'#888'};padding:6px 10px;margin:8px 0;background:#faf9fd;border-radius:6px"><b>${esc(x.id)}</b> · <span style="color:${sev[x.sev]||'#888'}">${esc(x.sev)}</span> · ${x.status==='แก้แล้ว'?'✅ แก้แล้ว':'⏳ รอแก้'}<div>${esc(x.issue)}</div><div class="mu">วิธีแก้: ${esc(x.fix)}</div></div>`).join('')||'<div>ไม่พบข้อผิดพลาด</div>'}</div>`:'<div style="margin-top:10px">ยังไม่มีรายงานของตอนนี้</div>'}
+  ${C?`<details style="margin-top:12px"><summary><b>📚 สิ่งที่ต้องต่อเนื่องไปตอนถัดไป</b></summary>${Object.entries(C).map(([k,v])=>`<div><b>${esc(k)}:</b> ${esc(Array.isArray(v)?v.join(' · '):typeof v==='object'?JSON.stringify(v):v)}</div>`).join('')}</details>`:''}</div>`;
+  o.onclick=e=>{if(e.target===o||e.target.closest('[data-c]'))o.remove();};document.body.appendChild(o);}
+function mkAudio(){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;const ac=new AC();
+  const comp=ac.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(ac.destination);
+  const bus=k=>{const g=ac.createGain();g.connect(comp);return g;},B={bgm:bus(),sfx:bus(),amb:bus()};
+  let mix={bgm:.2,sfx:.6,amb:.16};try{Object.assign(mix,JSON.parse(localStorage.getItem('ss_mix')||'{}'));}catch(e){}
+  let duck=1;const apply=(f=.25)=>{const t=ac.currentTime;B.bgm.gain.setTargetAtTime(mix.bgm*duck,t,f/3);B.sfx.gain.setTargetAtTime(mix.sfx,t,.03);B.amb.gain.setTargetAtTime(mix.amb*(duck<1?.7:1),t,f/3);};apply(.01);
+  const NB=(()=>{const b=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b;})();
+  const noise=(t,dur,out,{type='bandpass',f=1000,f2,q=1,a=.01,v=1}={})=>{const s=ac.createBufferSource();s.buffer=NB;s.loop=true;const fl=ac.createBiquadFilter();fl.type=type;fl.frequency.setValueAtTime(f,t);if(f2)fl.frequency.exponentialRampToValueAtTime(f2,t+dur);fl.Q.value=q;const g=ac.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+dur);s.connect(fl);fl.connect(g);g.connect(out);s.start(t,Math.random());s.stop(t+dur+.05);return g;};
+  const tone=(t,dur,out,{type='sine',f=440,f2,v=.5,a=.005,det=0}={})=>{const o=ac.createOscillator();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);o.detune.value=det;const g=ac.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g);g.connect(out);o.start(t);o.stop(t+dur+.05);return o;};
+  /* คลังเสียงประกอบ (key → เสียง) */
+  const SFX={
+    whoosh:(t,o,v)=>noise(t,.45,o,{f:300,f2:3000,q:2,a:.15,v:v}),
+    swish:(t,o,v)=>noise(t,.18,o,{f:1500,f2:5000,q:3,a:.02,v:v}),
+    impact:(t,o,v)=>{tone(t,.7,o,{f:110,f2:40,v:v});noise(t,.35,o,{type:'lowpass',f:1200,v:v*.8});},
+    boom:(t,o,v)=>{tone(t,1.6,o,{f:70,f2:28,v:v});noise(t,1.4,o,{type:'lowpass',f:500,f2:80,v:v*.9,a:.01});},
+    sting:(t,o,v)=>{[55,58.3,82.4].forEach(f=>tone(t,1.6,o,{type:'sawtooth',f,v:v*.25}));noise(t,.5,o,{type:'lowpass',f:2500,v:v*.6});tone(t,1.2,o,{f:880,f2:860,v:v*.12,type:'square'});},
+    reveal:(t,o,v)=>{tone(t,1.8,o,{type:'triangle',f:220,v:v*.35});tone(t+.12,1.6,o,{type:'triangle',f:311,v:v*.3});tone(t+.24,1.5,o,{type:'triangle',f:466,v:v*.25});},
+    knock:(t,o,v)=>{[0,.32].forEach(d=>{noise(t+d,.09,o,{type:'bandpass',f:350,q:4,v:v});tone(t+d,.08,o,{f:180,f2:120,v:v*.6});});},
+    heartbeat:(t,o,v)=>{[0,.28,.9,1.18].forEach((d,i)=>tone(t+d,.18,o,{f:i%2?55:65,f2:40,v:v*(i%2?.7:1)}));},
+    bell:(t,o,v)=>{[[1,1],[2.76,.5],[5.4,.25],[8.9,.12]].forEach(([m,a])=>tone(t,4.5/m**.3,o,{f:196*m,v:v*a*.5,a:.002}));},
+    chime:(t,o,v)=>{[1568,2093,2637,3136].forEach((f,i)=>tone(t+i*.07,.9,o,{f,v:v*.18}));},
+    can:(t,o,v)=>{[1,2.3,3.9].forEach(m=>tone(t,.25,o,{type:'square',f:620*m,v:v*.06}));tone(t+.18,.2,o,{f:120,f2:70,v:v*.5});noise(t+.18,.12,o,{type:'lowpass',f:900,v:v*.4});},
+    click:(t,o,v)=>tone(t,.05,o,{type:'square',f:2200,v:v*.25}),
+    paper:(t,o,v)=>{for(let i=0;i<5;i++)noise(t+i*.09,.07,o,{type:'highpass',f:2500,v:v*.5});},
+    steps:(t,o,v)=>{for(let i=0;i<4;i++)noise(t+i*.42,.1,o,{type:'lowpass',f:450,v:v*.8});},
+    run:(t,o,v)=>{for(let i=0;i<8;i++)noise(t+i*.17,.07,o,{type:'lowpass',f:700,v:v*.7});},
+    creak:(t,o,v)=>{const x=tone(t,1.1,o,{type:'sawtooth',f:260,f2:420,v:v*.12});const l=ac.createOscillator(),lg=ac.createGain();l.frequency.value=23;lg.gain.value=30;l.connect(lg);lg.connect(x.frequency);l.start(t);l.stop(t+1.2);},
+    fire:(t,o,v)=>{noise(t,2.2,o,{type:'lowpass',f:900,v:v*.7,a:.15});for(let i=0;i<14;i++)noise(t+Math.random()*2,.03,o,{type:'highpass',f:3000,v:v*.6});},
+    flame:(t,o,v)=>{noise(t,1.2,o,{f:200,f2:2500,q:.8,a:.05,v:v});tone(t,1,o,{f:90,f2:45,v:v*.5});},
+    boing:(t,o,v)=>{const x=tone(t,.55,o,{f:180,f2:520,v:v*.4});const l=ac.createOscillator(),lg=ac.createGain();l.frequency.value=18;lg.gain.value=40;l.connect(lg);lg.connect(x.frequency);l.start(t);l.stop(t+.6);},
+    pop:(t,o,v)=>tone(t,.12,o,{f:900,f2:220,v:v*.5}),
+    pops:(t,o,v)=>{for(let i=0;i<3;i++)tone(t+i*.16,.1,o,{f:700+i*200,f2:250,v:v*.4});},
+    fail:(t,o,v)=>{[392,370,349,330].forEach((f,i)=>tone(t+i*.28,i<3?.26:.9,o,{type:'triangle',f,v:v*.3}));},
+    wind:(t,o,v)=>noise(t,2.2,o,{f:400,f2:1200,q:1.5,a:.7,v:v*.8}),
+    gasp:(t,o,v)=>{tone(t,.25,o,{f:500,f2:1400,v:v*.3});noise(t,.2,o,{type:'highpass',f:2000,v:v*.3});},
+    shock:(t,o,v)=>{tone(t,.4,o,{type:'square',f:1200,f2:300,v:v*.15});noise(t,.3,o,{type:'bandpass',f:1800,q:2,v:v*.5});},
+    sparkle:(t,o,v)=>{for(let i=0;i<6;i++)tone(t+i*.06,.5,o,{f:2000+Math.random()*2500,v:v*.1});},
+    hum:(t,o,v)=>tone(t,2,o,{type:'sawtooth',f:100,v:v*.04,a:.4}),
+    glitch:(t,o,v)=>{for(let i=0;i<6;i++)tone(t+i*.05,.04,o,{type:'square',f:200+Math.random()*1800,v:v*.15});},
+    crowd:(t,o,v)=>noise(t,1.5,o,{f:600,q:.6,a:.3,v:v*.3}),
+    door:(t,o,v)=>{SFX.creak(t,o,v);noise(t+1,.15,o,{type:'lowpass',f:300,v:v});},
+    bag:(t,o,v)=>{for(let i=0;i<3;i++)noise(t+i*.11,.12,o,{type:'bandpass',f:3500,q:.7,v:v*.4});},
+    bite:(t,o,v)=>{noise(t,.08,o,{type:'highpass',f:1800,v:v*.6});noise(t+.25,.08,o,{type:'highpass',f:1800,v:v*.5});},
+    scream:(t,o,v)=>{const x=tone(t,1.1,o,{type:'sawtooth',f:520,f2:300,v:v*.2});noise(t,1,o,{f:1200,q:1,v:v*.4});},
+  };
+  /* เสียงบรรยากาศตามสถานที่ (วนจนกว่าจะเปลี่ยนฉาก) */
+  let ambNodes=[],ambKey='',ambT=0;
+  const AMB={
+    office:()=>[loopNoise({type:'lowpass',f:400,v:.25}),tick(1,'tick')],
+    dark:()=>[loopNoise({type:'lowpass',f:220,v:.4}),tick(3.7,'creak')],
+    night:()=>[loopNoise({type:'bandpass',f:120,q:3,v:.5}),tick(.22,'cricket')],
+    outside:()=>[loopNoise({type:'bandpass',f:500,q:.8,v:.5,lfo:.08}),loopTone(55,.08)],
+    bakery:()=>[loopNoise({type:'bandpass',f:700,q:.5,v:.18}),tick(1.6,'bird')],
+    city:()=>[loopNoise({type:'bandpass',f:450,q:.7,v:.35,lfo:.05})],
+    bedroom:()=>[loopNoise({type:'lowpass',f:300,v:.15}),tick(5,'wind')],
+    tower:()=>[loopNoise({type:'bandpass',f:350,q:1,v:.45,lfo:.1})],
+  };
+  function loopNoise({type,f,q=1,v,lfo}){const s=ac.createBufferSource();s.buffer=NB;s.loop=true;const fl=ac.createBiquadFilter();fl.type=type;fl.frequency.value=f;fl.Q.value=q;const g=ac.createGain();g.gain.value=v;s.connect(fl);fl.connect(g);g.connect(ambOut);s.start();let l;if(lfo){l=ac.createOscillator();const lg=ac.createGain();l.frequency.value=lfo;lg.gain.value=f*.6;l.connect(lg);lg.connect(fl.frequency);l.start();}return {stop:()=>{try{s.stop();l&&l.stop();}catch(e){}}};}
+  function loopTone(f,v){const o=ac.createOscillator();o.frequency.value=f;const g=ac.createGain();g.gain.value=v;o.connect(g);g.connect(ambOut);o.start();return {stop:()=>{try{o.stop();}catch(e){}}};}
+  function tick(every,kind){let on=true;const go=()=>{if(!on)return;const t=ac.currentTime+.02;
+      if(kind==='tick')tone(t,.03,ambOut,{type:'square',f:3200,v:.05});
+      else if(kind==='cricket'){if(Math.random()<.6)for(let i=0;i<3;i++)tone(t+i*.035,.025,ambOut,{f:4400+Math.random()*300,v:.05});}
+      else if(kind==='bird'){if(Math.random()<.5){const b=2500+Math.random()*1500;tone(t,.12,ambOut,{f:b,f2:b*1.4,v:.06});tone(t+.15,.1,ambOut,{f:b*1.2,f2:b*.9,v:.05});}}
+      else if(kind==='creak'){if(Math.random()<.4)SFX.creak(t,ambOut,.25);}
+      else if(kind==='wind'){if(Math.random()<.5)SFX.wind(t,ambOut,.4);}
+      tid=setTimeout(go,every*1000*(.7+Math.random()*.6));};let tid=setTimeout(go,200);return {stop:()=>{on=false;clearTimeout(tid);}};}
+  const ambOut=ac.createGain();ambOut.connect(B.amb);
+  /* ดนตรีพื้นหลัง: สร้างโน้ตสดตามแนว (ตั้งเวลาล่วงหน้าทีละนิด) */
+  const SC={maj:[0,2,4,5,7,9,11],min:[0,2,3,5,7,8,10],pent:[0,2,4,7,9],minp:[0,3,5,7,10]};
+  const hz=n=>440*2**((n-69)/12);
+  const pluck=(t,n,o,v,d=1.2,type='triangle')=>{tone(t,d,o,{type,f:hz(n),v,a:.004});tone(t,d*.6,o,{type:'sine',f:hz(n+12),v:v*.25,a:.004});};
+  const pad=(t,ns,o,v,d)=>ns.forEach(n=>{const x=ac.createOscillator();x.type='sawtooth';x.frequency.value=hz(n);x.detune.value=(Math.random()-.5)*14;const fl=ac.createBiquadFilter();fl.type='lowpass';fl.frequency.value=900;const g=ac.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+d*.3);g.gain.linearRampToValueAtTime(0,t+d);x.connect(fl);fl.connect(g);g.connect(o);x.start(t);x.stop(t+d+.05);});
+  const drum=(t,o,v,f=60)=>{tone(t,.4,o,{f:f*2,f2:f*.6,v});noise(t,.08,o,{type:'lowpass',f:800,v:v*.4});};
+  const STY={ /* bpm, ฟังก์ชันเล่น 1 จังหวะ (beat i, เวลา t) */
+    piano_light:{bpm:96,f:(i,t,o)=>{const ch=[[60,64,67],[57,60,64],[53,57,60],[55,59,62]][Math.floor(i/8)%4];pluck(t,ch[i%3]+(i%8>4?12:0),o,.12,.9);if(i%4===0)pluck(t,ch[0]-12,o,.1,1.6,'sine');}},
+    piano_warm:{bpm:64,f:(i,t,o)=>{const ch=[[57,60,64],[53,57,60],[48,52,55],[55,59,62]][Math.floor(i/6)%4];pluck(t,ch[i%3]+12,o,.1,2.2,'sine');if(i%6===0){pluck(t,ch[0]-12,o,.12,3,'sine');}}},
+    strings_tense:{bpm:60,f:(i,t,o)=>{if(i%4===0){const r=[45,44,45,41][Math.floor(i/4)%4];pad(t,[r,r+3,r+7],o,.06,4.2);}if(i%2===0)tone(t,.3,o,{type:'triangle',f:hz(33),v:.12});}},
+    horror_drone:{bpm:40,f:(i,t,o)=>{if(i%4===0)pad(t,[33,34,40],o,.05,6.5);if(Math.random()<.3)tone(t,2.5,o,{f:hz(84+Math.floor(Math.random()*6)),v:.03});}},
+    action_taiko:{bpm:140,f:(i,t,o)=>{const p=[1,0,0,1,0,1,0,0][i%8];if(p)drum(t,o,.35,50);if(i%8===6)drum(t,o,.25,80);const r=[45,45,48,45,43,45,50,48][i%8];tone(t,.18,o,{type:'sawtooth',f:hz(r+12),v:.05});if(i%16===0)pad(t,[57,60,64],o,.04,3.4);}},
+    morning_flute:{bpm:100,f:(i,t,o)=>{const ch=[[60,64,67],[65,69,72],[62,65,69],[67,71,74]][Math.floor(i/8)%4];if(i%2===0)pluck(t,ch[(i/2)%3]-12,o,.09,.7);if(i%4===0){const m=72+SC.pent[Math.floor(Math.random()*5)];const x=tone(t,.9,o,{f:hz(m),v:.07,a:.06});}}},
+    night_guitar:{bpm:76,f:(i,t,o)=>{const ch=[[52,55,59,64],[48,52,55,60],[50,53,57,62],[47,50,55,59]][Math.floor(i/8)%4];pluck(t,ch[i%4],o,.1,1.4);}},
+    ending_theme:{bpm:84,f:(i,t,o)=>{const bar=Math.floor(i/8)%8,ch=[[48,55,64],[43,50,59],[45,52,60],[41,48,57],[48,55,64],[43,50,59],[41,48,57],[43,50,59]][bar];
+      if(i%8===0){pad(t,[ch[0]+12,ch[1]+12,ch[2]+12],o,.035,5.6);pluck(t,ch[0]-12,o,.13,3,'sine');}
+      pluck(t,[ch[0],ch[1],ch[2],ch[1]+12][i%4]+12,o,.07,1.4);
+      const mel=[76,74,72,74,76,76,76,0,74,74,74,0,76,79,79,0,76,74,72,74,76,76,76,76,74,74,76,74,72,0,0,0][(i+bar*8)%32];if(mel&&i%2===0)tone(t,.9,o,{type:'triangle',f:hz(mel),v:.07,a:.03});
+      if(i%4===2)noise(t,.05,o,{type:'highpass',f:6000,v:.05});if(i%8===4)drum(t,o,.12,70);}},
+    mystery_bell:{bpm:50,f:(i,t,o)=>{if(i%3===0)SFX.bell(t,o,.12);if(i%8===0)pad(t,[50,53,57],o,.035,7);}},
+  };
+  let bg=null,bgKey='';
+  function bgm(st){const k=st&&st.s||'';if(k===bgKey)return;const old=bg;bgKey=k;const fo=(st&&+st.fo)||1.5,fi=(st&&+st.fi)||1.5;
+    if(old){const t=ac.currentTime;old.g.gain.setTargetAtTime(0,t,fo/3);old.on=false;setTimeout(()=>old.g.disconnect(),fo*1500+200);}
+    if(!k||!STY[k]){bg=null;return;}const S=STY[k],g=ac.createGain();g.gain.value=0;g.gain.setTargetAtTime(Math.min(1.4,(+st.vol||1)),ac.currentTime,fi/3);g.connect(B.bgm);
+    const sp=60/(+st.tempo||S.bpm),me={g,on:true};let i=0,nt=ac.currentTime+.1;const sch=()=>{if(!me.on)return;while(nt<ac.currentTime+.4){try{S.f(i,nt,g);}catch(e){}i++;nt+=sp;}me.tm=setTimeout(sch,120);};sch();bg=me;}
+  function amb(k){if(k===ambKey)return;ambKey=k;const t=ac.currentTime;ambOut.gain.setTargetAtTime(0,t,.3);const old=ambNodes;setTimeout(()=>{old.forEach(n=>n.stop());ambNodes=k&&AMB[k]?AMB[k]():[];ambOut.gain.setTargetAtTime(1,ac.currentTime,.4);},900);}
+  return {ac,mix,SFX,
+    resume(){return ac.resume&&ac.resume();},
+    cue(list){const t0=ac.currentTime+.03;(list||[]).forEach(c=>{const f=SFX[c.k];if(f)try{f(t0+(+c.t||0),B.sfx,Math.min(1.5,+c.v||1));}catch(e){}});},
+    scene(a){if(!a)return;if('amb' in a)amb(a.amb||'');if(a.bgm)bgm(a.bgm);},
+    duck(on){duck=on?.4:1;apply(on?.2:.8);},
+    setMix(k,v){mix[k]=v;try{localStorage.setItem('ss_mix',JSON.stringify(mix));}catch(e){}apply(.05);},
+    pause(){try{ac.suspend();}catch(e){}},play(){try{ac.resume();}catch(e){}},
+    stop(){try{if(bg)bg.on=false;ambNodes.forEach(n=>n.stop());ac.close();}catch(e){}}};}
+function playEp(n){const sb=ST.sbs[n];if(!sb)return;const st=[],say=v=>{try{const y=JSON.parse(v.say||'null')||{};y.lines=Array.isArray(y.lines)&&y.lines.length?y.lines:(y.say?[{who:y.who||'',say:y.say}]:[]);return y;}catch(e){return {lines:[]};}};
+  const E=((ST.plan&&ST.plan.eps)||[]).find(e=>+e.no===+n)||{},SER=(ST.plan&&ST.plan.title)||'';let pi=-1;
+  sb.scenes.forEach((S,si)=>S.shots.forEach(v=>{const d=say(v),D=d.dir||{},img=v.img?botU('/img/'+v.img):'',ls=d.lines.length?d.lines:[{who:'',say:''}];pi++;
+    const vm={};String(v.vo||'').split(',').forEach(x=>{const [a,b]=x.split(':');if(b)vm[a]=b;});
+    const fx=[d.think||'',d.ono||''],tr=[d.thinkTh?'('+d.thinkTh+')':'',d.onoTh?'『'+d.onoTh+'』':''].filter(Boolean).join('  ');
+    const base={img,sc:si+1,pi,mv:D.kind||'',ph:v.th||'',fx,aud:D.audio||null,ty:D.type||[],grade:D.grade||'',dur:+D.dur||0};let first=true;
+    const push=x=>{st.push({...base,...x,first});first=false;};
+    if(tr&&d.lines.length)push({who:'',t:tr,ja:'',sx:1,vo:''}); /* เสียงประกอบ/คำลอยภาษาญี่ปุ่นบนภาพ → คำแปลไทยขึ้นซับก่อนบทพูด */
+    ls.forEach((l,i)=>push({nv:l.nv||'',who:l.who||'',t:(!d.lines.length&&!l.say&&tr)?tr:l.say||'',ja:l.ja||'',sx:(!d.lines.length&&tr)?1:0,vo:vm[i]||'',ps:+l.pause||0}));}));
+  if(!st.length)return;let i=0,auto=false,tm=0,kt=0,hideT=0,lastPi=-1,A=null,tyT=[];
+  if(!document.getElementById('anfont')){const l=document.createElement('link');l.id='anfont';l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Mitr:wght@400;600&family=Noto+Serif+JP:wght@600;900&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@500;700&family=Sriracha&family=Rampart+One&family=Yomogi&display=swap';document.head.appendChild(l);}
+  const o=document.createElement('div');o.id='anp';o.innerHTML=`<style>#anp{position:fixed;inset:0;height:100vh;height:100dvh;background:#000;z-index:9999;display:flex;flex-direction:column;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box}
+#anp .fr{position:relative;width:min(100%,calc(100vh * 16 / 9));aspect-ratio:16/9;margin:0 auto;background:#111;overflow:hidden;container-type:inline-size}@supports (height:100dvh){#anp .fr{width:min(100%,calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9))}}
+#anp .fr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s,filter .8s;transform-origin:50% 50%}#anp .fr img.on{opacity:1}#anp .fr img.kb{animation:kb 9s ease-out forwards}#anp .fr img.kb2{animation:kb2 9s ease-out forwards}@keyframes kb{from{transform:scale(1)}to{transform:scale(1.08) translate(-1%,-1%)}}@keyframes kb2{from{transform:scale(1.08) translate(1%,0)}to{transform:scale(1) translate(0,0)}}#anp .fr img.kbp{animation:kbp 10s linear forwards}@keyframes kbp{from{transform:scale(1.1) translate(3%,0)}to{transform:scale(1.1) translate(-3%,0)}}#anp .fr img.kbs{animation:kbs .9s ease-out forwards}@keyframes kbs{0%{transform:scale(1.18)}30%{transform:scale(1.06) translate(-1%,1%)}45%{transform:scale(1.06) translate(1%,-1%)}60%{transform:scale(1.05) translate(-.5%,0)}100%{transform:scale(1.05)}}#anp .fr img.kbn{animation:none}
+#anp .gr{position:absolute;inset:0;pointer-events:none;mix-blend-mode:soft-light;opacity:0;transition:opacity .8s,background .8s}
+#anp .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-size:14px;padding:20px;text-align:center}
+#anp .sub{position:absolute;left:4%;right:4%;bottom:5.5%;text-align:center;color:#fff;font-size:clamp(15px,3.4cqw,34px);line-height:1.42;text-shadow:0 0 4px #000,0 0 4px #000,2px 2px 3px #000;z-index:2;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}#anp .sub b{color:#ffd76a;font-weight:600}#anp .sub .w{transition:opacity .12s}#anp .sub .w.o{opacity:.4}#anp .sub.nv{font-style:italic;color:#e8eefc}#anp .sub.tk{font-style:italic;color:#c9c3ff}#anp .sub.sx{color:#ffd76a;font-size:clamp(13px,2.8cqw,24px)}#anp .sub .ja{display:block;font-family:'Zen Maru Gothic',sans-serif;font-size:.78em;opacity:.95;margin-bottom:.1em}#anp .sub.jo .ja{font-size:1em}
+#anp .f1{position:absolute;left:5%;top:9%;color:#fff;font-family:'Yusei Magic',sans-serif;font-size:clamp(13px,3cqw,26px);text-shadow:0 0 4px #000,0 0 4px #000;z-index:2;animation:tyfade .6s both}#anp .f2{position:absolute;right:5%;top:8%;z-index:2;font-family:'Dela Gothic One',sans-serif;font-size:clamp(20px,6cqw,60px);color:#fff;-webkit-text-stroke:.09em #000;paint-order:stroke fill;transform:rotate(-8deg);animation:tyscale .45s cubic-bezier(.3,1.6,.5,1) both;letter-spacing:.02em}
+#anp .ty{position:absolute;inset:0;pointer-events:none;z-index:3}#anp .ty>div{position:absolute;max-width:80%;text-align:center}
+#anp .ty .p-tl{left:5%;top:7%;text-align:left}#anp .ty .p-tr{right:5%;top:7%;text-align:right}#anp .ty .p-t{left:50%;top:7%;transform:translateX(-50%)}#anp .ty .p-c{left:50%;top:44%;transform:translate(-50%,-50%)}#anp .ty .p-l{left:6%;top:40%;text-align:left}#anp .ty .p-r{right:6%;top:40%;text-align:right}#anp .ty .p-bl{left:5%;bottom:24%;text-align:left}#anp .ty .p-br{right:5%;bottom:24%;text-align:right}
+#anp .s-title .m{white-space:nowrap;font-family:'Noto Serif JP',serif;font-weight:900;font-size:clamp(26px,7.5cqw,78px);color:#fff;letter-spacing:.12em;text-shadow:0 0 18px rgba(255,255,255,.45)}#anp .s-title .s{font-family:'Mitr',sans-serif;font-size:clamp(14px,3cqw,30px);color:#ffe3a3;margin-top:.3em;letter-spacing:.06em}
+#anp .s-intro{background:linear-gradient(90deg,rgba(0,0,0,.75),rgba(0,0,0,0));padding:.4em 1.4em .5em .8em;border-left:.25em solid #ffd76a}#anp .s-intro .m{font-family:'Dela Gothic One',sans-serif;font-size:clamp(18px,4.6cqw,46px);color:#fff}#anp .s-intro .s{font-family:'Mitr',sans-serif;font-size:clamp(12px,2.2cqw,22px);color:#ffd76a}
+#anp .s-trans .m{font-family:'Noto Serif JP',serif;font-weight:600;font-size:clamp(18px,4.2cqw,44px);color:#fff;letter-spacing:.3em;text-shadow:0 0 8px #000}#anp .s-trans .s{font-family:'Mitr',sans-serif;font-size:clamp(12px,2.3cqw,22px);color:#ddd;letter-spacing:.15em}
+#anp .s-sign{background:rgba(250,244,228,.92);color:#2a2116;border:.12em solid #3b2f22;border-radius:.2em;padding:.25em .7em;font-family:'Zen Maru Gothic',sans-serif;font-weight:700;font-size:clamp(13px,3cqw,30px);box-shadow:0 .2em .6em rgba(0,0,0,.5);transform:perspective(500px) rotateY(-8deg)}#anp .s-sign .s{font-family:'Mitr',sans-serif;font-size:.55em;font-weight:400;opacity:.8}
+#anp .s-doc{background:#fffdf3;color:#1d2a52;padding:.35em .8em;font-family:'Yomogi',cursive;font-size:clamp(13px,2.8cqw,28px);box-shadow:0 .2em .5em rgba(0,0,0,.5);transform:rotate(-2deg);border-left:.15em solid #c33}#anp .s-doc .s{font-family:'Sriracha',cursive;font-size:.65em;color:#a33}
+#anp .s-manga .m{font-family:'Dela Gothic One',sans-serif;font-size:clamp(22px,7cqw,72px);color:#fff;-webkit-text-stroke:.09em #000;paint-order:stroke fill;transform:rotate(-6deg);display:inline-block}#anp .s-manga .s{font-family:'Mitr',sans-serif;color:#ffd76a;font-size:clamp(11px,2cqw,20px);text-shadow:0 0 3px #000}
+#anp .s-drama .m{font-family:'Noto Serif JP',serif;font-weight:900;font-size:clamp(20px,5cqw,52px);color:#fff;text-shadow:0 0 12px #000,0 0 22px rgba(160,180,255,.6)}#anp .s-drama .s{font-family:'Mitr',sans-serif;color:#cfd8ff;font-size:clamp(11px,2.1cqw,20px)}
+#anp .s-emo .m{font-family:'Yusei Magic',sans-serif;font-size:clamp(18px,4.5cqw,44px);color:#ffd1e6;text-shadow:0 0 8px rgba(255,120,180,.8),0 0 2px #000}#anp .s-emo .s{font-family:'Sriracha',cursive;color:#ffe;font-size:clamp(11px,2.1cqw,20px);text-shadow:0 0 3px #000}
+#anp .s-horror .m{font-family:'Dela Gothic One',sans-serif;font-size:clamp(20px,5.5cqw,56px);color:#e8e8e8;text-shadow:2px 0 #b00,-2px 0 #06c,0 0 14px #000;letter-spacing:.08em}#anp .s-horror .s{font-family:'Mitr',sans-serif;color:#f99;font-size:clamp(11px,2.1cqw,20px);text-shadow:0 0 3px #000}
+#anp .s-cute .m{font-family:'Rampart One',sans-serif;font-size:clamp(18px,5cqw,50px);color:#fff4b8;-webkit-text-stroke:.05em #b05;paint-order:stroke fill}#anp .s-cute .s{font-family:'Sriracha',cursive;color:#fff;font-size:clamp(11px,2.1cqw,20px);text-shadow:0 0 3px #000}
+#anp .s-meme .m{font-family:'Mitr',sans-serif;font-weight:600;font-size:clamp(15px,3.6cqw,36px);color:#fff;-webkit-text-stroke:.08em #000;paint-order:stroke fill;text-transform:uppercase}
+#anp .a-fade{animation:tyfade .7s both}#anp .a-scale{animation:tyscale .5s cubic-bezier(.3,1.6,.5,1) both}#anp .a-motion{animation:tymove 1.2s cubic-bezier(.2,.8,.2,1) both}#anp .a-reveal{animation:tyrev 1.6s cubic-bezier(.6,0,.2,1) both}#anp .a-glitch .m{animation:tygl .35s steps(2) infinite}#anp .x-out{animation:tyout .6s both}#anp .x-dis .m span,#anp .x-dis .s span{display:inline-block;transition:transform 1.1s ease-out,opacity 1.1s,filter 1.1s}
+@keyframes tyfade{from{opacity:0}to{opacity:1}}@keyframes tyscale{from{opacity:0;transform:scale(1.8) rotate(-8deg)}to{opacity:1}}@keyframes tymove{from{opacity:0;translate:-12% 0}to{opacity:1;translate:0 0}}@keyframes tyrev{from{clip-path:inset(0 100% 0 0);letter-spacing:.6em;opacity:.2}to{clip-path:inset(0 0 0 0);opacity:1}}@keyframes tygl{0%{transform:translate(0)}25%{transform:translate(-2px,1px) skewX(6deg);clip-path:inset(10% 0 40% 0)}50%{transform:translate(2px,-1px)}75%{clip-path:inset(55% 0 5% 0);transform:translate(-1px,0)}100%{transform:translate(0)}}@keyframes tyout{to{opacity:0;filter:blur(6px)}}
+#anp .crl{position:absolute;inset:0;overflow:hidden}#anp .ct{position:absolute;left:0;right:0;top:100%;text-align:center;color:#eee;font-size:clamp(12px,2.4cqw,24px);line-height:1.7}#anp .cs{margin:2.2em 0}#anp .ch{font-family:'Noto Serif JP',serif;color:#ffd76a;letter-spacing:.15em;margin-bottom:.4em}#anp .cr{display:flex;justify-content:center;gap:1.2em}#anp .cr span:first-child{min-width:9em;text-align:right;color:#bbb;font-family:Mitr,sans-serif}#anp .cr span:last-child{min-width:9em;text-align:left;font-family:'Zen Maru Gothic',sans-serif}#anp .card{position:absolute;inset:0;background:#000;z-index:1;opacity:0;transition:opacity .8s;pointer-events:none}#anp .card.on{opacity:1}
+#anp .big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:4;background:rgba(0,0,0,.35)}#anp .big span{width:84px;height:84px;border-radius:50%;background:rgba(0,0,0,.6);border:2px solid #fff;color:#fff;font-size:38px;display:flex;align-items:center;justify-content:center;padding-left:6px;box-sizing:border-box}
+#anp .ui{transition:opacity .3s}#anp.hid .ui{opacity:0;pointer-events:none}
+#anp .top{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;padding:10px;gap:8px;z-index:5;background:linear-gradient(#000a,#0000)}
+#anp .ctl{position:absolute;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));z-index:5;background:linear-gradient(#0000,#000c)}
+#anp button{background:rgba(0,0,0,.55);color:#fff;border:1px solid #555;border-radius:18px;padding:6px 12px;font-size:14px;min-height:38px;min-width:40px}
+#anp .row{display:flex;align-items:center;gap:8px}#anp input[type=range]{flex:1;accent-color:#8b7cf6;height:28px}#anp .tm{color:#ddd;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#anp [data-st]{color:#bbb;font-size:12px;text-align:center;min-height:16px}
+#anp .mx{position:absolute;right:10px;top:56px;z-index:6;background:rgba(20,20,28,.95);border:1px solid #444;border-radius:12px;padding:10px 14px;color:#ddd;font-size:13px;width:230px;display:none}#anp .mx.on{display:block}#anp .mx label{display:flex;align-items:center;gap:8px;margin:4px 0}#anp .mx label span{width:84px}
+@media (min-width:700px){#anp button{font-size:17px;padding:9px 16px;min-height:46px;min-width:50px}#anp .tm{font-size:15px}#anp .mx{font-size:15px;width:280px}}</style>
+<div class="fr"><img><img><div class="gr"></div><div class="ph"></div><div class="f1"></div><div class="f2"></div><div class="ty"></div><div class="card"></div><div class="sub"></div><div class="big"><span>▶</span></div></div>
+<div class="top ui"><button data-x>✕</button><span class="tm" data-n></span><span style="display:flex;gap:6px"><button data-cr title="เครดิตท้ายเรื่อง">🎞</button><button data-lang></button><button data-mx>🎚</button><button data-snd></button><button data-fs>⛶</button></span></div>
+<div class="mx ui"><b>ระดับเสียง</b><label><span>🎵 ดนตรี</span><input type="range" min="0" max="0.6" step="0.02" data-m="bgm"></label><label><span>💥 เสียงประกอบ</span><input type="range" min="0" max="1.2" step="0.05" data-m="sfx"></label><label><span>🌙 บรรยากาศ</span><input type="range" min="0" max="0.5" step="0.02" data-m="amb"></label><div style="font-size:11px;opacity:.7;margin-top:4px">เสียงพากย์ดังเต็มเสมอ ดนตรีจะเบาลงเองตอนมีคนพูด</div></div>
+<div class="ctl ui"><div data-st></div><div class="row"><button data-p>⏮</button><button data-a>▶</button><button data-nx>⏭</button><span class="tm" data-t>0:00</span><input type="range" min="0" value="0" step="1" data-sk><span class="tm" data-tt>0:00</span></div></div>`;
+  document.body.appendChild(o);const $o=q=>o.querySelector(q),ims=[...o.querySelectorAll('.fr img')];let cur=0;
+  const seg=(t,lang)=>{if(lang==='ja')return [...t];try{return [...new Intl.Segmenter('th',{granularity:'word'}).segment(t)].map(x=>x.segment);}catch(e){return t.split(/(\s+)/);}};
+  const stt=m=>{$o('[data-st]').textContent=m||'';};
+  const au=new Audio();au.preload='auto';const pre=new Audio();pre.preload='auto';let snd=localStorage.getItem('ss_snd')!=='0',waitAu=false;
+  let lang=localStorage.getItem('ss_sub')||'th';const LN={th:'ไทย',ja:'日本語',both:'ไทย+日'};const langT=()=>$o('[data-lang]').textContent='字 '+LN[lang];langT();
+  const sndT=()=>$o('[data-snd]').textContent=snd?'🔊':'🔇';sndT();
+  const dur=x=>x.d?x.d*1000+(x.ps?x.ps*1000:450):Math.max(1800,1200+x.t.length*75)+(x.t?0:900)+(x.ps||0)*1000; /* เวลาอ่านขั้นต่ำ ~13 ตัวอักษร/วินาที */
+  const fmt=ms=>{const s=Math.round(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+  const sk=$o('[data-sk]');sk.max=st.length-1;
+  const tot=()=>st.reduce((a,x)=>a+dur(x),0),upT=()=>{let a=0;for(let k=0;k<i;k++)a+=dur(st[k]);$o('[data-t]').textContent=fmt(a);$o('[data-tt]').textContent=fmt(tot());sk.value=i;$o('[data-n]').textContent=`ตอน ${n} · ฉาก ${st[i].sc} · ${i+1}/${st.length}`;};
+  const sayVo=x=>{au.pause();if(!snd||!x.vo){stt(x.vo?'':(x.t&&!x.sx?'(บรรทัดนี้ยังไม่มีเสียงพากย์)':''));return false;}au.src=botU('/vo/'+x.vo);stt('');au.play().then(()=>A&&A.duck(true)).catch(e=>stt('⚠️ เล่นเสียงไม่ได้ — แตะที่ซับเพื่อลองใหม่'));return true;};
+  au.onpause=()=>A&&A.duck(false);
+  au.onloadedmetadata=()=>{if(isFinite(au.duration)&&st[i]&&st[i].vo&&au.src.includes(st[i].vo)){st[i].d=au.duration;upT();}};
+  const preload=()=>{const y=st[i+1];if(!y)return;if(y.img){const p=new Image();p.src=y.img;}if(snd&&y.vo)pre.src=botU('/vo/'+y.vo);};
+  const showUI=()=>{o.classList.remove('hid');clearTimeout(hideT);if(auto)hideT=setTimeout(()=>o.classList.add('hid'),3000);};
+  const kbOf=k=>/Establishing|Transition|Tracking|Pan/.test(k)?'kbp':/Wide|Ending/.test(k)?'kb2':/Reaction|Climax|Action|Comedy/.test(k)?'kbs':/Silent/.test(k)?'kbn':'kb'; /* การเคลื่อนกล้องตามใบสั่งงานผู้กำกับ */
+  /* ปรับโทนสี (color grading) ตามอารมณ์ฉาก — ทำบนภาพสีจริง ภาพร่างขาวดำไม่ถูกย้อมสี */
+  const GR={warm:['rgba(255,170,80,.55)','sepia(.15) saturate(1.1)'],cool:['rgba(80,140,255,.5)','saturate(.85)'],pastel:['rgba(255,200,230,.45)','saturate(.8) brightness(1.06)'],cinematic:['rgba(40,90,110,.45)','contrast(1.1) saturate(.9)'],dark:['rgba(10,10,40,.6)','brightness(.78) contrast(1.15)'],vintage:['rgba(200,160,90,.5)','sepia(.35) contrast(.95)'],dream:['rgba(220,180,255,.5)','brightness(1.08) saturate(.9) blur(.3px)'],contrast:['rgba(0,0,0,0)','contrast(1.3)'],mono:['rgba(0,0,0,0)','grayscale(1) contrast(1.1)'],love:['rgba(255,120,170,.45)','saturate(1.05)'],hope:['rgba(255,210,110,.5)','brightness(1.07)'],mystery:['rgba(90,60,170,.55)','contrast(1.08) brightness(.9)'],fear:['rgba(0,0,30,.6)','contrast(1.35) brightness(.8)']};
+  function grade(x){const g=GR[x.grade],gr=$o('.gr'),draft=document.documentElement.classList.contains('sbdraft');gr.style.opacity=g&&!draft?'1':'0';if(g)gr.style.background=g[0];ims.forEach(e=>e.style.filter=g&&!draft?g[1]:'');}
+  function setImg(x){const a=ims[cur];if(x.img){$o('.ph').textContent='';if(a.getAttribute('src')===x.img)return;cur^=1;const b=ims[cur];b.className='';b.onload=()=>{void b.offsetWidth;b.className='on '+kbOf(x.mv);a.classList.remove('on');};b.src=x.img;}else{ims.forEach(e=>e.classList.remove('on'));$o('.ph').textContent='⏳ ภาพยังไม่เสร็จ · '+x.ph;}}
+  /* ตัวอักษรบนจอ (สร้างด้วยระบบ ไม่ให้ AI วาดตัวหนังสือ) */
+  const fill=s=>String(s||'').replace('{ep}',n).replace('{ep_title}',E.title||'').replace('{series}',SER);
+  const spanify=(el,txt)=>{el.innerHTML='';[...txt].forEach(c=>{const s=document.createElement('span');s.textContent=c;el.appendChild(s);});};
+  function typo(x){tyT.forEach(clearTimeout);tyT=[];const L=$o('.ty');L.innerHTML='';$o('.card').classList.remove('on');
+    (x.ty||[]).forEach(T=>{const at=(+T.t||0)*1000,dd=(+T.d||0)*1000;tyT.push(setTimeout(()=>{
+      if(T.k==='title'||T.card)$o('.card').classList.add('on');
+      const el=document.createElement('div');el.className=`p-${T.pos||'c'} s-${T.sty||'drama'} a-${T.anim||'fade'}`;const m=document.createElement('div');m.className='m';const s=document.createElement('div');s.className='s';el.append(m,s);L.appendChild(el);
+      const tx=fill(T.tx),sub=fill(T.sub);
+      if(T.anim==='type'){let k=0;const step=()=>{m.textContent=tx.slice(0,++k);if(k<tx.length)tyT.push(setTimeout(step,70));else s.textContent=sub;};step();A&&A.cue([{k:'click',v:.3}]);}else{spanify(m,tx);spanify(s,sub);}
+      if(T.anim==='glitch'){el.classList.add('a-glitch');A&&A.cue([{k:'glitch',v:.6}]);tyT.push(setTimeout(()=>el.classList.remove('a-glitch'),1200));}
+      if(dd)tyT.push(setTimeout(()=>{if(T.out==='dissolve'){el.classList.add('x-dis');el.querySelectorAll('span').forEach(sp=>{sp.style.transform=`translate(${(Math.random()-.5)*160}px,${-40-Math.random()*120}px) rotate(${(Math.random()-.5)*90}deg)`;sp.style.opacity=0;sp.style.filter='blur(3px)';});}else el.classList.add('x-out');if(T.k==='title'||T.card)$o('.card').classList.remove('on');},dd));
+    },at));});}
+  function enterPanel(x){grade(x);typo(x);const f=$o('.f1'),g=$o('.f2');f.textContent=x.fx[0];g.textContent=x.fx[1];f.style.animation='none';g.style.animation='none';void g.offsetWidth;f.style.animation='';g.style.animation='';if(A&&auto){A.scene(x.aud);A.cue(x.aud&&x.aud.sfx);}}
+  function show(){const x=st[i];setImg(x);if(x.pi!==lastPi){lastPi=x.pi;enterPanel(x);}
+    const sb=$o('.sub'),th=x.who[0]==='~',useJa=lang!=='th'&&x.ja&&!x.sx;sb.className='sub'+(x.sx?' sx':x.who?(th?' tk':''):' nv')+(lang==='ja'&&useJa?' jo':'');
+    const txt=lang==='ja'&&useJa?x.ja:x.t,lg=lang==='ja'&&useJa?'ja':'th';
+    const wh=seg(txt,lg).map(w=>`<span class="w o">${esc(w)}</span>`).join(''),jaLine=lang==='both'&&useJa?`<span class="ja">${esc(x.ja)}</span>`:'';
+    const who=x.who.replace(/^~/,'');sb.innerHTML=!txt?'':jaLine+(!x.who?wh:th?`(${esc(who)} ในใจ) ${wh}`:`<b>${esc(who)}:</b> ${wh}`);
+    const spans=[...sb.querySelectorAll('.w')],hl=f=>{const c=Math.ceil(spans.length*Math.min(1,Math.max(0,f)));spans.forEach((e,k)=>e.classList.toggle('o',k>=c));};
+    upT();clearInterval(kt);clearTimeout(tm);au.pause();
+    if(!auto){hl(1);return;}
+    waitAu=sayVo(x);preload();
+    if(x.sx||!x.t)hl(1);else{const t0=Date.now();kt=setInterval(()=>{if(waitAu&&au.duration&&isFinite(au.duration))hl((au.currentTime+0.15)/au.duration);else if(!waitAu)hl((Date.now()-t0)/Math.max(800,dur(x)-700));},80);}
+    const nx=()=>{if(i<st.length-1){i++;show();}else{hl(1);showCredits();}},gap=(x.ps?x.ps*1000:450);
+    if(waitAu){au.onended=()=>{A&&A.duck(false);if(auto)tm=setTimeout(nx,gap);};au.onerror=()=>{stt('⚠️ โหลดเสียงไม่ได้');if(auto)tm=setTimeout(nx,dur(x));};}else tm=setTimeout(nx,dur(x));}
+  /* เครดิตท้ายเรื่อง (End Credits) + ดนตรีปิด */
+  let cast=null;api('vo_cast').then(r=>{cast=r&&r.cast||null;}).catch(()=>{});
+  function credits(){const used=new Set(),narr=new Set();st.forEach(x=>{if(x.who)used.add(x.who.replace(/^~/,''));else if(x.t&&!x.sx)narr.add(x.nv||'narrator');});
+    const C=cast||{},vv=k=>C[k]&&C[k].sp?'VOICEVOX:'+C[k].sp:'',NN={narrator:'Storyteller',n_cine:'Cinematic',n_anime:'Anime',n_dark:'Dark',n_doc:'Documentary',n_emo:'Emotional',n_epic:'Epic',narrator2:'Dark'};
+    const rows=[...used].map(w=>[w,vv(w)||vv('_m')]).filter(r=>r[1]),nr=[...narr].map(k=>['ผู้บรรยาย · '+(NN[k]||k),vv(k)]).filter(r=>r[1]);
+    const allv=[...new Set([...rows,...nr].map(r=>r[1]))];
+    const sec=(h,arr)=>`<div class="cs"><div class="ch">${h}</div>${arr.map(([a,b])=>`<div class="cr"><span>${esc(a)}</span><span>${esc(b)}</span></div>`).join('')}</div>`;
+    return `<div class="ct"><div class="cs"><div class="m" style="font-family:'Noto Serif JP',serif;font-weight:900;font-size:2.2em;letter-spacing:.12em">私が恋した理由</div><div style="font-family:Mitr,sans-serif;color:#ffe3a3">${esc(SER||'สาเหตุที่ฉันรัก')}</div><div style="margin-top:.6em;font-family:'Noto Serif JP',serif">第${n}話　${esc(E.title||'')}</div></div>
+      ${sec('キャスト · นักพากย์',rows)}${sec('ナレーション · ผู้บรรยาย',nr)}
+      ${sec('音声 · เสียงพากย์',[['เสียงสังเคราะห์','VOICEVOX'],...allv.map(v=>['',v])])}
+      ${sec('映像 · ภาพ',[['ภาพสตอรีบอร์ด','AI · FLUX.1 [schnell] (Apache-2.0)'],['ตัวอักษรและซับ','สร้างด้วยระบบในเว็บ']])}
+      ${sec('音楽 · ดนตรีและเสียงประกอบ',[['ดนตรีปิด / ดนตรีประกอบ','สร้างสดด้วย Web Audio'],['เสียงประกอบ / บรรยากาศ','สร้างสดด้วย Web Audio']])}
+      ${sec('制作 · สร้างโดย',[['สตูดิโอ','Xiress Studio']])}
+      <div class="cs" style="margin-top:3em"><div style="font-family:'Noto Serif JP',serif;font-size:1.8em;letter-spacing:.3em">つづく</div><div style="font-family:Mitr,sans-serif;color:#ccc">โปรดติดตามตอนต่อไป</div></div></div>`;}
+  function showCredits(){if(!A){A=mkAudio();A&&A.play();}const L=$o('.ty');tyT.forEach(clearTimeout);tyT=[];$o('.sub').innerHTML='';$o('.f1').textContent='';$o('.f2').textContent='';
+    $o('.card').classList.add('on');L.innerHTML=`<div class="crl">${credits()}</div>`;au.pause();
+    if(A){A.scene({amb:'',bgm:{s:'ending_theme',fi:2,fo:3,vol:1.15}});}
+    const el=L.querySelector('.ct'),FH=$o('.fr').clientHeight,H=el.scrollHeight,dur=Math.max(30,Math.min(60,(H+FH)/30));try{el.animate([{transform:'translateY(0)'},{transform:`translateY(${-(H+FH)}px)`}],{duration:dur*1000,fill:'forwards',easing:'linear'});}catch(e){}
+    tyT.push(setTimeout(()=>{if(A)A.scene({bgm:{s:'',fo:3}});tyT.push(setTimeout(()=>{$o('.card').classList.remove('on');L.innerHTML='';setPlay(false);},3200));},dur*1000));}
+  function setPlay(p){auto=p;if(p&&!A){A=mkAudio();if(A){Object.keys(A.mix).forEach(k=>{const r=o.querySelector(`[data-m="${k}"]`);if(r)r.value=A.mix[k];});}}if(A){p?A.play():A.pause();}if(p&&A){lastPi=-1;}
+    $o('[data-a]').textContent=p?'⏸':'▶';$o('.big').style.display=p?'none':'flex';show();showUI();}
+  function go(d){i=Math.max(0,Math.min(st.length-1,i+d));show();showUI();}
+  function close(){clearTimeout(tm);clearInterval(kt);clearTimeout(hideT);tyT.forEach(clearTimeout);au.pause();A&&A.stop();try{const d=document;if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);}catch(x){}document.removeEventListener('keydown',kd);o.remove();}
+  const kd=e=>{if(e.key===' '){e.preventDefault();setPlay(!auto);}else if(e.key==='ArrowRight')go(1);else if(e.key==='ArrowLeft')go(-1);else if(e.key==='Escape')close();};document.addEventListener('keydown',kd);
+  sk.oninput=()=>{i=+sk.value;upT();};sk.onchange=()=>{i=+sk.value;show();showUI();};
+  o.querySelectorAll('[data-m]').forEach(r=>r.oninput=()=>{if(!A){A=mkAudio();}A&&A.setMix(r.dataset.m,+r.value);});
+  o.onclick=e=>{const c=s=>e.target.closest(s);
+    if(c('[data-x]'))return close();
+    if(c('[data-fs]')){const d=document,fe=d.fullscreenElement||d.webkitFullscreenElement;try{if(fe)(d.exitFullscreen||d.webkitExitFullscreen).call(d);else (o.requestFullscreen||o.webkitRequestFullscreen).call(o);}catch(x){}return;}
+    if(c('[data-snd]')){snd=!snd;localStorage.setItem('ss_snd',snd?'1':'0');sndT();if(!snd)au.pause();else if(auto)show();return;}
+    if(c('[data-lang]')){lang=lang==='th'?'ja':lang==='ja'?'both':'th';localStorage.setItem('ss_sub',lang);langT();show();return;}
+    if(c('[data-cr]')){auto=true;$o('[data-a]').textContent='⏸';clearTimeout(tm);clearInterval(kt);$o('.big').style.display='none';showCredits();return;}
+    if(c('[data-mx]')){$o('.mx').classList.toggle('on');clearTimeout(hideT);return;}
+    if(c('.mx'))return;
+    if(c('[data-a]'))return setPlay(!auto);if(c('[data-p]'))return go(-1);if(c('[data-nx]'))return go(1);
+    if(c('.sub')&&!auto){sayVo(st[i]);return;} /* หยุดอยู่ แตะซับ = ฟังเสียงบรรทัดนี้ */
+    if(c('.ctl')||c('.top'))return;
+    if(o.classList.contains('hid')){showUI();return;} /* แตะจอตอนเล่น = โชว์ปุ่มก่อน */
+    $o('.mx').classList.remove('on');setPlay(!auto);};
+  o.onmousemove=()=>{if(auto)showUI();};
+  show();showUI();}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&window._needLoad){window._needLoad=0;load();}}); /* ดึงข้อมูลต่อเมื่อกลับมาเปิดหน้านี้ ไม่ดึงทิ้งไว้ตอนสลับแท็บ */
+// หลอด % โควตาอ่านฐานข้อมูลวันนี้ แยกตามที่มา + ประเมินว่าทำต่อ/ทำเพิ่มจะใช้กี่ %
+const MTAG=[[/^web:vcastep:sb/,'หน้าสตูดิโอ · สตอรีบอร์ด','#8b7cf6'],[/^web:vcastep:(lib|training|xl_)/,'หน้าสตูดิโอ · LoRA','#b49cff'],[/^web:(vcastep:get|vcastep$|anime)/,'หน้าสตูดิโอ · ข้อมูลเรื่อง/ตอน','#c9bfff'],[/^web:img/,'เปิดดูภาพ','#e0d8ff'],[/^web:/,'หน้าเว็บ · อื่นๆ','#ddd'],
+  [/^kaggle/,'เครื่อง Kaggle รับ/ส่งงาน','#3fb6a8'],[/^bg:anime/,'เบื้องหลัง · สตอรีบอร์ด/อนิเมะอัตโนมัติ','#f0a640'],[/^bg:tick/,'เบื้องหลัง · คิววาดภาพ','#f5c060'],[/^bg:lora/,'เบื้องหลัง · LoRA','#e8885a'],[/^bg:kaggle/,'เบื้องหลัง · ดูแลงาน Kaggle/วิดีโอ','#d0664a'],[/^bg:heal/,'เบื้องหลัง · ซ่อมงานที่พัง','#c05050'],[/^bg:(cast|aud)/,'เบื้องหลัง · คัดนักแสดง','#a04060'],[/./,'อื่นๆ','#999']];
+function meterCard(){const M=ST.meter;if(!M)return ST.reads>=60?`<div class="c warn">⚠️ วันนี้ใช้โควตาอ่านฐานข้อมูลไปแล้ว ${ST.reads}%</div>`:'';
+  const cap=M.cap,pc=x=>x/cap*100,f=x=>x>=10?x.toFixed(0):x>=1?x.toFixed(1):x>=0.01?x.toFixed(2):'<0.01';
+  const G={};for(const r of M.by||[]){const m=MTAG.find(t=>t[0].test(r.tag));const g=G[m[1]]||(G[m[1]]={l:m[1],col:m[2],n:0,c:0,tags:{}});g.n+=+r.n;g.c+=+r.c;g.tags[r.tag]={n:+r.n,c:+r.c};}
+  const gs=Object.values(G).sort((a,b)=>b.n-a.n),tot=Math.max(M.total,gs.reduce((a,g)=>a+g.n,0)),other=Math.max(0,tot-gs.reduce((a,g)=>a+g.n,0));
+  const d0=Date.parse(M.day+'T00:00:00Z'),h=Math.max(0.25,(M.now-d0)/3.6e6),proj=pc(tot/h*24);
+  const av=re=>{let n=0,c=0;for(const r of M.by||[])if(re.test(r.tag)){n+=+r.n;c+=+r.c;}return c?n/c:0;};
+  const nEp=Object.keys(ST.sbs||{}).length||1,perLoad=av(/^web:vcastep:get$/)+av(/^web:anime/)+av(/^web:vcastep:lib$/)+av(/^web:vcastep:training$/)+av(/^web:vcastep:xl_list$/)+nEp*av(/^web:vcastep:sb$/);
+  const bgH=gs.filter(g=>/^เบื้องหลัง/.test(g.l)).reduce((a,g)=>a+g.n,0)/h,img=av(/^web:img/),kg=av(/^kaggle/);
+  const used=pc(tot),col=used>=86?'#c0392b':used>=64?'#e67e22':'#27ae60',left=(new Date(d0+86400000)).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+  return `<div class="c"><details><summary style="cursor:pointer;list-style:none"><b>📊 โควตาอ่านฐานข้อมูลวันนี้ <span style="color:${col}">${f(used)}%</span></b> <span class="mu">(${(tot/1e6).toFixed(2)} จาก ${cap/1e6} ล้านแถว · รีเซ็ต ${left})</span>
+    <div style="position:relative;height:16px;border-radius:8px;background:#eee;overflow:hidden;margin:8px 0 2px;display:flex">${gs.map(g=>`<div title="${esc(g.l)}" style="width:${pc(g.n)}%;background:${g.col}"></div>`).join('')}${other?`<div style="width:${pc(other)}%;background:#999"></div>`:''}
+    ${M.budget?`<div title="กำหนดการใช้ถึงตอนนี้" style="position:absolute;left:${Math.min(100,pc(M.budget))}%;top:0;bottom:0;border-left:2px dotted #333"></div>`:''}${M.web?`<div style="position:absolute;left:${pc(M.web)}%;top:0;bottom:0;border-left:2px dashed #e67e22"></div>`:''}<div style="position:absolute;left:${pc(M.stop)}%;top:0;bottom:0;border-left:2px dashed #c0392b"></div>${M.kstop?`<div style="position:absolute;left:${pc(M.kstop)}%;top:0;bottom:0;border-left:2px solid #7b1fa2"></div>`:''}</div>
+    <div style="font-size:13px;margin-top:4px">${ST.save===3?'🔴 ประหยัดสุด: หน้าเว็บไม่รีเฟรชเอง ใช้ข้อมูลที่เก็บไว้ (กดรีเฟรชด้านล่างเมื่อต้องการของใหม่)':ST.save===2?'🟠 โหมดประหยัด: หน้าเว็บรีเฟรชทุก 10 นาที สตอรีบอร์ดใช้ข้อมูลที่เก็บไว้':ST.save===1?'🟡 งานเบื้องหลังหยุดแล้ว · หน้าเว็บรีเฟรชทุก 5 นาที':M.every>1?`🟡 ใช้เร็วกว่ากำหนด: งานเบื้องหลังเว้นทำทุก ${M.every} นาที เพื่อให้โควตาพอทั้งวัน`:'🟢 ปกติ: ใช้ตามกำหนด'}</div>
+    ${ST.save>=2?'<button data-mrefresh style="margin-top:6px">🔄 รีเฟรชข้อมูลล่าสุด (ใช้โควตา)</button>':''}
+    <div class="mu" style="font-size:12px">เส้นจุดดำ = กำหนดการใช้ถึงตอนนี้ (เกินเส้นนี้งานเบื้องหลังจะชะลอเอง) · เส้นแดง ${f(pc(M.stop))}% = หยุดงานเบื้องหลัง ทำต่อหลังรีเซ็ต ·${M.web?` เส้นส้ม ${f(pc(M.web))}% = หน้าเว็บโหมดประหยัด ·`:''}${M.kstop?` เส้นม่วง ${f(pc(M.kstop))}% = หยุดจ่ายงานให้ Kaggle ·`:''} 100% = เว็บใช้ไม่ได้จนรีเซ็ต · แตะเพื่อดูรายละเอียด</div></summary>
+    <div style="margin-top:8px;font-size:13.5px">${gs.map(g=>`<div style="display:flex;gap:8px;align-items:center;margin:3px 0"><span style="width:12px;height:12px;border-radius:3px;background:${g.col};flex:none"></span><span style="flex:1">${esc(g.l)}</span><b>${f(pc(g.n))}%</b><span class="mu" style="width:118px;text-align:right">${g.c} ครั้ง · ครั้งละ ${f(pc(g.n/g.c))}%</span></div>`).join('')||'<div class="mu">ยังไม่มีข้อมูลแยกที่มา (เริ่มนับหลังอัปเดตนี้)</div>'}${other?`<div class="mu">ส่วนที่นับก่อนเริ่มแยกที่มา ${f(pc(other))}%</div>`:''}
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)"><b>ประเมินจากการใช้จริงวันนี้</b>
+    <div>• ถ้าใช้แบบนี้ต่อทั้งวัน: <b style="color:${proj>=100?'#c0392b':proj>=86?'#e67e22':'#27ae60'}">~${f(proj)}%</b>${proj>=100?' ⚠️ จะเต็มก่อนรีเซ็ต':''}</div>
+    <div>• งานเบื้องหลังทำงานเอง: ~${f(pc(bgH))}% ต่อชั่วโมง</div>
+    ${perLoad?`<div>• เปิดหน้าสตูดิโอทิ้งไว้ (รีเฟรชเองทุกนาที): ~${f(pc(perLoad))}% ต่อครั้ง · ~${f(pc(perLoad*60))}% ต่อชั่วโมง · หลายแท็บคูณตามจำนวนแท็บ</div>`:''}
+    ${img?`<div>• เปิดดูภาพใหม่ 100 ภาพ: ~${f(pc(img*100))}% (ภาพที่เคยเปิดแล้วไม่นับซ้ำ)</div>`:''}
+    ${kg?`<div>• เครื่อง Kaggle รับ/ส่งงาน: ~${f(pc(kg))}% ต่อครั้ง</div>`:''}
+    <div class="mu" style="font-size:12px;margin-top:4px">ตัวเลขประเมินจากค่าเฉลี่ยของวันนี้ ยิ่งใช้นานยิ่งแม่น ช่วงเช้าหลังรีเซ็ตอาจคลาดเคลื่อนมาก</div></div></div></details></div>`;}
+// การ์ดโควตาฟรีทั้งหมด (แยกจากหลอดอ่านฐานข้อมูล/เว็บล่ม)
+function quotaCard(){const Q=ST.quota;if(!Q||!Q.items)return '';
+  const f=x=>x>=10?Math.round(x).toLocaleString('th-TH'):x>=1?x.toFixed(1):x.toFixed(2),pc=it=>Math.min(100,it.used/it.cap*100);
+  const rs=t=>{if(!t)return 'สะสม ไม่รีเซ็ต';const d=t-Date.now(),h=d/3.6e6;return 'รีเซ็ต '+(h<24?`ในอีก ${h<1?Math.max(1,Math.round(d/6e4))+' นาที':Math.round(h)+' ชม.'}`:new Date(t).toLocaleDateString('th-TH',{weekday:'short',day:'numeric',month:'short'})+' '+new Date(t).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}));};
+  const col=x=>x>=95?'#c0392b':x>=80?'#e67e22':x>=50?'#f1c40f':'#27ae60',worst=Q.items.reduce((m,it)=>Math.max(m,pc(it)),0);
+  return `<div class="c"><details><summary style="cursor:pointer;list-style:none"><b>🧾 โควตาฟรีทั้งหมด</b> <span class="mu">${Q.items.length} รายการ · สูงสุด <b style="color:${col(worst)}">${f(worst)}%</b> · แตะเพื่อดู</span></summary>
+  <div style="margin-top:8px">${Q.items.map(it=>{const x=pc(it);return `<div style="margin:9px 0"><div style="display:flex;gap:6px;font-size:13.5px"><span style="flex:1">${esc(it.name)}${it.full?' <b style="color:#c0392b">หมดแล้ว</b>':''}</span><b style="color:${col(x)}">${f(x)}%</b></div>
+    <div style="height:8px;border-radius:4px;background:#eee;overflow:hidden;margin:3px 0"><div style="height:100%;width:${x}%;background:${col(x)}"></div></div>
+    <div class="mu" style="font-size:12px">${it.est?'ประมาณ ':''}${f(it.used)} / ${f(it.cap)} ${esc(it.unit)} · ${rs(it.reset)}${it.note?' · '+esc(it.note):''}</div></div>`;}).join('')}
+  <div class="mu" style="font-size:12px;margin-top:6px">อัปเดตทุก 5 นาที · "ประมาณ" = ระบบนับเอง ไม่ใช่ตัวเลขจากผู้ให้บริการ ตัวเลขจริงดูได้ที่ Cloudflare / kaggle.com / Supabase · เริ่มนับหลังอัปเดตนี้ ก่อนหน้านี้ไม่มีข้อมูล</div></div></details></div>`;}
+// ผู้ช่วย Kaggle: โหลดเมื่อเปิดการ์ดเท่านั้น (ประหยัดโควตาอ่าน)
+function helperCard(){const H=ST.helpers;
+  const ago=t=>{if(!t)return 'ยังไม่เคย';const m=(Date.now()-t)/6e4;return m<2?'เมื่อสักครู่':m<60?Math.round(m)+' นาทีก่อน':m<1440?Math.round(m/60)+' ชม.ก่อน':Math.round(m/1440)+' วันก่อน';};
+  const kst=h=>/running/.test(h.kstat)?'🟢 เครื่องกำลังทำงาน':/starting|queued/.test(h.kstat)?'🟡 กำลังเปิดเครื่อง':h.kpause>Date.now()?'⏸ พักไว้ถึง '+new Date(h.kpause).toLocaleString('th-TH',{weekday:'short',hour:'2-digit',minute:'2-digit'}):'⚪ ว่าง รอคิวงานเยอะพอค่อยเปิดเอง';
+  return `<div class="c"><details data-hcard ${ST.hOpen?'open':''}><summary style="cursor:pointer;list-style:none"><b>🤝 ผู้ช่วย Kaggle</b> <span class="mu">${H?H.length+' คน · รันอัตโนมัติ '+H.filter(x=>x.auto&&x.on).length:'แตะเพื่อดู'}</span></summary>
+  ${!H?'<div class="mu" style="margin-top:6px">⏳ กำลังโหลด…</div>':H.map(h=>`<div style="border-top:1px solid var(--bd);margin-top:8px;padding-top:8px"><div style="display:flex;gap:6px;align-items:center"><b style="flex:1">${esc(h.name)}</b><span class="${h.on?'ok':'mu'}">${h.on?'✅ เปิดสิทธิ์':'⏸ ปิดอยู่'}</span><button data-hset="${h.id}|${h.on?0:1}">${h.on?'ปิด':'เปิด'}</button></div>
+    ${h.auto?`<div style="font-size:13px;margin-top:4px">🤖 รันอัตโนมัติด้วยบัญชี Kaggle <b>${esc(h.kuser)}</b><br>${kst(h)}<div style="height:8px;border-radius:4px;background:#eee;overflow:hidden;margin:5px 0 2px"><div style="height:100%;width:${Math.min(100,(h.kgh||0)/30*100)}%;background:${(h.kgh||0)>=27?'#c0392b':(h.kgh||0)>=20?'#e67e22':'#27ae60'}"></div></div><span class="mu" style="font-size:12px">GPU สัปดาห์นี้ ~${(h.kgh||0).toFixed(1)} / 30 ชม. (${Math.round(Math.min(100,(h.kgh||0)/30*100))}%)</span>${h.kerr?`<br><span class="warn">⚠️ ${esc(h.kerr)}</span>`:''}</div><div class="mu" style="font-size:12px">ติดต่อล่าสุด ${ago(h.seen)} · ช่วยทำงานไปแล้ว ${h.done} ชิ้น${h.cur?' · ตอนนี้: '+esc(h.cur):''}</div><button data-hunk="${h.id}" style="margin-top:6px">ยกเลิกการผูก Kaggle</button>`
+    :`<div class="mu" style="font-size:12.5px;margin:4px 0">ยังไม่ได้ผูกให้รันอัตโนมัติ · ติดต่อล่าสุด ${ago(h.seen)} · ช่วยไปแล้ว ${h.done} ชิ้น</div>
+      <input data-hku="${h.id}" type="text" placeholder="ชื่อผู้ใช้ Kaggle ของ${esc(h.name)}" style="width:100%;margin:3px 0" autocapitalize="off" autocorrect="off">
+      <input data-hkk="${h.id}" type="password" placeholder="API key (หรือวางทั้งไฟล์ kaggle.json)" style="width:100%;margin:3px 0" autocapitalize="off" autocorrect="off">
+      <button class="go" data-hsetk="${h.id}" style="width:100%;margin-top:3px">🔗 ผูกให้รันอัตโนมัติ</button>
+      ${h.on?`<button data-hcopy="${esc(h.link)}" style="margin-top:6px;width:100%">📋 หรือคัดลอกลิงก์ให้กดรันเอง</button>`:''}`}</div>`).join('')}
+  ${H?`<div style="border-top:1px solid var(--bd);margin-top:10px;padding-top:8px;display:flex;gap:6px"><input data-hadd type="text" placeholder="ชื่อผู้ช่วยคนใหม่" style="flex:1"><button data-haddb>➕ เพิ่ม</button></div>`:''}
+  <div class="mu" style="font-size:12px;margin-top:8px"><b>เอา API key ของ Kaggle:</b> ผู้ช่วยเข้า kaggle.com ด้วยบัญชีตัวเอง → รูปโปรไฟล์ → Settings → หัวข้อ API → Create New Token → จะได้ชื่อผู้ใช้กับ key (หรือไฟล์ kaggle.json) ส่งมาให้กรอกตรงนี้ · บัญชีต้องยืนยันเบอร์โทรแล้วถึงจะใช้ GPU ได้<br><b>ระบบเปิดเครื่องผู้ช่วยเมื่อ:</b> เครื่องหลักหมดโควตา หรือคิวงานเหลือเยอะ (เครื่องหลักทำอยู่แล้วยังเหลือ 4 งานขึ้นไป) · เปิดทีละคน · ใช้โควตา GPU ของผู้ช่วย 30 ชม./สัปดาห์ · key เก็บในฐานข้อมูลของเรา ไม่แสดงกลับบนหน้าเว็บ · กดยกเลิกการผูกได้ตลอด</div></details></div>`;}
+let tt=0;function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',5000);}
+/* ---------- บอท (ใช้ลิงก์/รหัสเดียวกับสตูดิโอเดิม) ---------- */
+function botCfg(){try{return JSON.parse(localStorage.getItem('ss_imgbot')||'{}')||{};}catch(e){return {};}}
+function botU(p){const c=botCfg();return String(c.url||'').replace(/\/+$/,'')+p+(p.includes('?')?'&':'?')+'k='+encodeURIComponent(c.key||'');}
+function botErr(e){const m=String(e&&e.message||e);return /failed to fetch|load failed|networkerror|network request/i.test(m)?'ติดต่อบอทไม่ได้ ตรวจลิงก์บอท หรือบอทยังไม่ได้ deploy':m;}
+const SNAP_ACTS=new Set(['get','sb','lib','training','xl_list','eps','quota']); /* ข้อมูลที่ดูอย่างเดียว: เก็บสำเนาล่าสุดไว้ในเครื่อง เผื่อฐานข้อมูลเต็มโควตา/บอทล่ม จะยังเปิดดูได้ */
+async function botApi0(p,body){const r=await fetch(botU(p),body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});
+  if(r.status===401)throw new Error('รหัสผ่านบอทไม่ถูกต้อง');const j=await r.json().catch(()=>({error:'บอทตอบกลับไม่ถูกต้อง (ลิงก์ถูกไหม?)'}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j;}
+function snapGet(p,body){try{const v=JSON.parse(localStorage.getItem('snap:'+p+':'+(body.story||'')+':'+body.act+':'+(body.ep||body.series_id||''))||'null');return v?v.j:null;}catch(e){return null;}}
+async function botApi(p,body){const sk=body&&SNAP_ACTS.has(body.act)?'snap:'+p+':'+(body.story||'')+':'+body.act+':'+(body.ep||body.series_id||''):'';
+  try{const j=await botApi0(p,body);if(sk){try{localStorage.setItem(sk,JSON.stringify({t:Date.now(),j}));}catch(e){}}return j;}
+  catch(e){const m=String(e.message||e);if(sk&&!/รหัสผ่าน/.test(m)){try{const v=JSON.parse(localStorage.getItem(sk)||'null');if(v){window._staleAt=Math.min(window._staleAt||Infinity,v.t);window._staleErr=m;return v.j;}}catch(x){}}throw e;}}
+async function testBot(url,key){
+  url=String(url||'').trim().replace(/\/+$/,'');
+  if(!/^https?:\/\//i.test(url))return{ok:false,m:'❌ ลิงก์ต้องขึ้นต้นด้วย https:// เช่น https://xxx.workers.dev'};
+  let r;try{r=await fetch(url+'/api/ping?k='+encodeURIComponent(key||''),{cache:'no-store'});}catch(e){return{ok:false,m:'❌ ติดต่อลิงก์นี้ไม่ได้ — ลิงก์พิมพ์ผิด หรือ Worker ยังไม่ได้ deploy / ถูกลบ'};}
+  if(r.status===401)return{ok:false,m:'❌ ลิงก์ถูก แต่รหัสผ่านบอทไม่ตรง'};
+  if(r.status===404)return{ok:false,m:'❌ ลิงก์นี้ตอบมา แต่ไม่ใช่บอทตัวนี้ (ไม่พบ /api/ping)'};
+  const j=await r.json().catch(()=>null);
+  if(!r.ok||!j||!j.ok)return{ok:false,m:'❌ บอทตอบกลับผิดปกติ (HTTP '+r.status+')'};
+  if(!j.ver)return{ok:true,m:'⚠️ เชื่อมได้ แต่บอทเป็นเวอร์ชันเก่า ยังไม่มีระบบ LoRA ใหม่ — deploy worker.js ล่าสุดก่อน'};
+  const ks=+j.kseen,ago=ks?Math.round((Date.now()-ks)/60000):null;
+  return{ok:true,m:'✅ เชื่อมบอทได้ (เวอร์ชัน '+j.ver+') · Kaggle '+(ago==null?'ยังไม่เคยต่อเข้ามา':ago<=10?'ออนไลน์ ('+ago+' นาทีก่อน)':'เงียบไป '+ago+' นาที — ตรวจว่า Kaggle ยังรันอยู่')};}
+/* ---------- อ่านไฟล์โครงเรื่อง .docx ---------- */
+async function readDocxXml(file){const buf=new Uint8Array(await file.arrayBuffer()),dv=new DataView(buf.buffer),td=new TextDecoder();let e=-1;for(let i=buf.length-22;i>=Math.max(0,buf.length-70000);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break;}}if(e<0)throw new Error('ไฟล์ไม่ใช่ .docx');const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);for(let k=0;k<n;k++){if(dv.getUint32(p,true)!==0x02014b50)break;const meth=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true),nm=td.decode(buf.subarray(p+46,p+46+nl));p+=46+nl+xl+cl;if(nm!=='word/document.xml')continue;const ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),raw=buf.subarray(ds,ds+cs);if(meth===0)return td.decode(raw);if(typeof DecompressionStream==='undefined')throw new Error('เบราว์เซอร์นี้อ่าน .docx ไม่ได้ ลองอัปเดต iOS/เบราว์เซอร์');return td.decode(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());}throw new Error('ไม่พบเนื้อหาในไฟล์');}
+function docxBlocks(xml){const d=new DOMParser().parseFromString(xml,'application/xml'),W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',T=el=>[...el.getElementsByTagNameNS(W,'t')].map(x=>x.textContent).join('').trim(),body=d.getElementsByTagNameNS(W,'body')[0],out=[];if(!body)return out;for(const ch of body.children){if(ch.localName==='p'){const t=T(ch);if(t)out.push({t:'p',text:t});}else if(ch.localName==='tbl'){out.push({t:'tbl',rows:[...ch.children].filter(x=>x.localName==='tr').map(tr=>[...tr.children].filter(x=>x.localName==='tc').map(tc=>[...tc.getElementsByTagNameNS(W,'p')].map(T).filter(Boolean).join(' ')))});}}return out;}
+function epRange(s){if(/ทุก/.test(s))return[0];const o=[];String(s).split(/[,，]/).forEach(t=>{const m=t.match(/(\d+)\s*[–—-]\s*(\d+)/);if(m){for(let i=+m[1];i<=+m[2];i++)o.push(i);}else{const n=t.match(/\d+/);if(n)o.push(+n[0]);}});return o;}
+function parsePlan(blocks){
+  const P=blocks.filter(b=>b.t==='p').map(b=>b.text),all=P.join('\n'),roles=[],locs=[],eps=[];
+  const title=(P[0]||'').split('—')[0].replace(/[“”"]/g,'').trim(),ov=(P.find(x=>/^เรื่องย่อ\s*[:：]/.test(x))||'').replace(/^เรื่องย่อ\s*[:：]\s*/,'');
+  for(const b of blocks){if(b.t!=='tbl'||b.rows.length<2)continue;const hd=b.rows[0],hs=hd.join('|'),ix=re=>hd.findIndex(c=>re.test(c));
+    if(/ชื่อ/.test(hs)&&/ความลับ/.test(hs)){const iK=ix(/บทบาท/),iN=ix(/ชื่อ/),iL=ix(/ตัวตน/),iS=ix(/ความลับ/),iT=ix(/นิสัย/);
+      for(const r of b.rows.slice(1)){const nm=r[iN]||'',full=nm.replace(/\(.*?\)|（.*?）/g,'').trim();if(!full)continue;const am=nm.match(/\([^)\d]*(\d+)\)/);roles.push({key:full.split(/\s+/)[0],name:full,kind:(r[iK]||'').trim(),age:am?+am[1]:0,look:r[iL]||'',secret:r[iS]||'',traits:r[iT]||''});}}
+    else if(/สถานที่/.test(hs)&&/ตอน/.test(hs)){for(const r of b.rows.slice(1)){if(r[0])locs.push({name:r[0],eps:epRange(r[1]||''),note:r[2]||''});}}}
+  for(const x of P){const m=x.match(/^((?:พ่อ|แม่)ของ\S+)\s*\(([^)]+)\)\s*[:：]\s*(.+)$/);if(m&&!roles.some(r=>r.key===m[2]))roles.push({key:m[2],name:m[2],kind:m[1],age:40,look:m[3],secret:'',traits:'',g:m[1].startsWith('แม่')?'f':'m'});}
+  const cue=n=>{let f=0,m=0,i=-1;while((i=all.indexOf(n,i+1))>=0){const l=all.slice(i+n.length,i+n.length+30);if(/หญิง|สาว/.test(l))f++;else if(/ชาย|หนุ่ม/.test(l))m++;}return f>m?'f':m>f?'m':'';};
+  roles.forEach(r=>{if(r.g)return;r.g=!r.age?'x':/ป้า|หญิง|สาว|แม่/.test(r.name+r.kind)?'f':/ลุง|ชาย|หนุ่ม/.test(r.name+r.kind)?'m':cue(r.key);});
+  roles.forEach(r=>{r.tier=r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'main':'support';});
+  let cur=null;
+  for(const x of P){const m=x.match(/^ตอน\s*(\d+)\s*[—–-]\s*(.+)$/);if(m){const no=+m[1];if(eps.some(e=>e.no===no))cur=null;else{cur={no,title:m[2].trim(),f:{}};eps.push(cur);}continue;}
+    if(cur){const k=x.match(/^(คดี|เรื่อง|ฉากสู้|อารมณ์|จบตอน)\s*[:：]\s*(.+)$/);if(k)cur.f[k[1]]=k[2];else if(/^(เรื่องย่อ|โลกและ|ตัวละคร|สถานที่|สิ่งที่)/.test(x))cur=null;}}
+  eps.forEach(E=>{const tx=E.title+' '+Object.values(E.f).join(' ');E.cast=roles.filter(r=>/คู่หลัก/.test(r.kind)||tx.includes(r.key)||tx.includes(r.name)||(/^พ่อของ/.test(r.kind)&&/พ่อ(?!ค้า)/.test(tx))).map(r=>r.key);});
+  return{title,overview:ov,rule:(P.find(x=>/^ทุกตอน/.test(x))||'').slice(0,400),roles,eps:eps.sort((a,b)=>a.no-b.no),locs};}
+/* ---------- สถานะ ---------- */
+(function(){const m=location.hash.match(/#sync=([^&]+)/);if(!m)return;try{const o=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1])))));if(o.url){localStorage.setItem('ss_imgbot',JSON.stringify({url:o.url,key:o.key||''}));}if(o.story)localStorage.setItem('ss_story',o.story);if(o.sty)localStorage.setItem('ss_sty',o.sty);if(o.asp)localStorage.setItem('ss_asp',o.asp);history.replaceState(null,'',location.pathname+location.search);window._synced=1;}catch(e){}})(); /* ลิงก์ตั้งค่าจากอีกเครื่อง: บันทึกลิงก์บอท/รหัส/เรื่อง แล้วลบออกจากแถบที่อยู่ */
+const ST={story:localStorage.getItem('ss_story')||'',plan:null,cands:[],epst:{},fin:{},scn:[],busy:'',msg:'',err:'',qc:null,qcBusy:false,best:0,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||'',tab:'story',editBot:false,lib:[],train:[],xl:[],autos:null,weights:{},testMsg:'',kind:localStorage.getItem('ss_kind')||'',sb:null,sbs:{},sbSel:0,sbMode:localStorage.getItem('ss_sbmode')||'read',selEp:0,more:false,onlyReady:localStorage.getItem('ss_onlyready')!=='0'};
+const STY=[['tv','📺 เส้นสะอาด สีเรียบ (อนิเมะทีวี)','clean modern TV anime style, thin crisp uniform line art, flat cel shading with a single soft shadow tone, simple flat colors, clean color fills, minimal gradients, no painterly texture, no bloom, no heavy rendering, clear readable shapes, bright even lighting, consistent character design'],
+['rom','💗 รอมคอมใส','bright soft anime style, pastel colors, high-key lighting, delicate fine line art, expressive cute faces, soft blush, detailed hair strands, clean cel shading, romantic comedy mood'],
+['dark','🌑 ดราม่ามืดหนัก','dark gritty anime style, desaturated cold palette, heavy shadows, strong rim light, detailed fine line art, cinematic dramatic lighting, grim tense atmosphere'],
+['act','⚔️ แอ็กชันคมเข้ม','dynamic action anime style, bold sharp line art, high contrast, vivid saturated accents, dramatic low angle, motion energy, cinematic lighting'],
+['cine','🎞 ซีเนม่าเหมือนจริง','cinematic semi-realistic anime style, shallow depth of field, natural lighting, detailed textures, subtle film grain'],
+['soft','🌸 นุ่มนวลมาตรฐาน','soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading']];
+const KIND=[['anime','🎌','อนิเมะ','916',''],['film','🎬','หนัง','169','cine'],['series','📺','ซีรีส์','169',''],['ad','📣','โฆษณา','916','']];
+const ASP=[['916','📱 TikTok 9:16',768,1344],['11','⬜ จัตุรัส 1:1',1024,1024],['169','🖥 จอกว้าง 16:9',1344,768]];
+let POLL=0;
+const api=(act,o)=>botApi('/api/vcastep',{story:ST.story,act,...(o||{})});
+const tierOf=r=>r.tier||(r.g==='x'?'none':/คู่หลัก/.test(r.kind)?'main':'support'),live=r=>r.g!=='x'&&tierOf(r)!=='none';
+const castOf=k=>ST.cands.find(c=>c.cast_role===k&&c.cast_story===ST.story);
 async function load(){
- const R=await Promise.all([S.sb.from('categories').select('*').order('created_at'),S.sb.from('locations').select('*').order('created_at'),
-  S.sb.from('products').select('*,categories(name,prefix),variants(id,size,pattern,stock_levels(qty,location_id))').order('created_at',{ascending:false})]);
- if(R.some(r=>r.error)){toast('โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชหน้า');return}
- S.cats=R[0].data;S.locs=R[1].data;S.prods=R[2].data;
- const need=S.prods.filter(p=>p.image_path&&!S.imgs[p.image_path]).map(p=>p.image_path);
- if(need.length){const r=await S.sb.storage.from('product-images').createSignedUrls(need,3600);(r.data||[]).forEach(o=>{if(o.signedUrl)S.imgs[o.path]=o.signedUrl})}
- S.ready=true;render();openHash();
-}
-function filt(){const t=S.q.trim().toLowerCase();return S.prods.filter(p=>(!S.cat||p.category_id===S.cat)&&(S.stf==='all'||p.status===S.stf)&&(!t||p.name.toLowerCase().includes(t)||p.code.toLowerCase().includes(t)))}
-const stChips=()=>`<div class="chips"><button class="chip ${S.stf==='all'?'on':''}" data-a="st" data-v="all">ทุกสถานะ</button>${Object.keys(ST).map(k=>`<button class="chip ${S.stf===k?'on':''}" data-a="st" data-v="${k}"><i class="dt" style="background:var(--${k})"></i>${ST[k]}</button>`).join('')}</div>`;
-const emptyBox=`<div class="empty">ยังไม่มีสินค้า<br>กดปุ่ม + เพื่อเพิ่มสินค้าชิ้นแรก</div>`;
+  clearTimeout(POLL);window._staleAt=0;window._staleErr='';if(document.hidden){window._needLoad=1;return;}
+  if(botCfg().url&&!ST.story){try{const r=await botApi('/api/anime',{act:'series_list'});const L=(r.series||[]).map(x=>x.title).filter(Boolean);if(L.length){ST.story=L[0];localStorage.setItem('ss_story',ST.story);}}catch(e){}} /* เครื่องใหม่ (เช่น iPad) ยังไม่เคยเลือกเรื่อง: ใช้เรื่องล่าสุดในบอท */
+  if(!botCfg().url||!ST.story){render();return;}
+  try{const r=await api('get');ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.best=+r.best||0;if(r.kind)ST.kind=r.kind;ST.reads=+r.reads||0;ST.meter=r.meter||null;document.documentElement.classList.toggle('sbdraft',r.draft!==false);ST.boost=+r.boost||0;ST.err='';}catch(e){ST.err=botErr(e);}
+  {const lv=ST.meter?ST.meter.total/ST.meter.cap:(ST.reads||0)/100;ST.save=ST.force?0:lv>=0.95?3:lv>=0.9?2:lv>=0.85?1:0;ST.force=0;} /* 85% ขึ้นไป: หน้าเว็บประหยัดการอ่านเพื่อไม่ให้ล่ม */
+  const cached=(act,o)=>ST.save?snapGet('/api/vcastep',{story:ST.story,act,...(o||{})}):null;
+  if(!ST.qAt||Date.now()-ST.qAt>300000||ST.qForce){ST.qForce=0;try{const r=(ST.save>=1&&snapGet('/api/vcastep',{story:ST.story,act:'quota'}))||await api('quota');ST.quota=r;ST.qAt=Date.now();}catch(e){}} /* โควตาอื่นๆ: ดึงทุก 5 นาที */
+  const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
+  if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
+  try{const r=cached('lib')||await api('lib');ST.lib=r.loras||[];ST.weights=r.weights||{};}catch(e){ST.lib=[];}
+  try{const r=cached('training')||await api('training');ST.train=r.items||[];ST.autos=r.autos||null;}catch(e){ST.train=[];}
+  try{const r=cached('xl_list')||await api('xl_list');ST.xl=r.items||[];}catch(e){ST.xl=[];}
+  const gl=sbList(),g=sbCur(),sbs={};for(const n of gl){if(ST.epst[n].status==='running'){try{sbs[n]=(ST.save>=2&&cached('sb',{ep:n}))||await api('sb',{ep:n});}catch(e){}}}
+  ST.sbs=sbs;ST.sb=sbs[g]||null;
+  const idleOf=n=>sbs[n]&&sbs[n].ready&&ST.epst[n].gate==='sb'&&!sbs[n].scenes.some(x=>x.shots.some(v=>v.pending||!v.say)); /* สตอรีบอร์ดครบแล้ว รอคนกดอนุมัติ: ไม่ต้องรีเฟรชเอง */
+  await autoLora();render();
+  if(Object.entries(ST.epst).some(([k,v])=>v&&(v.status==='running'||v.status==='waiting')&&!idleOf(+k))){if(ST.save<3)POLL=setTimeout(load,ST.save===2?600000:ST.save===1?300000:g?60000:45000);}
+  else if(ST.train.some(x=>x.status!=='failed')||ST.lib.some(x=>x.testing)||(!ST.onlyReady&&ST.plan&&ST.plan.roles.some(r=>live(r)&&tierOf(r)==='main'&&(!castOf(r.key)||(castOf(r.key).lora!=='ready'&&castOf(r.key).lora!=='failed')))))POLL=setTimeout(load,20000);}
+/* ตัวหลักที่ยังไม่มีตัวละคร/LoRA: ส่งสร้างให้ (บอทฝึก LoRA ต่อเองเมื่อภาพชุดฝึกครบ) */
+const LG=new Set(); // กันสั่งสร้างตัวละครซ้ำคนเดิม
+const LT={}; // เวลาที่สั่งเทรนล่าสุดต่อคน กันสั่งรัวๆ
+async function autoLora(){const pl=ST.plan;if(!pl||ST.onlyReady)return;
+  for(const r of pl.roles){if(!live(r)||tierOf(r)!=='main')continue;const c=castOf(r.key);if(!c)continue;
+    if(!+c.char_id&&c.lora!=='queued'&&c.lora!=='ready'&&!LG.has(c.id)){LG.add(c.id);try{await api('lorago',{cand:c.id});}catch(e){LG.delete(c.id);}}
+    else if(+c.char_id&&c.lora==='none'&&Date.now()-(LT[c.id]||0)>60000){LT[c.id]=Date.now();try{await api('lorago',{cand:c.id});}catch(e){}}}} /* ภาพชุดฝึกพร้อมเมื่อไหร่ สตูดิโอสั่งเทรนเอง · ตัวที่เทรนพังไม่ลองเองซ้ำ ต้องกดเทรนใหม่ */
+const sbList=()=>Object.entries(ST.epst).filter(([k,v])=>v&&v.gate&&!ST.fin[k]).map(([k])=>+k).sort((a,b)=>a-b);
+const sbCur=()=>{const l=sbList();return l.includes(ST.sbSel)?ST.sbSel:(l[0]||0);};
+/* ---------- ประเภทงาน + สตอรีบอร์ด 1 ตอน ---------- */
+async function setKind(k){const x=KIND.find(v=>v[0]===k);if(!x)return;ST.kind=k;localStorage.setItem('ss_kind',k);
+  if(!ST.plan){render();return;}
+  try{await api('setkind',{kind:k});const a=ASP.find(v=>v[0]===x[3]),s=STY.find(v=>v[0]===(x[4]||ST.sty))||STY[4],o={img_w:a[2],img_h:a[3]};
+    if(x[4]||!ST.sty){o.style=s[2];o.style_preset=s[0];ST.sty=s[0];localStorage.setItem('ss_sty',s[0]);}
+    await botApi('/api/settings',o);ST.asp=a[0];localStorage.setItem('ss_asp',a[0]);toast('ตั้งเป็น'+x[2]+': '+a[1]+' · สไตล์ '+s[1]);}catch(e){toast(botErr(e));}render();}
+async function startSb(no,nolora,count){ST.busy='กำลังเริ่มสตอรีบอร์ด…';ST.msg='';render();
+  try{const r=await api('make',{ep:no,sb:1,count:count||1,...(nolora?{nolora:1}:{})});toast(r.waiting?'รอ LoRA ของ '+r.waiting.join(', ')+' — เริ่มเองเมื่อพร้อม':'เริ่มแล้ว ระบบกำลังเขียนบทและวาดสตอรีบอร์ด');}catch(e){ST.msg='⚠️ '+botErr(e);}ST.busy='';await load();}
+async function sbRedo(id){const c='';toast('กำลังสั่งวาดใหม่…'); // ไม่ใช้กล่องถามของเบราว์เซอร์ (บางเครื่องกล่องไม่ขึ้น ปุ่มเลยเหมือนกดไม่ติด)
+  try{const r=await api('sb_redo',{ep:sbCur(),shot:id,command:c});toast(r.pending?'ช็อตนี้กำลังวาดอยู่แล้ว':'สั่งวาดใหม่แล้ว รอสักครู่');}catch(e){toast(botErr(e));}await load();}
+async function sbOk(){if(!confirm('อนุมัติสตอรีบอร์ดนี้ แล้วให้ระบบทำคลิปทั้งตอน?'))return;try{await api('sb_ok',{ep:sbCur()});toast('อนุมัติแล้ว ระบบเริ่มทำทั้งตอน');}catch(e){toast(botErr(e));}await load();}
+async function sbLora(){try{const r=await api('sb_lora',{ep:sbCur()});toast('สั่งวาดใหม่ '+(r.redo||0)+' ช็อตด้วย LoRA แล้ว');}catch(e){toast(botErr(e));}await load();}
+async function sbStill(){if(!confirm('ทำตอนนี้เป็นวิดีโอภาพนิ่ง + ซับ (ไม่มีอนิเมชั่น) ไว้ดูทั้งตอนก่อน?'))return;try{await api('sb_ok',{ep:sbCur(),still:1});toast('เริ่มรวมเป็นวิดีโอภาพนิ่งแล้ว');}catch(e){toast(botErr(e));}await load();}
+async function sbStop(){if(!confirm('ยกเลิกตอนนี้? (ภาพที่วาดไปแล้วยังอยู่)'))return;try{await api('stop',{ep:sbCur()});toast('ยกเลิกแล้ว');}catch(e){toast(botErr(e));}await load();}
+function ep_status(no){const s=ST.epst[no];return s?s.status:'';}
+/* ---------- เริ่มทำทั้งเรื่อง ---------- */
+async function startAll(){
+  const pl=ST.plan;
+  if(ST.onlyReady){const miss=pl.roles.filter(r=>live(r)&&tierOf(r)==='main'&&!(castOf(r.key)&&castOf(r.key).lora==='ready')).map(r=>r.key);
+    if(miss.length){ST.msg='ยังไม่ได้เลือก LoRA ที่เสร็จแล้วให้ตัวหลัก: '+miss.join(', ')+' — ไปเลือกที่แถบ 🧬 LoRA';ST.tab='lora';render();return;}}
+  ST.busy='กำลังจัดนักแสดงและเริ่มทำ…';ST.msg='';render();
+  try{
+    let a=await api('autocast');
+    if(a.left&&a.left.length){ // คลังนักแสดงไม่พอ: เก็บผู้สมัครที่ออดิชันไว้แล้วลองจับคู่ใหม่
+      const l=await botApi('/api/vcastaud',{act:'list'});let n=0;
+      for(const c of (l.cands||[])){if(n>=40)break;if(!+c.kept&&+c.card>0&&!c.cast_role){await botApi('/api/vcastaud',{act:'keep',id:c.id});n++;}}
+      a=await api('autocast');}
+    if(a.left&&a.left.length){ // ยังไม่พอ: ให้ระบบเรียกผู้สมัครเพิ่ม
+      const need=new Set(a.left.map(k=>(pl.roles.find(r=>r.key===k)||{}).g));
+      if(need.has('f'))await botApi('/api/vcastaud',{act:'gen',role:'อายะ',n:4});
+      if(need.has('m'))await botApi('/api/vcastaud',{act:'gen',role:'โยมะ',n:4});
+      ST.msg='นักแสดงในคลังไม่พอสำหรับ '+a.left.join(', ')+' — ระบบเรียกผู้สมัครเพิ่มแล้ว รอภาพขึ้นราว 10 นาที แล้วกด 🚀 อีกครั้ง';ST.busy='';await load();return;}
+    await load();
+    const errs=[];let wait=new Set(),run=0;
+    for(const E of pl.eps){try{const r=await api('make',{ep:E.no,all:true});if(r.waiting)r.waiting.forEach(x=>wait.add(x));else run++;}catch(e){errs.push(`ตอน ${E.no}: ${botErr(e)}`);}}
+    ST.msg=(errs.length?errs.join('\n')+'\n':'')+`เริ่มแล้ว ${run} ตอน`+(wait.size?` · อีกหลายตอนรอ LoRA ของ ${[...wait].join(', ')} (ฝึกเอง เริ่มต่อเองเมื่อพร้อม)`:'')+' · ปิดหน้านี้ได้ ระบบทำต่อเองจนครบ';
+  }catch(e){ST.msg='⚠️ '+botErr(e);}
+  ST.busy='';await load();}
+async function stopAll(){if(!confirm('หยุดทุกตอนที่กำลังทำ? (ของที่ทำไปแล้วยังอยู่)'))return;ST.busy='กำลังหยุด…';render();
+  try{for(const E of ST.plan.eps){if(ST.epst[E.no])await api('stop',{ep:E.no});}ST.msg='หยุดแล้ว';}catch(e){ST.msg='⚠️ '+botErr(e);}ST.busy='';await load();}
+/* ---------- อัปโหลดบท ---------- */
+async function onFile(f){if(!f)return;
+  try{toast('กำลังอ่านไฟล์…');const pl=parsePlan(docxBlocks(await readDocxXml(f)));
+    if(!pl.roles.length||!pl.eps.length)throw new Error('อ่านโครงเรื่องไม่ออก ต้องมีตารางตัวละคร และหัวข้อแบบ "ตอน 1 — ชื่อตอน"');
+    const name=(pl.title||f.name.replace(/\.\w+$/,'')).slice(0,60);ST.story=name;localStorage.setItem('ss_story',name);
+    await botApi('/api/vcastep',{act:'save',story:name,plan:pl});ST.msg='';toast(`อ่านแล้ว ${pl.roles.length} บท · ${pl.eps.length} ตอน`);await load();
+    if(ST.kind)await setKind(ST.kind);
+  }catch(e){toast(botErr(e));}}
+async function setR(key,field,val){try{await api('setr',{key,field,value:val});await load();}catch(e){toast(botErr(e));}}
+async function setSty(k){const x=STY.find(v=>v[0]===k);if(!x)return;try{await botApi('/api/settings',{style:x[2],style_preset:k});ST.sty=k;localStorage.setItem('ss_sty',k);toast('ตั้งสไตล์แล้ว (มีผลกับภาพที่ทำใหม่)');render();}catch(e){toast(botErr(e));}}
+async function setAsp(k){const x=ASP.find(v=>v[0]===k);if(!x)return;try{await botApi('/api/settings',{img_w:x[2],img_h:x[3]});ST.asp=k;localStorage.setItem('ss_asp',k);toast('ตั้งสัดส่วนแล้ว (มีผลกับภาพที่ทำใหม่)');render();}catch(e){toast(botErr(e));}}
+async function runQc(){if(ST.qcBusy)return;ST.qcBusy=true;render();
+  try{for(let i=0;i<80;i++){const r=await api('qc');ST.qc=r;render();if(!r.left)break;await new Promise(x=>setTimeout(x,800));}}catch(e){toast(botErr(e));}
+  ST.qcBusy=false;render();}
+async function pickBest(no){try{await api('pick',{ep:no});ST.best=no;toast('เลือกตอน '+no+' สำหรับ TikTok แล้ว');render();}catch(e){toast(botErr(e));}}
+async function dl(id,name){try{toast('กำลังโหลดไฟล์…');const r=await fetch(botU('/vid/'+id));if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);}catch(e){window.open(botU('/vid/'+id),'_blank');}}
+function bestEp(){const q=ST.qc;if(!q||!q.eps)return 0;const c=q.eps.filter(E=>E.final&&!E.fixing&&!E.bad);if(!c.length)return 0;c.sort((a,b)=>(b.avg==null?50:b.avg)-(a.avg==null?50:a.avg));return c[0].no;}
+/* ---------- หน้าจอ ---------- */
+function render(){const A=$('#app');
+  /* ช่องกรอกในการ์ด (key ผู้ช่วย ฯลฯ): ระหว่างพิมพ์ ไม่วาดหน้าใหม่ทับ · ค่าที่พิมพ์ค้างไว้คงอยู่หลังวาดใหม่ */
+  {const ae=document.activeElement;if(ae&&A.contains(ae)&&ae.tagName==='INPUT'&&ae.closest('[data-hcard]')&&!window._forceRender){clearTimeout(window._rdT);window._rdT=setTimeout(render,4000);return;}window._forceRender=0;
+   window._keep=window._keep||{};A.querySelectorAll('[data-hcard] input').forEach(x=>{const k=[...x.attributes].filter(a=>a.name.startsWith('data-')).map(a=>a.name+'='+a.value).join('&');if(k)window._keep[k]=x.value;});}
+  if(!botCfg().url||ST.editBot){A.innerHTML=`<div class="c"><h2>🔌 เชื่อมบอท${botCfg().url?'ใหม่':''}</h2><div class="mu">ใส่ลิงก์บอท (Worker ที่ deploy ล่าสุด) กับรหัสผ่าน เก็บในเครื่องนี้</div><input type="text" id="bu" placeholder="https://...workers.dev" value="${esc(botCfg().url||'')}"><input type="password" id="bk" placeholder="รหัสผ่านบอท"><button class="on" id="bs">บันทึกและเชื่อม</button><button id="bt0">🧪 ทดสอบ</button>${botCfg().url?'<button id="bc">ยกเลิก</button>':''}<div id="bt" class="mu" style="margin-top:6px;white-space:pre-wrap"></div></div>`;
+    $('#bt0').onclick=async()=>{const o=$('#bt');o.textContent='⏳ กำลังทดสอบ…';const r=await testBot($('#bu').value,$('#bk').value);o.textContent=r.m;};
+    $('#bs').onclick=()=>{localStorage.setItem('ss_imgbot',JSON.stringify({url:$('#bu').value.trim(),key:$('#bk').value}));ST.editBot=false;ST.err='';load();};
+    const bc=$('#bc');if(bc)bc.onclick=()=>{ST.editBot=false;render();};return;}
+  const pl=ST.plan&&ST.plan.roles&&ST.plan.roles.length?ST.plan:null;let h='';
+  if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button><button data-test="1">🧪 ทดสอบ</button></div>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
+  if(window._staleAt)h+=`<div class="c warn">📴 ฐานข้อมูลใช้ไม่ได้ชั่วคราว${/exceeded|limit|โควตา|D1/i.test(window._staleErr||'')?' (โควตาอ่านฟรีของวันหมด กลับมาเอง 07:00)':''} — กำลังแสดงข้อมูลล่าสุดที่เก็บไว้ในเครื่องนี้ เมื่อ ${new Date(window._staleAt).toLocaleString('th-TH',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})} · อ่านและดูแบบอนิเมะได้ ภาพที่เคยเปิดแล้วยังขึ้น · ปุ่มแก้ไข/วาดใหม่จะใช้ไม่ได้จนกว่าฐานข้อมูลกลับมา</div>`;
+  if(window._synced){window._synced=0;setTimeout(()=>toast('รับการตั้งค่าจากอีกเครื่องแล้ว'),300);}
+  if(botCfg().url)h+=`<div class="c" style="display:flex;gap:8px;align-items:center"><span class="mu" style="flex:1;font-size:13px">📲 เปิดสตูดิโอบน iPad / เครื่องอื่น ให้เห็นเหมือนเครื่องนี้</span><button data-sync>ส่งลิงก์ตั้งค่า</button></div>`;
+  h+=meterCard();h+=quotaCard();h+=helperCard();
+  if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
+  if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
+  const kd=`<div class="c"><h2><span class="stp">1</span>ประเภทงาน</h2><div class="kd">${KIND.map(x=>`<button class="${ST.kind===x[0]?'on':''}" data-kind="${x[0]}"><b>${x[1]}</b>${x[2]}</button>`).join('')}</div>${ST.kind?'':'<div class="mu" style="margin-top:6px">แตะเลือก ระบบตั้งสัดส่วนภาพ ความยาว และจังหวะตัดให้เอง</div>'}</div>`;
+  if(!pl){h+=kd+`<div class="c"><h2><span class="stp">2</span>ใส่บท</h2><label class="drop" id="dz"><div style="font-size:40px">📄</div>แตะเพื่อเลือก หรือลากไฟล์บท (.docx) มาวาง<input type="file" id="pf" accept=".docx" hidden></label></div>`;}
+  else{
+    const roles=pl.roles.filter(r=>r.g!=='x'&&tierOf(r)!=='none'||!r.g),nog=pl.roles.filter(r=>!r.g&&tierOf(r)!=='none'),started=Object.keys(ST.epst).length,lib=ST.lib;
+    h+=kd;
+    h+=`<div class="c"><div class="row sp"><h2><span class="stp">2</span>บทและตัวละคร</h2><label class="mu" style="cursor:pointer">📄 เปลี่ยนไฟล์<input type="file" id="pf" accept=".docx" hidden></label></div><div><b>${esc(pl.title||ST.story)}</b> <small>· ${pl.eps.length} ตอน</small></div>
+      ${nog.length?`<div class="warn" style="margin-top:6px">เลือกเพศให้ครบก่อน</div>`:''}<button data-a="dcast" style="width:100%;margin-top:8px">🤖 ออกแบบตัวละครจากบท แล้วทำ LoRA ให้เอง</button>${lib.length?'':'<div class="warn" style="margin-top:6px">ยังไม่มี LoRA ที่เทรนเสร็จ — เสร็จเมื่อไหร่จะขึ้นให้เลือกตรงนี้เอง <button class="sm" data-tab="lora">ดูสถานะ</button></div>'}`;
+    h+=roles.map(r=>{const t=tierOf(r),c=castOf(r.key),cur=c?(lib.find(x=>x.cand===c.id)||{}).lid||0:0,b=(a,v,cv,n)=>`<button class="sm ${cv===v?'on':''}" data-r="${esc(r.key)}|${a}|${v}">${n}</button>`;
+      return `<div class="it"><div class="row sp"><span class="row" style="flex-wrap:nowrap;gap:10px">${c&&c.face?`<img src="${esc(botU('/img/'+c.face))}" loading="lazy" style="width:44px;height:44px;border-radius:10px;object-fit:cover;object-position:top;border:1px solid var(--bd)">`:''}<b>${esc(r.key)}</b></span><span class="mu">${t==='main'?'ตัวหลัก':esc(r.kind)}</span></div>
+        ${!r.g?`<div class="row">${b('g','f',r.g,'👩 หญิง')}${b('g','m',r.g,'👨 ชาย')}${b('g','x',r.g,'🐾 ไม่ใช่คน')}</div>`
+        :(lib.length?`<select data-lp="${esc(r.key)}" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin-top:4px;background:#fff;color:var(--fg)"><option value="0">${t==='main'?'— เลือก LoRA —':'— ไม่ใช้ LoRA —'}</option>${lib.map(x=>{const other=x.cast_role&&x.cast_story&&x.cast_story!==ST.story,took=x.cast_role&&x.cast_story===ST.story&&x.cast_role!==r.key;return `<option value="${x.lid}" ${+cur===+x.lid?'selected':''} ${other?'disabled':''}>🧬 ${esc(x.name)}${other?' (ใช้เรื่องอื่นอยู่)':took?' (ย้ายจากบท '+esc(x.cast_role)+')':''}</option>`;}).join('')}</select>`:'')
+         +(ST.more?`<div class="row" style="margin-top:4px">${b('t','main',t,'🧬 ตัวหลัก')}${b('t','support',t,'👤 ตัวรอง')}${b('t','none',t,'⛔ ไม่ใช้')}</div>`:'')}</div>`;}).join('')+'</div>';
+    /* ---- 3 · สตอรีบอร์ด (ทำรวดได้ 3 ตอน · อ่านแบบเว็บตูน หรือแก้ทีละช็อต) ---- */
+    const gl=sbList(),g=sbCur(),cur=g?ST.epst[g]:null,E=g?pl.eps.find(x=>x.no===g):null,fn=(pl.title||'video').slice(0,30),say=v=>{try{const y=JSON.parse(v.say||'null')||{};y.lines=Array.isArray(y.lines)&&y.lines.length?y.lines:(y.say?[{who:y.who||'',say:y.say}]:[]);return y;}catch(e){return {lines:[]};}};
+    const doneEps=pl.eps.filter(x=>ST.fin[x.no]&&ST.epst[x.no]&&ST.epst[x.no].gate),nextNo=(pl.eps.find(x=>!ST.epst[x.no]&&!ST.fin[x.no]&&x.no>(gl[gl.length-1]||0))||{}).no||0;
+    h+=`<div class="c"><h2><span class="stp">3</span>สตอรีบอร์ด</h2>`;
+    h+=doneEps.map(x=>`<div class="it"><div class="row sp"><b>ตอน ${x.no} · ${esc(x.title)}</b><span class="ok">✅ เสร็จ</span></div><button class="sm" data-dl="${ST.fin[x.no]}|${esc(fn)}-ep${x.no}.mp4">⬇ ดาวน์โหลด</button><a class="btn sm" href="${esc(botU('/vid/'+ST.fin[x.no]))}" target="_blank">▶ ดู</a><button class="sm" data-reopen="${x.no}">↩ กลับไปแก้สตอรีบอร์ด / ทำอนิเมะเต็ม</button></div>`).join('');
+    if(ST.busy)h+=`<div class="mu">⏳ ${esc(ST.busy)}</div>`;
+    else if(!gl.length){
+      const no=pl.eps.some(x=>x.no===ST.selEp)?ST.selEp:(pl.eps.find(x=>!ST.fin[x.no])||pl.eps[0]).no,set=pl.eps.filter(x=>x.no>=no).slice(0,3),last=set[set.length-1].no;
+      const need=[...new Set(set.flatMap(Ex=>(Ex.cast||[]).map(k=>pl.roles.find(r=>r.key===k)).filter(r=>r&&live(r)&&tierOf(r)==='main'&&!(castOf(r.key)&&castOf(r.key).lora==='ready')).map(r=>r.key)))],dis=nog.length||!ST.kind?' disabled':'',lab=set.length>1?`${set.length} ตอน (ตอน ${no}–${last})`:`ตอน ${no}`;
+      h+=`<div class="mu">ระบบเขียนบท แตกช็อต ตัดช็อตซ้ำ ใส่บทพูด แล้ววาดภาพมาให้อ่านแบบเว็บตูนก่อน ยังไม่ทำคลิปจนกว่าจะกดอนุมัติทีละตอน</div>`;
+      if(pl.eps.length>1)h+=`<div class="mu" style="margin-top:8px">เริ่มจากตอน</div><select id="sbep" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin:4px 0 8px;background:#fff;color:var(--fg)">${pl.eps.map(x=>`<option value="${x.no}" ${x.no===no?'selected':''}>ตอน ${x.no} · ${esc(x.title)}${ST.fin[x.no]?' ✅':''}</option>`).join('')}</select>`;
+      if(!ST.kind)h+=`<div class="warn">เลือกประเภทงานที่ข้อ 1 ก่อน</div>`;
+      if(need.length)h+=`<div class="warn" style="margin:6px 0">ตัวหลักที่ยังไม่มี LoRA: ${esc(need.join(', '))}</div><button class="go" data-sb="${no}|1|${set.length}"${dis}>🎨 ทำฉบับร่าง ${lab} (ยังไม่ใช้ LoRA)</button><div class="mu" style="margin:4px 0 8px">ไว้อ่านลำดับเรื่องและมุมกล้อง หน้าตัวละครจะยังไม่คงที่</div><button data-sb="${no}|0|${set.length}"${dis} style="width:100%">⏳ รอ LoRA เสร็จ แล้วเริ่มให้เอง</button>`;
+      else h+=`<button class="go" data-sb="${no}|0|${set.length}"${dis} style="margin-top:6px">🎨 ทำสตอรีบอร์ด ${lab}</button>`;
+    }else{
+      h+=`<div class="row" style="margin:4px 0 8px"><button class="${ST.sbMode==='read'?'on':''}" data-sbm="read">📖 อ่านแบบเว็บตูน</button><button class="${ST.sbMode!=='read'?'on':''}" data-sbm="edit">▦ แก้ทีละช็อต</button></div>`;
+      {const bl=ST.boost-Date.now();h+=bl>0?`<div class="c" style="margin:0 0 8px;padding:8px 10px;display:flex;gap:8px;align-items:center"><span style="flex:1">⚡ กำลังเร่งสตอรีบอร์ด เหลืออีก ${Math.ceil(bl/60000)} นาที</span><button data-boost="0">หยุดเร่ง</button></div>`:`<div class="row" style="margin:0 0 8px"><button data-boost="1">⚡ เร่งวาด 1 ชม.</button><button data-boost="3">⚡ เร่ง 3 ชม.</button></div><div class="mu" style="margin:-4px 0 8px;font-size:12px">เร่ง = วาดทุกนาทีและใช้โควตาวาดของทั้งวันทันที ไม่รอเกลี่ย · กินโควตาอ่านเร็วขึ้น แต่ยังหยุดเองที่ 85%</div>`;}
+      const stat=n=>{const c=ST.epst[n],sb=ST.sbs[n];if(c.status==='waiting')return `<span class="warn">⏳ รอ LoRA ${esc((c.need||[]).join(', '))}</span>`;if(!sb)return '<span class="mu">⏳ กำลังเริ่ม</span>';if(c.gate==='ok')return '<span class="ok">✅ อนุมัติแล้ว กำลังทำคลิป</span>';if(sb.ready)return `<span class="ok">ภาพครบ ${sb.tot} ช็อต</span>`;return `<span class="mu">${sb.tot?'🎨 ภาพ '+sb.img+'/'+sb.tot:'✍️ กำลังเขียนบท'}</span>`;};
+      if(ST.sbMode==='read'){
+        h+=`<div class="mu">เลื่อนอ่านต่อเนื่อง ${gl.length} ตอน · จะแก้ภาพหรืออนุมัติ กด "แก้ทีละช็อต"</div></div>`;
+        h+=gl.map(n=>{const Ex=pl.eps.find(x=>x.no===n)||{},sb=ST.sbs[n],side={};let k=0,sn=0;
+          return `<div class="wt"><div class="wth"><b>ตอน ${n}</b> · ${esc(Ex.title||'')}<div style="font-size:13px;font-weight:400;margin-top:2px">${stat(n)}</div>${sb&&sb.tot?`<button class="go" data-play="${n}" style="margin-top:8px;width:100%">🎬 ดูแบบอนิเมะ (ซับขึ้นทีละบรรทัด)</button><button data-qcrep="${n}" style="margin-top:6px;width:100%">📋 รายงานตรวจความต่อเนื่อง</button>`:''}${sb&&sb.tot?(()=>{let nv=0,nl=0;sb.scenes.forEach(S=>S.shots.forEach(v=>{nl+=say(v).lines.length;nv+=String(v.vo||'').split(',').filter(Boolean).length;}));return `<div style="display:flex;gap:6px;align-items:center;margin-top:6px"><span class="mu" style="flex:1;font-size:12.5px">🎙 เสียงพากย์ญี่ปุ่น ${nv}/${nl} บรรทัด</span><button data-vomake="${n}">${nv?'ทำบรรทัดที่ขาด':'🎙 ทำเสียงพากย์'}</button>${nv?`<button data-voredo="${n}" title="ทำเสียงใหม่ทุกบรรทัดตามผังเสียงตัวละครล่าสุด">↻ ทำใหม่ทั้งหมด</button>`:''}</div>`;})():''}</div>${sb?sb.scenes.map(S=>S.shots.map(v=>{const d=say(v);k++;
+            const vm={};String(v.vo||'').split(',').forEach(x=>{const [a,b]=x.split(':');if(b)vm[a]=b;});const va=i=>vm[i]?` data-vo="${vm[i]}" style="cursor:pointer"`:'',vi=i=>vm[i]?' <span style="opacity:.55;font-size:11px">🔊</span>':'';
+            const tx=d.lines.map((l,i)=>{if(!l.who)return `<div class="nv"${va(i)}>${esc(l.say)}${vi(i)}</div>`;if(l.who[0]==='~')return `<div class="tk"${va(i)}><b>${esc(l.who.slice(1))} (ในใจ)</b>${esc(l.say)}${vi(i)}</div>`;if(!(l.who in side))side[l.who]=sn++%2?'r':'l';return `<div class="bb ${side[l.who]}"${va(i)}><b>${esc(l.who)}</b>${esc(l.say)}${vi(i)}</div>`;}).join('');
+            return `<div class="wp"><div class="im">${v.img?`<img src="${esc(botU('/img/'+v.img))}" loading="lazy">`:`<div class="ph">⏳ ${k} · ${esc(v.th||'')}</div>`}${d.think?`<div class="fx1">${esc(d.think)}${d.thinkTh?`<small style="display:block;font-size:.55em;opacity:.85">${esc(d.thinkTh)}</small>`:''}</div>`:''}${d.ono?`<div class="fx2">${esc(d.ono)}${d.onoTh?`<small style="display:block;font-size:.45em;opacity:.85;text-align:right">${esc(d.onoTh)}</small>`:''}</div>`:''}</div>${d.dir?`<details class="dir"><summary>🎬 ${esc(d.dir.id||'')} · ${esc(d.dir.kind||'')} · ${esc(d.dir.genre||'')}</summary>${[['ช็อต','shot'],['มุมกล้อง','angle'],['กล้องเคลื่อน','move'],['การกระทำ','act'],['สีหน้า','face'],['ฉาก','env'],['แสง','light'],['เวลา (วิ)','dur'],['อารมณ์ที่ต้องการ','mood'],['เสียงประกอบ','sfx'],['ดนตรี','bgm'],['การเคลื่อนไหว','anim'],['ผู้บรรยาย','narr'],['พรอมต์ภาพ',''],['พรอมต์วิดีโอ','vp']].map(([a,b])=>`<div><b>${a}:</b> ${esc(b?String(d.dir[b]??''):v.en||'')}</div>`).join('')}${d.dir.lit?`<div><b>โทนสี:</b> ${esc(d.dir.lit.grade_th||'')} · <b>อากาศ:</b> ${esc(d.dir.lit.weather||'')}</div>`:''}${d.dir.audio?`<div><b>เสียงบรรยากาศ:</b> ${esc(d.dir.audio.amb||'-')}</div>`:''}${(d.dir.type||[]).length?`<div><b>ข้อความบนจอ:</b> ${d.dir.type.map(t=>esc(t.tx+(t.sub?' ('+t.sub+')':''))).join(' · ')}</div>`:''}${d.lines.some(l=>l.pause)?`<div><b>เว้นจังหวะ:</b> ${d.lines.map((l,i)=>l.pause?`บรรทัด ${i+1} ${l.pause} วิ`:'').filter(Boolean).join(', ')}</div>`:''}</details>`:''}${tx}</div>`;}).join('')+(S.writing?'<div class="nr">✍️ ซีนนี้กำลังเขียนบท…</div>':'')).join(''):''}</div>`;}).join('');
+        h+=`<div class="c">`;
+      }else{
+        if(gl.length>1)h+=`<div class="row" style="margin-bottom:6px">${gl.map(n=>`<button class="sm ${n===g?'on':''}" data-sbsel="${n}">ตอน ${n}</button>`).join('')}</div>`;
+        h+=`<div class="row sp"><b>ตอน ${g} · ${esc(E?E.title:'')}</b>${stat(g)}</div>`;
+        if(cur.status==='waiting')h+=`<div style="margin-top:8px"><button data-sb="${g}|1|1">ทำฉบับร่างเลยโดยไม่ใช้ LoRA</button></div>`;
+        else{
+          const sb=ST.sb,ok=cur.gate==='ok',sc=ST.scn.filter(x=>+x.ep===g),vid=sc.reduce((n,x)=>n+(+x.vid||0),0);
+          if(!sb)h+=`<div class="mu">⏳ กำลังโหลดสตอรีบอร์ด…</div>`;
+          else{
+            const wr=sb.scenes.some(x=>x.writing)||!sb.scenes.length,pct=sb.tot?Math.round(sb.img/sb.tot*100):0;
+            if(ok)h+=`<div class="mu">ซีนเสร็จ ${sc.filter(x=>+x.fin).length}/${sc.length||sb.scenes.length} · คลิป ${vid} ช็อต (ช็อตที่เหลือใช้ภาพนิ่งซูมช้า) · ปิดหน้านี้ได้ ระบบทำต่อเอง</div>`;
+            else if(sb.ready&&(sb.need||[]).length)h+=`<div class="warn" style="margin-top:6px">นี่คือฉบับร่าง (ยังไม่ใช้ LoRA) — ของจริงเริ่มได้เมื่อเลือก LoRA ให้ตัวหลักครบ ยังขาด: ${esc(sb.need.join(', '))} (เลือกที่ข้อ 2)</div>`;
+            if(!ok&&sb.ready)h+=`<button data-a="sbstill" style="width:100%;margin-top:6px">🎞 ทำเป็นวิดีโอภาพนิ่ง + ซับก่อน (ยังไม่มีอนิเมชั่น)</button>`;
+            else if(sb.ready&&sb.stale)h+=`<div class="warn">LoRA ครบแล้ว แต่มี ${sb.stale} ช็อตที่วาดไว้ก่อนมี LoRA หน้าตัวละครจะยังไม่ตรง</div><button class="go" data-a="sblora" style="margin:8px 0">🧬 เริ่มของจริง: วาดด้วย LoRA คุณภาพสูง (${sb.stale} ช็อต)</button>`;
+            else if(sb.ready)h+=`<button class="go" data-a="sbok" style="margin:8px 0">✅ อนุมัติ ทำตอน ${g} เป็นคลิป</button>`;
+            else h+=`<div class="mu">${wr?'✍️ กำลังเขียนบทและแตกช็อต':'🎨 กำลังวาด'} · ปิดหน้านี้ได้ ระบบทำต่อเอง</div><div class="bar"><i style="width:${pct}%"></i></div>`;
+            if(!ok&&(sb.cut||sb.fix||sb.qn))h+=`<div class="mu" style="margin-top:6px">🤖 ระบบตรวจเอง: ${sb.cut?'ตัดช็อตซ้ำ '+sb.cut+' ช็อต · ':''}${sb.fix?'ปรับมุมกล้อง '+sb.fix+' ช็อต · ':''}ตรวจภาพแล้ว ${sb.qn}/${sb.tot}${sb.bad?' · <span class="bad">ยังเสีย '+sb.bad+' (ลองวาดใหม่ครบ 2 รอบแล้ว)</span>':''}</div>`;
+            h+=sb.scenes.map(S=>`<div class="mu" style="margin-top:12px"><b>ซีน ${S.sc}</b> · ${esc(S.title||'')}${S.writing?' · กำลังเขียน…':''}</div><div class="sbg">${S.shots.map((v,i)=>{const d=say(v);return `<div${v.bad?' style="border-color:var(--bad)"':''}>${v.img?`<a href="${esc(botU('/img/'+v.img))}" target="_blank"><img src="${esc(botU('/img/'+v.img))}" loading="lazy"></a>`:`<div class="ph">⏳</div>`}<div class="tx"><b>${i+1}</b> ${esc(d.lines.length?d.lines.map(l=>(l.who?l.who+': ':'')+l.say).join(' / '):(v.th||''))}</div>${ok?'':`<div class="sbb"><button data-redo="${v.id}"${v.pending?' disabled':''}>${v.pending?'⏳':'🔄 วาดใหม่'}</button><button data-del="${v.id}" title="ลบช็อต">🗑</button></div>`}</div>`;}).join('')}</div>`).join('');
+          }
+        }
+        h+=`<div style="margin-top:10px"><button data-a="sbstop">⏹ ${cur.gate==='ok'?'หยุด':'ยกเลิก'}ตอน ${g}</button></div>`;
+      }
+      if(nextNo&&gl.length<3)h+=`<button data-sb="${nextNo}|${gl.some(n=>ST.epst[n].status==='waiting')?0:1}|1" style="width:100%;margin-top:8px">➕ ทำสตอรีบอร์ดตอน ${nextNo} เพิ่ม</button>`;
+    }
+    h+=`</div>`;
+    if(ST.msg)h+=`<div class="c" style="white-space:pre-wrap">${esc(ST.msg)}</div>`;
+    h+=`<button data-a="more" style="width:100%">${ST.more?'▲ ซ่อน':'⚙️ เพิ่มเติม'}</button>`;
+    if(ST.more){
+    h+=`<div class="c"><h2>🎨 สไตล์และสัดส่วนภาพ</h2><div class="mu">สไตล์</div><div class="row">${STY.map(x=>`<button class="${ST.sty===x[0]?'on':''}" data-sty="${x[0]}">${x[1]}</button>`).join('')}</div><div class="mu" style="margin-top:8px">สัดส่วนภาพ (ลง TikTok เลือก 9:16)</div><div class="row">${ASP.map(x=>`<button class="${ST.asp===x[0]?'on':''}" data-asp="${x[0]}">${x[1]}</button>`).join('')}</div><div class="mu" style="margin-top:6px">มีผลกับภาพที่สร้างใหม่หลังจากนี้ ภาพที่ทำไปแล้วไม่เปลี่ยน</div></div>`;
+    if(pl.locs.length)h+=`<div class="c"><h2>📍 สถานที่ (${pl.locs.length})</h2>${pl.locs.map(L=>`<div class="it"><div class="row sp"><b>${esc(L.name)}</b><span class="mu">${L.eps[0]===0?'ทุกตอน':L.eps.length?'ตอน '+L.eps.join(', '):''}</span></div>${L.note?`<div class="mu">${esc(L.note)}</div>`:''}</div>`).join('')}</div>`;
+    h+=`<div class="c"><h2>🎞 เนื้อเรื่องรายตอน</h2>${pl.eps.map(E=>`<div class="it"><b>ตอน ${E.no} · ${esc(E.title)}</b><div class="mu">${esc(E.f['เรื่อง']||E.f['คดี']||'')}</div>${E.f['ฉากสู้']?`<div class="mu">⚔️ ${esc(E.f['ฉากสู้'])}</div>`:''}${E.cast.length?`<div class="mu">🎭 ${esc(E.cast.join(', '))}</div>`:''}</div>`).join('')}</div>`;
 
-function prodPage(){
- return `<div class="cats"><button class="cat ${!S.cat?'on':''}" data-a="cat" data-v=""><span>${ic('grid',24)}</span>ทั้งหมด</button>${S.cats.map(c=>`<button class="cat ${S.cat===c.id?'on':''}" data-a="cat" data-v="${c.id}"><span>${E[c.prefix]||'📦'}</span>${esc(c.name)}</button>`).join('')}</div>${stChips()}<div class="pg" id="lst"></div><button class="fab" data-a="add" aria-label="เพิ่มสินค้า">${ic('plus',28)}</button>`}
-function list(){const L=filt();$('lst').innerHTML=L.length?L.map(p=>`<button class="pc" data-a="open" data-v="${esc(p.code)}"><div class="im">${thumb(p)}<i class="dt" style="background:var(--${p.status})"></i></div><div class="pi"><div class="pn">${esc(p.name)}</div><div class="pr">฿${fmt(p.base_price)}</div><div class="pm"><span>${esc(p.code)}</span><span>คงเหลือ ${pq(p)}</span></div></div></button>`).join(''):(S.prods.length?'<div class="empty">ไม่พบสินค้า</div>':emptyBox)}
-
-function stockPage(){
- const L=S.locs,tot=id=>S.prods.reduce((a,p)=>a+(p.variants||[]).reduce((b,v)=>b+(id?lq(v,id):vq(v)),0),0);
- const sh=S.loc==='all'?L:L.filter(l=>l.id===S.loc);
- const rows=filt().filter(p=>S.loc==='all'||(p.variants||[]).some(v=>lq(v,S.loc)>0));
- return `<h2>คลังสินค้า</h2><div class="grid"><div class="card"><small>รวมทุกที่</small><b class="v">${fmt(tot())} ชิ้น</b></div>${L.map(l=>`<div class="card"><small>${esc(l.name)}</small><b class="v">${fmt(tot(l.id))} ชิ้น</b></div>`).join('')}</div>
- <div class="chips"><button class="chip ${S.loc==='all'?'on':''}" data-a="loc" data-v="all">${ic('pin',14)} ทุกที่</button>${L.map(l=>`<button class="chip ${S.loc===l.id?'on':''}" data-a="loc" data-v="${l.id}">${esc(l.name)}</button>`).join('')}</div>${stChips()}
- ${rows.map(p=>`<div class="card"><button class="row" style="width:100%;text-align:left;padding-top:0" data-a="open" data-v="${esc(p.code)}"><div class="th">${thumb(p)}</div><div class="gr"><b>${esc(p.code)}</b> ${esc(p.name)}<br><small>รวม ${pq(p)} ชิ้น</small></div><i class="dt" style="background:var(--${p.status})"></i></button>${(p.variants||[]).map(v=>`<div class="kv"><span>${esc(vname(v))}</span><span>${sh.map(l=>esc(l.name)+' '+lq(v,l.id)).join(' · ')}</span></div>`).join('')}</div>`).join('')||(S.prods.length?'<div class="empty">ไม่พบสินค้า</div>':emptyBox)}
- <div class="note">ยอดขายของแต่ละชิ้นจะแสดงเมื่อเปิดระบบขาย (ระยะที่ 4)</div>`}
-
-function dashPage(){
- const c={green:0,blue:0,red:0,black:0};S.prods.forEach(p=>c[p.status]++);
- const n=S.prods.length,C=2*Math.PI*40;let off=0;
- const seg=n?Object.keys(c).map(k=>{const l=c[k]/n*C,s=`<circle cx="60" cy="60" r="40" fill="none" stroke-width="18" style="stroke:var(--${k})" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)"/>`;off+=l;return s}).join(''):'<circle cx="60" cy="60" r="40" fill="none" stroke-width="18" style="stroke:var(--line)"/>';
- const val=S.prods.reduce((a,p)=>a+pq(p)*Number(p.current_cost),0),low=S.prods.filter(p=>p.status!=='black'&&pq(p)<=3).length;
- return `<h2>ภาพรวมร้าน</h2><div class="grid"><div class="card"><small>จำนวนรุ่น</small><b class="v">${fmt(n)}</b></div><div class="card"><small>สินค้ารวม</small><b class="v">${fmt(S.prods.reduce((a,p)=>a+pq(p),0))} ชิ้น</b></div><div class="card"><small>มูลค่าต้นทุนรวม</small><b class="v">฿${fmt(val)}</b></div><div class="card"><small>ใกล้หมด (≤3 ชิ้น)</small><b class="v">${low} รุ่น</b></div></div>
- <div class="card"><h3>สถานะสินค้า</h3><div style="display:flex;align-items:center;gap:16px"><svg viewBox="0 0 120 120" width="130">${seg}<text x="60" y="66" text-anchor="middle" style="font-size:20px;font-weight:700;fill:var(--text)">${n}</text></svg><div>${Object.keys(c).map(k=>`<div style="font-size:.85rem;margin:4px 0"><i class="dt" style="background:var(--${k});margin-right:6px"></i>${ST[k]} ${c[k]} รุ่น</div>`).join('')}</div></div></div>
- <div class="note">ยอดขายและกำไรจะแสดงที่นี่เมื่อเปิดระบบขาย (ระยะที่ 4)</div>`}
-const other=m=>`<h2>${m.t}</h2><div class="card empty">${ic(m.i,44)}<p style="margin-top:10px">เร็ว ๆ นี้ (ระยะที่ ${m.p})</p></div>`;
-
-function render(){
- const id=S.cur;$('sw').style.display=(id==='prod'||id==='stock')?'block':'none';
- $('view').innerHTML=!S.ready?'<div class="empty">กำลังโหลดข้อมูล...</div>':id==='prod'?prodPage():id==='stock'?stockPage():id==='dash'?dashPage():other(M.find(x=>x.id===id));
- if(S.ready&&id==='prod')list();
- $('side').innerHTML='<span class="logo">Xiress</span>'+M.map(m=>`<button class="${m.id===id?'on':''}" data-a="go" data-v="${m.id}">${ic(m.i,20)}${m.t}</button>`).join('');
- $('bot').innerHTML=M.slice(0,3).map(m=>`<button class="${m.id===id?'on':''}" data-a="go" data-v="${m.id}">${ic(m.i)}${m.t}</button>`).join('')+`<button class="${M.slice(3).some(m=>m.id===id)?'on':''}" data-a="more">${ic('menu')}เพิ่มเติม</button>`;
-}
-function go(id){S.cur=id;closeSheet();render();window.scrollTo(0,0)}
-
-function detail(code){
- const p=S.prods.find(x=>x.code===code);if(!p)return toast('ไม่พบสินค้า '+code);
- const vs=p.variants||[];
- openSheet(head(esc(p.name))+`<div class="im" style="border-radius:16px;aspect-ratio:16/10">${thumb(p)}</div>
- <div class="kv"><span>รหัสสินค้า</span><b>${esc(p.code)}</b></div><div class="kv"><span>ประเภท</span><span>${esc(p.categories&&p.categories.name)}</span></div>
- <div class="kv"><span>ต้นทุน</span><span>฿${fmt(p.current_cost)}</span></div><div class="kv"><span>ราคาขายตั้งต้น</span><b>฿${fmt(p.base_price)}</b></div>
- <div class="kv"><span>สถานะ</span><span><i class="dt" style="background:var(--${p.status});margin-right:6px"></i>${ST[p.status]}</span></div>
- <div class="kv"><span>คงเหลือรวม</span><b>${pq(p)} ชิ้น</b></div>
- ${p.description?`<div class="kv"><span>รายละเอียด</span><span>${esc(p.description)}</span></div>`:''}
- <h3 style="margin-top:14px">แยกตามไซส์/ลาย</h3>${vs.map(v=>`<div class="kv"><span>${esc(vname(v))}</span><span>${S.locs.map(l=>esc(l.name)+' '+lq(v,l.id)).join(' · ')}</span></div>`).join('')}
- <button class="btn" data-a="qr" data-v="${esc(p.code)}">${ic('qr',20)} QR Code สินค้า</button>`)}
-
-function qrUrl(code){const q=qrcode(0,'M');q.addData(location.origin+location.pathname+'#p='+encodeURIComponent(code));q.make();return q.createDataURL(8,3)}
-function qrSheet(code){
- const p=S.prods.find(x=>x.code===code);if(!p)return;let u;
- try{u=qrUrl(code)}catch(e){return toast('สร้าง QR ไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่')}
- openSheet(head('QR Code')+`<div class="qrb"><img src="${u}" alt="QR"><h3 style="margin-top:10px">${esc(code)}</h3><small>${esc(p.name)}</small></div>
- <div class="btns"><button class="btn" data-a="dl" data-v="${esc(code)}">${ic('dl',20)} ดาวน์โหลด</button><button class="btn o" data-a="pr" data-v="${esc(code)}">${ic('print',20)} พิมพ์</button></div>`)}
-function dl(code){
- const p=S.prods.find(x=>x.code===code),im=new Image();
- im.onload=()=>{const w=im.width,c=document.createElement('canvas');c.width=w;c.height=w+90;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,w+90);x.drawImage(im,0,0);x.fillStyle='#000';x.textAlign='center';x.font='bold 34px sans-serif';x.fillText(code,w/2,w+38);x.font='24px sans-serif';x.fillText(p.name.slice(0,26),w/2,w+72);c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='QR-'+code+'.png';a.click()})};
- im.src=qrUrl(code)}
-function pr(code){const p=S.prods.find(x=>x.code===code);$('pa').innerHTML=`<img src="${qrUrl(code)}" style="width:55mm"><div><b>${esc(code)}</b></div><div>${esc(p.name)}</div>`;setTimeout(()=>window.print(),200)}
-function openHash(){const m=location.hash.match(/^#p=(.+)$/);if(m&&S.ready)detail(decodeURIComponent(m[1]))}
-window.addEventListener('hashchange',openHash);
-
-const vrow=()=>`<div class="vr card"><div class="two"><input class="vs" placeholder="ไซส์ เช่น M"><input class="vp" placeholder="ลาย/สี เช่น ลายดอก"></div><div class="lq">${S.locs.map(l=>`<label>จำนวน ${esc(l.name)}<input type="number" inputmode="numeric" min="0" placeholder="0" data-l="${l.id}"></label>`).join('')}</div><button type="button" class="lk" data-a="delrow">ลบแถวนี้</button></div>`;
-function addSheet(){
- openSheet(head('เพิ่มสินค้า')+`<label class="ph" id="phl" for="pf">${ic('cam',34)}<span>ถ่ายรูป / เลือกรูปสินค้า</span></label><input type="file" id="pf" accept="image/*" style="display:none">
- <label>ชื่อสินค้า<input id="fn" placeholder="เช่น กางเกงยีนส์"></label>
- <label>ประเภท<select id="fc"><option value="">เลือกประเภท</option>${S.cats.map(c=>`<option value="${c.id}">${esc(c.name)} (${c.prefix})</option>`).join('')}</select></label>
- <div class="two"><label>ต้นทุน (บาท)<input id="fcost" type="number" inputmode="decimal" min="0"></label><label>ราคาขายตั้งต้น<input id="fp" type="number" inputmode="decimal" min="0"></label></div>
- <label>รายละเอียดเพิ่มเติม<textarea id="fd" rows="2"></textarea></label>
- <h3>ไซส์ / ลาย และจำนวน</h3><small>ถ้าไม่มีไซส์/ลาย เว้นว่างไว้ แล้วใส่จำนวนอย่างเดียว</small><div id="vrs" style="margin-top:8px">${vrow()}</div>
- <button type="button" class="btn o" data-a="row">${ic('plus',18)} เพิ่มไซส์/ลาย</button><div class="err" id="er"></div><button class="btn" id="sv" data-a="save">บันทึกสินค้า</button>`);
- $('pf').onchange=e=>{const f=e.target.files[0];if(f)$('phl').innerHTML=`<img src="${URL.createObjectURL(f)}" alt="">`}}
-function shrink(f){return new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?ok(b):no(),'image/jpeg',.8)};im.onerror=no;im.src=u})}
-async function save(){
- const er=m=>$('er').textContent=m,btn=$('sv');er('');
- const name=$('fn').value.trim(),cat=$('fc').value,cost=parseFloat($('fcost').value),price=parseFloat($('fp').value);
- if(!name||!cat||isNaN(cost)||isNaN(price)||cost<0||price<0)return er('กรอกชื่อ ประเภท ต้นทุน และราคาให้ครบ');
- const vs=[...document.querySelectorAll('.vr')].map(r=>{const st={};r.querySelectorAll('[data-l]').forEach(i=>{const n=parseInt(i.value);if(n>0)st[i.dataset.l]=n});return{size:r.querySelector('.vs').value,pattern:r.querySelector('.vp').value,stock:st}});
- if(!vs.some(v=>Object.keys(v.stock).length))return er('ใส่จำนวนสินค้าอย่างน้อย 1 ช่อง');
- if(price<cost&&!confirm('ราคาขายต่ำกว่าต้นทุน ยืนยันบันทึก?'))return;
- btn.disabled=true;btn.textContent='กำลังบันทึก...';let path=null;
- try{
-  const f=$('pf').files[0];
-  if(f){path=S.uid+'/'+Date.now()+'.jpg';const u=await S.sb.storage.from('product-images').upload(path,await shrink(f),{contentType:'image/jpeg'});if(u.error){path=null;throw u.error}}
-  const r=await S.sb.rpc('create_product',{p_category_id:cat,p_name:name,p_cost:cost,p_price:price,p_description:$('fd').value.trim()||null,p_image_path:path,p_variants:vs});
-  if(r.error){if(path)S.sb.storage.from('product-images').remove([path]);throw r.error}
-  await load();qrSheet(r.data.code);toast('บันทึกแล้ว รหัส '+r.data.code);
- }catch(e){btn.disabled=false;btn.textContent='บันทึกสินค้า';er(/duplicate|variants_unique/i.test(e.message||'')?'มีไซส์/ลายซ้ำกันในสินค้านี้':'บันทึกไม่สำเร็จ: '+(e.message||e))}
-}
-
-const A={go:v=>go(v),cat:v=>{S.cat=v;render()},st:v=>{S.stf=v;render()},loc:v=>{S.loc=v;render()},open:v=>detail(v),qr:v=>qrSheet(v),dl:v=>dl(v),pr:v=>pr(v),add:()=>S.ready&&addSheet(),row:()=>$('vrs').insertAdjacentHTML('beforeend',vrow()),
- delrow:(v,t)=>{if(document.querySelectorAll('.vr').length>1)t.closest('.vr').remove()},save:()=>save(),close:()=>closeSheet(),
- more:()=>openSheet(head('เมนูเพิ่มเติม')+M.slice(3).map(m=>`<button class="row" style="width:100%;padding:14px 4px" data-a="go" data-v="${m.id}">${ic(m.i,22)}${m.t}</button>`).join('')),
- theme:()=>theme(document.documentElement.dataset.theme==='dark'?'light':'dark'),logout:()=>{if(confirm('ออกจากระบบ?'))S.sb.auth.signOut()}};
-document.addEventListener('click',e=>{if(e.target.id==='sheet')return closeSheet();const t=e.target.closest('[data-a]');if(t&&A[t.dataset.a])A[t.dataset.a](t.dataset.v,t)});
-$('q').oninput=e=>{S.q=e.target.value;if(!S.ready)return;S.cur==='prod'?list():render()};
-function theme(t){document.documentElement.dataset.theme=t;$('theme').innerHTML=ic(t==='dark'?'sun':'moon',20);try{localStorage.setItem('theme',t)}catch(e){}}
-$('out').innerHTML=ic('back',22);
-let t0;try{t0=localStorage.getItem('theme')}catch(e){}
-theme(t0||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));
-window.App={start(sb,u){if(S.uid===u.id&&S.ready)return;S.sb=sb;S.uid=u.id;load()},stop(){S.ready=false;S.uid=null;S.prods=[];S.imgs={};closeSheet();render()}};
-render();
-setTimeout(()=>{$('splash').classList.add('hide');setTimeout(()=>$('splash').remove(),500)},1500);
-</script>
-<script src="auth.js"></script>
- <script src="sell.js"></script>
-<script src="status.js"></script>
-<script src="stock.js"></script>
-<script src="rent.js"></script>
-<script src="edit.js"></script>
-<script src="delete.js"></script>
-<script src="overview.js"></script>
-<script src="final.js"></script>
-<script src="cart.js"></script>
-<script src="extras.js"></script>
-<script src="alerts.js"></script>
-<script src="pages.js"></script>
-<script src="office.js"></script>
-<script src="easy.js"></script>
-<script src="tarot.js"></script>
-<script src="crm.js"></script>
-<script src="anim-link.js"></script>
-<script src="oracle-link.js"></script>
-<script src="acc-merge.js"></script>
-
-</body>
-</html>
+    h+=`<div class="c"><h2>🚀 ทำทั้งเรื่องต่อเนื่อง</h2><div class="mu">แบบเดิม: ทำทุกตอนติดกันโดยไม่หยุดให้ดูสตอรีบอร์ด</div>${started?`${epList(pl)}<div style="margin-top:8px"><button data-a="stop">⏹ หยุดทั้งหมด</button><button data-a="go">🔁 สั่งเริ่มตอนที่ยังไม่ได้เริ่ม</button></div>`:`<button data-a="go"${nog.length?' disabled':''} style="margin-top:8px">🚀 เริ่มทำทั้งเรื่อง (${pl.eps.length} ตอน)</button>`}</div>`;
+    }}
+  if(pl&&ST.more&&Object.keys(ST.epst).length){const q=ST.qc,sug=bestEp(),pick=ST.best;
+    h+=`<div class="c"><h2>🔍 ตรวจและแก้ซีนอัตโนมัติ</h2><div class="mu">ระบบดูภาพทุกช็อต ถ้าเจอภาพเสีย (มือ/หน้าเพี้ยน ภาพว่าง) จะลบแล้ววาดใหม่เองสูงสุด 2 รอบ แล้วรวมซีนใหม่</div>
+      <button class="on" data-a="qc"${ST.qcBusy?' disabled':''} style="margin-top:8px">${ST.qcBusy?'⏳ กำลังตรวจ…':'🔍 ตรวจและแก้ตอนนี้'}</button>
+      ${q&&q.vision===false?'<div class="warn" style="margin-top:6px">AI ดูภาพไม่ได้ตอนนี้ ระบบตรวจแค่ภาพว่าง/เสีย ยังไม่ตรวจมือหรือหน้าเพี้ยน</div>':''}
+      ${q&&q.eps?q.eps.map(E=>`<div class="it"><div class="row sp"><b>ตอน ${E.no}${sug===E.no?' ⭐':''}${pick===E.no?' 🎯':''}</b><span class="mu">${E.avg==null?'ยังไม่มีคะแนน':'คะแนนภาพ '+E.avg+'/100'}</span></div><div class="mu">ซีนเสร็จ ${E.fin}/${E.scenes} · ตรวจแล้ว ${E.scored}/${E.shots} ช็อต${E.fixing?` · <span class="warn">กำลังแก้/รอวาด ${E.fixing}</span>`:''}${E.bad?` · <span class="bad">ยังเสีย ${E.bad}</span>`:''}</div>${E.issues&&E.issues.length?`<div class="mu" style="font-size:12px">${esc(E.issues.join(' · '))}</div>`:''}${E.final?`<button class="sm ${pick===E.no?'on':''}" data-pick="${E.no}">🎯 เลือกตอนนี้ลง TikTok</button>`:''}</div>`).join('')+(sug?`<div class="mu" style="margin-top:6px">⭐ = ตอนที่คะแนนสูงสุดและไม่มีภาพเสีย</div>`:''):''}</div>`;
+    if(pick){const f=ST.fin[pick],ss=ST.scn.filter(x=>+x.ep===pick&&+x.final);
+      h+=`<div class="c"><h2>🎵 ตอนที่เลือกลง TikTok: ตอน ${pick}</h2>${f?`<button class="go" data-dl="${f}|${esc((pl.title||'anime').slice(0,30))}-ep${pick}.mp4">⬇ ดาวน์โหลดทั้งตอน</button>`:'<div class="warn">ตอนนี้ยังรวมไม่เสร็จ ให้รอหรือกดตรวจแก้ก่อน</div>'}
+      ${ss.length?`<div class="mu" style="margin:8px 0 4px">หรือโหลดแยกซีน (TikTok แบ่งเป็นพาร์ตสั้นได้)</div>${ss.map(x=>`<button class="sm" data-dl="${x.final}|${esc((pl.title||'anime').slice(0,30))}-ep${pick}-sc${x.sc}.mp4">⬇ ซีน ${x.sc}</button>`).join('')}`:''}
+      <div class="mu" style="margin-top:8px">ตอนนี้วิดีโอยังไม่มีเสียงพากย์ ซับ และเพลง ต้องใส่ในแอปตัดต่อก่อนอัปโหลด</div></div>`;}
+  }
+  A.innerHTML=h;bindTabs(A);
+  if(window._keep)A.querySelectorAll('[data-hcard] input').forEach(x=>{const k=[...x.attributes].filter(a=>a.name.startsWith('data-')).map(a=>a.name+'='+a.value).join('&');if(window._keep[k])x.value=window._keep[k];});
+  A.querySelectorAll('[data-sty]').forEach(b=>b.onclick=()=>setSty(b.dataset.sty));
+  A.querySelectorAll('[data-asp]').forEach(b=>b.onclick=()=>setAsp(b.dataset.asp));
+  A.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>pickBest(+b.dataset.pick));
+  A.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>{const [i,n]=b.dataset.dl.split('|');dl(i,n);});
+  const pf=$('#pf');if(pf)pf.onchange=e=>{const f=e.target.files[0];e.target.value='';onFile(f);};
+  const dz=$('#dz');if(dz){dz.ondragover=e=>{e.preventDefault();dz.classList.add('over');};dz.ondragleave=()=>dz.classList.remove('over');dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');onFile(e.dataTransfer.files[0]);};}
+  A.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const [k,f,v]=b.dataset.r.split('|');setR(k,f==='g'?'g':'tier',v);});
+  A.querySelectorAll('[data-retry]').forEach(b=>b.onclick=async()=>{b.disabled=true;LG.delete(b.dataset.retry);try{await api('lorago',{cand:b.dataset.retry});toast('สั่งสร้าง LoRA ใหม่แล้ว');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-ep]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('make',{ep:+b.dataset.ep,all:true});toast(r.waiting?'ตอนนี้รอ LoRA '+r.waiting.join(', '):'เริ่มทำตอน '+b.dataset.ep+' แล้ว');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>setKind(b.dataset.kind));
+  A.querySelectorAll('[data-sb]').forEach(b=>b.onclick=()=>{const [n,nl,c]=b.dataset.sb.split('|');startSb(+n,nl==='1',+c||1);});
+  A.querySelectorAll('[data-boost]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('boost',{hours:+b.dataset.boost});ST.boost=+r.until||0;toast(r.until?'⚡ เร่งแล้ว':'หยุดเร่งแล้ว');}catch(e){toast(botErr(e));}render();});
+  {const hc=A.querySelector('[data-hcard]');if(hc)hc.ontoggle=async()=>{ST.hOpen=hc.open;if(hc.open&&!ST.helpers){try{ST.helpers=(await api('helpers')).items||[];}catch(e){ST.helpers=[];toast(botErr(e));}render();}};}
+  A.querySelectorAll('[data-hset]').forEach(b=>b.onclick=async()=>{const [id,on]=b.dataset.hset.split('|');b.disabled=true;try{ST.helpers=(await api('helpers',{set:+id,on:+on})).items||[];toast(+on?'เปิดสิทธิ์แล้ว':'ปิดสิทธิ์แล้ว');}catch(e){toast(botErr(e));}render();});
+  const hcall=async(o,msg)=>{let ok=0;try{ST.helpers=(await api('helpers',o)).items||[];ok=1;if(msg)toast(msg);}catch(e){toast('❌ '+botErr(e));}if(ok)window._keep={};window._forceRender=1;if(document.activeElement)document.activeElement.blur();render();};
+  A.querySelectorAll('[data-hsetk]').forEach(b=>b.onclick=()=>{const id=b.dataset.hsetk,u=A.querySelector(`[data-hku="${id}"]`).value,k=A.querySelector(`[data-hkk="${id}"]`).value;b.disabled=true;b.textContent='⏳ กำลังตรวจกับ Kaggle…';hcall({setk:+id,kuser:u,kkey:k},'ผูกแล้ว ระบบจะเปิดเครื่องผู้ช่วยเองเมื่อคิวเยอะ');});
+  A.querySelectorAll('[data-hunk]').forEach(b=>b.onclick=()=>{b.disabled=true;hcall({unk:+b.dataset.hunk},'ยกเลิกการผูกแล้ว');});
+  {const ab=A.querySelector('[data-haddb]');if(ab)ab.onclick=()=>{const n=A.querySelector('[data-hadd]').value.trim();if(!n)return toast('ใส่ชื่อก่อน');ab.disabled=true;hcall({add:n},'เพิ่มผู้ช่วยแล้ว');};}
+  A.querySelectorAll('[data-hcopy]').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.hcopy);toast('คัดลอกลิงก์แล้ว ส่งให้ผู้ช่วยได้เลย');}catch(e){prompt('คัดลอกลิงก์นี้',b.dataset.hcopy);}});
+  A.querySelectorAll('[data-sync]').forEach(b=>b.onclick=async()=>{const c=botCfg(),o={url:c.url,key:c.key,story:ST.story,sty:localStorage.getItem('ss_sty')||'',asp:localStorage.getItem('ss_asp')||''};
+    const u=location.origin+location.pathname+'#sync='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(o)))));
+    if(!confirm('ลิงก์นี้มีรหัสบอทอยู่ด้วย ส่งให้เครื่องของคุณเองเท่านั้น (AirDrop / โน้ต / แชทกับตัวเอง) ห้ามส่งให้คนอื่น'))return;
+    try{if(navigator.share){await navigator.share({title:'ตั้งค่าสตูดิโอ',url:u});return;}}catch(e){}
+    try{await navigator.clipboard.writeText(u);toast('คัดลอกลิงก์แล้ว ไปเปิดบน iPad ได้เลย');}catch(e){prompt('คัดลอกลิงก์นี้ไปเปิดบน iPad',u);}});
+  A.querySelectorAll('[data-mrefresh]').forEach(b=>b.onclick=()=>{ST.force=1;load();});
+  A.querySelectorAll('[data-qcrep]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('qcrep',{ep:+b.dataset.qcrep});showQc(r.rep,r.canon,+b.dataset.qcrep);}catch(e){toast('โหลดรายงานไม่ได้');}b.disabled=false;});
+  A.querySelectorAll('[data-voredo]').forEach(b=>b.onclick=async()=>{if(b.dataset.ok!=='1'){b.dataset.ok='1';b.textContent='แตะอีกครั้งเพื่อยืนยัน';setTimeout(()=>{b.dataset.ok='';b.textContent='↻ ทำใหม่ทั้งหมด';},4000);return;}b.disabled=true;try{const r=await api('vo_make',{ep:+b.dataset.voredo,redo:1});toast(r.lines?`สั่งทำเสียงใหม่ ${r.lines} บรรทัด (เสียงเดิมใช้ได้จนกว่าเสียงใหม่จะเสร็จ)`:'ไม่มีบรรทัดให้ทำ');}catch(e){toast('สั่งไม่สำเร็จ');}b.disabled=false;});
+  A.querySelectorAll('[data-vomake]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('vo_make',{ep:+b.dataset.vomake});toast(r.lines?`สั่งทำเสียง ${r.lines} บรรทัดแล้ว เครื่อง CPU ของ Kaggle จะทำให้`:'ไม่มีบรรทัดที่ต้องทำ (บรรทัดที่ยังไม่มีบทญี่ปุ่นจะข้าม)');}catch(e){toast(botErr(e));}});
+  {if(!window._voAu)window._voAu=new Audio();A.querySelectorAll('[data-vo]').forEach(el=>el.onclick=()=>{const a=window._voAu;a.pause();a.src=botU('/vo/'+el.dataset.vo);a.play().catch(()=>{});});}
+  A.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>playEp(+b.dataset.play));
+  A.querySelectorAll('[data-sbm]').forEach(b=>b.onclick=()=>{ST.sbMode=b.dataset.sbm;localStorage.setItem('ss_sbmode',ST.sbMode);render();});
+  A.querySelectorAll('[data-sbsel]').forEach(b=>b.onclick=()=>{ST.sbSel=+b.dataset.sbsel;ST.sb=ST.sbs[ST.sbSel]||null;render();});
+  A.querySelectorAll('[data-redo]').forEach(b=>b.onclick=()=>sbRedo(+b.dataset.redo));
+  A.querySelectorAll('[data-reopen]').forEach(b=>b.onclick=async()=>{if(!confirm('กลับไปที่สตอรีบอร์ดของตอนนี้? (ไฟล์วิดีโอที่รวมไว้จะถูกลบ)'))return;try{await api('sb_reopen',{ep:+b.dataset.reopen});}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{const id=+b.dataset.del;if(!(window._armDel&&window._armDel.id===id&&Date.now()-window._armDel.t<8000)){window._armDel={id,t:Date.now()};b.textContent='❓';toast('แตะถังขยะของช่องนี้อีกครั้งภายใน 8 วินาที เพื่อยืนยันลบ');return;}window._armDel=null;b.disabled=true;b.textContent='⏳';try{await api('sb_del',{ep:sbCur(),shot:+b.dataset.del});toast('ลบช็อตแล้ว');}catch(e){toast(botErr(e));}await load();});
+  const se=$('#sbep');if(se)se.onchange=()=>{ST.selEp=+se.value;render();};
+  A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;if(a==='more'){ST.more=!ST.more;render();}else if(a==='sbok')sbOk();else if(a==='sblora')sbLora();else if(a==='sbstill')sbStill();else if(a==='dcast'){if(!confirm('ให้ระบบออกแบบตัวละครทุกบทตามบท (ส่วนที่บทไม่บอกจะออกแบบตามธีมเรื่อง) วาดชุดฝึก แล้วเทรน LoRA และใส่บทให้เอง? นักแสดงจากคลังเก่าที่ใส่บทไว้จะถูกถอดออก (ไม่ลบ)'))return;api('design_cast').then(r=>{toast(r.made&&r.made.length?'เริ่มออกแบบ: '+r.made.join(', '):'ทุกบทมีตัวละครแล้ว');load();}).catch(e=>toast(botErr(e)));}else if(a==='sbstop')sbStop();else if(a==='stop')stopAll();else if(a==='qc')runQc();else startAll();});}
+/* ---------- แถบ LoRA: เลือกเฉพาะ LoRA ที่เทรนเสร็จแล้วมาใช้ในบท ---------- */
+function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ST.tab=b.dataset.tab;render();window.scrollTo(0,0);});
+  A.querySelectorAll('[data-bot]').forEach(b=>b.onclick=()=>{ST.editBot=true;render();window.scrollTo(0,0);});
+  A.querySelectorAll('[data-wipe]').forEach(b=>b.onclick=wipeRebuild);
+  A.querySelectorAll('[data-autoff]').forEach(b=>b.onclick=async()=>{if(!confirm('ปิดระบบอัตโนมัติเก่าทั้งหมด และล้างคิวงานเทรน LoRA/ภาพที่ค้างอยู่?'))return;b.disabled=true;try{const r=await api('autos_off');toast('ปิดแล้ว · ล้างงานเทรนค้าง '+(r.loras_cleared||0)+' รายการ');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-test]').forEach(b=>b.onclick=async()=>{ST.testMsg='⏳ กำลังทดสอบ…';render();const c=botCfg(),r=await testBot(c.url,c.key);ST.testMsg=r.m;render();});}
+async function wipeRebuild(){
+  const t=prompt('จะลบคลังนักแสดงเก่าทั้งหมด (ผู้สมัคร ตัวละคร LoRA ภาพ) กู้คืนไม่ได้\nพิมพ์ ลบทั้งหมด เพื่อยืนยัน');if(t!=='ลบทั้งหมด'){if(t!==null)toast('ยกเลิก: พิมพ์ไม่ตรง');return;}
+  ST.busy='กำลังลบคลังเก่า…';ST.msg='';ST.tab='story';render();
+  try{const r=await botApi('/api/vcastaud',{act:'wipe_all',confirm:'ลบทั้งหมด'});
+    if(ST.plan)for(const E of ST.plan.eps){if(ST.epst[E.no])await api('stop',{ep:E.no});}
+    await api('autos_off');ST.onlyReady=false;localStorage.setItem('ss_onlyready','0');LG.clear();for(const k in LT)delete LT[k];ST.lib=[];
+    toast('ลบแล้ว '+(r.removed||0)+' คน เริ่มเรียกนักแสดงใหม่');ST.busy='';await load();await startAll();
+  }catch(e){ST.busy='';ST.msg='⚠️ '+botErr(e);await load();}}
+function loraTab(pl){
+  const roles=pl.roles.filter(r=>live(r)),lib=ST.lib,tr=ST.train||[],mb=x=>x.size?Math.round(x.size/1048576)+' MB':'';
+  const usedBy=x=>x.cast_role?(x.cast_story===ST.story?'ใช้เป็นบท: <b>'+esc(x.cast_role)+'</b>':'ใช้อยู่ในเรื่อง “'+esc(x.cast_story)+'”'):'ยังว่าง';
+  let h=`<div class="c"><h2>🧬 LoRA ที่เสร็จแล้ว (${lib.length})</h2><div class="mu">เลือกใช้ในบทได้เฉพาะ LoRA ที่เทรนเสร็จพร้อมใช้ — ตัวที่รอคิว/กำลังเทรน/เทรนพังแสดงแยกด้านล่าง และเลือกไม่ได้</div>
+    <label class="row" style="margin-top:8px;cursor:pointer"><input type="checkbox" id="onlyr" ${ST.onlyReady?'checked':''} style="width:auto"> <span>ใช้เฉพาะ LoRA ที่เสร็จแล้ว (ไม่สั่งเทรนใหม่เอง)</span></label></div>`;
+  if(tr.length){h+=`<div class="c"><h2>⏳ รอคิว / กำลังเทรน (${tr.filter(x=>x.status!=='failed').length})</h2><div class="mu">เทรนทีละตัว ตัวหลักได้เข้าก่อน</div>`+tr.map(x=>{
+    const pct=x.total?Math.min(100,Math.round(x.step/x.total*100)):0,age=x.at?Math.round((Date.now()-x.at)/60000):null;
+    const st=x.status==='failed'?'<span class="bad">❌ เทรนพัง</span>':x.status==='training'?`<span class="warn">🔧 กำลังเทรน${x.total?' '+pct+'%':''}</span>`:`<span class="mu">⏳ รอคิว${x.pos?' ลำดับ '+x.pos:''}${x.pri===0?' · ตัวหลัก':''}</span>`;
+    const hint=/pip|venv|not found/i.test(x.error)?'<div class="warn" style="font-size:12px">ดูเหมือนสคริปต์ Kaggle เก่า — deploy worker.js ใหม่ ให้ Kaggle ดึงสคริปต์ล่าสุด แล้วกดเทรนใหม่</div>':'';
+    return `<div class="it"><div class="row sp"><b>${esc(x.name)}</b>${st}</div>${x.cast_role?`<div class="mu">บท: ${esc(x.cast_role)}</div>`:''}
+      ${x.status==='training'?`${x.total?`<div class="mu">สเต็ป ${x.step}/${x.total}</div><div class="bar"><i style="width:${pct}%"></i></div>`:''}${x.tail?`<div class="mu" style="font-size:12px;word-break:break-all">${esc(x.tail)}</div>`:''}${age!=null&&age>=10?`<div class="warn" style="font-size:12px">⚠️ ไม่มีความคืบหน้ามา ${age} นาที อาจค้าง</div>`:''}`:''}
+      ${x.status==='failed'?`${x.error?`<div class="bad" style="font-size:12px;word-break:break-all;white-space:pre-wrap">${esc(x.error)}</div>`:''}${hint}${x.cand?`<button class="sm" data-retry="${x.cand}">🔁 เทรนใหม่</button>`:''}`:''}</div>`;}).join('')+'</div>';}
+  h+=`<div class="c"><h2>📚 คลัง</h2>`+(lib.length?lib.map(x=>`<div class="it"><div class="row" style="flex-wrap:nowrap;gap:10px">${x.face?`<img src="${esc(botU('/img/'+x.face))}" loading="lazy" style="width:56px;height:56px;border-radius:12px;object-fit:cover;object-position:top;border:1px solid var(--bd)">`:''}<div style="flex:1"><b>${esc(x.name)}</b> <span class="ok">✅ พร้อมใช้</span> <span class="mu">${mb(x)}</span><div class="mu">${usedBy(x)}</div></div></div>
+      <div class="row" style="margin-top:6px"><button class="sm" data-lt="${x.lid}" ${x.testing?'disabled':''}>${x.testing?'⏳ กำลังวาดภาพทดสอบ…':'🖼 ทดสอบหน้า'}</button></div>
+      ${x.test?`<a href="${esc(botU('/img/'+x.test))}" target="_blank"><img src="${esc(botU('/img/'+x.test))}" loading="lazy" style="width:130px;border-radius:12px;margin-top:6px;border:1px solid var(--bd)"></a><div class="mu" style="font-size:12px">ภาพทดสอบ (แตะเพื่อขยาย) — ถ้าหน้าไม่ตรงตัวละคร ให้เทรนใหม่</div>`:''}</div>`).join(''):'<div class="warn">ยังไม่มี LoRA ที่เทรนเสร็จ — เมื่อบอทเทรนเสร็จจะมาโผล่ที่นี่เอง</div>')+'</div>';
+  {const X=ST.xl||[],KN={style:'🎨 สไตล์',enemy:'👹 ศัตรู',place:'📍 สถานที่'},stt=x=>x.lora==='ready'?`<span class="ok">✅ พร้อมใช้${x.size?' · '+Math.round(x.size/1048576)+' MB':''}</span>`:x.lora==='queued'?'<span class="warn">⏳ รอเทรน/กำลังเทรน</span>':x.lora==='failed'?'<span class="bad">❌ เทรนพัง</span>':`<span class="mu">🖼 วาดชุดฝึก ${x.img}/16</span>`;
+   h+=`<div class="c"><h2>🧩 LoRA ของเรื่อง: สไตล์ · ศัตรู · สถานที่</h2><div class="mu">ทำให้ลายเส้น ตัวประหลาด และฉากหลัก หน้าตาเหมือนเดิมทุกช็อต ระบบวาดชุดฝึก 16 ภาพแล้วเทรนเอง และใช้ให้อัตโนมัติเมื่อพร้อม</div>
+    ${X.map(x=>`<div class="it"><div class="row" style="flex-wrap:nowrap;gap:10px">${x.face?`<img src="${esc(botU('/img/'+x.face))}" loading="lazy" style="width:56px;height:56px;border-radius:12px;object-fit:cover;border:1px solid var(--bd)">`:''}<div style="flex:1"><b>${esc(x.name)}</b> <span class="mu">${KN[x.kind]||''}</span><div>${stt(x)}</div></div><button class="sm" data-xdel="${x.id}">🗑</button></div></div>`).join('')}
+    <button class="on" data-xauto="1" style="margin-top:8px;width:100%">🤖 ให้ระบบเลือกจากบท (สไตล์ + ศัตรู + สถานที่)</button>
+    <div class="mu" style="margin:10px 0 4px">หรือเพิ่มเอง</div><div class="row"><select id="xk" style="padding:10px;border-radius:10px;border:1px solid var(--bd);font:inherit;background:#fff;color:var(--fg)"><option value="enemy">👹 ศัตรู</option><option value="place">📍 สถานที่</option></select><input type="text" id="xn" placeholder="ชื่อ" style="flex:1;min-width:120px"></div><input type="text" id="xd" placeholder="หน้าตาเป็นยังไง (พิมพ์ไทยได้)"><button data-xnew="1">➕ เพิ่ม</button></div>`;}
+  h+=`<div class="c"><h2>🎭 เลือก LoRA ให้แต่ละบท</h2>`+roles.map(r=>{const c=castOf(r.key),cur=c?(lib.find(x=>x.cand===c.id)||{}).lid||0:0,t=tierOf(r),w=Math.round((+(ST.weights||{})[r.key]||0.8)*100);
+    return `<div class="it"><div class="row sp"><b>${esc(r.key)}</b><span class="mu">${esc(r.kind)}${t==='main'?' · ตัวหลัก':''}</span></div>
+      <select data-lp="${esc(r.key)}" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin-top:4px"><option value="0">— ไม่เลือก —</option>${lib.map(x=>{const other=x.cast_role&&x.cast_story&&x.cast_story!==ST.story,took=x.cast_role&&x.cast_story===ST.story&&x.cast_role!==r.key;return `<option value="${x.lid}" ${+cur===+x.lid?'selected':''} ${other?'disabled':''}>${esc(x.name)}${other?' (ใช้เรื่องอื่นอยู่)':took?' (ย้ายจากบท '+esc(x.cast_role)+')':''}</option>`;}).join('')}</select>
+      ${cur?`<div class="row" style="margin-top:6px;flex-wrap:nowrap"><span class="mu" style="white-space:nowrap">น้ำหนัก <b data-lwv="${esc(r.key)}">${(w/100).toFixed(2)}</b></span><input type="range" min="30" max="120" step="5" value="${w}" data-lw="${esc(r.key)}" style="flex:1"></div><div class="mu" style="font-size:12px">ต่ำ = หน้านุ่ม/อิสระ · สูง = ล็อกหน้าแน่นแต่อาจแข็ง (แนะนำ 0.8)</div>`:''}
+      ${t==='main'&&!cur?'<div class="warn" style="font-size:13px">ตัวหลักต้องเลือก LoRA ที่เสร็จแล้วก่อนเริ่มสร้าง</div>':''}</div>`;}).join('')+'</div>';
+  {const a=ST.autos,on=a?[a.fill&&'เติมคิวภาพเอง',a.lora&&'เทรน LoRA เอง (ฝั่งบอท)',a.cast&&'แคสติ้งรายวัน',a.aud&&'ออดิชันรายวัน'].filter(Boolean):[];
+   h+=`<div class="c"><h2>⛔ ระบบอัตโนมัติเก่า</h2>${a?(on.length?`<div class="warn">ยังเปิดอยู่: ${esc(on.join(' · '))}</div>`:'<div class="ok">ปิดครบแล้ว — ตอนนี้ทำงานเฉพาะที่สตูดิโอสั่งเท่านั้น</div>'):'<div class="mu">อ่านสถานะไม่ได้ (บอทอาจเป็นเวอร์ชันเก่า)</div>'}<div class="mu" style="margin-top:4px">ปิด: เติมคิวภาพเอง · เทรน LoRA เองฝั่งบอท · แคสติ้ง/ออดิชันรายวัน และล้างคิวงานเทรน/ภาพที่ค้าง (ตอนที่สร้างอยู่ใน 🎬 เรื่องไม่ถูกแตะ)</div><button data-autoff="1" style="margin-top:8px">⛔ ปิดทั้งหมด + ล้างคิวค้าง</button></div>`;}
+  h+=`<div class="c"><h2>🔌 การเชื่อมบอท</h2><button data-test="1">🧪 ทดสอบการเชื่อมต่อ</button><button data-bot="1">เชื่อมบอทใหม่</button>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
+  h+=`<div class="c"><h2>♻️ เริ่มใหม่ทั้งหมด</h2><div class="mu">ลบคลังนักแสดงเก่า (ผู้สมัคร ตัวละคร LoRA และภาพทั้งหมด) แล้วเรียกนักแสดงใหม่ เทรน LoRA ใหม่ให้ตัวหลัก ลบแล้วกู้คืนไม่ได้</div><button data-wipe="1" style="margin-top:8px;border-color:var(--bad);color:var(--bad)">🗑 ลบคลังเก่า + สร้าง LoRA ใหม่</button></div>`;
+  return h;}
+function bindLora(A){
+  A.querySelectorAll('[data-xauto]').forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent='⏳ AI กำลังอ่านบท…';try{const r=await api('xl_auto');toast(r.made&&r.made.length?'เพิ่มแล้ว: '+r.made.join(', '):'ไม่มีอะไรให้เพิ่ม (มีครบแล้ว)');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-xnew]').forEach(b=>b.onclick=async()=>{const n=$('#xn').value.trim(),d=$('#xd').value.trim();if(!n||!d){toast('ใส่ชื่อและคำอธิบายก่อน');return;}b.disabled=true;try{await api('xl_new',{kind:$('#xk').value,name:n,desc:d});toast('เพิ่มแล้ว กำลังวาดชุดฝึก');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-xdel]').forEach(b=>b.onclick=async()=>{if(!confirm('ลบ LoRA นี้และภาพชุดฝึก?'))return;try{await api('xl_del',{id:+b.dataset.xdel});}catch(e){toast(botErr(e));}await load();});
+  const o=A.querySelector('#onlyr');if(o)o.onchange=async()=>{ST.onlyReady=o.checked;localStorage.setItem('ss_onlyready',o.checked?'1':'0');toast(o.checked?'ใช้เฉพาะ LoRA ที่เสร็จแล้ว':'สตูดิโอจะสั่งเทรนตัวหลักให้เมื่อภาพชุดฝึกพร้อม');render();if(!o.checked)load();};
+  A.querySelectorAll('[data-lp]').forEach(sel=>sel.onchange=async()=>{sel.disabled=true;try{await api('lorapick',{key:sel.dataset.lp,lora:+sel.value});toast('บันทึกแล้ว');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-lt]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('lora_test',{lora:+b.dataset.lt});toast('สั่งวาดภาพทดสอบแล้ว รอสักครู่');}catch(e){toast(botErr(e));}await load();});
+  A.querySelectorAll('[data-lw]').forEach(r=>{const k=r.dataset.lw,lab=[...A.querySelectorAll('[data-lwv]')].find(x=>x.dataset.lwv===k);r.oninput=()=>{if(lab)lab.textContent=(r.value/100).toFixed(2);};r.onchange=async()=>{try{await api('lorawt',{key:k,w:r.value/100});(ST.weights=ST.weights||{})[k]=r.value/100;toast('บันทึกน้ำหนักแล้ว (มีผลกับภาพที่สร้างใหม่)');}catch(e){toast(botErr(e));}};});
+  A.querySelectorAll('[data-retry]').forEach(b=>b.onclick=async()=>{b.disabled=true;LG.delete(b.dataset.retry);try{await api('lorago',{cand:b.dataset.retry});toast('สั่งเทรนใหม่แล้ว');}catch(e){toast(botErr(e));}await load();});}
+function epList(pl){return pl.eps.map(E=>{const s=ST.epst[E.no],sc=ST.scn.filter(x=>+x.ep===E.no),fin=ST.fin[E.no],tot=sc.reduce((n,x)=>n+(+x.tot||0),0),vid=sc.reduce((n,x)=>n+(+x.vid||0),0),img=sc.reduce((n,x)=>n+(+x.img||0),0),done=sc.filter(x=>+x.fin).length;
+    const st=fin?'<span class="ok">✅ เสร็จ</span>':!s?`<span class="mu">ยังไม่เริ่ม</span> <button class="sm" data-ep="${E.no}">▶ ทำตอนนี้</button>`:s.status==='waiting'?`<span class="warn">⏳ รอ LoRA ${esc((s.need||[]).join(', '))}</span>`:`<span class="warn">🎬 กำลังทำ</span>`;
+    const pct=tot?Math.round((img+vid)/(tot*2)*100):0;
+    return `<div class="it"><div class="row sp"><b>ตอน ${E.no} · ${esc(E.title)}</b>${st}</div>${s&&s.status==='running'&&!fin?`<div class="mu">ซีนเสร็จ ${done}/${sc.length||3} · ภาพ ${img}/${tot} · วิดีโอ ${vid}/${tot}</div><div class="bar"><i style="width:${pct}%"></i></div>`:''}
+      ${fin?`<a class="btn" href="${esc(botU('/vid/'+fin))}" target="_blank">▶ ดูตอนนี้</a>`:sc.filter(x=>+x.final).map(x=>`<a class="btn" href="${esc(botU('/vid/'+x.final))}" target="_blank">▶ ซีน ${x.sc}</a>`).join('')}</div>`;}).join('');}
+load();
+</script></body></html>

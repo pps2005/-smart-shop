@@ -1,10 +1,10 @@
 {
- "name": "SMART SHOP",
- "short_name": "SMART SHOP",
+ "name": "Xiress Studio",
+ "short_name": "Xiress Studio",
  "start_url": "./",
  "display": "standalone",
- "background_color": "#16a34a",
- "theme_color": "#16a34a",
+ "background_color": "#14141a",
+ "theme_color": "#7c5cff",
  "icons": [
   {
    "src": "icon-192.png",

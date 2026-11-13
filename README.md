@@ -1,5 +1,9 @@
-# SMART SHOP
-เว็บสแตติก (ไม่ต้องมี build) — อัปโหลดทุกไฟล์ในโฟลเดอร์นี้ขึ้นโฮสต์สแตติกใดก็ได้
-(GitHub Pages / Cloudflare Pages / Netlify) แล้วจะได้ลิงก์ถาวร จากนั้นทำ QR Code จากลิงก์นั้น
+# Xiress Studio
+สตูดิโอทำอนิเมะ AI และหลังบ้านช่อง
 
-แมพ 3D: world-3d.js (ภายนอก) · world-int.js (ภายใน) · world-ui.js (UI + แชทน้องฟ้า) · three.min.js (r128, ฝังไว้ ไม่พึ่ง CDN)
+- index.html — สตูดิโอหลัก (สตอรีบอร์ด เสียงพากย์ ดูแบบอนิเมะ โควตา ผู้ช่วย)
+- anime-core.html — ตัวละคร · สถานที่ · ซีน
+- scene-pick.html — เลือกฉากทำตอน + ล็อกหน้า
+- anime.html — สตูดิโอรุ่นเก่า (v3)
+- worker.js — บอทหลังบ้าน (Cloudflare Worker anime-image-bot + D1 + Kaggle)
+- sbx.json — สตอรีบอร์ดที่เขียนมือ
