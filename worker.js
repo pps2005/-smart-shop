@@ -628,10 +628,10 @@ async function autoFill(env, s) {
 const HY_FLUX_STYLE = 'high quality full colour TV anime background art and key frame, clean consistent line art, flat cel colours with soft gradients, detailed real architecture and furniture with textures, correct perspective and depth, believable lighting and cast shadows, every sign, label, screen and paper is blank with no letters.';
 const HY_SDXL_STYLE = 'anime screencap, anime coloring, flat color, clean lineart, cel shading, detailed background';
 const HY_TAGS = { // แท็กประจำตัว (SDXL) — แก้ได้ที่ settings hytags (JSON ชื่อ → {tags, desc})
-  'โทวะ': { tags: '1boy, adult, young man, handsome, black hair, messy hair, ahoge, round eyewear, thin glasses, mole under eye, white shirt, collared shirt, sleeves rolled up, loose necktie, dark necktie, grey sweater vest, black pants', desc: 'a young man with messy black hair and round glasses in a grey knit vest and loose necktie' },
-  'ริน': { tags: '1girl, adult, young woman, beautiful, red hair, long hair, high ponytail, sharp eyes, oversized black hoodie, black shorts, black pantyhose, sneakers', desc: 'a young woman with a long red ponytail in an oversized black hoodie and black tights' },
-  'ริน_d': { tags: '1girl, adult, young woman, beautiful, red hair, braided bun, low bun, large round eyewear, white apron, cream blouse, smile', desc: 'a young woman with a red braided bun, big round glasses and a white bakery apron' },
-  'มิโอะ': { neg: 'sweater vest, vest, school uniform, pleated skirt, necktie', tags: '1girl, adult, young woman, office lady, brown hair, short bob, blunt bangs, rabbit hair ornament, half-closed eyes, white blouse, long sleeves, open dark cardigan, long skirt', desc: 'a young office woman with a short brown bob, blunt bangs and a rabbit hair clip' },
+  'โทวะ': { neg: 'green hair, blue hair, brown hair', tags: '1boy, adult, young man, handsome, black hair, messy hair, ahoge, round eyewear, thin glasses, mole under eye, white shirt, collared shirt, sleeves rolled up, loose necktie, dark necktie, grey sweater vest, black pants', desc: 'a young man with messy black hair and round glasses in a grey knit vest and loose necktie' },
+  'ริน': { neg: 'black hair, brown hair, blonde hair', tags: '1girl, adult, young woman, beautiful, red hair, long hair, high ponytail, sharp eyes, oversized black hoodie, black shorts, black pantyhose, sneakers', desc: 'a young woman with a long red ponytail in an oversized black hoodie and black tights' },
+  'ริน_d': { neg: 'black hair, brown hair, blonde hair', tags: '1girl, adult, young woman, beautiful, red hair, braided bun, low bun, large round eyewear, white apron, cream blouse, smile', desc: 'a young woman with a red braided bun, big round glasses and a white bakery apron' },
+  'มิโอะ': { neg: 'sweater vest, vest, cardigan, school uniform, pleated skirt, necktie, brown hair, blue hair, red hair', tags: '1girl, adult, young woman, office lady, black hair, short bob, blunt bangs, rabbit hair ornament, half-closed eyes, white blouse, collared blouse, long sleeves, dark long skirt', desc: 'a young office woman with a short black bob, blunt bangs, a rabbit hair clip and a white long-sleeve blouse' },
   'หัวหน้าซาเอกิ': { tags: '1girl, mature female, beautiful, black hair, short bob, streaked hair, silver streak, drop earrings, black pantsuit, formal suit, black jacket, black pants, high collar blouse', desc: 'an elegant woman with a black bob with one silver streak in a black pantsuit' },
   'ป้าฮานะ': { tags: '1girl, mature female, beautiful, youthful, grey hair, hair bun, sharp eyes, white apron, flour on clothes', desc: 'a youthful pretty woman baker with grey hair in a bun and a white apron' },
   'ไค': { tags: '1boy, adult, young man, handsome, blonde hair, short hair, spiky hair, scar on eyebrow, open jacket, courier jacket, large backpack, grin', desc: 'a young man with spiky blond hair in an open courier jacket with a big backpack' },
@@ -654,12 +654,13 @@ function hyOpt(en, names, s) {
   const place = /archive office/.test(lo) ? 'indoors, office, filing cabinet, wooden floor, arched window, ceiling lamp' : /vending machine/.test(lo) ? 'outdoors, night, alley, gravel, brick wall, vending machine, bench, street lamp' : /storage aisle/.test(lo) ? 'indoors, storage room, shelves, dark, light bulb' : /bakery/.test(lo) ? 'indoors, bakery, bread, counter, sunlight' : /outside the city barrier|floating rock/.test(lo) ? 'outdoors, night, starry sky, floating island, dark mist' : /town|street|roof/.test(lo) ? 'outdoors, town, street, japanese architecture, lantern' : '';
   const pc = chars.filter(c => c.p), cnt = pc.length ? [pc.filter(c => /1girl/.test(c.tags)).length, pc.filter(c => /1boy/.test(c.tags)).length] : [0, 0];
   const cntT = pc.length ? [cnt[1] ? cnt[1] + 'boy' + (cnt[1] > 1 ? 's' : '') : '', cnt[0] ? cnt[0] + 'girl' + (cnt[0] > 1 ? 's' : '') : ''].filter(Boolean).join(', ') : (hands ? 'hands, close-up' : 'no humans, scenery');
-  const plush = /plush toys/.test(lo) ? 'row of five small plush toys, rabbit plush, teddy bear, seal plush, cat plush, chick plush' : '';
+  const plush = /plush toys/.test(lo) ? 'exactly five small plush toys sitting on the desk, white rabbit plush, brown teddy bear, grey seal plush, orange tabby cat plush, yellow chick plush' : '';
   const L = lit.toLowerCase(), litT = /night|moon|lamp|glow/.test(L) ? 'night, dark, lamp light' : /dim|flicker|dark/.test(L) ? 'dim lighting' : /afternoon|sunset|evening|dusk|golden/.test(L) ? 'afternoon, warm sunlight, golden hour' : /morning|dawn/.test(L) ? 'morning, soft sunlight' : /sun|window|day|bright/.test(L) ? 'daylight, sunlight' : '';
   return {
     chars, bg, mode: contact || chibi || hands ? 'over' : 'comp', style: s.hy_style || HY_SDXL_STYLE,
     pose: /from behind|back view|back to the viewer/.test(lo) ? 'from behind' : /side view|profile/.test(lo) ? 'from side' : '',
     all: [cntT, chars.map(c => c.tags.replace(/^(chibi, )?\d?(boy|girl|1boy|1girl), /, '$1')).join(', '), place, litT, 'consistent lighting, full color', plush].filter(Boolean).join(', ').slice(0, 900),
+    neg: (() => { const T = chars.map(c => c.tags).join(', ').toLowerCase(), N = ['monochrome, greyscale, sketch, english text, japanese text, letters, logo, watermark, school uniform, serafuku, floating objects, multicolored hair, streaked hair, colored inner hair', ...chars.map(c => c.neg || '')].join(', ').split(',').map(x => x.trim()).filter(x => x && !T.includes(x.toLowerCase())); return [...new Set(N)].join(', '); })(), // คำห้ามของตัวละครหนึ่งที่ชนกับชุด/ผมของอีกตัวในช่องเดียวกันถูกตัดออก
     props: plush ? { 88: 'small cute plush toy, stuffed animal' } : {}, dc: 0.62,
     ...(plush ? { plush: ['long-eared white rabbit plush toy', 'brown teddy bear plush toy', 'grey seal plush toy, round seal', 'small cat plush toy', 'yellow chick plush toy, baby bird'] } : {}),
   };
@@ -1284,11 +1285,11 @@ async function bridgeImg(env, s) {
     // ภาพร่าง: สถานที่เดียวกันใช้ seed ชุดเดียวกัน (ฉากหลัง/ลายเส้นใกล้กันขึ้น) + วาด 2 แบบแล้วให้ CLIP ตรวจเลือกภาพที่ตรงบทและฉากหลังครบที่สุด
     const locSeed = shLoc ? [...shLoc].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 2000000000 + 1 : 0;
     const hyOn = draft && s.img_hybrid === '1'; // ภาพแบบผสม: FLUX วาดฉาก · SDXL อนิเมะวาดตัวละคร/ของสำคัญทั้งหมด (สี) — ผู้ใช้สั่ง: รายละเอียดสำคัญใช้ SDXL เท่านั้น
-    const eg = hyOn ? 'hybrid' : draft ? fluxEng(s) : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
+    const eg = hyOn ? (s.img_hy_mode === 'paste' ? 'hybrid' : 'cn') : draft ? fluxEng(s) : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
     const npExp = !draft || /chibi/i.test(shEn) || /only (his|her|the two) hands?|hand(s)? (is|are) visible/i.test(shEn) ? null : /No people in the picture/.test(shEn) ? 0 : /Exactly one person/.test(shEn) ? 1 : /Exactly two people/.test(shEn) ? 2 : null; // จำนวนคนที่บทกำหนด ให้เครื่องตรวจภาพนับเทียบ
     const plushBad = draft && /talisman archive office/.test(shEn) && !/plush toys/.test(shEn) ? ['a person holding a teddy bear or stuffed toy', 'stuffed toys lying on the floor'] : [];
     let shChars = []; if (hyOn) { const cr = await env.DB.prepare('SELECT chars FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { shChars = JSON.parse((cr && cr.chars) || '[]'); } catch { shChars = []; } }
-    const opt = { ...(hyOn ? { hy: hyOpt(shEn, shChars, s) } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
+    const opt = { ...(hyOn ? { hy: hyOpt(shEn, shChars, s) } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: noChar ? '[[STYLE]]' : j.prompt }, s, noChar ? shEn : /chr\d+x/.test(String(j.prompt || '')) ? shEn : '', { nochar: noChar , color: hyOn }) : withStyle(j.prompt, s)).slice(0, 4000), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -1567,7 +1568,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR json_extract(opt,'$.engine') IS NOT 'hybrid') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 10 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn')) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 11 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -3073,8 +3074,172 @@ def gen_hybrid(j, port=8188):
     return jpg, int(time.time() - t0), W, H
 
 
+# ---------- ภาพแบบ ControlNet (cn): FLUX วางโครงภาพ → SDXL อนิเมะวาดใหม่ทั้งภาพรอบเดียวตามเส้นโครง ----------
+#   ไม่มีการตัดแปะ: โต๊ะ ของ คน เงา อยู่ในมุมมองเดียวกัน (ผู้ใช้เจอ: โต๊ะไม่เท่ากัน ตุ๊กตาลอย จากวิธีแปะทีละชิ้น)
+#   ControlNet Union SDXL (xinsir, Apache-2.0 ใช้หารายได้ได้)
+CN_REPO = ("xinsir/controlnet-union-sdxl-1.0", "diffusion_pytorch_model.safetensors")
+
+
+def ensure_cn():
+    if M.get("cn"):
+        return
+    with LOCK:
+        if M.get("cn"):
+            return
+        log("กำลังโหลด ControlNet SDXL (ครั้งแรกประมาณ 2–4 นาที)")
+        fetch([("controlnet", CN_REPO[0], CN_REPO[1], "cn_union_sdxl.safetensors")])
+        M["cn"] = "cn_union_sdxl.safetensors"
+
+
+def wf_sdxl_cn(img_name, pos, neg, seed, denoise, strength, prefix, batch=2, union=True, loras=None):
+    wf = wf_sdxl_i2i(img_name, pos, neg, seed, denoise, prefix, loras)
+    wf["10"] = {"class_type": "ControlNetLoader", "inputs": {"control_net_name": M["cn"]}}
+    cn = ["10", 0]
+    if union:
+        wf["11"] = {"class_type": "SetUnionControlNetType", "inputs": {"control_net": ["10", 0], "type": "canny/lineart/anime_lineart/mlsd"}}
+        cn = ["11", 0]
+    wf["12"] = {"class_type": "Canny", "inputs": {"image": ["4", 0], "low_threshold": 0.2, "high_threshold": 0.5}}
+    wf["13"] = {"class_type": "ControlNetApplyAdvanced", "inputs": {"positive": ["2", 0], "negative": ["3", 0], "control_net": cn, "image": ["12", 0], "strength": strength, "start_percent": 0.0, "end_percent": 0.85}}
+    wf["14"] = {"class_type": "RepeatLatentBatch", "inputs": {"samples": ["5", 0], "amount": batch}}
+    wf["6"]["inputs"]["positive"] = ["13", 0]
+    wf["6"]["inputs"]["negative"] = ["13", 1]
+    wf["6"]["inputs"]["latent_image"] = ["14", 0]
+    return wf
+
+
+def ident_check(path, chars):
+    # คนแต่ละคนในภาพตรงกับตัวละครในบทไหม (กันชุด/ผมสลับกัน เช่น แว่นไปอยู่ผิดคน) → (ผ่าน, คะแนนห่าง)
+    pc = [c for c in chars if c.get("p")]
+    if len(pc) < 2:
+        return True, 0.0
+    try:
+        import itertools
+        import torch
+        from PIL import Image
+        from transformers import CLIPModel, CLIPProcessor
+        global _CLIP
+        if _CLIP is None:
+            nm = "openai/clip-vit-base-patch32"
+            _CLIP = (CLIPModel.from_pretrained(nm).eval(), CLIPProcessor.from_pretrained(nm))
+        m, pr = _CLIP
+        bx = [b for b in detect_boxes(path) if b[0] == 1][:len(pc)]
+        if len(bx) < len(pc):
+            return True, 0.0  # จำนวนคนตรวจแยกอยู่แล้ว
+        im = Image.open(path).convert("RGB")
+        crops = [im.crop([int(v) for v in b[1]]) for b in bx]
+        inp = pr(text=[str(c.get("desc") or "")[:200] for c in pc], images=crops, return_tensors="pt", padding=True, truncation=True)
+        with torch.no_grad():
+            lg = m(**inp).logits_per_image.tolist()
+        best, bs = None, -1e9
+        for perm in itertools.permutations(range(len(pc))):
+            s = sum(lg[i][perm[i]] for i in range(len(perm)))
+            if s > bs:
+                bs, best = s, perm
+        ok, mg = True, 1e9
+        for i, ci in enumerate(best):
+            row = lg[i]
+            other = max([row[k] for k in range(len(pc)) if k != ci] or [row[ci]])
+            mg = min(mg, row[ci] - other)
+            if row[ci] < other:
+                ok = False
+        return ok, mg
+    except Exception as e:
+        log("ตรวจตัวตนตัวละครไม่ได้: %s" % str(e)[:120])
+        return True, 0.0
+
+
+def gen_cn(j, port=8188):
+    from PIL import Image
+    opt = j.get("opt") or {}
+    hy = opt.get("hy") or {}
+    t0 = time.time()
+    ensure_image("schnell")
+    ensure_image("sdxl")
+    ensure_cn()
+    W = max(512, min(1536, int(opt.get("w") or 1344))) // 16 * 16
+    H = max(512, min(1536, int(opt.get("h") or 768))) // 16 * 16
+    seed = int(opt.get("seed") or 0) or (int(opt.get("seedLoc") or 0) * 1000 + int(opt.get("jobId") or 0) % 1000 if opt.get("seedLoc") else 0) or random.randint(1, 2 ** 31)
+    jid = "i%s" % j["id"]
+    exp = opt.get("np")
+    exp = None if exp is None or exp == "" else int(exp)
+    chars = hy.get("chars") or []
+    style = hy.get("style") or "anime screencap, flat color, clean lineart, cel shading"
+    neg = IMG_NEG + ", " + (hy.get("neg") or "monochrome, greyscale, sketch, letters, logo, school uniform")
+    _QNEG[:] = opt.get("qneg") or []
+    qc = opt.get("qc") or [j.get("prompt") or ""]
+
+    def bad_count(pth):
+        cnt = person_count(pth) if exp is not None else None
+        return cnt, cnt is not None and ((exp == 0 and cnt >= 1) or (exp > 0 and cnt > exp))
+
+    # 1) FLUX วางโครงภาพ (มุมกล้อง ตำแหน่งคน/ของ เส้นโต๊ะ) 2 แบบ × สูงสุด 2 รอบ
+    best, tmp = None, []
+    for rd in range(2):
+        pf = "img%sA%d" % (jid, rd)
+        outs = comfy_go(wf_flux(j.get("prompt") or "", W, H, seed + rd * 7919, 2, pf), pf, port)
+        tmp += outs
+        scs, _ = clip_scores(outs, qc)
+        for k, pth in enumerate(outs):
+            sc = scs[k] if k < len(scs) else 0.0
+            cnt, bad = bad_count(pth)
+            log("ภาพ %s โครง %d/%d: คะแนน %.1f · คน %s/%s %s" % (jid, rd + 1, k + 1, sc, "-" if cnt is None else cnt, "-" if exp is None else exp, "ไม่ผ่าน" if bad else "ผ่าน"))
+            key = (0 if bad else 1, sc)
+            if best is None or key > best[0]:
+                best = (key, pth)
+        if best[0][0] == 1:
+            break
+    comfy_free(port)
+    os.makedirs(os.path.join(COMFY, "input"), exist_ok=True)
+    lay = "%s_lay.png" % jid
+    Image.open(best[1]).convert("RGB").save(os.path.join(COMFY, "input", lay))
+    # 2) SDXL วาดใหม่ทั้งภาพรอบเดียว ตามเส้นโครง (ControlNet) · ตรวจจำนวนคน + ตัวตนตัวละคร + ภาพเพี้ยน
+    pos = IMG_POS + style + ", " + (hy.get("all") or "")
+    dn, stg = float(hy.get("dn") or 0.82), float(hy.get("cs") or 0.7)
+    pick, union = None, True
+    for rd in range(2):
+        pf = "img%sC%d" % (jid, rd)
+        try:
+            outs = comfy_go(wf_sdxl_cn(lay, pos, neg, seed + 501 + rd * 97, dn, stg, pf, 2, union), pf, port)
+        except RuntimeError as e:
+            if union and "SetUnionControlNetType" in str(e) or (union and "node" in str(e).lower()):
+                log("ComfyUI รุ่นนี้ไม่มีตัวเลือกชนิด ControlNet ใช้แบบทั่วไปแทน")
+                union = False
+                outs = comfy_go(wf_sdxl_cn(lay, pos, neg, seed + 501 + rd * 97, dn, stg, pf, 2, union), pf, port)
+            else:
+                raise
+        tmp += outs
+        scs, _ = clip_scores(outs, qc)
+        for k, pth in enumerate(outs):
+            sc = scs[k] if k < len(scs) else 0.0
+            cnt, bad = bad_count(pth)
+            idok, mg = ident_check(pth, chars)
+            ok = not bad and idok
+            log("ภาพ %s SDXL %d/%d: คะแนน %.1f · คน %s/%s · ตัวละคร %s %s" % (jid, rd + 1, k + 1, sc, "-" if cnt is None else cnt, "-" if exp is None else exp, "ตรง" if idok else "สลับ", "ผ่าน" if ok else "ไม่ผ่าน"))
+            key = (1 if ok else 0, sc)
+            if pick is None or key > pick[0]:
+                pick = (key, pth)
+        if pick[0][0] == 1:
+            break
+        if rd == 0:
+            log("ภาพ %s: ยังไม่มีแบบไหนผ่าน วาดใหม่อีกรอบ" % jid)
+    comfy_free(port)
+    im = Image.open(pick[1]).convert("RGB")
+    if im.size != (W, H):
+        im = im.resize((W, H), Image.LANCZOS)
+    jpg = os.path.join(ROOT, "%s.jpg" % jid)
+    im.save(jpg, "JPEG", quality=92, optimize=True)
+    for f in tmp + [os.path.join(COMFY, "input", lay)]:
+        try:
+            os.remove(f)
+        except Exception:
+            pass
+    return jpg, int(time.time() - t0), W, H
+
+
 def gen_image(j, port=8188):
     opt = j.get("opt") or {}
+    if opt.get("engine") == "cn":
+        return gen_cn(j, port)
     if opt.get("engine") == "hybrid":
         return gen_hybrid(j, port)
     engine = opt.get("engine") if opt.get("engine") in ("sdxl", "schnell") else "dev"
@@ -3852,7 +4017,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=10" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=11" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):

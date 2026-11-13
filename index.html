@@ -237,7 +237,7 @@ function playEp(n){const sb=ST.sbs[n];if(!sb)return;const st=[],say=v=>{try{cons
   const fmt=ms=>{const s=Math.round(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
   const sk=$o('[data-sk]');sk.max=st.length-1;
   const tot=()=>st.reduce((a,x)=>a+dur(x),0),upT=()=>{let a=0;for(let k=0;k<i;k++)a+=dur(st[k]);$o('[data-t]').textContent=fmt(a);$o('[data-tt]').textContent=fmt(tot());sk.value=i;$o('[data-n]').textContent=`ตอน ${n} · ฉาก ${st[i].sc} · ${i+1}/${st.length}`;};
-  const sayVo=x=>{au.pause();if(!snd||!x.vo){stt(x.vo?'':(x.t&&!x.sx?'(บรรทัดนี้ยังไม่มีเสียงพากย์)':''));return false;}au.src=botU('/vo/'+x.vo);stt('');au.play().then(()=>A&&A.duck(true)).catch(e=>stt('⚠️ เล่นเสียงไม่ได้ — แตะที่ซับเพื่อลองใหม่'));return true;};
+  const sayVo=x=>{au.pause();if(!snd||!x.vo){stt(x.vo?'':(x.t&&!x.sx?'(บรรทัดนี้ยังไม่มีเสียงพากย์)':''));return false;}au.src=botU('/vo/'+x.vo);au.volume=String(x.who||'').startsWith('~')?.85:1;/* เสียงในใจ 85% ของเสียงพูด (ผู้ใช้สั่ง 80–90%) */stt('');au.play().then(()=>A&&A.duck(true)).catch(e=>stt('⚠️ เล่นเสียงไม่ได้ — แตะที่ซับเพื่อลองใหม่'));return true;};
   au.onpause=()=>A&&A.duck(false);
   au.onloadedmetadata=()=>{if(isFinite(au.duration)&&st[i]&&st[i].vo&&au.src.includes(st[i].vo)){st[i].d=au.duration;upT();}};
   const preload=()=>{const y=st[i+1];if(!y)return;if(y.img){const p=new Image();p.src=y.img;}if(snd&&y.vo)pre.src=botU('/vo/'+y.vo);};
