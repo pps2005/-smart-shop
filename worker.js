@@ -1269,8 +1269,10 @@ async function kImgOn(env, s, now) {
 async function bridgeImg(env, s) {
   const rows = (await env.DB.prepare("SELECT id,project,scene,prompt,steps,seed,eng FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux' ORDER BY CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) ELSE 999999 END, CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, id LIMIT 40").all()).results;
   if (!rows.length) return 0;
+  // จองงานแบบอะตอมก่อนส่ง (เคยมีรอบทำงานซ้อน 2 รอบ ส่งงานเดียวกันไป Kaggle ซ้ำ 2 เท่า)
+  const got = new Set(((await env.DB.prepare(`UPDATE jobs SET status='kaggle' WHERE status='queued' AND id IN (${rows.map(() => '?').join(',')}) RETURNING id`).bind(...rows.map(r => r.id)).all()).results || []).map(r => r.id));
   const st = [], now = Date.now();
-  for (const j of rows) {
+  for (const j of rows) { if (!got.has(j.id)) continue;
     let lo = [];
     if (String(j.project).startsWith('ฉาก')) { const sh = await env.DB.prepare('SELECT loras FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { lo = JSON.parse((sh && sh.loras) || '[]'); } catch { lo = []; } }
     if (String(j.project).startsWith('ทดสอบLoRA·')) lo = [{ id: +String(j.project).split('·')[1] || 0, w: 0.8 }];
