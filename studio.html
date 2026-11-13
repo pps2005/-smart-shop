@@ -32,71 +32,222 @@ a.btn{display:inline-block;text-decoration:none;border:1px solid var(--bd);color
 <script>
 const $=s=>document.querySelector(s),esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // ตัวเล่นแบบอนิเมะ: ภาพ 16:9 เต็มจอ ซับขึ้นทีละบรรทัด (บทเล่า = ตัวเอียง · บทพูด = ชื่อ: ข้อความ · ในใจ = วงเล็บ) แตะขวา/ล่าง = ถัดไป แตะซ้าย = ย้อน
+/* ===== เสียงในตัวเล่นอนิเมะ: เสียงประกอบ/บรรยากาศ/ดนตรี สร้างสดด้วย WebAudio (ฟรี ไม่มีลิขสิทธิ์) + ผสมเสียง (ลดดนตรีตอนมีคนพูด) ===== */
+function showQc(R,C,n){const o=document.createElement('div');o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:flex;align-items:flex-end;justify-content:center';
+  const sev={สูง:'#d33',กลาง:'#e90',ต่ำ:'#888'},rows=(R&&R.items)||[];
+  o.innerHTML=`<div style="background:#fff;max-width:760px;width:100%;max-height:85vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 18px calc(16px + env(safe-area-inset-bottom));font-size:14.5px;line-height:1.55"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">📋 ตรวจความต่อเนื่อง ตอน ${n}</b><button data-c>ปิด</button></div>
+  ${R?`<div class="mu" style="margin:4px 0 10px">ตรวจ ${R.panels} ช่อง · ${esc(R.at||'')} · ต้องแก้ ${rows.filter(x=>x.status!=='แก้แล้ว').length} · แก้แล้ว ${rows.filter(x=>x.status==='แก้แล้ว').length}</div>
+  ${(R.checks||[]).map(c=>`<div>${c.ok?'✅':'⚠️'} ${esc(c.name)}</div>`).join('')}
+  <div style="margin-top:10px">${rows.map(x=>`<div style="border-left:4px solid ${sev[x.sev]||'#888'};padding:6px 10px;margin:8px 0;background:#faf9fd;border-radius:6px"><b>${esc(x.id)}</b> · <span style="color:${sev[x.sev]||'#888'}">${esc(x.sev)}</span> · ${x.status==='แก้แล้ว'?'✅ แก้แล้ว':'⏳ รอแก้'}<div>${esc(x.issue)}</div><div class="mu">วิธีแก้: ${esc(x.fix)}</div></div>`).join('')||'<div>ไม่พบข้อผิดพลาด</div>'}</div>`:'<div style="margin-top:10px">ยังไม่มีรายงานของตอนนี้</div>'}
+  ${C?`<details style="margin-top:12px"><summary><b>📚 สิ่งที่ต้องต่อเนื่องไปตอนถัดไป</b></summary>${Object.entries(C).map(([k,v])=>`<div><b>${esc(k)}:</b> ${esc(Array.isArray(v)?v.join(' · '):typeof v==='object'?JSON.stringify(v):v)}</div>`).join('')}</details>`:''}</div>`;
+  o.onclick=e=>{if(e.target===o||e.target.closest('[data-c]'))o.remove();};document.body.appendChild(o);}
+function mkAudio(){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;const ac=new AC();
+  const comp=ac.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(ac.destination);
+  const bus=k=>{const g=ac.createGain();g.connect(comp);return g;},B={bgm:bus(),sfx:bus(),amb:bus()};
+  let mix={bgm:.2,sfx:.6,amb:.16};try{Object.assign(mix,JSON.parse(localStorage.getItem('ss_mix')||'{}'));}catch(e){}
+  let duck=1;const apply=(f=.25)=>{const t=ac.currentTime;B.bgm.gain.setTargetAtTime(mix.bgm*duck,t,f/3);B.sfx.gain.setTargetAtTime(mix.sfx,t,.03);B.amb.gain.setTargetAtTime(mix.amb*(duck<1?.7:1),t,f/3);};apply(.01);
+  const NB=(()=>{const b=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b;})();
+  const noise=(t,dur,out,{type='bandpass',f=1000,f2,q=1,a=.01,v=1}={})=>{const s=ac.createBufferSource();s.buffer=NB;s.loop=true;const fl=ac.createBiquadFilter();fl.type=type;fl.frequency.setValueAtTime(f,t);if(f2)fl.frequency.exponentialRampToValueAtTime(f2,t+dur);fl.Q.value=q;const g=ac.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+dur);s.connect(fl);fl.connect(g);g.connect(out);s.start(t,Math.random());s.stop(t+dur+.05);return g;};
+  const tone=(t,dur,out,{type='sine',f=440,f2,v=.5,a=.005,det=0}={})=>{const o=ac.createOscillator();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);o.detune.value=det;const g=ac.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g);g.connect(out);o.start(t);o.stop(t+dur+.05);return o;};
+  /* คลังเสียงประกอบ (key → เสียง) */
+  const SFX={
+    whoosh:(t,o,v)=>noise(t,.45,o,{f:300,f2:3000,q:2,a:.15,v:v}),
+    swish:(t,o,v)=>noise(t,.18,o,{f:1500,f2:5000,q:3,a:.02,v:v}),
+    impact:(t,o,v)=>{tone(t,.7,o,{f:110,f2:40,v:v});noise(t,.35,o,{type:'lowpass',f:1200,v:v*.8});},
+    boom:(t,o,v)=>{tone(t,1.6,o,{f:70,f2:28,v:v});noise(t,1.4,o,{type:'lowpass',f:500,f2:80,v:v*.9,a:.01});},
+    sting:(t,o,v)=>{[55,58.3,82.4].forEach(f=>tone(t,1.6,o,{type:'sawtooth',f,v:v*.25}));noise(t,.5,o,{type:'lowpass',f:2500,v:v*.6});tone(t,1.2,o,{f:880,f2:860,v:v*.12,type:'square'});},
+    reveal:(t,o,v)=>{tone(t,1.8,o,{type:'triangle',f:220,v:v*.35});tone(t+.12,1.6,o,{type:'triangle',f:311,v:v*.3});tone(t+.24,1.5,o,{type:'triangle',f:466,v:v*.25});},
+    knock:(t,o,v)=>{[0,.32].forEach(d=>{noise(t+d,.09,o,{type:'bandpass',f:350,q:4,v:v});tone(t+d,.08,o,{f:180,f2:120,v:v*.6});});},
+    heartbeat:(t,o,v)=>{[0,.28,.9,1.18].forEach((d,i)=>tone(t+d,.18,o,{f:i%2?55:65,f2:40,v:v*(i%2?.7:1)}));},
+    bell:(t,o,v)=>{[[1,1],[2.76,.5],[5.4,.25],[8.9,.12]].forEach(([m,a])=>tone(t,4.5/m**.3,o,{f:196*m,v:v*a*.5,a:.002}));},
+    chime:(t,o,v)=>{[1568,2093,2637,3136].forEach((f,i)=>tone(t+i*.07,.9,o,{f,v:v*.18}));},
+    can:(t,o,v)=>{[1,2.3,3.9].forEach(m=>tone(t,.25,o,{type:'square',f:620*m,v:v*.06}));tone(t+.18,.2,o,{f:120,f2:70,v:v*.5});noise(t+.18,.12,o,{type:'lowpass',f:900,v:v*.4});},
+    click:(t,o,v)=>tone(t,.05,o,{type:'square',f:2200,v:v*.25}),
+    paper:(t,o,v)=>{for(let i=0;i<5;i++)noise(t+i*.09,.07,o,{type:'highpass',f:2500,v:v*.5});},
+    steps:(t,o,v)=>{for(let i=0;i<4;i++)noise(t+i*.42,.1,o,{type:'lowpass',f:450,v:v*.8});},
+    run:(t,o,v)=>{for(let i=0;i<8;i++)noise(t+i*.17,.07,o,{type:'lowpass',f:700,v:v*.7});},
+    creak:(t,o,v)=>{const x=tone(t,1.1,o,{type:'sawtooth',f:260,f2:420,v:v*.12});const l=ac.createOscillator(),lg=ac.createGain();l.frequency.value=23;lg.gain.value=30;l.connect(lg);lg.connect(x.frequency);l.start(t);l.stop(t+1.2);},
+    fire:(t,o,v)=>{noise(t,2.2,o,{type:'lowpass',f:900,v:v*.7,a:.15});for(let i=0;i<14;i++)noise(t+Math.random()*2,.03,o,{type:'highpass',f:3000,v:v*.6});},
+    flame:(t,o,v)=>{noise(t,1.2,o,{f:200,f2:2500,q:.8,a:.05,v:v});tone(t,1,o,{f:90,f2:45,v:v*.5});},
+    boing:(t,o,v)=>{const x=tone(t,.55,o,{f:180,f2:520,v:v*.4});const l=ac.createOscillator(),lg=ac.createGain();l.frequency.value=18;lg.gain.value=40;l.connect(lg);lg.connect(x.frequency);l.start(t);l.stop(t+.6);},
+    pop:(t,o,v)=>tone(t,.12,o,{f:900,f2:220,v:v*.5}),
+    pops:(t,o,v)=>{for(let i=0;i<3;i++)tone(t+i*.16,.1,o,{f:700+i*200,f2:250,v:v*.4});},
+    fail:(t,o,v)=>{[392,370,349,330].forEach((f,i)=>tone(t+i*.28,i<3?.26:.9,o,{type:'triangle',f,v:v*.3}));},
+    wind:(t,o,v)=>noise(t,2.2,o,{f:400,f2:1200,q:1.5,a:.7,v:v*.8}),
+    gasp:(t,o,v)=>{tone(t,.25,o,{f:500,f2:1400,v:v*.3});noise(t,.2,o,{type:'highpass',f:2000,v:v*.3});},
+    shock:(t,o,v)=>{tone(t,.4,o,{type:'square',f:1200,f2:300,v:v*.15});noise(t,.3,o,{type:'bandpass',f:1800,q:2,v:v*.5});},
+    sparkle:(t,o,v)=>{for(let i=0;i<6;i++)tone(t+i*.06,.5,o,{f:2000+Math.random()*2500,v:v*.1});},
+    hum:(t,o,v)=>tone(t,2,o,{type:'sawtooth',f:100,v:v*.04,a:.4}),
+    glitch:(t,o,v)=>{for(let i=0;i<6;i++)tone(t+i*.05,.04,o,{type:'square',f:200+Math.random()*1800,v:v*.15});},
+    crowd:(t,o,v)=>noise(t,1.5,o,{f:600,q:.6,a:.3,v:v*.3}),
+    door:(t,o,v)=>{SFX.creak(t,o,v);noise(t+1,.15,o,{type:'lowpass',f:300,v:v});},
+    bag:(t,o,v)=>{for(let i=0;i<3;i++)noise(t+i*.11,.12,o,{type:'bandpass',f:3500,q:.7,v:v*.4});},
+    bite:(t,o,v)=>{noise(t,.08,o,{type:'highpass',f:1800,v:v*.6});noise(t+.25,.08,o,{type:'highpass',f:1800,v:v*.5});},
+    scream:(t,o,v)=>{const x=tone(t,1.1,o,{type:'sawtooth',f:520,f2:300,v:v*.2});noise(t,1,o,{f:1200,q:1,v:v*.4});},
+  };
+  /* เสียงบรรยากาศตามสถานที่ (วนจนกว่าจะเปลี่ยนฉาก) */
+  let ambNodes=[],ambKey='',ambT=0;
+  const AMB={
+    office:()=>[loopNoise({type:'lowpass',f:400,v:.25}),tick(1,'tick')],
+    dark:()=>[loopNoise({type:'lowpass',f:220,v:.4}),tick(3.7,'creak')],
+    night:()=>[loopNoise({type:'bandpass',f:120,q:3,v:.5}),tick(.22,'cricket')],
+    outside:()=>[loopNoise({type:'bandpass',f:500,q:.8,v:.5,lfo:.08}),loopTone(55,.08)],
+    bakery:()=>[loopNoise({type:'bandpass',f:700,q:.5,v:.18}),tick(1.6,'bird')],
+    city:()=>[loopNoise({type:'bandpass',f:450,q:.7,v:.35,lfo:.05})],
+    bedroom:()=>[loopNoise({type:'lowpass',f:300,v:.15}),tick(5,'wind')],
+    tower:()=>[loopNoise({type:'bandpass',f:350,q:1,v:.45,lfo:.1})],
+  };
+  function loopNoise({type,f,q=1,v,lfo}){const s=ac.createBufferSource();s.buffer=NB;s.loop=true;const fl=ac.createBiquadFilter();fl.type=type;fl.frequency.value=f;fl.Q.value=q;const g=ac.createGain();g.gain.value=v;s.connect(fl);fl.connect(g);g.connect(ambOut);s.start();let l;if(lfo){l=ac.createOscillator();const lg=ac.createGain();l.frequency.value=lfo;lg.gain.value=f*.6;l.connect(lg);lg.connect(fl.frequency);l.start();}return {stop:()=>{try{s.stop();l&&l.stop();}catch(e){}}};}
+  function loopTone(f,v){const o=ac.createOscillator();o.frequency.value=f;const g=ac.createGain();g.gain.value=v;o.connect(g);g.connect(ambOut);o.start();return {stop:()=>{try{o.stop();}catch(e){}}};}
+  function tick(every,kind){let on=true;const go=()=>{if(!on)return;const t=ac.currentTime+.02;
+      if(kind==='tick')tone(t,.03,ambOut,{type:'square',f:3200,v:.05});
+      else if(kind==='cricket'){if(Math.random()<.6)for(let i=0;i<3;i++)tone(t+i*.035,.025,ambOut,{f:4400+Math.random()*300,v:.05});}
+      else if(kind==='bird'){if(Math.random()<.5){const b=2500+Math.random()*1500;tone(t,.12,ambOut,{f:b,f2:b*1.4,v:.06});tone(t+.15,.1,ambOut,{f:b*1.2,f2:b*.9,v:.05});}}
+      else if(kind==='creak'){if(Math.random()<.4)SFX.creak(t,ambOut,.25);}
+      else if(kind==='wind'){if(Math.random()<.5)SFX.wind(t,ambOut,.4);}
+      tid=setTimeout(go,every*1000*(.7+Math.random()*.6));};let tid=setTimeout(go,200);return {stop:()=>{on=false;clearTimeout(tid);}};}
+  const ambOut=ac.createGain();ambOut.connect(B.amb);
+  /* ดนตรีพื้นหลัง: สร้างโน้ตสดตามแนว (ตั้งเวลาล่วงหน้าทีละนิด) */
+  const SC={maj:[0,2,4,5,7,9,11],min:[0,2,3,5,7,8,10],pent:[0,2,4,7,9],minp:[0,3,5,7,10]};
+  const hz=n=>440*2**((n-69)/12);
+  const pluck=(t,n,o,v,d=1.2,type='triangle')=>{tone(t,d,o,{type,f:hz(n),v,a:.004});tone(t,d*.6,o,{type:'sine',f:hz(n+12),v:v*.25,a:.004});};
+  const pad=(t,ns,o,v,d)=>ns.forEach(n=>{const x=ac.createOscillator();x.type='sawtooth';x.frequency.value=hz(n);x.detune.value=(Math.random()-.5)*14;const fl=ac.createBiquadFilter();fl.type='lowpass';fl.frequency.value=900;const g=ac.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+d*.3);g.gain.linearRampToValueAtTime(0,t+d);x.connect(fl);fl.connect(g);g.connect(o);x.start(t);x.stop(t+d+.05);});
+  const drum=(t,o,v,f=60)=>{tone(t,.4,o,{f:f*2,f2:f*.6,v});noise(t,.08,o,{type:'lowpass',f:800,v:v*.4});};
+  const STY={ /* bpm, ฟังก์ชันเล่น 1 จังหวะ (beat i, เวลา t) */
+    piano_light:{bpm:96,f:(i,t,o)=>{const ch=[[60,64,67],[57,60,64],[53,57,60],[55,59,62]][Math.floor(i/8)%4];pluck(t,ch[i%3]+(i%8>4?12:0),o,.12,.9);if(i%4===0)pluck(t,ch[0]-12,o,.1,1.6,'sine');}},
+    piano_warm:{bpm:64,f:(i,t,o)=>{const ch=[[57,60,64],[53,57,60],[48,52,55],[55,59,62]][Math.floor(i/6)%4];pluck(t,ch[i%3]+12,o,.1,2.2,'sine');if(i%6===0){pluck(t,ch[0]-12,o,.12,3,'sine');}}},
+    strings_tense:{bpm:60,f:(i,t,o)=>{if(i%4===0){const r=[45,44,45,41][Math.floor(i/4)%4];pad(t,[r,r+3,r+7],o,.06,4.2);}if(i%2===0)tone(t,.3,o,{type:'triangle',f:hz(33),v:.12});}},
+    horror_drone:{bpm:40,f:(i,t,o)=>{if(i%4===0)pad(t,[33,34,40],o,.05,6.5);if(Math.random()<.3)tone(t,2.5,o,{f:hz(84+Math.floor(Math.random()*6)),v:.03});}},
+    action_taiko:{bpm:140,f:(i,t,o)=>{const p=[1,0,0,1,0,1,0,0][i%8];if(p)drum(t,o,.35,50);if(i%8===6)drum(t,o,.25,80);const r=[45,45,48,45,43,45,50,48][i%8];tone(t,.18,o,{type:'sawtooth',f:hz(r+12),v:.05});if(i%16===0)pad(t,[57,60,64],o,.04,3.4);}},
+    morning_flute:{bpm:100,f:(i,t,o)=>{const ch=[[60,64,67],[65,69,72],[62,65,69],[67,71,74]][Math.floor(i/8)%4];if(i%2===0)pluck(t,ch[(i/2)%3]-12,o,.09,.7);if(i%4===0){const m=72+SC.pent[Math.floor(Math.random()*5)];const x=tone(t,.9,o,{f:hz(m),v:.07,a:.06});}}},
+    night_guitar:{bpm:76,f:(i,t,o)=>{const ch=[[52,55,59,64],[48,52,55,60],[50,53,57,62],[47,50,55,59]][Math.floor(i/8)%4];pluck(t,ch[i%4],o,.1,1.4);}},
+    mystery_bell:{bpm:50,f:(i,t,o)=>{if(i%3===0)SFX.bell(t,o,.12);if(i%8===0)pad(t,[50,53,57],o,.035,7);}},
+  };
+  let bg=null,bgKey='';
+  function bgm(st){const k=st&&st.s||'';if(k===bgKey)return;const old=bg;bgKey=k;const fo=(st&&+st.fo)||1.5,fi=(st&&+st.fi)||1.5;
+    if(old){const t=ac.currentTime;old.g.gain.setTargetAtTime(0,t,fo/3);old.on=false;setTimeout(()=>old.g.disconnect(),fo*1500+200);}
+    if(!k||!STY[k]){bg=null;return;}const S=STY[k],g=ac.createGain();g.gain.value=0;g.gain.setTargetAtTime(Math.min(1.4,(+st.vol||1)),ac.currentTime,fi/3);g.connect(B.bgm);
+    const sp=60/(+st.tempo||S.bpm),me={g,on:true};let i=0,nt=ac.currentTime+.1;const sch=()=>{if(!me.on)return;while(nt<ac.currentTime+.4){try{S.f(i,nt,g);}catch(e){}i++;nt+=sp;}me.tm=setTimeout(sch,120);};sch();bg=me;}
+  function amb(k){if(k===ambKey)return;ambKey=k;const t=ac.currentTime;ambOut.gain.setTargetAtTime(0,t,.3);const old=ambNodes;setTimeout(()=>{old.forEach(n=>n.stop());ambNodes=k&&AMB[k]?AMB[k]():[];ambOut.gain.setTargetAtTime(1,ac.currentTime,.4);},900);}
+  return {ac,mix,SFX,
+    resume(){return ac.resume&&ac.resume();},
+    cue(list){const t0=ac.currentTime+.03;(list||[]).forEach(c=>{const f=SFX[c.k];if(f)try{f(t0+(+c.t||0),B.sfx,Math.min(1.5,+c.v||1));}catch(e){}});},
+    scene(a){if(!a)return;if('amb' in a)amb(a.amb||'');if(a.bgm)bgm(a.bgm);},
+    duck(on){duck=on?.4:1;apply(on?.2:.8);},
+    setMix(k,v){mix[k]=v;try{localStorage.setItem('ss_mix',JSON.stringify(mix));}catch(e){}apply(.05);},
+    pause(){try{ac.suspend();}catch(e){}},play(){try{ac.resume();}catch(e){}},
+    stop(){try{if(bg)bg.on=false;ambNodes.forEach(n=>n.stop());ac.close();}catch(e){}}};}
 function playEp(n){const sb=ST.sbs[n];if(!sb)return;const st=[],say=v=>{try{const y=JSON.parse(v.say||'null')||{};y.lines=Array.isArray(y.lines)&&y.lines.length?y.lines:(y.say?[{who:y.who||'',say:y.say}]:[]);return y;}catch(e){return {lines:[]};}};
-  sb.scenes.forEach((S,si)=>S.shots.forEach(v=>{const d=say(v),img=v.img?botU('/img/'+v.img):'',ls=d.lines.length?d.lines:[{who:'',say:''}];
+  const E=((ST.plan&&ST.plan.eps)||[]).find(e=>+e.no===+n)||{},SER=(ST.plan&&ST.plan.title)||'';let pi=-1;
+  sb.scenes.forEach((S,si)=>S.shots.forEach(v=>{const d=say(v),D=d.dir||{},img=v.img?botU('/img/'+v.img):'',ls=d.lines.length?d.lines:[{who:'',say:''}];pi++;
     const vm={};String(v.vo||'').split(',').forEach(x=>{const [a,b]=x.split(':');if(b)vm[a]=b;});
     const fx=[d.think||'',d.ono||''],tr=[d.thinkTh?'('+d.thinkTh+')':'',d.onoTh?'『'+d.onoTh+'』':''].filter(Boolean).join('  ');
-    if(tr&&d.lines.length)st.push({img,sc:si+1,mv:(d.dir||{}).kind||'',ph:v.th||'',who:'',t:tr,sx:1,vo:'',fx}); /* เสียงประกอบ/คำลอยภาษาญี่ปุ่นบนภาพ → คำแปลไทยขึ้นซับก่อนบทพูด */
-    ls.forEach((l,i)=>st.push({img,sc:si+1,mv:(d.dir||{}).kind||'',ph:v.th||'',who:l.who||'',t:(!d.lines.length&&!l.say&&tr)?tr:l.say||'',sx:(!d.lines.length&&tr)?1:0,vo:vm[i]||'',fx}));}));
-  if(!st.length)return;let i=0,auto=false,tm=0,kt=0,hideT=0,started=false;
+    const base={img,sc:si+1,pi,mv:D.kind||'',ph:v.th||'',fx,aud:D.audio||null,ty:D.type||[],grade:D.grade||'',dur:+D.dur||0};let first=true;
+    const push=x=>{st.push({...base,...x,first});first=false;};
+    if(tr&&d.lines.length)push({who:'',t:tr,ja:'',sx:1,vo:''}); /* เสียงประกอบ/คำลอยภาษาญี่ปุ่นบนภาพ → คำแปลไทยขึ้นซับก่อนบทพูด */
+    ls.forEach((l,i)=>push({who:l.who||'',t:(!d.lines.length&&!l.say&&tr)?tr:l.say||'',ja:l.ja||'',sx:(!d.lines.length&&tr)?1:0,vo:vm[i]||'',ps:+l.pause||0}));}));
+  if(!st.length)return;let i=0,auto=false,tm=0,kt=0,hideT=0,lastPi=-1,A=null,tyT=[];
+  if(!document.getElementById('anfont')){const l=document.createElement('link');l.id='anfont';l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Mitr:wght@400;600&family=Noto+Serif+JP:wght@600;900&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@500;700&family=Sriracha&family=Rampart+One&family=Yomogi&display=swap';document.head.appendChild(l);}
   const o=document.createElement('div');o.id='anp';o.innerHTML=`<style>#anp{position:fixed;inset:0;height:100vh;height:100dvh;background:#000;z-index:9999;display:flex;flex-direction:column;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box}
 #anp .fr{position:relative;width:min(100%,calc(100vh * 16 / 9));aspect-ratio:16/9;margin:0 auto;background:#111;overflow:hidden;container-type:inline-size}@supports (height:100dvh){#anp .fr{width:min(100%,calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9))}}
-#anp .fr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s;transform-origin:50% 50%}#anp .fr img.on{opacity:1}#anp .fr img.kb{animation:kb 9s ease-out forwards}#anp .fr img.kb2{animation:kb2 9s ease-out forwards}@keyframes kb{from{transform:scale(1)}to{transform:scale(1.08) translate(-1%,-1%)}}@keyframes kb2{from{transform:scale(1.08) translate(1%,0)}to{transform:scale(1) translate(0,0)}}#anp .fr img.kbp{animation:kbp 10s linear forwards}@keyframes kbp{from{transform:scale(1.1) translate(3%,0)}to{transform:scale(1.1) translate(-3%,0)}}#anp .fr img.kbs{animation:kbs .9s ease-out forwards}@keyframes kbs{0%{transform:scale(1.18)}30%{transform:scale(1.06) translate(-1%,1%)}45%{transform:scale(1.06) translate(1%,-1%)}60%{transform:scale(1.05) translate(-.5%,0)}100%{transform:scale(1.05)}}#anp .fr img.kbn{animation:none}
+#anp .fr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s,filter .8s;transform-origin:50% 50%}#anp .fr img.on{opacity:1}#anp .fr img.kb{animation:kb 9s ease-out forwards}#anp .fr img.kb2{animation:kb2 9s ease-out forwards}@keyframes kb{from{transform:scale(1)}to{transform:scale(1.08) translate(-1%,-1%)}}@keyframes kb2{from{transform:scale(1.08) translate(1%,0)}to{transform:scale(1) translate(0,0)}}#anp .fr img.kbp{animation:kbp 10s linear forwards}@keyframes kbp{from{transform:scale(1.1) translate(3%,0)}to{transform:scale(1.1) translate(-3%,0)}}#anp .fr img.kbs{animation:kbs .9s ease-out forwards}@keyframes kbs{0%{transform:scale(1.18)}30%{transform:scale(1.06) translate(-1%,1%)}45%{transform:scale(1.06) translate(1%,-1%)}60%{transform:scale(1.05) translate(-.5%,0)}100%{transform:scale(1.05)}}#anp .fr img.kbn{animation:none}
+#anp .gr{position:absolute;inset:0;pointer-events:none;mix-blend-mode:soft-light;opacity:0;transition:opacity .8s,background .8s}
 #anp .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-size:14px;padding:20px;text-align:center}
-#anp .sub{position:absolute;left:4%;right:4%;bottom:6%;text-align:center;color:#fff;font-size:clamp(15px,3.6vw,30px);font-size:clamp(15px,3.4cqw,34px);line-height:1.45;text-shadow:0 0 4px #000,0 0 4px #000,2px 2px 3px #000;z-index:1}#anp .sub b{color:#ffd76a;font-weight:600}#anp .sub .w{transition:opacity .12s}#anp .sub .w.o{opacity:.4}#anp .sub.nv{font-style:italic;color:#e8eefc}#anp .sub.tk{font-style:italic;color:#c9c3ff}#anp .sub.sx{color:#ffd76a;font-size:clamp(13px,3vw,24px)}
-#anp .f1{position:absolute;left:6%;top:8%;color:#fff;font-size:clamp(13px,3vw,24px);font-style:italic;text-shadow:0 0 4px #000,0 0 4px #000}#anp .f2{position:absolute;right:6%;top:8%;color:#7fd0ff;font-weight:800;font-size:clamp(18px,5vw,44px);transform:rotate(-8deg);text-shadow:2px 2px 0 #000}
-#anp .big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:3;background:rgba(0,0,0,.35)}#anp .big span{width:84px;height:84px;border-radius:50%;background:rgba(0,0,0,.6);border:2px solid #fff;color:#fff;font-size:38px;display:flex;align-items:center;justify-content:center;padding-left:6px;box-sizing:border-box}
+#anp .sub{position:absolute;left:4%;right:4%;bottom:5.5%;text-align:center;color:#fff;font-size:clamp(15px,3.4cqw,34px);line-height:1.42;text-shadow:0 0 4px #000,0 0 4px #000,2px 2px 3px #000;z-index:2;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}#anp .sub b{color:#ffd76a;font-weight:600}#anp .sub .w{transition:opacity .12s}#anp .sub .w.o{opacity:.4}#anp .sub.nv{font-style:italic;color:#e8eefc}#anp .sub.tk{font-style:italic;color:#c9c3ff}#anp .sub.sx{color:#ffd76a;font-size:clamp(13px,2.8cqw,24px)}#anp .sub .ja{display:block;font-family:'Zen Maru Gothic',sans-serif;font-size:.78em;opacity:.95;margin-bottom:.1em}#anp .sub.jo .ja{font-size:1em}
+#anp .f1{position:absolute;left:5%;top:9%;color:#fff;font-family:'Yusei Magic',sans-serif;font-size:clamp(13px,3cqw,26px);text-shadow:0 0 4px #000,0 0 4px #000;z-index:2;animation:tyfade .6s both}#anp .f2{position:absolute;right:5%;top:8%;z-index:2;font-family:'Dela Gothic One',sans-serif;font-size:clamp(20px,6cqw,60px);color:#fff;-webkit-text-stroke:.09em #000;paint-order:stroke fill;transform:rotate(-8deg);animation:tyscale .45s cubic-bezier(.3,1.6,.5,1) both;letter-spacing:.02em}
+#anp .ty{position:absolute;inset:0;pointer-events:none;z-index:3}#anp .ty>div{position:absolute;max-width:80%;text-align:center}
+#anp .ty .p-tl{left:5%;top:7%;text-align:left}#anp .ty .p-tr{right:5%;top:7%;text-align:right}#anp .ty .p-t{left:50%;top:7%;transform:translateX(-50%)}#anp .ty .p-c{left:50%;top:44%;transform:translate(-50%,-50%)}#anp .ty .p-l{left:6%;top:40%;text-align:left}#anp .ty .p-r{right:6%;top:40%;text-align:right}#anp .ty .p-bl{left:5%;bottom:24%;text-align:left}#anp .ty .p-br{right:5%;bottom:24%;text-align:right}
+#anp .s-title .m{white-space:nowrap;font-family:'Noto Serif JP',serif;font-weight:900;font-size:clamp(26px,7.5cqw,78px);color:#fff;letter-spacing:.12em;text-shadow:0 0 18px rgba(255,255,255,.45)}#anp .s-title .s{font-family:'Mitr',sans-serif;font-size:clamp(14px,3cqw,30px);color:#ffe3a3;margin-top:.3em;letter-spacing:.06em}
+#anp .s-intro{background:linear-gradient(90deg,rgba(0,0,0,.75),rgba(0,0,0,0));padding:.4em 1.4em .5em .8em;border-left:.25em solid #ffd76a}#anp .s-intro .m{font-family:'Dela Gothic One',sans-serif;font-size:clamp(18px,4.6cqw,46px);color:#fff}#anp .s-intro .s{font-family:'Mitr',sans-serif;font-size:clamp(12px,2.2cqw,22px);color:#ffd76a}
+#anp .s-trans .m{font-family:'Noto Serif JP',serif;font-weight:600;font-size:clamp(18px,4.2cqw,44px);color:#fff;letter-spacing:.3em;text-shadow:0 0 8px #000}#anp .s-trans .s{font-family:'Mitr',sans-serif;font-size:clamp(12px,2.3cqw,22px);color:#ddd;letter-spacing:.15em}
+#anp .s-sign{background:rgba(250,244,228,.92);color:#2a2116;border:.12em solid #3b2f22;border-radius:.2em;padding:.25em .7em;font-family:'Zen Maru Gothic',sans-serif;font-weight:700;font-size:clamp(13px,3cqw,30px);box-shadow:0 .2em .6em rgba(0,0,0,.5);transform:perspective(500px) rotateY(-8deg)}#anp .s-sign .s{font-family:'Mitr',sans-serif;font-size:.55em;font-weight:400;opacity:.8}
+#anp .s-doc{background:#fffdf3;color:#1d2a52;padding:.35em .8em;font-family:'Yomogi',cursive;font-size:clamp(13px,2.8cqw,28px);box-shadow:0 .2em .5em rgba(0,0,0,.5);transform:rotate(-2deg);border-left:.15em solid #c33}#anp .s-doc .s{font-family:'Sriracha',cursive;font-size:.65em;color:#a33}
+#anp .s-manga .m{font-family:'Dela Gothic One',sans-serif;font-size:clamp(22px,7cqw,72px);color:#fff;-webkit-text-stroke:.09em #000;paint-order:stroke fill;transform:rotate(-6deg);display:inline-block}#anp .s-manga .s{font-family:'Mitr',sans-serif;color:#ffd76a;font-size:clamp(11px,2cqw,20px);text-shadow:0 0 3px #000}
+#anp .s-drama .m{font-family:'Noto Serif JP',serif;font-weight:900;font-size:clamp(20px,5cqw,52px);color:#fff;text-shadow:0 0 12px #000,0 0 22px rgba(160,180,255,.6)}#anp .s-drama .s{font-family:'Mitr',sans-serif;color:#cfd8ff;font-size:clamp(11px,2.1cqw,20px)}
+#anp .s-emo .m{font-family:'Yusei Magic',sans-serif;font-size:clamp(18px,4.5cqw,44px);color:#ffd1e6;text-shadow:0 0 8px rgba(255,120,180,.8),0 0 2px #000}#anp .s-emo .s{font-family:'Sriracha',cursive;color:#ffe;font-size:clamp(11px,2.1cqw,20px);text-shadow:0 0 3px #000}
+#anp .s-horror .m{font-family:'Dela Gothic One',sans-serif;font-size:clamp(20px,5.5cqw,56px);color:#e8e8e8;text-shadow:2px 0 #b00,-2px 0 #06c,0 0 14px #000;letter-spacing:.08em}#anp .s-horror .s{font-family:'Mitr',sans-serif;color:#f99;font-size:clamp(11px,2.1cqw,20px);text-shadow:0 0 3px #000}
+#anp .s-cute .m{font-family:'Rampart One',sans-serif;font-size:clamp(18px,5cqw,50px);color:#fff4b8;-webkit-text-stroke:.05em #b05;paint-order:stroke fill}#anp .s-cute .s{font-family:'Sriracha',cursive;color:#fff;font-size:clamp(11px,2.1cqw,20px);text-shadow:0 0 3px #000}
+#anp .s-meme .m{font-family:'Mitr',sans-serif;font-weight:600;font-size:clamp(15px,3.6cqw,36px);color:#fff;-webkit-text-stroke:.08em #000;paint-order:stroke fill;text-transform:uppercase}
+#anp .a-fade{animation:tyfade .7s both}#anp .a-scale{animation:tyscale .5s cubic-bezier(.3,1.6,.5,1) both}#anp .a-motion{animation:tymove 1.2s cubic-bezier(.2,.8,.2,1) both}#anp .a-reveal{animation:tyrev 1.6s cubic-bezier(.6,0,.2,1) both}#anp .a-glitch .m{animation:tygl .35s steps(2) infinite}#anp .x-out{animation:tyout .6s both}#anp .x-dis .m span,#anp .x-dis .s span{display:inline-block;transition:transform 1.1s ease-out,opacity 1.1s,filter 1.1s}
+@keyframes tyfade{from{opacity:0}to{opacity:1}}@keyframes tyscale{from{opacity:0;transform:scale(1.8) rotate(-8deg)}to{opacity:1}}@keyframes tymove{from{opacity:0;translate:-12% 0}to{opacity:1;translate:0 0}}@keyframes tyrev{from{clip-path:inset(0 100% 0 0);letter-spacing:.6em;opacity:.2}to{clip-path:inset(0 0 0 0);opacity:1}}@keyframes tygl{0%{transform:translate(0)}25%{transform:translate(-2px,1px) skewX(6deg);clip-path:inset(10% 0 40% 0)}50%{transform:translate(2px,-1px)}75%{clip-path:inset(55% 0 5% 0);transform:translate(-1px,0)}100%{transform:translate(0)}}@keyframes tyout{to{opacity:0;filter:blur(6px)}}
+#anp .card{position:absolute;inset:0;background:#000;z-index:1;opacity:0;transition:opacity .8s;pointer-events:none}#anp .card.on{opacity:1}
+#anp .big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:4;background:rgba(0,0,0,.35)}#anp .big span{width:84px;height:84px;border-radius:50%;background:rgba(0,0,0,.6);border:2px solid #fff;color:#fff;font-size:38px;display:flex;align-items:center;justify-content:center;padding-left:6px;box-sizing:border-box}
 #anp .ui{transition:opacity .3s}#anp.hid .ui{opacity:0;pointer-events:none}
-#anp .top{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;padding:10px;gap:8px;z-index:4;background:linear-gradient(#000a,#0000)}
-#anp .ctl{position:absolute;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));z-index:4;background:linear-gradient(#0000,#000c)}
+#anp .top{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;padding:10px;gap:8px;z-index:5;background:linear-gradient(#000a,#0000)}
+#anp .ctl{position:absolute;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));z-index:5;background:linear-gradient(#0000,#000c)}
 #anp button{background:rgba(0,0,0,.55);color:#fff;border:1px solid #555;border-radius:18px;padding:6px 12px;font-size:14px;min-height:38px;min-width:40px}
 #anp .row{display:flex;align-items:center;gap:8px}#anp input[type=range]{flex:1;accent-color:#8b7cf6;height:28px}#anp .tm{color:#ddd;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
 #anp [data-st]{color:#bbb;font-size:12px;text-align:center;min-height:16px}
-@media (min-width:700px){#anp button{font-size:17px;padding:9px 16px;min-height:46px;min-width:50px}#anp .tm{font-size:15px}}</style>
-<div class="fr"><img><img><div class="ph"></div><div class="f1"></div><div class="f2"></div><div class="sub"></div><div class="big"><span>▶</span></div></div>
-<div class="top ui"><button data-x>✕</button><span class="tm" data-n></span><span style="display:flex;gap:6px"><button data-snd></button><button data-fs>⛶</button></span></div>
+#anp .mx{position:absolute;right:10px;top:56px;z-index:6;background:rgba(20,20,28,.95);border:1px solid #444;border-radius:12px;padding:10px 14px;color:#ddd;font-size:13px;width:230px;display:none}#anp .mx.on{display:block}#anp .mx label{display:flex;align-items:center;gap:8px;margin:4px 0}#anp .mx label span{width:84px}
+@media (min-width:700px){#anp button{font-size:17px;padding:9px 16px;min-height:46px;min-width:50px}#anp .tm{font-size:15px}#anp .mx{font-size:15px;width:280px}}</style>
+<div class="fr"><img><img><div class="gr"></div><div class="ph"></div><div class="f1"></div><div class="f2"></div><div class="ty"></div><div class="card"></div><div class="sub"></div><div class="big"><span>▶</span></div></div>
+<div class="top ui"><button data-x>✕</button><span class="tm" data-n></span><span style="display:flex;gap:6px"><button data-lang></button><button data-mx>🎚</button><button data-snd></button><button data-fs>⛶</button></span></div>
+<div class="mx ui"><b>ระดับเสียง</b><label><span>🎵 ดนตรี</span><input type="range" min="0" max="0.6" step="0.02" data-m="bgm"></label><label><span>💥 เสียงประกอบ</span><input type="range" min="0" max="1.2" step="0.05" data-m="sfx"></label><label><span>🌙 บรรยากาศ</span><input type="range" min="0" max="0.5" step="0.02" data-m="amb"></label><div style="font-size:11px;opacity:.7;margin-top:4px">เสียงพากย์ดังเต็มเสมอ ดนตรีจะเบาลงเองตอนมีคนพูด</div></div>
 <div class="ctl ui"><div data-st></div><div class="row"><button data-p>⏮</button><button data-a>▶</button><button data-nx>⏭</button><span class="tm" data-t>0:00</span><input type="range" min="0" value="0" step="1" data-sk><span class="tm" data-tt>0:00</span></div></div>`;
   document.body.appendChild(o);const $o=q=>o.querySelector(q),ims=[...o.querySelectorAll('.fr img')];let cur=0;
-  const seg=t=>{try{return [...new Intl.Segmenter('th',{granularity:'word'}).segment(t)].map(x=>x.segment);}catch(e){return t.split(/(\s+)/);}};
+  const seg=(t,lang)=>{if(lang==='ja')return [...t];try{return [...new Intl.Segmenter('th',{granularity:'word'}).segment(t)].map(x=>x.segment);}catch(e){return t.split(/(\s+)/);}};
   const stt=m=>{$o('[data-st]').textContent=m||'';};
   const au=new Audio();au.preload='auto';const pre=new Audio();pre.preload='auto';let snd=localStorage.getItem('ss_snd')!=='0',waitAu=false;
+  let lang=localStorage.getItem('ss_sub')||'th';const LN={th:'ไทย',ja:'日本語',both:'ไทย+日'};const langT=()=>$o('[data-lang]').textContent='字 '+LN[lang];langT();
   const sndT=()=>$o('[data-snd]').textContent=snd?'🔊':'🔇';sndT();
-  const dur=x=>x.d?x.d*1000+450:1600+x.t.length*85+(x.t?0:900);
+  const dur=x=>x.d?x.d*1000+(x.ps?x.ps*1000:450):Math.max(1800,1200+x.t.length*75)+(x.t?0:900)+(x.ps||0)*1000; /* เวลาอ่านขั้นต่ำ ~13 ตัวอักษร/วินาที */
   const fmt=ms=>{const s=Math.round(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
   const sk=$o('[data-sk]');sk.max=st.length-1;
   const tot=()=>st.reduce((a,x)=>a+dur(x),0),upT=()=>{let a=0;for(let k=0;k<i;k++)a+=dur(st[k]);$o('[data-t]').textContent=fmt(a);$o('[data-tt]').textContent=fmt(tot());sk.value=i;$o('[data-n]').textContent=`ตอน ${n} · ฉาก ${st[i].sc} · ${i+1}/${st.length}`;};
-  const sayVo=x=>{au.pause();if(!snd||!x.vo){stt(x.vo?'':(x.t&&!x.sx?'(บรรทัดนี้ยังไม่มีเสียงพากย์)':''));return false;}au.src=botU('/vo/'+x.vo);stt('');au.play().catch(e=>stt('⚠️ เล่นเสียงไม่ได้ — แตะที่ซับเพื่อลองใหม่'));return true;};
+  const sayVo=x=>{au.pause();if(!snd||!x.vo){stt(x.vo?'':(x.t&&!x.sx?'(บรรทัดนี้ยังไม่มีเสียงพากย์)':''));return false;}au.src=botU('/vo/'+x.vo);stt('');au.play().then(()=>A&&A.duck(true)).catch(e=>stt('⚠️ เล่นเสียงไม่ได้ — แตะที่ซับเพื่อลองใหม่'));return true;};
+  au.onpause=()=>A&&A.duck(false);
   au.onloadedmetadata=()=>{if(isFinite(au.duration)&&st[i]&&st[i].vo&&au.src.includes(st[i].vo)){st[i].d=au.duration;upT();}};
   const preload=()=>{const y=st[i+1];if(!y)return;if(y.img){const p=new Image();p.src=y.img;}if(snd&&y.vo)pre.src=botU('/vo/'+y.vo);};
   const showUI=()=>{o.classList.remove('hid');clearTimeout(hideT);if(auto)hideT=setTimeout(()=>o.classList.add('hid'),3000);};
   const kbOf=k=>/Establishing|Transition|Tracking|Pan/.test(k)?'kbp':/Wide|Ending/.test(k)?'kb2':/Reaction|Climax|Action|Comedy/.test(k)?'kbs':/Silent/.test(k)?'kbn':'kb'; /* การเคลื่อนกล้องตามใบสั่งงานผู้กำกับ */
+  /* ปรับโทนสี (color grading) ตามอารมณ์ฉาก — ทำบนภาพสีจริง ภาพร่างขาวดำไม่ถูกย้อมสี */
+  const GR={warm:['rgba(255,170,80,.55)','sepia(.15) saturate(1.1)'],cool:['rgba(80,140,255,.5)','saturate(.85)'],pastel:['rgba(255,200,230,.45)','saturate(.8) brightness(1.06)'],cinematic:['rgba(40,90,110,.45)','contrast(1.1) saturate(.9)'],dark:['rgba(10,10,40,.6)','brightness(.78) contrast(1.15)'],vintage:['rgba(200,160,90,.5)','sepia(.35) contrast(.95)'],dream:['rgba(220,180,255,.5)','brightness(1.08) saturate(.9) blur(.3px)'],contrast:['rgba(0,0,0,0)','contrast(1.3)'],mono:['rgba(0,0,0,0)','grayscale(1) contrast(1.1)'],love:['rgba(255,120,170,.45)','saturate(1.05)'],hope:['rgba(255,210,110,.5)','brightness(1.07)'],mystery:['rgba(90,60,170,.55)','contrast(1.08) brightness(.9)'],fear:['rgba(0,0,30,.6)','contrast(1.35) brightness(.8)']};
+  function grade(x){const g=GR[x.grade],gr=$o('.gr'),draft=document.documentElement.classList.contains('sbdraft');gr.style.opacity=g&&!draft?'1':'0';if(g)gr.style.background=g[0];ims.forEach(e=>e.style.filter=g&&!draft?g[1]:'');}
   function setImg(x){const a=ims[cur];if(x.img){$o('.ph').textContent='';if(a.getAttribute('src')===x.img)return;cur^=1;const b=ims[cur];b.className='';b.onload=()=>{void b.offsetWidth;b.className='on '+kbOf(x.mv);a.classList.remove('on');};b.src=x.img;}else{ims.forEach(e=>e.classList.remove('on'));$o('.ph').textContent='⏳ ภาพยังไม่เสร็จ · '+x.ph;}}
-  function show(){const x=st[i];setImg(x);
-    const sb=$o('.sub'),th=x.who[0]==='~';sb.className='sub'+(x.sx?' sx':x.who?(th?' tk':''):' nv');
-    const ws=seg(x.t),wh=ws.map((w,k)=>`<span class="w o">${esc(w)}</span>`).join('');
-    sb.innerHTML=!x.t?'':!x.who?wh:th?`(${esc(x.who.slice(1))} ในใจ) ${wh}`:`<b>${esc(x.who)}:</b> ${wh}`;
+  /* ตัวอักษรบนจอ (สร้างด้วยระบบ ไม่ให้ AI วาดตัวหนังสือ) */
+  const fill=s=>String(s||'').replace('{ep}',n).replace('{ep_title}',E.title||'').replace('{series}',SER);
+  const spanify=(el,txt)=>{el.innerHTML='';[...txt].forEach(c=>{const s=document.createElement('span');s.textContent=c;el.appendChild(s);});};
+  function typo(x){tyT.forEach(clearTimeout);tyT=[];const L=$o('.ty');L.innerHTML='';$o('.card').classList.remove('on');
+    (x.ty||[]).forEach(T=>{const at=(+T.t||0)*1000,dd=(+T.d||0)*1000;tyT.push(setTimeout(()=>{
+      if(T.k==='title'||T.card)$o('.card').classList.add('on');
+      const el=document.createElement('div');el.className=`p-${T.pos||'c'} s-${T.sty||'drama'} a-${T.anim||'fade'}`;const m=document.createElement('div');m.className='m';const s=document.createElement('div');s.className='s';el.append(m,s);L.appendChild(el);
+      const tx=fill(T.tx),sub=fill(T.sub);
+      if(T.anim==='type'){let k=0;const step=()=>{m.textContent=tx.slice(0,++k);if(k<tx.length)tyT.push(setTimeout(step,70));else s.textContent=sub;};step();A&&A.cue([{k:'click',v:.3}]);}else{spanify(m,tx);spanify(s,sub);}
+      if(T.anim==='glitch'){el.classList.add('a-glitch');A&&A.cue([{k:'glitch',v:.6}]);tyT.push(setTimeout(()=>el.classList.remove('a-glitch'),1200));}
+      if(dd)tyT.push(setTimeout(()=>{if(T.out==='dissolve'){el.classList.add('x-dis');el.querySelectorAll('span').forEach(sp=>{sp.style.transform=`translate(${(Math.random()-.5)*160}px,${-40-Math.random()*120}px) rotate(${(Math.random()-.5)*90}deg)`;sp.style.opacity=0;sp.style.filter='blur(3px)';});}else el.classList.add('x-out');if(T.k==='title'||T.card)$o('.card').classList.remove('on');},dd));
+    },at));});}
+  function enterPanel(x){grade(x);typo(x);const f=$o('.f1'),g=$o('.f2');f.textContent=x.fx[0];g.textContent=x.fx[1];f.style.animation='none';g.style.animation='none';void g.offsetWidth;f.style.animation='';g.style.animation='';if(A&&auto){A.scene(x.aud);A.cue(x.aud&&x.aud.sfx);}}
+  function show(){const x=st[i];setImg(x);if(x.pi!==lastPi){lastPi=x.pi;enterPanel(x);}
+    const sb=$o('.sub'),th=x.who[0]==='~',useJa=lang!=='th'&&x.ja&&!x.sx;sb.className='sub'+(x.sx?' sx':x.who?(th?' tk':''):' nv')+(lang==='ja'&&useJa?' jo':'');
+    const txt=lang==='ja'&&useJa?x.ja:x.t,lg=lang==='ja'&&useJa?'ja':'th';
+    const wh=seg(txt,lg).map(w=>`<span class="w o">${esc(w)}</span>`).join(''),jaLine=lang==='both'&&useJa?`<span class="ja">${esc(x.ja)}</span>`:'';
+    const who=x.who.replace(/^~/,'');sb.innerHTML=!txt?'':jaLine+(!x.who?wh:th?`(${esc(who)} ในใจ) ${wh}`:`<b>${esc(who)}:</b> ${wh}`);
     const spans=[...sb.querySelectorAll('.w')],hl=f=>{const c=Math.ceil(spans.length*Math.min(1,Math.max(0,f)));spans.forEach((e,k)=>e.classList.toggle('o',k>=c));};
-    $o('.f1').textContent=x.fx[0];$o('.f2').textContent=x.fx[1];upT();
-    clearInterval(kt);clearTimeout(tm);au.pause();
+    upT();clearInterval(kt);clearTimeout(tm);au.pause();
     if(!auto){hl(1);return;}
     waitAu=sayVo(x);preload();
     if(x.sx||!x.t)hl(1);else{const t0=Date.now();kt=setInterval(()=>{if(waitAu&&au.duration&&isFinite(au.duration))hl((au.currentTime+0.15)/au.duration);else if(!waitAu)hl((Date.now()-t0)/Math.max(800,dur(x)-700));},80);}
-    const nx=()=>{if(i<st.length-1){i++;show();}else{setPlay(false);hl(1);}};
-    if(waitAu){au.onended=()=>{if(auto)tm=setTimeout(nx,450);};au.onerror=()=>{stt('⚠️ โหลดเสียงไม่ได้');if(auto)tm=setTimeout(nx,dur(x));};}else tm=setTimeout(nx,dur(x));}
-  function setPlay(p){auto=p;started=started||p;$o('[data-a]').textContent=p?'⏸':'▶';$o('.big').style.display=p?'none':'flex';show();showUI();}
+    const nx=()=>{if(i<st.length-1){i++;show();}else{setPlay(false);hl(1);}},gap=(x.ps?x.ps*1000:450);
+    if(waitAu){au.onended=()=>{A&&A.duck(false);if(auto)tm=setTimeout(nx,gap);};au.onerror=()=>{stt('⚠️ โหลดเสียงไม่ได้');if(auto)tm=setTimeout(nx,dur(x));};}else tm=setTimeout(nx,dur(x));}
+  function setPlay(p){auto=p;if(p&&!A){A=mkAudio();if(A){Object.keys(A.mix).forEach(k=>{const r=o.querySelector(`[data-m="${k}"]`);if(r)r.value=A.mix[k];});}}if(A){p?A.play():A.pause();}if(p&&A){lastPi=-1;}
+    $o('[data-a]').textContent=p?'⏸':'▶';$o('.big').style.display=p?'none':'flex';show();showUI();}
   function go(d){i=Math.max(0,Math.min(st.length-1,i+d));show();showUI();}
-  function close(){clearTimeout(tm);clearInterval(kt);clearTimeout(hideT);au.pause();try{const d=document;if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);}catch(x){}document.removeEventListener('keydown',kd);o.remove();}
+  function close(){clearTimeout(tm);clearInterval(kt);clearTimeout(hideT);tyT.forEach(clearTimeout);au.pause();A&&A.stop();try{const d=document;if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);}catch(x){}document.removeEventListener('keydown',kd);o.remove();}
   const kd=e=>{if(e.key===' '){e.preventDefault();setPlay(!auto);}else if(e.key==='ArrowRight')go(1);else if(e.key==='ArrowLeft')go(-1);else if(e.key==='Escape')close();};document.addEventListener('keydown',kd);
   sk.oninput=()=>{i=+sk.value;upT();};sk.onchange=()=>{i=+sk.value;show();showUI();};
+  o.querySelectorAll('[data-m]').forEach(r=>r.oninput=()=>{if(!A){A=mkAudio();}A&&A.setMix(r.dataset.m,+r.value);});
   o.onclick=e=>{const c=s=>e.target.closest(s);
     if(c('[data-x]'))return close();
     if(c('[data-fs]')){const d=document,fe=d.fullscreenElement||d.webkitFullscreenElement;try{if(fe)(d.exitFullscreen||d.webkitExitFullscreen).call(d);else (o.requestFullscreen||o.webkitRequestFullscreen).call(o);}catch(x){}return;}
     if(c('[data-snd]')){snd=!snd;localStorage.setItem('ss_snd',snd?'1':'0');sndT();if(!snd)au.pause();else if(auto)show();return;}
+    if(c('[data-lang]')){lang=lang==='th'?'ja':lang==='ja'?'both':'th';localStorage.setItem('ss_sub',lang);langT();show();return;}
+    if(c('[data-mx]')){$o('.mx').classList.toggle('on');clearTimeout(hideT);return;}
+    if(c('.mx'))return;
     if(c('[data-a]'))return setPlay(!auto);if(c('[data-p]'))return go(-1);if(c('[data-nx]'))return go(1);
     if(c('.sub')&&!auto){sayVo(st[i]);return;} /* หยุดอยู่ แตะซับ = ฟังเสียงบรรทัดนี้ */
     if(c('.ctl')||c('.top'))return;
     if(o.classList.contains('hid')){showUI();return;} /* แตะจอตอนเล่น = โชว์ปุ่มก่อน */
-    setPlay(!auto);};
+    $o('.mx').classList.remove('on');setPlay(!auto);};
   o.onmousemove=()=>{if(auto)showUI();};
   show();showUI();}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&window._needLoad){window._needLoad=0;load();}}); /* ดึงข้อมูลต่อเมื่อกลับมาเปิดหน้านี้ ไม่ดึงทิ้งไว้ตอนสลับแท็บ */
@@ -343,10 +494,10 @@ function render(){const A=$('#app');
       if(ST.sbMode==='read'){
         h+=`<div class="mu">เลื่อนอ่านต่อเนื่อง ${gl.length} ตอน · จะแก้ภาพหรืออนุมัติ กด "แก้ทีละช็อต"</div></div>`;
         h+=gl.map(n=>{const Ex=pl.eps.find(x=>x.no===n)||{},sb=ST.sbs[n],side={};let k=0,sn=0;
-          return `<div class="wt"><div class="wth"><b>ตอน ${n}</b> · ${esc(Ex.title||'')}<div style="font-size:13px;font-weight:400;margin-top:2px">${stat(n)}</div>${sb&&sb.tot?`<button class="go" data-play="${n}" style="margin-top:8px;width:100%">🎬 ดูแบบอนิเมะ (ซับขึ้นทีละบรรทัด)</button>`:''}${sb&&sb.tot?(()=>{let nv=0,nl=0;sb.scenes.forEach(S=>S.shots.forEach(v=>{nl+=say(v).lines.length;nv+=String(v.vo||'').split(',').filter(Boolean).length;}));return `<div style="display:flex;gap:6px;align-items:center;margin-top:6px"><span class="mu" style="flex:1;font-size:12.5px">🎙 เสียงพากย์ญี่ปุ่น ${nv}/${nl} บรรทัด</span><button data-vomake="${n}">${nv?'ทำบรรทัดที่ขาด':'🎙 ทำเสียงพากย์'}</button></div>`;})():''}</div>${sb?sb.scenes.map(S=>S.shots.map(v=>{const d=say(v);k++;
+          return `<div class="wt"><div class="wth"><b>ตอน ${n}</b> · ${esc(Ex.title||'')}<div style="font-size:13px;font-weight:400;margin-top:2px">${stat(n)}</div>${sb&&sb.tot?`<button class="go" data-play="${n}" style="margin-top:8px;width:100%">🎬 ดูแบบอนิเมะ (ซับขึ้นทีละบรรทัด)</button><button data-qcrep="${n}" style="margin-top:6px;width:100%">📋 รายงานตรวจความต่อเนื่อง</button>`:''}${sb&&sb.tot?(()=>{let nv=0,nl=0;sb.scenes.forEach(S=>S.shots.forEach(v=>{nl+=say(v).lines.length;nv+=String(v.vo||'').split(',').filter(Boolean).length;}));return `<div style="display:flex;gap:6px;align-items:center;margin-top:6px"><span class="mu" style="flex:1;font-size:12.5px">🎙 เสียงพากย์ญี่ปุ่น ${nv}/${nl} บรรทัด</span><button data-vomake="${n}">${nv?'ทำบรรทัดที่ขาด':'🎙 ทำเสียงพากย์'}</button></div>`;})():''}</div>${sb?sb.scenes.map(S=>S.shots.map(v=>{const d=say(v);k++;
             const vm={};String(v.vo||'').split(',').forEach(x=>{const [a,b]=x.split(':');if(b)vm[a]=b;});const va=i=>vm[i]?` data-vo="${vm[i]}" style="cursor:pointer"`:'',vi=i=>vm[i]?' <span style="opacity:.55;font-size:11px">🔊</span>':'';
             const tx=d.lines.map((l,i)=>{if(!l.who)return `<div class="nv"${va(i)}>${esc(l.say)}${vi(i)}</div>`;if(l.who[0]==='~')return `<div class="tk"${va(i)}><b>${esc(l.who.slice(1))} (ในใจ)</b>${esc(l.say)}${vi(i)}</div>`;if(!(l.who in side))side[l.who]=sn++%2?'r':'l';return `<div class="bb ${side[l.who]}"${va(i)}><b>${esc(l.who)}</b>${esc(l.say)}${vi(i)}</div>`;}).join('');
-            return `<div class="wp"><div class="im">${v.img?`<img src="${esc(botU('/img/'+v.img))}" loading="lazy">`:`<div class="ph">⏳ ${k} · ${esc(v.th||'')}</div>`}${d.think?`<div class="fx1">${esc(d.think)}${d.thinkTh?`<small style="display:block;font-size:.55em;opacity:.85">${esc(d.thinkTh)}</small>`:''}</div>`:''}${d.ono?`<div class="fx2">${esc(d.ono)}${d.onoTh?`<small style="display:block;font-size:.45em;opacity:.85;text-align:right">${esc(d.onoTh)}</small>`:''}</div>`:''}</div>${d.dir?`<details class="dir"><summary>🎬 ${esc(d.dir.id||'')} · ${esc(d.dir.kind||'')} · ${esc(d.dir.genre||'')}</summary>${[['ช็อต','shot'],['มุมกล้อง','angle'],['กล้องเคลื่อน','move'],['การกระทำ','act'],['สีหน้า','face'],['ฉาก','env'],['แสง','light'],['เวลา (วิ)','dur'],['อารมณ์ที่ต้องการ','mood'],['เสียงประกอบ','sfx'],['ดนตรี','bgm'],['การเคลื่อนไหว','anim'],['พรอมต์ภาพ',''],['พรอมต์วิดีโอ','vp']].map(([a,b])=>`<div><b>${a}:</b> ${esc(b?String(d.dir[b]??''):v.en||'')}</div>`).join('')}</details>`:''}${tx}</div>`;}).join('')+(S.writing?'<div class="nr">✍️ ซีนนี้กำลังเขียนบท…</div>':'')).join(''):''}</div>`;}).join('');
+            return `<div class="wp"><div class="im">${v.img?`<img src="${esc(botU('/img/'+v.img))}" loading="lazy">`:`<div class="ph">⏳ ${k} · ${esc(v.th||'')}</div>`}${d.think?`<div class="fx1">${esc(d.think)}${d.thinkTh?`<small style="display:block;font-size:.55em;opacity:.85">${esc(d.thinkTh)}</small>`:''}</div>`:''}${d.ono?`<div class="fx2">${esc(d.ono)}${d.onoTh?`<small style="display:block;font-size:.45em;opacity:.85;text-align:right">${esc(d.onoTh)}</small>`:''}</div>`:''}</div>${d.dir?`<details class="dir"><summary>🎬 ${esc(d.dir.id||'')} · ${esc(d.dir.kind||'')} · ${esc(d.dir.genre||'')}</summary>${[['ช็อต','shot'],['มุมกล้อง','angle'],['กล้องเคลื่อน','move'],['การกระทำ','act'],['สีหน้า','face'],['ฉาก','env'],['แสง','light'],['เวลา (วิ)','dur'],['อารมณ์ที่ต้องการ','mood'],['เสียงประกอบ','sfx'],['ดนตรี','bgm'],['การเคลื่อนไหว','anim'],['พรอมต์ภาพ',''],['พรอมต์วิดีโอ','vp']].map(([a,b])=>`<div><b>${a}:</b> ${esc(b?String(d.dir[b]??''):v.en||'')}</div>`).join('')}${d.dir.lit?`<div><b>โทนสี:</b> ${esc(d.dir.lit.grade_th||'')} · <b>อากาศ:</b> ${esc(d.dir.lit.weather||'')}</div>`:''}${d.dir.audio?`<div><b>เสียงบรรยากาศ:</b> ${esc(d.dir.audio.amb||'-')}</div>`:''}${(d.dir.type||[]).length?`<div><b>ข้อความบนจอ:</b> ${d.dir.type.map(t=>esc(t.tx+(t.sub?' ('+t.sub+')':''))).join(' · ')}</div>`:''}${d.lines.some(l=>l.pause)?`<div><b>เว้นจังหวะ:</b> ${d.lines.map((l,i)=>l.pause?`บรรทัด ${i+1} ${l.pause} วิ`:'').filter(Boolean).join(', ')}</div>`:''}</details>`:''}${tx}</div>`;}).join('')+(S.writing?'<div class="nr">✍️ ซีนนี้กำลังเขียนบท…</div>':'')).join(''):''}</div>`;}).join('');
         h+=`<div class="c">`;
       }else{
         if(gl.length>1)h+=`<div class="row" style="margin-bottom:6px">${gl.map(n=>`<button class="sm ${n===g?'on':''}" data-sbsel="${n}">ตอน ${n}</button>`).join('')}</div>`;
@@ -418,6 +569,7 @@ function render(){const A=$('#app');
     try{if(navigator.share){await navigator.share({title:'ตั้งค่าสตูดิโอ',url:u});return;}}catch(e){}
     try{await navigator.clipboard.writeText(u);toast('คัดลอกลิงก์แล้ว ไปเปิดบน iPad ได้เลย');}catch(e){prompt('คัดลอกลิงก์นี้ไปเปิดบน iPad',u);}});
   A.querySelectorAll('[data-mrefresh]').forEach(b=>b.onclick=()=>{ST.force=1;load();});
+  A.querySelectorAll('[data-qcrep]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('qcrep',{ep:+b.dataset.qcrep});showQc(r.rep,r.canon,+b.dataset.qcrep);}catch(e){toast('โหลดรายงานไม่ได้');}b.disabled=false;});
   A.querySelectorAll('[data-vomake]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const r=await api('vo_make',{ep:+b.dataset.vomake});toast(r.lines?`สั่งทำเสียง ${r.lines} บรรทัดแล้ว เครื่อง CPU ของ Kaggle จะทำให้`:'ไม่มีบรรทัดที่ต้องทำ (บรรทัดที่ยังไม่มีบทญี่ปุ่นจะข้าม)');}catch(e){toast(botErr(e));}});
   {if(!window._voAu)window._voAu=new Audio();A.querySelectorAll('[data-vo]').forEach(el=>el.onclick=()=>{const a=window._voAu;a.pause();a.src=botU('/vo/'+el.dataset.vo);a.play().catch(()=>{});});}
   A.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>playEp(+b.dataset.play));
