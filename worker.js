@@ -4551,6 +4551,26 @@ async function castApi(req, env, url, body) {
         if (!key) return json({ error: 'ไม่พบบท' }, 400);
         m[key] = v; await setSetting(env, 'lw:' + story, JSON.stringify(m)); return json({ ok: true, w: v });
       }
+      if (act === 'refs') { // แผ่นอ้างอิงตัวละคร (ปกติ + หน้าตลก): รายการภาพ + ที่อนุมัติแล้ว + คิวที่ค้าง
+        const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project LIKE 'อ้างอิง·%' ORDER BY id").all()).results;
+        const q = (await env.DB.prepare("SELECT project,COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND project LIKE 'อ้างอิง·%' GROUP BY project").all()).results;
+        return json({ ok: true, imgs: im, queued: q, ok_: (await rd('charref:' + story)) || {}, names: Object.keys(HY_TAGS).filter(n => n !== 'ริน_d') });
+      }
+      if (act === 'ref_ok') { // อนุมัติภาพอ้างอิง: {name, kind:'n'|'g', id, on}
+        const cur = (await rd('charref:' + story)) || {}, nm = String(b.name || ''), k = b.kind === 'g' ? 'g' : 'n'; cur[nm] = cur[nm] || { n: 0, g: [] };
+        if (k === 'n') cur[nm].n = b.on ? +b.id : 0; else { const g = new Set(cur[nm].g || []); b.on ? g.add(+b.id) : g.delete(+b.id); cur[nm].g = [...g]; }
+        await setSetting(env, 'charref:' + story, JSON.stringify(cur)); return json({ ok: true, ok_: cur });
+      }
+      if (act === 'ref_make') { // วาดแผ่นอ้างอิงด้วย SDXL (Animagine) — ปกติ 2 แบบ + หน้าตลก 4 แบบ ต่อตัว (ระบุ name = ทำเฉพาะตัวนั้น)
+        const HT = { ...HY_TAGS }; let n = 0;
+        const GAG = ['comedic deadpan face, half-closed eyes, flat unimpressed expression, blank stare, colorful speed lines background', 'comedic laughing face, huge wide open mouth, closed happy eyes, exaggerated expression, colorful burst background', 'comedic shocked face, white blank eyes, sweatdrop, mouth wide open, exaggerated, colorful speed lines background', 'comedic smug face, smirk, half-closed eyes, raised eyebrow, sparkles background'];
+        for (const [nm, t] of Object.entries(HT)) { if (nm === 'ริน_d' || (b.name && b.name !== nm)) continue;
+          const base = t.tags.replace(/^(chibi, )?/, '');
+          const jobs = [['ปกติ', `${base}, full body, standing, front view, arms at sides, neutral expression, simple white background, anime screencap, flat color, clean lineart, character design`, 832, 1216], ['ปกติ', `${base}, full body, standing, three-quarter view, gentle expression, simple white background, anime screencap, flat color, clean lineart, character design`, 832, 1216], ...(t.o ? GAG.slice(0, 2) : GAG).map(g => ['ตลก', `${base}, upper body, ${g}, anime screencap, flat color, clean lineart`, 1024, 1024])];
+          for (const [k, pr, w, h] of jobs) { await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)").bind('อ้างอิง·' + nm + '·' + k, '', '0', pr, Date.now(), JSON.stringify({ engine: 'sdxl', w, h, steps: 30, seed: 0, loras: [] })).run(); n++; }
+        }
+        return json({ ok: true, jobs: n });
+      }
       if (act === 'qcrep') { // รายงานตรวจความต่อเนื่อง/คุณภาพของตอน (สร้างโดยสคริปต์ตรวจก่อนส่งวาด)
         return json({ ok: true, rep: await rd('qcrep:' + story + '|' + (+b.ep || 1)), canon: await rd('canon:' + story) });
       }
