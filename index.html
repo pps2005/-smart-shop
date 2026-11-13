@@ -590,10 +590,12 @@ function render(){const A=$('#app');
   if(ST.err)h+=`<div class="c bad">⚠️ ${esc(ST.err)}<div><button data-bot="1" style="margin-top:8px">🔌 เชื่อมบอทใหม่</button><button data-test="1">🧪 ทดสอบ</button></div>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
   if(window._staleAt)h+=`<div class="c warn">📴 ฐานข้อมูลใช้ไม่ได้ชั่วคราว${/exceeded|limit|โควตา|D1/i.test(window._staleErr||'')?' (โควตาอ่านฟรีของวันหมด กลับมาเอง 07:00)':''} — กำลังแสดงข้อมูลล่าสุดที่เก็บไว้ในเครื่องนี้ เมื่อ ${new Date(window._staleAt).toLocaleString('th-TH',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})} · อ่านและดูแบบอนิเมะได้ ภาพที่เคยเปิดแล้วยังขึ้น · ปุ่มแก้ไข/วาดใหม่จะใช้ไม่ได้จนกว่าฐานข้อมูลกลับมา</div>`;
   if(window._synced){window._synced=0;setTimeout(()=>toast('รับการตั้งค่าจากอีกเครื่องแล้ว'),300);}
-  if(botCfg().url)h+=`<div class="c" style="display:flex;gap:8px;align-items:center"><span class="mu" style="flex:1;font-size:13px">📲 เปิดสตูดิโอบน iPad / เครื่องอื่น ให้เห็นเหมือนเครื่องนี้</span><button data-sync>ส่งลิงก์ตั้งค่า</button></div>`;
-  h+=meterCard();h+=quotaCard();h+=helperCard();
-  if(pl)h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab==='story'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button></div>`;
+  /* แถบ 📋 สรุปงาน: ลิงก์ตั้งค่าเครื่องอื่น + โควตาฐานข้อมูล + แผนงานในคิว + โควตาฟรีทั้งหมด + ผู้ช่วย Kaggle (ผู้ใช้สั่งแยกเป็นหน้าเอง) */
+  if(!pl&&ST.tab==='lora')ST.tab='story';
+  {const qp=quotaPct();h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab!=='lora'&&ST.tab!=='sum'?'on':''}" data-tab="story">🎬 เรื่อง</button>${pl?`<button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button>`:''}<button class="${ST.tab==='sum'?'on':''}" data-tab="sum">📋 สรุปงาน <span style="color:${qp>=97?'#c0392b':qp>=85?'#e67e22':'#27ae60'}">${qp.toFixed(0)}%</span></button></div>`;}
+  if(ST.tab==='sum'){if(botCfg().url)h+=`<div class="c" style="display:flex;gap:8px;align-items:center"><span class="mu" style="flex:1;font-size:13px">📲 เปิดสตูดิโอบน iPad / เครื่องอื่น ให้เห็นเหมือนเครื่องนี้</span><button data-sync>ส่งลิงก์ตั้งค่า</button></div>`;h+=meterCard();h+=quotaCard();h+=helperCard();}
   if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
+  if(ST.tab!=='sum'){
   const kd=`<div class="c"><h2><span class="stp">1</span>ประเภทงาน</h2><div class="kd">${KIND.map(x=>`<button class="${ST.kind===x[0]?'on':''}" data-kind="${x[0]}"><b>${x[1]}</b>${x[2]}</button>`).join('')}</div>${ST.kind?'':'<div class="mu" style="margin-top:6px">แตะเลือก ระบบตั้งสัดส่วนภาพ ความยาว และจังหวะตัดให้เอง</div>'}</div>`;
   if(!pl){h+=kd+`<div class="c"><h2><span class="stp">2</span>ใส่บท</h2><label class="drop" id="dz"><div style="font-size:40px">📄</div>แตะเพื่อเลือก หรือลากไฟล์บท (.docx) มาวาง<input type="file" id="pf" accept=".docx" hidden></label></div>`;}
   else{
@@ -674,6 +676,7 @@ function render(){const A=$('#app');
       h+=`<div class="c"><h2>🎵 ตอนที่เลือกลง TikTok: ตอน ${pick}</h2>${f?`<button class="go" data-dl="${f}|${esc((pl.title||'anime').slice(0,30))}-ep${pick}.mp4">⬇ ดาวน์โหลดทั้งตอน</button>`:'<div class="warn">ตอนนี้ยังรวมไม่เสร็จ ให้รอหรือกดตรวจแก้ก่อน</div>'}
       ${ss.length?`<div class="mu" style="margin:8px 0 4px">หรือโหลดแยกซีน (TikTok แบ่งเป็นพาร์ตสั้นได้)</div>${ss.map(x=>`<button class="sm" data-dl="${x.final}|${esc((pl.title||'anime').slice(0,30))}-ep${pick}-sc${x.sc}.mp4">⬇ ซีน ${x.sc}</button>`).join('')}`:''}
       <div class="mu" style="margin-top:8px">ตอนนี้วิดีโอยังไม่มีเสียงพากย์ ซับ และเพลง ต้องใส่ในแอปตัดต่อก่อนอัปโหลด</div></div>`;}
+  }
   }
   A.innerHTML=h;bindTabs(A);
   if(window._keep)A.querySelectorAll('[data-hcard] input').forEach(x=>{const k=[...x.attributes].filter(a=>a.name.startsWith('data-')).map(a=>a.name+'='+a.value).join('&');if(window._keep[k])x.value=window._keep[k];});
