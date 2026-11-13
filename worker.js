@@ -1214,7 +1214,7 @@ async function kImgOn(env, s, now) {
   return true;
 }
 async function bridgeImg(env, s) {
-  const rows = (await env.DB.prepare("SELECT id,project,scene,prompt,steps,seed,eng FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux' ORDER BY id LIMIT 40").all()).results;
+  const rows = (await env.DB.prepare("SELECT id,project,scene,prompt,steps,seed,eng FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux' ORDER BY CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) ELSE 999999 END, CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, id LIMIT 40").all()).results;
   if (!rows.length) return 0;
   const st = [], now = Date.now();
   for (const j of rows) {
@@ -1274,7 +1274,7 @@ async function tick(env, force) {
     if (sl.full) return { skipped: 'slot full' };
     if (now - +s.last_run > 180000) await env.DB.prepare("UPDATE jobs SET status='queued' WHERE status='running'").run();
   }
-  const job = await env.DB.prepare("SELECT * FROM jobs WHERE status='queued' AND (?=0 OR eng='flux') ORDER BY id LIMIT 1").bind(useK ? 1 : 0).first();
+  const job = await env.DB.prepare("SELECT * FROM jobs WHERE status='queued' AND (?=0 OR eng='flux') ORDER BY CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) ELSE 999999 END, CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, id LIMIT 1").bind(useK ? 1 : 0).first();
   if (!job) { if (s.auto_fill === '1' && !force && !useK) { await autoFill(env, s); return { skipped: 'empty', filled: true }; } return { skipped: 'empty' }; }
   await setSetting(env, 'last_run', String(now));
   await env.DB.prepare("UPDATE jobs SET status='running' WHERE id=?").bind(job.id).run();
@@ -1504,7 +1504,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts).first();
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts).first();
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
