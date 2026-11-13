@@ -3981,7 +3981,8 @@ async function castApi(req, env, url, body) {
           v.prog = g;
         }
         let meter = null; try { const dy = new Date().toISOString().slice(0, 10); const tt0 = +((await getSettings(env))[readDay()]) || 0, pc0 = readPace(tt0); meter = { cap: READ_CAP, stop: READ_STOP, web: READ_WEB, kstop: READ_KSTOP, budget: Math.round(pc0.budget), every: pc0.every, day: dy, now: Date.now(), total: tt0, by: (await env.DB.prepare('SELECT tag,n,c FROM rmeter WHERE day=? ORDER BY n DESC').bind(dy).all()).results }; } catch (e) { meter = null; }
-        return json({ ok: true, meter, draft: (await getSettings(env)).sb_draft !== '0', boost: +((await getSettings(env)).boost_until) || 0, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
+        const voq = {}; for (const r of (await env.DB.prepare("SELECT project, SUM(json_array_length(json_extract(opt,'$.lines'))) n FROM vjobs WHERE kind='tts' AND status IN ('queued','running') AND project LIKE ? GROUP BY project").bind('เสียงพากย์·' + story + '·ตอน%').all()).results) voq[String(r.project).split('·ตอน').pop()] = +r.n || 0; // บรรทัดเสียงที่ยังรอทำ ต่อตอน
+        return json({ ok: true, voq, meter, draft: (await getSettings(env)).sb_draft !== '0', boost: +((await getSettings(env)).boost_until) || 0, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
       }
       if (act === 'save') {
         const pl = b.plan || {}; if (!Array.isArray(pl.roles) || !Array.isArray(pl.eps) || !pl.roles.length || !pl.eps.length) return json({ error: 'โครงเรื่องไม่ครบ (ต้องมีบทและตอน)' }, 400);
@@ -4054,6 +4055,7 @@ async function castApi(req, env, url, body) {
       }
       if (act === 'vo_samples') { // ทำเสียงตัวอย่างของทุกเสียงให้ฟังก่อนเลือก (เครื่อง CPU ฟรี)
         const lines = [], cast = {}; VV_VOICES.forEach(([sp], i) => { cast['_s' + i] = { sp, st: 'ノーマル', speed: 0.95 }; lines.push({ shot: -(i + 1), line: 0, who: '', nv: '_s' + i, ja: VV_SAMPLE, emo: 'n' }); });
+        await env.DB.prepare("DELETE FROM vjobs WHERE kind='tts' AND status='queued' AND ep='vs'").run(); // กดซ้ำ = แทนคิวเดิม ไม่ต่อท้าย
         await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind('เสียงตัวอย่างผู้บรรยาย', 'vs', Date.now(), JSON.stringify({ lines, cast })).run();
         return json({ ok: true, lines: lines.length });
       }
@@ -4061,20 +4063,27 @@ async function castApi(req, env, url, body) {
         const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!sr) return json({ error: 'ไม่พบเรื่อง' }, 404);
         const cast = castResolve((await rd('vcast:' + story)) || VCAST_DEFAULT), plan = await rd('plan:' + story), G = {}; for (const r of ((plan && plan.roles) || [])) G[r.key] = r.g;
         const scs = (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +b.ep).all()).results;
-        let nl = 0, nj = 0;
+        let nl = 0, nj = 0; const NJ = [];
         for (const sc of scs) { if (!sc.script_id) continue;
           const rows = (await env.DB.prepare("SELECT s.id,s.say,(SELECT group_concat(v.line) FROM voices v WHERE v.shot=s.id) have FROM shots s WHERE s.script_id=? ORDER BY s.idx").bind(sc.script_id).all()).results, L = [];
           for (const r of rows) { let y = {}; try { y = JSON.parse(r.say || '{}'); } catch (e) { } const hv = new Set(String(r.have || '').split(',').filter(Boolean).map(Number));
             (y.lines || []).forEach((l, i) => { if (!l.ja || (!b.redo && hv.has(i))) return; const wo = String(l.who || ''); if (b.only === 'narr' && wo) return; if (b.only === 'think' && !wo.startsWith('~')) return; if (b.only === 'narrthink' && wo && !wo.startsWith('~')) return; const w = String(l.who || ''), nm = w.replace(/^~/, ''); L.push({ shot: r.id, line: i, who: w, ja: String(l.ja).slice(0, 300), emo: String(l.emo || 'n'), g: G[nm] || '', ...(l.nv ? { nv: String(l.nv) } : {}), ...(+l.spd ? { spd: Math.min(1.6, Math.max(0.6, +l.spd)) } : {}), ...(l.pron ? { pron: String(l.pron).slice(0, 300) } : {}) }); }); }
-          for (let k = 0; k < L.length; k += 80) { const part = L.slice(k, k + 80);
-            await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind('เสียงพากย์·' + story + '·ตอน' + (+b.ep), 'v' + sc.script_id, Date.now(), JSON.stringify({ lines: part, cast })).run(); nj++; nl += part.length; } }
+          for (let k = 0; k < L.length; k += 80) NJ.push(['เสียงพากย์·' + story + '·ตอน' + (+b.ep), 'v' + sc.script_id, L.slice(k, k + 80)]); }
         { // พากย์ชื่อเรื่อง + ชื่อตอน (ผู้บรรยาย โทนยิ่งใหญ่ เสียงดังกว่าปกติ)
           const sja = (await rd('series_ja:' + story)) || '', eja = ((await rd('eptitle_ja:' + story)) || {})[String(+b.ep)] || '';
           const have = new Set((await env.DB.prepare('SELECT shot FROM voices WHERE line=0 AND shot IN (?,?)').bind(-200, -200 - (+b.ep)).all()).results.map(r => r.shot)), TL = [];
           const redoT = b.redo && (!b.only || b.only === 'narr' || b.only === 'narrthink');
           if (sja && (redoT || !have.has(-200))) TL.push({ shot: -200, line: 0, who: '', nv: '_title', ja: sja, emo: 'x', loud: 1 });
           if (eja && (redoT || !have.has(-200 - (+b.ep)))) TL.push({ shot: -200 - (+b.ep), line: 0, who: '', nv: '_title', ja: `第${+b.ep}話。　${eja}！`, emo: 'x', loud: 1 });
-          if (TL.length) { await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind('เสียงพากย์ชื่อเรื่อง·' + story, 'vt', Date.now(), JSON.stringify({ lines: TL, cast })).run(); nj++; nl += TL.length; }
+          if (TL.length) NJ.push(['เสียงพากย์ชื่อเรื่อง·' + story, 'vt', TL]);
+        }
+        { // กดซ้ำ = บรรทัดเดียวกันในคิวเก่าถูกแทนที่ (เคยกดหลายรอบจนคิวซ้ำ 4–5 เท่า รอเป็นชั่วโมง)
+          const K = new Set(); for (const [, , ls] of NJ) for (const l of ls) K.add(l.shot + ':' + l.line);
+          if (K.size) { const old = (await env.DB.prepare("SELECT id,opt FROM vjobs WHERE kind='tts' AND status='queued' AND project IN (?,?)").bind('เสียงพากย์·' + story + '·ตอน' + (+b.ep), 'เสียงพากย์ชื่อเรื่อง·' + story).all()).results;
+            for (const o of old) { let y = {}; try { y = JSON.parse(o.opt || '{}'); } catch (e) { } const keep = (y.lines || []).filter(l => !K.has(l.shot + ':' + l.line));
+              if (!keep.length) await env.DB.prepare('DELETE FROM vjobs WHERE id=?').bind(o.id).run();
+              else if (keep.length < (y.lines || []).length) { y.lines = keep; await env.DB.prepare('UPDATE vjobs SET opt=? WHERE id=?').bind(JSON.stringify(y), o.id).run(); } } }
+          for (const [pj, ep, ls] of NJ) { await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind(pj, ep, Date.now(), JSON.stringify({ lines: ls, cast })).run(); nj++; nl += ls.length; }
         }
         return json({ ok: true, jobs: nj, lines: nl });
       }
