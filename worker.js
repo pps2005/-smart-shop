@@ -4744,6 +4744,21 @@ async function castApi(req, env, url, body) {
           v.prog = g;
         }
         let meter = null; try { const dy = new Date().toISOString().slice(0, 10); const tt0 = +((await getSettings(env))[readDay()]) || 0, pc0 = readPace(tt0); meter = { cap: READ_CAP, stop: READ_STOP, web: READ_WEB, kstop: READ_KSTOP, budget: Math.round(pc0.budget), every: pc0.every, day: dy, now: Date.now(), total: tt0, by: (await env.DB.prepare('SELECT tag,n,c FROM rmeter WHERE day=? ORDER BY n DESC').bind(dy).all()).results }; } catch (e) { meter = null; }
+        if (meter) try { // แผนงานในคิว: แต่ละคิวจะใช้ฐานข้อมูลประมาณเท่าไร (คิดจากการใช้จริงวันนี้ต่อภาพ/ต่อบรรทัดเสียง)
+          const S = await getSettings(env), d0 = Date.parse(dy + 'T00:00:00Z');
+          const kR = meter.by.filter(r => /^(kaggle|bg:kaggle)/.test(r.tag)).reduce((a, r) => a + (+r.n || 0), 0);
+          const iT = ((await env.DB.prepare('SELECT COUNT(*) n FROM images WHERE created>=?').bind(d0).first()) || {}).n || 0, vT = ((await env.DB.prepare('SELECT COUNT(*) n FROM voices WHERE created>=?').bind(d0).first()) || {}).n || 0;
+          const perImg = iT >= 5 ? Math.round(kR / (iT + vT / 20)) : 2500, perLine = Math.max(30, Math.round(perImg / 20));
+          const Q = [], add = (label, n, unit, per, note) => { if (n > 0) Q.push({ label, n, unit, est: Math.round(n * per), note: note || '' }); };
+          const sc = {}; for (const r of (await env.DB.prepare('SELECT script_id,ep,sc FROM scenes').all()).results) sc[r.script_id] = `ตอน ${r.ep} ซีน ${r.sc}`;
+          const im = (await env.DB.prepare("SELECT CASE WHEN project LIKE 'อ้างอิง·%' THEN 'R' WHEN project LIKE 'ฉาก%·%' THEN substr(project,4,instr(project,'·')-4) ELSE 'X' END g, COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') GROUP BY g").all()).results;
+          for (const r of im) add(r.g === 'R' ? 'แผ่นอ้างอิงตัวละคร' : r.g === 'X' ? 'ภาพอื่นๆ' : 'ภาพ ' + (sc[r.g] || 'ฉาก ' + r.g), +r.n, 'ภาพ', perImg);
+          const held = String(S.img_hold || '').split(',').map(x => x.trim()).filter(Boolean);
+          for (const h of held) { const n = ((await env.DB.prepare('SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND NOT EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj)').bind(+h).first()) || {}).n || 0; add('ภาพ ' + (sc[h] || 'ฉาก ' + h), n, 'ภาพ', perImg, 'พักไว้ รอผู้ใช้เลือกภาพอ้างอิง'); }
+          const tl = ((await env.DB.prepare("SELECT SUM(json_array_length(json_extract(opt,'$.lines'))) n FROM vjobs WHERE kind='tts' AND status IN ('queued','running')").first()) || {}).n || 0; add('เสียงพากย์', +tl, 'บรรทัด', perLine);
+          const lp = String(S.lora_purge || '').split(',').filter(Boolean).length; add('ลบไฟล์ LoRA เก่า', lp, 'ไฟล์', 40);
+          meter.queue = { items: Q, perImg, perLine, measured: iT >= 5 };
+        } catch (e) { }
         const voq = {}; for (const r of (await env.DB.prepare("SELECT project, SUM(json_array_length(json_extract(opt,'$.lines'))) n FROM vjobs WHERE kind='tts' AND status IN ('queued','running') AND project LIKE ? GROUP BY project").bind('เสียงพากย์·' + story + '·ตอน%').all()).results) voq[String(r.project).split('·ตอน').pop()] = +r.n || 0; // บรรทัดเสียงที่ยังรอทำ ต่อตอน
         return json({ ok: true, voq, meter, draft: (await getSettings(env)).sb_draft !== '0' && (await getSettings(env)).img_hybrid !== '1' /* ภาพแบบผสมเป็นภาพสี: ไม่ใส่ฟิลเตอร์ขาวดำของภาพร่าง */, boost: +((await getSettings(env)).boost_until) || 0, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
       }
