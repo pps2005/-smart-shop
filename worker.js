@@ -11,7 +11,7 @@ import WORLD from './world.json';
 import SBX from './sbx.json'; // สตอรีบอร์ดที่เขียนมือ (เรื่อง → ตอน → ซีน → ช็อต) นำเข้าด้วย settings sb_import
 import MANGA from './mangaep.json'; // คลังโลก: อาวุธ พลังอาคม ของวิเศษ โลกและจักรวาล (400 รายการ) // คลังไอเดีย 600 รายการ (ตัวละคร ชุด พร็อพ สัตว์ องค์ประกอบฉาก เอฟเฟกต์) พร้อมรหัส CHR/COS/PRP/CRT/ELM/FX // คลัง 1000 ฉากอนิเมะของผู้ใช้ (Anime_Scene_Library_1000.xlsx) ใช้สุ่มแคสติ้งหมวดฉาก
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
-const BOT_VER = 'draft-k-1';
+const BOT_VER = 'draft-k-2';
 
 // ----- มิเตอร์การอ่านฐานข้อมูล: D1 ฟรีอ่านได้ 5 ล้านแถว/วัน (นับตามแถวที่สแกน) เกินแล้วระบบดับทั้งวัน → นับเองทุกคำสั่ง แล้วชะลองานเบื้องหลังเมื่อใกล้เพดาน -----
 const READ_CAP = 5000000, READ_SLOW = 3200000, READ_STOP = 4250000, READ_WEB = 4500000, READ_KSTOP = 4750000; // 85% หยุดงานเบื้องหลัง · 90% หน้าเว็บเข้าโหมดประหยัด · 95% หยุดจ่ายงานให้ Kaggle (ทำต่อหลังรีเซ็ต)
@@ -579,11 +579,26 @@ function fluxDraft(job, s, shEn) {
   // Flux ไม่ค่อยทำตามแท็กอายุ ต้องบอกเป็นประโยค (เจอจริง: ป้าฮานะ 61 ออกมาเป็นสาว)
   const age = /\b(old woman|old man|middle-aged)/.test(p) ? 'Every character is drawn youthful and attractive, looking much younger than their real age, smooth faces without wrinkles' : ''; // ผู้ใช้สั่ง: ทุกตัวดูหนุ่มสาว อายุเยอะให้สวย/หล่อกว่าวัย
   // ภาพร่างสตอรีบอร์ด = มังงะขาวดำตัดเส้นหมึก (ผู้ใช้เลือก): ไม่มีสี/แสงให้แกว่งข้ามช่อง · ตั้ง settings draft_style เพื่อเปลี่ยนได้
-  const wide = /establishing shot|wide shot|insert shot/i.test(p);
-  const st = String(s.draft_style || '').trim() || ('black and white manga illustration drawn with a fine-tip pen on clean white paper, very thin delicate uniform ink lines, airy and light, mostly white space, no solid black fills, hair drawn as many fine separate strands left white, only light dot screentone on small shadow areas, soft gentle faces with large detailed sparkling eyes, ' + (wide ? 'simple lightly sketched background with thin lines' : 'almost empty white background with only a few thin lines hinting at the place') + ', no color anywhere, no gray gradients, no text, no letters, no numbers, no speech bubbles, single panel, every character drawn in the same delicate manga style with slender anime proportions and anime faces, never a western cartoon caricature');
-  // ตัดคำบอกสีออกจากคำบรรยาย (เช่น red hair) ไม่งั้น Flux ระบายสีนั้นลงภาพขาวดำ — เจอจริง: ผมแดงของรินโผล่มาเป็นสี
+  const st = String(s.draft_style || '').trim() || 'black and white manga page panel drawn with a fine-tip pen, very thin delicate uniform ink lines, light dot screentone shading, hair drawn as fine separate strands, large detailed expressive eyes, background drawn in thin clean lines with real detail (room, furniture, street, sky), no color, no text, no speech bubbles, every character in the same delicate manga style with slender anime proportions';
   const mono = body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/, a tired gentle face/gi, ', a gentle face').replace(/\ba plain /gi, 'a ').replace(/\b(mature male|middle-aged man|mature female|middle-aged woman|old woman|old man),\s*/gi, '').replace(/ {2,}/g, ' ');
-  return `${st}. ${age ? age + '. ' : ''}${mono}. Strictly black ink on white paper, grayscale only, absolutely no colored areas.`;
+  return `${draftCam(mono)}. ${age ? age + '. ' : ''}Scene: ${mono}. Style: ${st}. Strictly black ink on white paper, grayscale only.`; // มุมกล้อง + เนื้อเรื่องมาก่อนลายเส้น (ตัวเข้ารหัส CLIP อ่านแค่ ~77 โทเคนแรก — เดิมลายเส้นมาก่อน มุมกล้องเลยหลุด ได้แต่หน้าตรง)
+}
+// มุมกล้องของช่อง → ประโยคบังคับท่า/มุม (Flux ชอบวาดคนหันหน้าตรงมองกล้องถ้าไม่สั่งชัด)
+function draftCam(en) {
+  const e = String(en || '').toLowerCase(), c = [];
+  if (/over-the-shoulder/.test(e)) c.push('over-the-shoulder shot, one character seen from behind in the foreground');
+  if (/back view|from behind|walking away/.test(e)) c.push('character seen from behind, back to the viewer');
+  if (/side view|from the side|profile|side shot/.test(e)) c.push('side profile view, character facing sideways');
+  if (/low angle/.test(e)) c.push('dramatic low-angle shot looking up from the ground');
+  if (/high angle|from above|from high above|top-down/.test(e)) c.push('high-angle shot looking down from above');
+  if (/extreme close-up/.test(e)) c.push('extreme close-up filling the frame');
+  else if (/close-up/.test(e)) c.push('close-up framing');
+  if (/two-shot|face to face/.test(e)) c.push('two characters interacting with each other, facing each other, not facing the viewer');
+  if (/wide shot|establishing/.test(e)) c.push('wide shot, the place fills the frame, characters small in the scene');
+  if (/dynamic|running|leaping|swinging|throwing|jumping|fighting|lunging/.test(e)) c.push('dynamic action pose with motion lines, diagonal composition');
+  if (/insert shot/.test(e)) c.push('insert shot of the object, no character faces');
+  if (!/back view|from behind|side|profile|over-the-shoulder|insert shot|wide shot|establishing/.test(e)) c.push('three-quarter view, the character is busy with the action and looking away from the viewer, candid moment, not posing for the camera');
+  return 'Manga panel. Camera: ' + c.join(', ');
 }
 function withStyle(p, s) { p = legacyFix(String(p || '')); if (p.includes('[[STYLE_OBJ]]')) p = p.split('[[STYLE_OBJ]]').join(objStyle(s)); if (p.includes('[[STYLE_ENV]]')) p = p.split('[[STYLE_ENV]]').join(envStyle(s)); return p.includes('[[STYLE]]') ? p.split('[[STYLE]]').join(curStyle(s)) : p; }
 // เจนต่อเนื่อง: คิวว่างเมื่อไร เติมผู้สมัครออดิชันใหม่เอง (สลับบท) — เอาไว้ให้ได้ภาพมากพอเลือกทำ LoRA
@@ -1207,7 +1222,7 @@ async function bridgeImg(env, s) {
     const draft = String(j.project).startsWith('ฉาก') && s.sb_draft !== '0';
     let shEn = ''; if (draft) { const shr = await env.DB.prepare('SELECT en FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; lo = []; }
     const eg = draft ? 'dev' : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
-    const opt = { jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '', quant: s.img_quant || '', loras: lo };
+    const opt = { ...(draft ? { gray: 1 } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: +s.img_w || 1024, h: +s.img_h || 1024, model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: j.prompt }, s, /chr\d+x/.test(String(j.prompt || '')) ? shEn : '') : withStyle(j.prompt, s)).slice(0, 1800), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -2641,6 +2656,8 @@ def gen_image(j, port=8188):
         raise RuntimeError("ไม่มีไฟล์ภาพออกมา")
     from PIL import Image
     im = Image.open(outs[-1]).convert("RGB")
+    if (j.get("opt") or {}).get("gray"):
+        im = im.convert("L").convert("RGB")  # สตอรีบอร์ดร่าง: บังคับขาวดำ กันสีหลุด
     if max(e[1] for e in im.getextrema()) < 10:
         raise RuntimeError("ภาพที่ได้เป็นสีดำ (VAE ผิดพลาด)")
     jpg = os.path.join(ROOT, "%s.jpg" % jid)
@@ -3783,7 +3800,7 @@ async function castApi(req, env, url, body) {
           v.prog = g;
         }
         let meter = null; try { const dy = new Date().toISOString().slice(0, 10); const tt0 = +((await getSettings(env))[readDay()]) || 0, pc0 = readPace(tt0); meter = { cap: READ_CAP, stop: READ_STOP, web: READ_WEB, kstop: READ_KSTOP, budget: Math.round(pc0.budget), every: pc0.every, day: dy, now: Date.now(), total: tt0, by: (await env.DB.prepare('SELECT tag,n,c FROM rmeter WHERE day=? ORDER BY n DESC').bind(dy).all()).results }; } catch (e) { meter = null; }
-        return json({ ok: true, meter, boost: +((await getSettings(env)).boost_until) || 0, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
+        return json({ ok: true, meter, draft: (await getSettings(env)).sb_draft !== '0', boost: +((await getSettings(env)).boost_until) || 0, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
       }
       if (act === 'save') {
         const pl = b.plan || {}; if (!Array.isArray(pl.roles) || !Array.isArray(pl.eps) || !pl.roles.length || !pl.eps.length) return json({ error: 'โครงเรื่องไม่ครบ (ต้องมีบทและตอน)' }, 400);
