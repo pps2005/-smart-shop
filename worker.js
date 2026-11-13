@@ -891,11 +891,11 @@ async function sbSay(env, s, sid) {
   const rows = (await env.DB.prepare('SELECT id,th,chars,say FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results; if (!rows.length) return 0;
   for (const r of rows) { try { r.dir = (JSON.parse(r.say || '{}') || {}).dir || null; } catch (e) { r.dir = null; } }
   const sc = await env.DB.prepare('SELECT body FROM scripts WHERE id=?').bind(sid).first();
-  const o = await llmJson(env, s, `บทของซีนนี้: ${String((sc && sc.body) || '').slice(0, 3000)}\n\nสตอรีบอร์ดเรียงตามลำดับ (เลข: เหตุการณ์ [ตัวละครในช็อต])\n${rows.map((r, i) => `${i + 1}: ${r.th} ${r.chars || '[]'}${r.dir ? ` {แนว ${r.dir.genre || '-'} · อารมณ์ที่ต้องการ: ${r.dir.mood || '-'}}` : ''}`).join('\n')}\n\nเขียนซับภาษาไทยแบบอนิเมะที่ใช้ภาพนิ่ง: ภาพหนึ่งค้างไว้ แล้วซับขึ้นทีละบรรทัด\n- แต่ละช็อตมี 1-3 บรรทัด (lines) บรรทัดละไม่เกิน 40 ตัวอักษร\n- บทพูด: who = ชื่อตัวละครที่อยู่ในช็อตนั้น ฉากสนทนาให้สลับกันพูดโต้ตอบบ่อยๆ (ถ้าทั้งคู่อยู่ในช็อตเดียวกัน สลับคนพูดในช็อตเดียวได้) ประโยคสั้น เป็นธรรมชาติ มีอารมณ์ ไม่ใช่คำห้วนคำเดียว\n- คำบรรยาย/ความคิด/เล่าสถานการณ์: who = "" แบ่งเป็นท่อนสั้นๆ ค่อยๆ เล่าทีละนิด\n- ต่อเนื่องกันทั้งซีน อ่านแล้วเข้าใจเรื่องโดยไม่ต้องมีเสียง ช็อตแอ็กชันล้วนให้ lines ว่างได้\n- เฉพาะช็อตหน้ามีม/จังหวะตลก/อารมณ์พุ่ง ใส่ตัวหนังสือลอยได้ (ช็อตปกติไม่ต้องใส่): think = ความคิดในใจสั้นๆ ไม่เกิน 18 ตัวอักษร (เช่น "ตื่นเต้นสุดๆ!" "ซวยแล้ว...") · ono = คำเสียงประกอบแบบมังงะ ไม่เกิน 8 ตัวอักษร (เช่น "ตึกตัก!" "ปิ๊ง!" "เงียบ..." "ฮึ่ม!")\nตอบเป็น JSON array: [{"n":เลขช็อต,"lines":[{"who":"ชื่อคนพูด หรือ \"\"","say":"ข้อความ"}],"think":"","ono":""}]`);
+  const o = await llmJson(env, s, `บทของซีนนี้: ${String((sc && sc.body) || '').slice(0, 3000)}\n\nสตอรีบอร์ดเรียงตามลำดับ (เลข: เหตุการณ์ [ตัวละครในช็อต])\n${rows.map((r, i) => `${i + 1}: ${r.th} ${r.chars || '[]'}${r.dir ? ` {แนว ${r.dir.genre || '-'} · อารมณ์ที่ต้องการ: ${r.dir.mood || '-'}}` : ''}`).join('\n')}\n\nเขียนซับภาษาไทยแบบอนิเมะที่ใช้ภาพนิ่ง: ภาพหนึ่งค้างไว้ แล้วซับขึ้นทีละบรรทัด\n- แต่ละช็อตมี 1-3 บรรทัด (lines) บรรทัดละไม่เกิน 40 ตัวอักษร\n- บทพูด: who = ชื่อตัวละครที่อยู่ในช็อตนั้น ฉากสนทนาให้สลับกันพูดโต้ตอบบ่อยๆ (ถ้าทั้งคู่อยู่ในช็อตเดียวกัน สลับคนพูดในช็อตเดียวได้) ประโยคสั้น เป็นธรรมชาติ มีอารมณ์ ไม่ใช่คำห้วนคำเดียว\n- คำบรรยาย/ความคิด/เล่าสถานการณ์: who = "" แบ่งเป็นท่อนสั้นๆ ค่อยๆ เล่าทีละนิด · บรรทัดบรรยายใส่ "nv" บอกโทนของผู้บรรยาย (narrator เล่าเรื่องอบอุ่น · n_cine ภาพยนตร์ · n_anime อนิเมะ/ตลก · n_dark มืดหม่น/สยอง · n_doc สารคดี/อธิบายโลก · n_emo อารมณ์ลึกซึ้ง · n_epic ยิ่งใหญ่/ฉากสู้) ถ้าเรื่องมีตัวช่วยเล่าเรื่อง (สัตว์/มาสคอต) ให้บางบรรทัดเป็นมุมมองของมัน แซว/สรุป/พาเรื่องเดิน ด้วย "nv":"companion"\n- ต่อเนื่องกันทั้งซีน อ่านแล้วเข้าใจเรื่องโดยไม่ต้องมีเสียง ช็อตแอ็กชันล้วนให้ lines ว่างได้\n- เฉพาะช็อตหน้ามีม/จังหวะตลก/อารมณ์พุ่ง ใส่ตัวหนังสือลอยได้ (ช็อตปกติไม่ต้องใส่): think = ความคิดในใจสั้นๆ ไม่เกิน 18 ตัวอักษร (เช่น "ตื่นเต้นสุดๆ!" "ซวยแล้ว...") · ono = คำเสียงประกอบแบบมังงะ ไม่เกิน 8 ตัวอักษร (เช่น "ตึกตัก!" "ปิ๊ง!" "เงียบ..." "ฮึ่ม!")\nตอบเป็น JSON array: [{"n":เลขช็อต,"lines":[{"who":"ชื่อคนพูด หรือ \"\"","say":"ข้อความ"}],"think":"","ono":""}]`);
   const arr = Array.isArray(o) ? o : (o && Array.isArray(o.shots) ? o.shots : []), st = [];
   for (const x of arr) {
     const r = rows[+x.n - 1]; if (!r) continue;
-    const ls = (Array.isArray(x.lines) ? x.lines : (x.say ? [x] : [])).filter(l => l && typeof l.say === 'string' && l.say.trim()).slice(0, 3).map(l => ({ who: String(l.who || '').slice(0, 40), say: l.say.trim().slice(0, 120) }));
+    const ls = (Array.isArray(x.lines) ? x.lines : (x.say ? [x] : [])).filter(l => l && typeof l.say === 'string' && l.say.trim()).slice(0, 3).map(l => ({ who: String(l.who || '').slice(0, 40), say: l.say.trim().slice(0, 120), ...(!l.who && /^(narrator|n_cine|n_anime|n_dark|n_doc|n_emo|n_epic|companion)$/.test(String(l.nv || '')) ? { nv: String(l.nv) } : {}) }));
     const think = typeof x.think === 'string' ? x.think.trim().slice(0, 40) : '', ono = typeof x.ono === 'string' ? x.ono.trim().slice(0, 14) : '';
     if (!ls.length && !think && !ono) continue;
     st.push(env.DB.prepare('UPDATE shots SET say=? WHERE id=?').bind(JSON.stringify({ who: ls[0] ? ls[0].who : '', say: ls[0] ? ls[0].say : '', lines: ls, ...(think ? { think } : {}), ...(ono ? { ono } : {}), ...(r.dir ? { dir: r.dir } : {}) }), r.id));
@@ -1819,6 +1819,34 @@ const VCAST_DEFAULT = {
   _f: { sp: '春日部つむぎ', st: 'ノーマル', speed: 1.0, pitch: 0, into: 1.0, d: { id: 'ตัวประกอบหญิง' } },
   _x: { sp: 'No.7', st: 'ノーマル', speed: 0.9, pitch: -0.08, into: 0.7, d: { id: 'อสูร/สิ่งที่ไม่ใช่คน' } },
 };
+// ผู้บรรยายคนเดียว + โทนตามบท: 7 แบบ = ส่วนต่างจากเสียงหลักของผู้บรรยาย (คูณด้วยความเข้มการพากย์ที่ผู้ใช้ตั้ง 0–1.5)
+const NARR_TONE = {
+  narrator: {}, // Storyteller: เสียงหลัก
+  n_cine: { speed: -0.08, pitch: -0.03, into: 0.12, pre: 0.08, post: 0.15, gap: 0.2 },
+  n_anime: { speed: 0.04, pitch: 0.02, into: 0.35 },
+  n_dark: { speed: -0.13, pitch: -0.05, into: -0.3, vol: -0.08, pre: 0.1, post: 0.2, gap: 0.3, st: 'ささやき' },
+  n_doc: { speed: 0.02, into: -0.12 },
+  n_emo: { speed: -0.07, into: 0.22, post: 0.2, gap: 0.3 },
+  n_epic: { speed: -0.04, pitch: -0.01, into: 0.4, vol: 0.08 },
+};
+NARR_TONE.narrator2 = NARR_TONE.n_dark;
+// รายชื่อเสียง VOICEVOX ให้เลือกเป็นผู้บรรยาย/ตัวช่วยเล่าเรื่อง (g: m ชาย · f หญิง · c ตัวการ์ตูน/สัตว์)
+const VV_VOICES = [['雨晴はう', 'f'], ['四国めたん', 'f'], ['春日部つむぎ', 'f'], ['冥鳴ひまり', 'f'], ['九州そら', 'f'], ['もち子さん', 'f'], ['WhiteCUL', 'f'], ['小夜/SAYO', 'f'], ['櫻歌ミコ', 'f'], ['春歌ナナ', 'f'], ['波音リツ', 'f'], ['No.7', 'f'], ['琴詠ニア', 'f'], ['中国うさぎ', 'f'],
+  ['青山龍星', 'm'], ['†聖騎士 紅桜†', 'm'], ['雀松朱司', 'm'], ['玄野武宏', 'm'], ['白上虎太郎', 'm'], ['剣崎雌雄', 'm'], ['麒ヶ島宗麟', 'm'], ['ちび式じい', 'm'],
+  ['ずんだもん', 'c'], ['猫使アル', 'c'], ['猫使ビィ', 'c'], ['あいえるたん', 'c'], ['満別花丸', 'c'], ['栗田まろん', 'c']];
+const VV_SAMPLE = 'ここは響の町。結界の下で、静かに時を刻む小さな町だ。……でも今夜、何かが起きる。';
+// แปลงผังเสียง: ผู้บรรยายทุกแบบ = เสียงเดียวกัน (cast.narrator) + โทนตามบท · companion = ตัวช่วยเล่าเรื่อง (สัตว์/มาสคอต) แยกเสียง
+function castResolve(cast) {
+  const c = { ...cast }, base = cast.narrator || VCAST_DEFAULT.narrator, k = Math.max(0, Math.min(1.5, cast.narrator && cast.narrator.k != null ? +cast.narrator.k : 1));
+  for (const [key, t] of Object.entries(NARR_TONE)) {
+    const o = { ...base, emo: undefined };
+    for (const f of ['speed', 'pitch', 'into', 'vol', 'pre', 'post', 'gap']) if (t[f]) o[f] = Math.round(((+base[f] || (f === 'speed' || f === 'into' || f === 'vol' ? 1 : f === 'pre' ? 0.1 : f === 'post' ? 0.2 : f === 'gap' ? 0.5 : 0)) + t[f] * k) * 1000) / 1000;
+    if (t.st && k >= 0.5) o.st = t.st; // เสียงกระซิบ (ถ้าผู้บรรยายคนนั้นมีสไตล์นี้ ไม่มีก็ใช้ปกติ)
+    c[key] = o;
+  }
+  if (!c.companion) c.companion = { sp: 'ずんだもん', st: 'ノーマル', speed: 1.1, pitch: 0.06, into: 1.4, name: 'โมจิ' };
+  return c;
+}
 // ---- เครื่อง CPU ของ Kaggle (ไม่จำกัดชั่วโมงต่อสัปดาห์): รับงานรวมตอน/ซับ/เสียงผสม/รวมคลิป ประหยัดโควตา GPU ----
 async function cpuKTick(env) {
   const S = {}; for (const r of (await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('v_cpu','kc_status','kc_pushed','kc_checked','self_url','ktoken','k_quant','k_user','k_key')").all()).results) S[r.key] = r.value;
@@ -2315,14 +2343,14 @@ def tts_job(j):
             qd["speedScale"] = float(c.get("speed", 1.0)) * (0.92 if emo == "w" else 1.0) * float(ln.get("spd") or 1.0)
             qd["pitchScale"] = float(c.get("pitch", 0.0))
             qd["intonationScale"] = float(c.get("into", 1.0)) * (1.15 if emo in ("x", "a") else 1.0)
-            qd["volumeScale"] = float(c.get("vol", 1.0)) * (0.85 if who.startswith("~") else 1.0)
+            qd["volumeScale"] = float(c.get("vol", 1.0))  # เสียงในใจดังเท่าเสียงพูด (ผู้ใช้สั่ง) · ต่างกันแค่ก้องเบาๆ
             qd["prePhonemeLength"] = float(c.get("pre", 0.08))  # ช่องหายใจก่อนพูด ตามผังเสียงตัวละคร
             qd["postPhonemeLength"] = float(c.get("post", 0.15))
             wav = vv_req("/synthesis", qd, q={"speaker": sid})
             wf = os.path.join(ROOT, "vo.wav")
             mf = os.path.join(ROOT, "vo.m4a")
             open(wf, "wb").write(wav)
-            fx = ["aecho=0.8:0.55:35:0.22"] if who.startswith("~") else []  # ความคิดในใจ: ก้องเบาๆ แบบอนิเมะ
+            fx = ["aecho=0.9:0.6:35:0.18"] if who.startswith("~") else []  # ความคิดในใจ: ก้องเบาๆ แบบอนิเมะ
             fx.append("loudnorm=I=-18:TP=-2:LRA=9")  # ปรับความดังทุกบรรทัดให้เท่ากัน (ตรวจคุณภาพเสียง)
             af = '-af "%s"' % ",".join(fx)
             sh('"%s" -y -loglevel error -i "%s" %s -ac 1 -ar 24000 -c:a aac -b:a 64k "%s"' % (ffmpeg_bin(), wf, af, mf))
@@ -3933,19 +3961,25 @@ async function castApi(req, env, url, body) {
       if (act === 'qcrep') { // รายงานตรวจความต่อเนื่อง/คุณภาพของตอน (สร้างโดยสคริปต์ตรวจก่อนส่งวาด)
         return json({ ok: true, rep: await rd('qcrep:' + story + '|' + (+b.ep || 1)), canon: await rd('canon:' + story) });
       }
-      if (act === 'vo_cast') { // ผังเสียงพากย์ของเรื่อง (แก้ได้: ส่ง cast มาแทน)
+      if (act === 'vo_cast') { // ผังเสียงพากย์ของเรื่อง (แก้ได้: ส่ง cast มาแทน) + รายชื่อเสียงให้เลือก + เสียงตัวอย่าง
         if (b.cast && typeof b.cast === 'object') await setSetting(env, 'vcast:' + story, JSON.stringify(b.cast));
-        return json({ ok: true, cast: (await rd('vcast:' + story)) || VCAST_DEFAULT });
+        const smp = (await env.DB.prepare('SELECT shot,id FROM voices WHERE shot<0 AND shot>-100').all()).results, sm = {}; for (const r of smp) sm[VV_VOICES[-r.shot - 1] ? VV_VOICES[-r.shot - 1][0] : r.shot] = r.id;
+        return json({ ok: true, cast: (await rd('vcast:' + story)) || VCAST_DEFAULT, voices: VV_VOICES, samples: sm });
+      }
+      if (act === 'vo_samples') { // ทำเสียงตัวอย่างของทุกเสียงให้ฟังก่อนเลือก (เครื่อง CPU ฟรี)
+        const lines = [], cast = {}; VV_VOICES.forEach(([sp], i) => { cast['_s' + i] = { sp, st: 'ノーマル', speed: 0.95 }; lines.push({ shot: -(i + 1), line: 0, who: '', nv: '_s' + i, ja: VV_SAMPLE, emo: 'n' }); });
+        await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind('เสียงตัวอย่างผู้บรรยาย', 'vs', Date.now(), JSON.stringify({ lines, cast })).run();
+        return json({ ok: true, lines: lines.length });
       }
       if (act === 'vo_make') { // สั่งทำเสียงพากย์ญี่ปุ่นของตอน (บรรทัดที่มีบทญี่ปุ่น) บนเครื่อง CPU ของ Kaggle
         const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!sr) return json({ error: 'ไม่พบเรื่อง' }, 404);
-        const cast = (await rd('vcast:' + story)) || VCAST_DEFAULT, plan = await rd('plan:' + story), G = {}; for (const r of ((plan && plan.roles) || [])) G[r.key] = r.g;
+        const cast = castResolve((await rd('vcast:' + story)) || VCAST_DEFAULT), plan = await rd('plan:' + story), G = {}; for (const r of ((plan && plan.roles) || [])) G[r.key] = r.g;
         const scs = (await env.DB.prepare('SELECT script_id FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +b.ep).all()).results;
         let nl = 0, nj = 0;
         for (const sc of scs) { if (!sc.script_id) continue;
           const rows = (await env.DB.prepare("SELECT s.id,s.say,(SELECT group_concat(v.line) FROM voices v WHERE v.shot=s.id) have FROM shots s WHERE s.script_id=? ORDER BY s.idx").bind(sc.script_id).all()).results, L = [];
           for (const r of rows) { let y = {}; try { y = JSON.parse(r.say || '{}'); } catch (e) { } const hv = new Set(String(r.have || '').split(',').filter(Boolean).map(Number));
-            (y.lines || []).forEach((l, i) => { if (!l.ja || (!b.redo && hv.has(i))) return; const w = String(l.who || ''), nm = w.replace(/^~/, ''); L.push({ shot: r.id, line: i, who: w, ja: String(l.ja).slice(0, 300), emo: String(l.emo || 'n'), g: G[nm] || '', ...(l.nv ? { nv: String(l.nv) } : {}), ...(+l.spd ? { spd: Math.min(1.6, Math.max(0.6, +l.spd)) } : {}), ...(l.pron ? { pron: String(l.pron).slice(0, 300) } : {}) }); }); }
+            (y.lines || []).forEach((l, i) => { if (!l.ja || (!b.redo && hv.has(i))) return; const wo = String(l.who || ''); if (b.only === 'narr' && wo) return; if (b.only === 'think' && !wo.startsWith('~')) return; if (b.only === 'narrthink' && wo && !wo.startsWith('~')) return; const w = String(l.who || ''), nm = w.replace(/^~/, ''); L.push({ shot: r.id, line: i, who: w, ja: String(l.ja).slice(0, 300), emo: String(l.emo || 'n'), g: G[nm] || '', ...(l.nv ? { nv: String(l.nv) } : {}), ...(+l.spd ? { spd: Math.min(1.6, Math.max(0.6, +l.spd)) } : {}), ...(l.pron ? { pron: String(l.pron).slice(0, 300) } : {}) }); }); }
           for (let k = 0; k < L.length; k += 80) { const part = L.slice(k, k + 80);
             await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind('เสียงพากย์·' + story + '·ตอน' + (+b.ep), 'v' + sc.script_id, Date.now(), JSON.stringify({ lines: part, cast })).run(); nj++; nl += part.length; } }
         return json({ ok: true, jobs: nj, lines: nl });
