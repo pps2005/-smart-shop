@@ -1290,6 +1290,8 @@ async function kImgOn(env, s, now) {
 }
 async function bridgeImg(env, s) {
   const rows = (await env.DB.prepare("SELECT id,project,scene,prompt,steps,seed,eng FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux' ORDER BY CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) ELSE 999999 END, CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, id LIMIT 40").all()).results;
+  { const HOLD = new Set(String(s.img_hold || '').split(',').map(x => x.trim()).filter(Boolean)); // พักวาดซีนที่ระบุ (script_id) เช่น รอผู้ใช้เลือกภาพอ้างอิงตัวละครก่อน
+    if (HOLD.size) for (let i = rows.length - 1; i >= 0; i--) { const m = /^ฉาก(\d+)·/.exec(String(rows[i].project)); if (m && HOLD.has(m[1])) rows.splice(i, 1); } }
   if (!rows.length) return 0;
   // จองงานแบบอะตอมก่อนส่ง (เคยมีรอบทำงานซ้อน 2 รอบ ส่งงานเดียวกันไป Kaggle ซ้ำ 2 เท่า)
   const got = new Set(((await env.DB.prepare(`UPDATE jobs SET status='kaggle' WHERE status='queued' AND id IN (${rows.map(() => '?').join(',')}) RETURNING id`).bind(...rows.map(r => r.id)).all()).results || []).map(r => r.id));
