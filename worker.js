@@ -1844,6 +1844,7 @@ function castResolve(cast) {
     if (t.st && k >= 0.5) o.st = t.st; // เสียงกระซิบ (ถ้าผู้บรรยายคนนั้นมีสไตล์นี้ ไม่มีก็ใช้ปกติ)
     c[key] = o;
   }
+  { const e = c.n_epic || base; c._title = { ...e, speed: Math.max(0.75, (+e.speed || 1) - 0.06), into: Math.min(2, (+e.into || 1) + 0.25), vol: 1.25, pre: 0.25, post: 0.5 }; } // เสียงพากย์ชื่อเรื่อง/ชื่อตอน: ช้าลงนิด เน้นคำ ดังขึ้น
   if (!c.companion) c.companion = { sp: 'ずんだもん', st: 'ノーマル', speed: 1.1, pitch: 0.06, into: 1.4, name: 'โมจิ' };
   return c;
 }
@@ -2351,7 +2352,7 @@ def tts_job(j):
             mf = os.path.join(ROOT, "vo.m4a")
             open(wf, "wb").write(wav)
             fx = ["aecho=0.9:0.6:35:0.18"] if who.startswith("~") else []  # ความคิดในใจ: ก้องเบาๆ แบบอนิเมะ
-            fx.append("loudnorm=I=-18:TP=-2:LRA=9")  # ปรับความดังทุกบรรทัดให้เท่ากัน (ตรวจคุณภาพเสียง)
+            fx.append("loudnorm=I=%d:TP=-1:LRA=9" % (-14 if ln.get("loud") else -18))  # ชื่อเรื่อง/ชื่อตอนดังกว่าปกติ  # ปรับความดังทุกบรรทัดให้เท่ากัน (ตรวจคุณภาพเสียง)
             af = '-af "%s"' % ",".join(fx)
             sh('"%s" -y -loglevel error -i "%s" %s -ac 1 -ar 24000 -c:a aac -b:a 64k "%s"' % (ffmpeg_bin(), wf, af, mf))
             call("/k/vo/%s?shot=%s&line=%s" % (j["id"], ln["shot"], ln["line"]), raw=open(mf, "rb").read(), timeout=120)
@@ -3964,7 +3965,8 @@ async function castApi(req, env, url, body) {
       if (act === 'vo_cast') { // ผังเสียงพากย์ของเรื่อง (แก้ได้: ส่ง cast มาแทน) + รายชื่อเสียงให้เลือก + เสียงตัวอย่าง
         if (b.cast && typeof b.cast === 'object') await setSetting(env, 'vcast:' + story, JSON.stringify(b.cast));
         const smp = (await env.DB.prepare('SELECT shot,id FROM voices WHERE shot<0 AND shot>-100').all()).results, sm = {}; for (const r of smp) sm[VV_VOICES[-r.shot - 1] ? VV_VOICES[-r.shot - 1][0] : r.shot] = r.id;
-        return json({ ok: true, cast: (await rd('vcast:' + story)) || VCAST_DEFAULT, voices: VV_VOICES, samples: sm });
+        const tv = (await env.DB.prepare('SELECT shot,id FROM voices WHERE shot<=-200 AND shot>-400 AND line=0').all()).results, ti = {}; for (const r of tv) ti[-r.shot - 200] = r.id; // 0 = ชื่อเรื่อง · n = ชื่อตอน n
+        return json({ ok: true, cast: (await rd('vcast:' + story)) || VCAST_DEFAULT, voices: VV_VOICES, samples: sm, titles: ti, epja: (await rd('eptitle_ja:' + story)) || {}, seriesja: (await rd('series_ja:' + story)) || '' });
       }
       if (act === 'vo_samples') { // ทำเสียงตัวอย่างของทุกเสียงให้ฟังก่อนเลือก (เครื่อง CPU ฟรี)
         const lines = [], cast = {}; VV_VOICES.forEach(([sp], i) => { cast['_s' + i] = { sp, st: 'ノーマル', speed: 0.95 }; lines.push({ shot: -(i + 1), line: 0, who: '', nv: '_s' + i, ja: VV_SAMPLE, emo: 'n' }); });
@@ -3982,6 +3984,14 @@ async function castApi(req, env, url, body) {
             (y.lines || []).forEach((l, i) => { if (!l.ja || (!b.redo && hv.has(i))) return; const wo = String(l.who || ''); if (b.only === 'narr' && wo) return; if (b.only === 'think' && !wo.startsWith('~')) return; if (b.only === 'narrthink' && wo && !wo.startsWith('~')) return; const w = String(l.who || ''), nm = w.replace(/^~/, ''); L.push({ shot: r.id, line: i, who: w, ja: String(l.ja).slice(0, 300), emo: String(l.emo || 'n'), g: G[nm] || '', ...(l.nv ? { nv: String(l.nv) } : {}), ...(+l.spd ? { spd: Math.min(1.6, Math.max(0.6, +l.spd)) } : {}), ...(l.pron ? { pron: String(l.pron).slice(0, 300) } : {}) }); }); }
           for (let k = 0; k < L.length; k += 80) { const part = L.slice(k, k + 80);
             await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind('เสียงพากย์·' + story + '·ตอน' + (+b.ep), 'v' + sc.script_id, Date.now(), JSON.stringify({ lines: part, cast })).run(); nj++; nl += part.length; } }
+        { // พากย์ชื่อเรื่อง + ชื่อตอน (ผู้บรรยาย โทนยิ่งใหญ่ เสียงดังกว่าปกติ)
+          const sja = (await rd('series_ja:' + story)) || '', eja = ((await rd('eptitle_ja:' + story)) || {})[String(+b.ep)] || '';
+          const have = new Set((await env.DB.prepare('SELECT shot FROM voices WHERE line=0 AND shot IN (?,?)').bind(-200, -200 - (+b.ep)).all()).results.map(r => r.shot)), TL = [];
+          const redoT = b.redo && (!b.only || b.only === 'narr' || b.only === 'narrthink');
+          if (sja && (redoT || !have.has(-200))) TL.push({ shot: -200, line: 0, who: '', nv: '_title', ja: sja, emo: 'x', loud: 1 });
+          if (eja && (redoT || !have.has(-200 - (+b.ep)))) TL.push({ shot: -200 - (+b.ep), line: 0, who: '', nv: '_title', ja: `第${+b.ep}話。　${eja}！`, emo: 'x', loud: 1 });
+          if (TL.length) { await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,'tts','','',NULL,0,'queued',0,?,'tts',?)").bind('เสียงพากย์ชื่อเรื่อง·' + story, 'vt', Date.now(), JSON.stringify({ lines: TL, cast })).run(); nj++; nl += TL.length; }
+        }
         return json({ ok: true, jobs: nj, lines: nl });
       }
       if (act === 'helpers') { // ผู้ช่วย Kaggle: ลิงก์สคริปต์ให้ผู้ช่วยกดรันใน Kaggle ของตัวเอง

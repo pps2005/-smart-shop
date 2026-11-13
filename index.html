@@ -117,6 +117,8 @@ function mkAudio(){const AC=window.AudioContext||window.webkitAudioContext;if(!A
     door:(t,o,v)=>{SFX.creak(t,o,v);noise(t+1,.15,o,{type:'lowpass',f:300,v:v});},
     bag:(t,o,v)=>{for(let i=0;i<3;i++)noise(t+i*.11,.12,o,{type:'bandpass',f:3500,q:.7,v:v*.4});},
     bite:(t,o,v)=>{noise(t,.08,o,{type:'highpass',f:1800,v:v*.6});noise(t+.25,.08,o,{type:'highpass',f:1800,v:v*.5});},
+    riser:(t,o,v)=>{noise(t,1.3,o,{f:200,f2:6000,q:1.2,a:1.2,v:v*.7});tone(t,1.3,o,{type:'sawtooth',f:110,f2:440,v:v*.08,a:1.1});},
+    fanfare:(t,o,v)=>{[[60,64,67,72],[62,67,71,74]].forEach((ch,k)=>ch.forEach(n=>{tone(t+k*.32,k?1.6:.3,o,{type:'sawtooth',f:440*2**((n-69)/12),v:v*.07,a:.01});tone(t+k*.32,k?1.6:.3,o,{type:'square',f:440*2**((n-57)/12),v:v*.04,a:.01});}));noise(t+.32,1.2,o,{type:'highpass',f:5000,v:v*.25,a:.01});},
     scream:(t,o,v)=>{const x=tone(t,1.1,o,{type:'sawtooth',f:520,f2:300,v:v*.2});noise(t,1,o,{f:1200,q:1,v:v*.4});},
   };
   /* เสียงบรรยากาศตามสถานที่ (วนจนกว่าจะเปลี่ยนฉาก) */
@@ -259,8 +261,16 @@ function playEp(n){const sb=ST.sbs[n];if(!sb)return;const st=[],say=v=>{try{cons
     },at));});}
   function enterPanel(x){grade(x);typo(x);const f=$o('.f1'),g=$o('.f2');f.textContent=x.fx[0];g.textContent=x.fx[1];f.style.animation='none';g.style.animation='none';void g.offsetWidth;f.style.animation='';g.style.animation='';if(A&&auto){A.scene(x.aud);A.cue(x.aud&&x.aud.sfx);}}
   function showCard(x){clearInterval(kt);clearTimeout(tm);au.pause();ims.forEach(e=>e.classList.remove('on'));$o('.ph').textContent='';$o('.sub').innerHTML='';$o('.f1').textContent='';$o('.f2').textContent='';
-    $o('.card').classList.add('on');if(A&&auto&&x.aud){A.scene(x.aud);}typo({ty:[x.card]});upT();
-    if(auto)tm=setTimeout(()=>{$o('.card').classList.remove('on');const L=$o('.ty');L.querySelectorAll(':scope>div').forEach(e=>e.classList.add('x-out'));tm=setTimeout(()=>{if(i<st.length-1){i++;show();}},650);},x.cd*1000);}
+    const T=x.card,isEp=/第|\{ep\}/.test(T.tx||''),isTitle=T.k==='title',ja=(VR.epja||{})[String(n)]||'';
+    $o('.card').classList.add('on');if(A&&auto&&x.aud){A.scene(isTitle?{amb:'',bgm:{s:'',fo:.6}}:x.aud);}
+    typo({ty:[isEp&&ja?{...T,sub:`「${ja.replace(/、/g,'')}」　${T.sub||''}`}:T]});upT();
+    const next=()=>{$o('.card').classList.remove('on');$o('.ty').querySelectorAll(':scope>div').forEach(e=>e.classList.add('x-out'));tm=setTimeout(()=>{if(i<st.length-1){i++;show();}},650);};
+    if(!auto)return;
+    /* พากย์ชื่อเรื่อง/ชื่อตอน + เสียงประกอบเปิดเรื่อง */
+    const vid=isTitle?(VR.titles||{})[isEp?n:0]:0;
+    if(isTitle&&A){A.cue(isEp?[{k:'whoosh',t:0,v:1},{k:'impact',t:.35,v:1.1},{k:'chime',t:.45,v:.7}]:[{k:'riser',t:0,v:1},{k:'boom',t:1.25,v:1.2},{k:'fanfare',t:1.3,v:1}]);}
+    if(vid&&snd){tm=setTimeout(()=>{au.src=botU('/vo/'+vid);au.volume=1;au.play().then(()=>A&&A.duck(true)).catch(()=>{});au.onended=()=>{A&&A.duck(false);tm=setTimeout(next,1100);};au.onerror=()=>{tm=setTimeout(next,x.cd*1000);};},isEp?500:1500);}
+    else tm=setTimeout(next,x.cd*1000);}
   function show(){const x=st[i];if(x.card){lastPi=x.pi;return showCard(x);}$o('.card').classList.remove('on');setImg(x);if(x.pi!==lastPi){lastPi=x.pi;enterPanel(x);}
     const sb=$o('.sub'),th=x.who[0]==='~',useJa=lang!=='th'&&x.ja&&!x.sx;sb.className='sub'+(x.sx?' sx':x.who?(th?' tk':''):' nv')+(lang==='ja'&&useJa?' jo':'');
     const txt=lang==='ja'&&useJa?x.ja:x.t,lg=lang==='ja'&&useJa?'ja':'th';
@@ -274,7 +284,7 @@ function playEp(n){const sb=ST.sbs[n];if(!sb)return;const st=[],say=v=>{try{cons
     const nx=()=>{if(i<st.length-1){i++;show();}else{hl(1);showCredits();}},gap=(x.ps?x.ps*1000:450);
     if(waitAu){au.onended=()=>{A&&A.duck(false);if(auto)tm=setTimeout(nx,gap);};au.onerror=()=>{stt('⚠️ โหลดเสียงไม่ได้');if(auto)tm=setTimeout(nx,dur(x));};}else tm=setTimeout(nx,dur(x));}
   /* เครดิตท้ายเรื่อง (End Credits) + ดนตรีปิด */
-  let cast=null;api('vo_cast').then(r=>{cast=r&&r.cast||null;}).catch(()=>{});
+  let cast=null,VR={};api('vo_cast').then(r=>{cast=r&&r.cast||null;VR=r||{};}).catch(()=>{});
   function credits(){const used=new Set(),narr=new Set();st.forEach(x=>{if(x.who)used.add(x.who.replace(/^~/,''));else if(x.t&&!x.sx)narr.add(x.nv||'narrator');});
     const C=cast||{},vv=k=>C[k]&&C[k].sp?'VOICEVOX:'+C[k].sp:'',NN={narrator:'Storyteller',n_cine:'Cinematic',n_anime:'Anime',n_dark:'Dark',n_doc:'Documentary',n_emo:'Emotional',n_epic:'Epic',narrator2:'Dark'};
     const rows=[...used].map(w=>[w,vv(w)||vv('_m')]).filter(r=>r[1]),nr=[['ผู้บรรยาย',vv('narrator')],...(narr.has('companion')?[[(C.companion&&C.companion.name)||'ตัวช่วยเล่าเรื่อง',C.companion&&C.companion.sp?'VOICEVOX:'+C.companion.sp:'VOICEVOX:ずんだもん']]:[])].filter(r=>r[1]);
