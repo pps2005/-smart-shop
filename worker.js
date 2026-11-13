@@ -579,7 +579,7 @@ function fluxDraft(job, s, shEn) {
   // Flux ไม่ค่อยทำตามแท็กอายุ ต้องบอกเป็นประโยค (เจอจริง: ป้าฮานะ 61 ออกมาเป็นสาว)
   const age = /\b(old woman|old man|middle-aged)/.test(p) ? 'Every character is drawn youthful and attractive, looking much younger than their real age, smooth faces without wrinkles' : ''; // ผู้ใช้สั่ง: ทุกตัวดูหนุ่มสาว อายุเยอะให้สวย/หล่อกว่าวัย
   // ภาพร่างสตอรีบอร์ด = มังงะขาวดำตัดเส้นหมึก (ผู้ใช้เลือก): ไม่มีสี/แสงให้แกว่งข้ามช่อง · ตั้ง settings draft_style เพื่อเปลี่ยนได้
-  const st = String(s.draft_style || '').trim() || 'black and white manga page panel drawn with a fine-tip pen, very thin delicate uniform ink lines, light dot screentone shading, hair drawn as fine separate strands, large detailed expressive eyes, background drawn in thin clean lines with real detail (room, furniture, street, sky), no color, no text, no speech bubbles, every character in the same delicate manga style with slender anime proportions';
+  const st = String(s.draft_style || '').trim() || 'professional black and white manga panel, clean consistent fine-pen line art with controlled line weight and precise contours, light dot screentone and controlled hatching for shading. Characters: hair drawn as fine separate strands, detailed expressive eyes with highlights, natural clothing folds and fabric texture, correct hand anatomy with five well-shaped fingers, small accessories drawn clearly. Environment: real architecture and furniture with surface textures (wood grain, paper, metal, glass, plush fur), small props that fit the place, clear foreground, midground and background with correct perspective and depth, contact shadows and cast shadows under people and objects. Clean and readable, not cluttered, every character in the same delicate manga style with slender anime proportions, no color, no text, no speech bubbles';
   const mono = body.replace(/,?\s*single cinematic illustration/, '').replace(/\b(bright |dark |pale |soft |warm |deep )?(red|blue|pink|yellow|orange|purple|green|golden|crimson|scarlet|indigo|teal|brown)\b\s*/gi, '').replace(/\bblond\b/gi, 'light').replace(/\b(a |an )?\d\d-year-old /gi, 'a ').replace(/, a tired gentle face/gi, ', a gentle face').replace(/\ba plain /gi, 'a ').replace(/\b(mature male|middle-aged man|mature female|middle-aged woman|old woman|old man),\s*/gi, '').replace(/ {2,}/g, ' ');
   return `${draftCam(mono)}. ${age ? age + '. ' : ''}Scene: ${mono}. Style: ${st}. The setting is always fully drawn behind the characters with complete background detail, never a blank or plain background. Strictly black ink on white paper, grayscale only.`; // มุมกล้อง + เนื้อเรื่องมาก่อนลายเส้น (ตัวเข้ารหัส CLIP อ่านแค่ ~77 โทเคนแรก — เดิมลายเส้นมาก่อน มุมกล้องเลยหลุด ได้แต่หน้าตรง)
 }
@@ -1224,9 +1224,11 @@ async function bridgeImg(env, s) {
     if (String(j.project).startsWith('ทดสอบLoRA·')) lo = [{ id: +String(j.project).split('·')[1] || 0, w: 0.8 }];
     // สตอรีบอร์ดช่วงร่าง (sb_draft ≠ 0): วาดเป็นมังงะขาวดำด้วย FLUX.1-dev บน Kaggle (ไม่ใช้ LoRA) ลายเส้นเดียวกับตัวสำรอง แต่ละเอียดกว่า · ปิดร่างด้วย sb_draft=0 เมื่อจะวาดจริงเป็นสี + LoRA
     const draft = String(j.project).startsWith('ฉาก') && s.sb_draft !== '0';
-    let shEn = ''; if (draft) { const shr = await env.DB.prepare('SELECT en FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; lo = []; }
+    let shEn = '', shLoc = ''; if (draft) { const shr = await env.DB.prepare('SELECT en,loc FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; shLoc = shr ? String(shr.loc || '') : ''; lo = []; }
+    // ภาพร่าง: สถานที่เดียวกันใช้ seed ชุดเดียวกัน (ฉากหลัง/ลายเส้นใกล้กันขึ้น) + วาด 2 แบบแล้วให้ CLIP ตรวจเลือกภาพที่ตรงบทและฉากหลังครบที่สุด
+    const locSeed = shLoc ? [...shLoc].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 2000000000 + 1 : 0;
     const eg = draft ? 'dev' : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
-    const opt = { ...(draft ? { gray: 1 } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
+    const opt = { ...(draft ? { gray: 1, takes: +s.draft_takes || 2, qc: [(shLoc ? shEn.replace(/^[^,]*,[^,]*,[^,]*,\s*/, '') : shEn).slice(0, 220), 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: j.prompt }, s, /chr\d+x/.test(String(j.prompt || '')) ? shEn : '') : withStyle(j.prompt, s)).slice(0, 1800), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -2601,6 +2603,34 @@ def ensure_lora(lid):
     return fn
 
 
+_CLIP = None
+
+
+def clip_pick(paths, pos):
+    # ตรวจคุณภาพภาพ (Visual QC): ให้คะแนน = ตรงกับบท/ฉากหลังครบ − ฉากว่าง/เบลอ/มือผิดรูป/มีสี/มีตัวหนังสือ แล้วเลือกภาพคะแนนสูงสุด
+    global _CLIP
+    neg = ["an empty blank white background", "a blurry messy unfinished sketch", "deformed hands with extra fingers", "a colored illustration", "text, letters and speech bubbles", "a cluttered noisy image"]
+    try:
+        import torch
+        from PIL import Image
+        from transformers import CLIPModel, CLIPProcessor
+        if _CLIP is None:
+            nm = "openai/clip-vit-base-patch32"
+            _CLIP = (CLIPModel.from_pretrained(nm).eval(), CLIPProcessor.from_pretrained(nm))
+        m, pr = _CLIP
+        ims = [Image.open(x).convert("RGB") for x in paths]
+        tx = [str(t)[:300] for t in pos if t] + neg
+        inp = pr(text=tx, images=ims, return_tensors="pt", padding=True, truncation=True)
+        with torch.no_grad():
+            lg = m(**inp).logits_per_image
+        npos = len(tx) - len(neg)
+        sc = lg[:, :npos].mean(1) - lg[:, npos:].mean(1) * 0.5
+        best = int(sc.argmax())
+        return best, "คะแนน " + " / ".join("%.1f" % float(v) for v in sc)
+    except Exception as e:
+        return len(paths) - 1, "ตรวจไม่ได้: %s" % str(e)[:120]
+
+
 def gen_image(j, port=8188):
     opt = j.get("opt") or {}
     engine = "sdxl" if opt.get("engine") == "sdxl" else "dev"
@@ -2612,7 +2642,8 @@ def gen_image(j, port=8188):
         steps = max(10, min(50, int(opt.get("steps") or 26)))
     else:
         steps = max(16, min(30, int(opt.get("steps") or 24)))
-    seed = int(opt.get("seed") or 0) or random.randint(1, 2 ** 31)
+    seed = int(opt.get("seed") or 0) or (int(opt.get("seedLoc") or 0) * 1000 + int(opt.get("jobId") or 0) % 1000 if opt.get("seedLoc") else 0) or random.randint(1, 2 ** 31)
+    takes = max(1, min(3, int(opt.get("takes") or 1))) if engine != "sdxl" else 1  # วาดหลายแบบในรอบเดียว แล้วตรวจเลือกภาพที่ดีที่สุด
     jid = "i%s" % j["id"]
     if engine == "sdxl":
         wf = {
@@ -2643,7 +2674,7 @@ def gen_image(j, port=8188):
             "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": (j.get("prompt") or "")}},
             "5": {"class_type": "FluxGuidance", "inputs": {"conditioning": ["4", 0], "guidance": float(opt.get("guidance") or FLUX_GUIDANCE)}},
             "6": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": ""}},
-            "7": {"class_type": "EmptySD3LatentImage", "inputs": {"width": W, "height": H, "batch_size": 1}},
+            "7": {"class_type": "EmptySD3LatentImage", "inputs": {"width": W, "height": H, "batch_size": takes}},
             "8": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed, "steps": steps, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "positive": ["5", 0], "negative": ["6", 0], "latent_image": ["7", 0], "denoise": 1.0}},
             "9": {"class_type": "VAEDecode", "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
             "10": {"class_type": "SaveImage", "inputs": {"images": ["9", 0], "filename_prefix": "img%s" % jid}},
@@ -2665,7 +2696,12 @@ def gen_image(j, port=8188):
     if not outs:
         raise RuntimeError("ไม่มีไฟล์ภาพออกมา")
     from PIL import Image
-    im = Image.open(outs[-1]).convert("RGB")
+    pick = len(outs) - 1
+    if takes > 1 and len(outs) > 1:
+        pick, info = clip_pick(outs[-takes:], opt.get("qc") or [j.get("prompt") or ""])
+        pick = len(outs) - takes + pick
+        log("ภาพ %s: วาด %d แบบ ตรวจด้วย CLIP เลือกแบบที่ %d (%s)" % (jid, takes, pick - (len(outs) - takes) + 1, info))
+    im = Image.open(outs[pick]).convert("RGB")
     if (j.get("opt") or {}).get("gray"):
         im = im.convert("L").convert("RGB")  # สตอรีบอร์ดร่าง: บังคับขาวดำ กันสีหลุด
     if max(e[1] for e in im.getextrema()) < 10:
