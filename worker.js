@@ -352,13 +352,14 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั�
   const outs = Object.entries(mix || { [C.def]: 12 }).filter(([k]) => C.of[k]);
   for (const [k, c] of outs) { const o = C.of[k];
     for (let t = 0; t < c; t++, i++) {
-      const v = C.o ? 'the glowing paper lantern hangs from the end of its tail, full body, ' + PM[i % PM.length] + ', simple white background' : 'full body, standing, ' + (i % 2 ? 'three-quarter view' : 'front view') + ', head to toe, feet visible, ' + EX[i % EX.length] + ', simple white background';
-      jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.id, o[1] ? '(' + o[1] + ':1.2)' : '', v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: C.o ? 1024 : 832, h: C.o ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg, ...ipa, takes: 2, np: C.o ? 0 : 1, qneg: qn }]);
+      const v = C.o ? 'the glowing paper lantern hangs from the end of its tail, full body, ' + PM[i % PM.length] + ', simple white background' : 'full body, wide shot, standing, ' + (i % 2 ? 'three-quarter view' : 'front view') + ', whole body in frame from head to shoes, shoes visible, ' + EX[i % EX.length] + ', simple white background';
+      const nego = neg + (C.o ? '' : ', cowboy shot, upper body, portrait, feet out of frame') + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'); // ชุดที่ไม่มีฮู้ด: กันหูกระต่ายจากภาพหลักมิโอะติดมา
+      jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.id, o[1] ? '(' + o[1] + ':1.2)' : '', v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: C.o ? 1024 : 832, h: C.o ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg: nego, ...ipa, takes: 2, np: C.o ? 0 : 1, qneg: C.o ? qn : [...qn, 'a person whose feet are cut off by the image frame'] }]);
       caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (/^1boy/.test(C.id) ? '1boy, ' : '1girl, ') + o[1] + ', ' + v);
     } }
   const ok = Object.keys(C.of); // หน้าตลก: ครึ่งตัว พื้นหลังสีสด เปลี่ยนชุดไปเรื่อยๆ
   for (let g = 0; g < (gags || 0); g++) { const o = C.of[ok[g % ok.length]];
-    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.id, '(' + o[1] + ':1.2)', 'upper body, head visible, ' + GX[g % GX.length] + ', colorful speed lines background, ' + ST].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg, ...(ref ? { ...ipa, rw: 0.4, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]); }
+    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.id, '(' + o[1] + ':1.2)', 'upper body, head visible, ' + GX[g % GX.length] + ', colorful speed lines background, ' + ST].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg + (/hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), ...(ref ? { ...ipa, rw: 0.4, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]); }
   return { jobs, set: { cid, caps, pfx } };
 }
 async function lsetReqTick(env, s) {
