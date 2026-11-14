@@ -1584,9 +1584,9 @@ async function bridgeImg(env, s) {
         let ofId = k && R.of && R.of[k] || 0;
         if (k && !ofId && C && C.of[k] && !gag) { // ชุดที่ช่องนี้ต้องใช้ แต่ผู้ใช้ยังไม่ได้ติ๊ก → หาเอง/วาดเอง/ใช้ชุดใกล้เคียง
           const lab = C.of[k][0], no = (R.no || []).includes(k);
-          if (!no) { const lib = await env.DB.prepare("SELECT id FROM images WHERE instr(project, ?)=1 AND instr(project, ?)>0 ORDER BY id DESC LIMIT 1").bind('อ้างอิง·' + c.n + '·ปกติ·', lab).first();
-            if (lib) ofId = lib.id;
-            else { const pend = await env.DB.prepare("SELECT status FROM vjobs WHERE kind='img' AND instr(project, ?)=1 AND instr(project, ?)>0 ORDER BY id DESC LIMIT 1").bind('อ้างอิง·' + c.n + '·ปกติ·', lab).first();
+          { const lib = await env.DB.prepare("SELECT id FROM images WHERE instr(project, ?)=1 AND instr(project, ?)>0 ORDER BY id DESC LIMIT 1").bind('อ้างอิง·' + c.n + '·ปกติ·', lab).first();
+            if (lib) ofId = lib.id; // มีรูปชุดนี้อยู่ = ใช้ได้เสมอ (ธง "ไม่เอาชุดนี้" ค้างจากการลบรูปรุ่นเก่าแล้ววาดใหม่)
+            else if (!no) { const pend = await env.DB.prepare("SELECT status FROM vjobs WHERE kind='img' AND instr(project, ?)=1 AND instr(project, ?)>0 ORDER BY id DESC LIMIT 1").bind('อ้างอิง·' + c.n + '·ปกติ·', lab).first();
               if (pend && (pend.status === 'queued' || pend.status === 'running')) wait = true;
               else if (!pend && R.n) { const P = lsetJobs(c.n, 0, +R.n, { [k]: 1 }, 1, 0); for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, Date.now(), JSON.stringify({ ...op, takes: 3 })).run(); wait = true; } } }
           if (!ofId && !wait) ofId = (R.of || {})[C.def] || Object.values(R.of || {})[0] || 0; } // ผู้ใช้ลบชุดนี้/วาดไม่สำเร็จ → ชุดที่เลือกไว้ใกล้สุด
@@ -5439,7 +5439,7 @@ async function castApi(req, env, url, body) {
         await env.DB.prepare('DELETE FROM images WHERE id=?').bind(id).run();
         const cur = (await rd('charref:' + story)) || {};
         { const pp = String(im.project).split('·'), nm = pp[1], C = HY_CHAR[nm], lab = pp.slice(3).join('·'); // ลบรูปชุดสุดท้าย = ผู้ใช้ไม่เอาชุดนี้ → ฉากที่ต้องใช้จะใช้ชุดใกล้เคียงแทน ไม่วาดชุดนี้ซ้ำ
-          if (C && pp[2] === 'ปกติ') for (const [k, o] of Object.entries(C.of)) if (lab.includes(o[0]) && !(await env.DB.prepare("SELECT 1 FROM images WHERE instr(project, ?)=1 AND instr(project, ?)>0 LIMIT 1").bind('อ้างอิง·' + nm + '·ปกติ·', o[0]).first())) { cur[nm] = cur[nm] || { n: 0, g: [] }; cur[nm].no = [...new Set([...(cur[nm].no || []), k])]; } } for (const v of Object.values(cur)) { v.m = (v.m || []).filter(x => x !== id); v.g = (v.g || []).filter(x => x !== id); if (v.n === id) v.n = v.m[0] || 0; if (v.of) for (const k of Object.keys(v.of)) if (v.of[k] === id) delete v.of[k]; }
+          if (C && pp[2] === 'ปกติ') for (const [k, o] of Object.entries(C.of)) if (lab.includes(o[0]) && !(await env.DB.prepare("SELECT 1 FROM images WHERE instr(project, ?)=1 AND instr(project, ?)>0 LIMIT 1").bind('อ้างอิง·' + nm + '·ปกติ·', o[0]).first()) && !(await env.DB.prepare("SELECT 1 FROM vjobs WHERE kind='img' AND status IN ('queued','running','hold') AND instr(project, ?)=1 AND instr(project, ?)>0 LIMIT 1").bind('อ้างอิง·' + nm + '·ปกติ·', o[0]).first())) { cur[nm] = cur[nm] || { n: 0, g: [] }; cur[nm].no = [...new Set([...(cur[nm].no || []), k])]; } } for (const v of Object.values(cur)) { v.m = (v.m || []).filter(x => x !== id); v.g = (v.g || []).filter(x => x !== id); if (v.n === id) v.n = v.m[0] || 0; if (v.of) for (const k of Object.keys(v.of)) if (v.of[k] === id) delete v.of[k]; }
         await setSetting(env, 'charref:' + story, JSON.stringify(cur)); return json({ ok: true, ok_: cur });
       }
       if (act === 'ref_memes') { // ยืนยันชุดที่เลือก → วาดร่างมีม 4 แบบต่อชุด (หน้ามีมผูกกับบทของตัวนั้น) (ล็อกหน้าจากภาพหลัก)
