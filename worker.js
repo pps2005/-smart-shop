@@ -348,7 +348,7 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั�
   const jobs = [], caps = [], pfx = 'อ้างอิง·' + n + '·ปกติ·' + (noset ? 'ใหม่' : 'ฝึก'); let i = 0;
   const qn = C.o ? ['two cats', 'a cat without a lantern on its tail', 'monochrome drawing'] : ['two people', 'the same person drawn twice', 'monochrome black and white drawing', 'a person whose head is cut off by the image frame', 'a view from below looking up at the legs', 'deformed body, extra limbs'];
   const neg = (C.neg ? C.neg + ', ' : '') + 'nsfw, nude, nipples, panties, underwear, huge breasts, gigantic breasts, monochrome, greyscale, multiple views, cropped, head out of frame, from below, close-up' + (C.o ? ', lantern on head, multiple cats' : ', 2girls, 2boys');
-  const ipa = ref ? { refimg: ref, rw: 0.45, ipa_end: 0.75, ...(C.o ? {} : { ref_crop: 'face' }) } : {}; // สัตว์ไม่ตัดหัว (ภาพหลักโมจิหางอยู่บนสุด ตัดแล้วได้หาง)
+  const ipa = ref ? { refimg: ref, rw: 0.35, ipa_end: 0.75, ...(C.o ? {} : { ref_crop: 'face' }) } : {}; // สัตว์ไม่ตัดหัว (ภาพหลักโมจิหางอยู่บนสุด ตัดแล้วได้หาง)
   const outs = Object.entries(mix || { [C.def]: 12 }).filter(([k]) => C.of[k]);
   for (const [k, c] of outs) { const o = C.of[k];
     for (let t = 0; t < c; t++, i++) {
@@ -725,10 +725,10 @@ const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 1
       festival: ['ยูกาตะเทศกาล', 'hair up, flower hair ornament, red yukata with white goldfish pattern, yellow obi, holding paper fan, wooden sandals', 'red goldfish yukata, flower in hair'],
       sleep: ['ชุดนอน', 'side braid, oversized white t-shirt, short shorts, barefoot, sleepy', 'oversized sleep tee and shorts'] }, def: 'night' },
   'มิโอะ': { id: '1girl, adult, young woman, beautiful, black hair, purple eyes, half-closed eyes, long eyelashes, curvy, slim waist', neg: 'brown hair, blue hair, red hair, school uniform, serafuku, pleated skirt, sweater vest, necktie',
-    of: { office: ['ออฟฟิศ (ประจำตัว)', 'short bob, blunt bangs, white rabbit hair clip, fitted white blouse, black collar, long sleeves, black pencil skirt, black pantyhose, black heels', 'office: white blouse, black pencil skirt, rabbit clip'],
+    of: { office: ['ออฟฟิศ (ประจำตัว)', 'short bob, blunt bangs, small white hair clip, fitted white blouse, black collar, long sleeves, black pencil skirt, black pantyhose, black heels', 'office: white blouse, black pencil skirt, rabbit clip'],
       inspector: ['สารวัตรอาคม (ตอน 4)', 'bob cut, hair pinned to one side, silver hairpin, black military uniform jacket with gold buttons, red armband, white gloves, black pencil skirt, knee boots, serious, cool', 'inspector uniform: black jacket, red armband'],
       battle: ['ต่อสู้สารวัตร (ตอน 4, 9)', 'bob cut, hair pinned, long black inspector coat flowing, red armband, white gloves, holding ink baton with glowing talisman, knee boots, fierce', 'inspector battle coat with ink baton'],
-      holiday: ['ลำลอง (ซื้อตุ๊กตา)', 'short bob, blunt bangs, white rabbit hair clip, pastel pink knit sweater, white flared skirt, white socks, mary janes, holding stuffed bunny, kawaii', 'pink knit sweater, white skirt, toy bunny'],
+      holiday: ['ลำลอง (ซื้อตุ๊กตา)', 'short bob, blunt bangs, small white hair clip, pastel pink knit sweater, white flared skirt, white socks, mary janes, holding stuffed bunny, kawaii', 'pink knit sweater, white skirt, toy bunny'],
       winter: ['หน้าหนาว', 'short bob, white earmuffs, cream duffle coat, pink scarf, black tights, brown boots, cute', 'cream duffle coat, earmuffs, pink scarf'],
       sleep: ['ชุดนอนกระต่าย', 'short bob, messy hair, white rabbit print pajamas, rabbit ears hood, hugging pillow, sleepy', 'rabbit pajamas with bunny-ear hood'] }, def: 'office' },
   'หัวหน้าซาเอกิ': { id: '1girl, mature female, beautiful, tall, black hair, streaked hair, silver streak, red eyes, sharp eyes, red lips, curvy', neg: 'red streak, pink hair',
@@ -1787,11 +1787,13 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR json_extract(opt,'$.refimg') IS NULL) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 18 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 16 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 19 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 19 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
-      if (+j.opt.refimg) j.opt.ref = (s.self_url || url.origin) + '/vi/' + (+j.opt.refimg) + '?s=' + await vvSig(env, 'i' + (+j.opt.refimg)); // ภาพอ้างอิงที่ผู้ใช้เลือก → ลิงก์มีลายเซ็นให้เครื่องดึง (IP-Adapter)
+      if (+j.opt.refimg) j.opt.ref = (s.self_url || url.origin) + '/vi/' + (+j.opt.refimg) + '?s=' + await vvSig(env, 'i' + (+j.opt.refimg));
+      { const si = +j.opt.styleimg || (j.kind === 'img' && (String(j.project).startsWith('อ้างอิง·') || j.opt.engine === 's3d') ? +s.style_img || 0 : 0); // ลายเส้นกลางของเรื่อง (ผู้ใช้เลือกลายเส้นมิโอะ) ใช้กับทุกภาพตัวละคร/ฉาก
+        if (si) j.opt.style_ref = (s.self_url || url.origin) + '/vi/' + si + '?s=' + await vvSig(env, 'i' + si); } // ภาพอ้างอิงที่ผู้ใช้เลือก → ลิงก์มีลายเซ็นให้เครื่องดึง (IP-Adapter)
       if (!hid) await setSetting(env, 'k_seen', String(Date.now()));
       return json({ job: j });
     }
@@ -3598,10 +3600,12 @@ def add_ipa(wf, model_ref, refs, final_node, end_at=1.0):
     wf["40"] = {"class_type": "IPAdapterModelLoader", "inputs": {"ipadapter_file": M["ipa"]}}
     wf["41"] = {"class_type": "CLIPVisionLoader", "inputs": {"clip_name": M["clipv"]}}
     pm = model_ref
-    for i, (img, mask, w) in enumerate(refs):
+    for i, r in enumerate(refs):
+        img, mask, w = r[0], r[1], r[2]
+        wt = r[3] if len(r) > 3 else "linear"  # "style transfer" = ดึงเฉพาะลายเส้น/โทนสีจากภาพต้นแบบลายเส้น
         a, b, c = str(50 + i * 3), str(51 + i * 3), str(52 + i * 3)
         wf[a] = {"class_type": "LoadImage", "inputs": {"image": img}}
-        wf[c] = {"class_type": "IPAdapterAdvanced", "inputs": {"model": pm, "ipadapter": ["40", 0], "image": [a, 0], "weight": w, "weight_type": "linear", "combine_embeds": "concat", "start_at": 0.0, "end_at": end_at, "embeds_scaling": "V only", "clip_vision": ["41", 0]}}
+        wf[c] = {"class_type": "IPAdapterAdvanced", "inputs": {"model": pm, "ipadapter": ["40", 0], "image": [a, 0], "weight": w, "weight_type": wt, "combine_embeds": "concat", "start_at": 0.0, "end_at": end_at, "embeds_scaling": "V only", "clip_vision": ["41", 0]}}
         if mask:
             wf[b] = {"class_type": "LoadImageMask", "inputs": {"image": mask, "channel": "red"}}
             wf[c]["inputs"]["attn_mask"] = [b, 0]
@@ -3650,7 +3654,7 @@ def add_loras(wf, loras, clip_nodes=("2", "3")):
     return pm
 
 
-def detail_pass(img_path, chars, masks, pos_style, neg, seed, prefix, port, loras):
+def detail_pass(img_path, chars, masks, pos_style, neg, seed, prefix, port, loras, style_img=None):
     # วาดซ่อมทีละตัวละคร (inpaint เฉพาะบริเวณตัวนั้น) ล็อกด้วยรูปชุด/หน้าของคนนั้น → ชุด/หน้าตรงขึ้นในช่องที่มีหลายคน
     from PIL import Image
     cur = img_path
@@ -3679,7 +3683,10 @@ def detail_pass(img_path, chars, masks, pos_style, neg, seed, prefix, port, lora
             wf["6"]["inputs"]["vae"] = ["9", 0]
             wf["12"]["inputs"]["vae"] = ["9", 0]
         pm = add_loras(wf, loras)
-        add_ipa(wf, pm, [(rimg, None, max(0.6, float(c.get("rw") or 0.6)))], "5")
+        rl = [(rimg, None, max(0.6, float(c.get("rw") or 0.6)))]
+        if style_img:
+            rl.append((style_img, None, 0.7, "style transfer"))
+        add_ipa(wf, pm, rl, "5")
         try:
             outs = comfy_go(wf, "%sD%d" % (prefix, k), port)
             if outs:
@@ -3739,6 +3746,10 @@ def gen_s3d(j, port=8188):
             k0 += nb
         if refs:
             log("ภาพ %s: ใช้ภาพอ้างอิงตัวละคร %d ตัว" % (jid, len(refs)))
+    if opt.get("style_ref") and ensure_ipa():
+        simg = get_ref(opt["style_ref"], jid, 77)
+        if simg:
+            refs.append((simg, None, float(opt.get("sw") or 0.7), "style transfer"))
     # 2) SDXL วาดทั้งภาพตามฉาก 3D · ตรวจจำนวนคน + ตัวตน + ภาพเพี้ยน · ไม่ผ่านวาดใหม่อีกรอบ
     pos = IMG_POS + style + ", " + (hy.get("all") or "")
     sd, sl = float(s3.get("sd") or 0.7), float(s3.get("sl") or 0.55)
@@ -3776,7 +3787,7 @@ def gen_s3d(j, port=8188):
     best = pick[1]
     if dmasks and opt.get("detail", 1) and not M.get("noipa"):
         try:
-            best = detail_pass(best, chars, dmasks, style, neg, seed + 777, jid, port, loras)
+            best = detail_pass(best, chars, dmasks, style, neg, seed + 777, jid, port, loras, next((r[0] for r in refs if len(r) > 3), None))
             tmp.append(best)
         except Exception as e:
             log("ขั้นวาดซ่อมพัง ใช้ภาพก่อนซ่อม: %s" % str(e)[:150])
@@ -3837,10 +3848,16 @@ def gen_image(j, port=8188):
         wf["2"]["inputs"]["clip"] = pc
         wf["3"]["inputs"]["clip"] = pc
         wf["5"]["inputs"]["model"] = pm
-        if opt.get("ref") and ensure_ipa():  # ภาพอ้างอิงที่ผู้ใช้เลือก: ล็อกหน้า/ทรงตัวละครด้วย IP-Adapter
-            rimg = get_ref(opt["ref"], jid, 0, opt.get("ref_crop"))
+        if (opt.get("ref") or opt.get("style_ref")) and ensure_ipa():  # ภาพอ้างอิง: ล็อกหน้า (ตัดหัว) + ล็อกลายเส้นกลางของเรื่อง (style transfer)
+            rl = []
+            rimg = get_ref(opt["ref"], jid, 0, opt.get("ref_crop")) if opt.get("ref") else None
             if rimg:
-                add_ipa(wf, pm, [(rimg, None, float(opt.get("rw") or 0.55))], "5", float(opt.get("ipa_end") or 1.0))  # ipa_end < 1 = ล็อกหน้า/โครงช่วงต้น ปล่อยลายเส้น/สีช่วงท้าย (กันสไตล์ภาพต้นแบบหลุดมา เช่น พื้นหลังสีรุ้ง ภาพซ้อนสองคน)
+                rl.append((rimg, None, float(opt.get("rw") or 0.55)))
+            simg = get_ref(opt["style_ref"], jid, 7) if opt.get("style_ref") else None
+            if simg:
+                rl.append((simg, None, float(opt.get("sw") or 0.8), "style transfer"))
+            if rl:
+                add_ipa(wf, pm, rl, "5", float(opt.get("ipa_end") or 1.0))  # ipa_end < 1 = ล็อกหน้า/โครงช่วงต้น ปล่อยลายเส้น/สีช่วงท้าย (กันสไตล์ภาพต้นแบบหลุดมา เช่น พื้นหลังสีรุ้ง ภาพซ้อนสองคน)
         if opt.get("neg"):
             wf["3"]["inputs"]["text"] = IMG_NEG + ", " + str(opt["neg"])
     else:
@@ -4727,7 +4744,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=18" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=19" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
