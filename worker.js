@@ -683,10 +683,10 @@ HY_TAGS['ริน_d'] = { tags: HY_CHAR['ริน'].id + ', ' + HY_CHAR['ร�
 function refPlan(cr) { // [project, prompt, opt] เรียงตามลำดับความสำคัญ: ชุดที่ใช้ในตอน 1 → ชุดอื่น → ตัวรอง
   const GAG = ['comedic deadpan face, half-closed eyes, flat unimpressed expression, blank stare, colorful speed lines background', 'comedic shocked face, white blank eyes, sweatdrop, mouth wide open, exaggerated, colorful speed lines background', 'comedic laughing face, huge wide open mouth, closed happy eyes, exaggerated expression, colorful burst background', 'comedic flustered face, blush, steam from ears, wavy mouth, embarrassed, sparkles background'];
   const ST = 'simple white background, anime screencap, flat color, clean lineart, character design, beautiful detailed eyes, perfect anatomy, good proportions';
-  const refOf = n => { const v = cr[n]; return v ? (+v.n || (v.g || [])[0] || 0) : 0; };
+  const refOf = n => { const v = cr[n]; return v ? (+v.n || 0) : 0; }; // ล็อกหน้าจากภาพปกติที่เลือกเท่านั้น (ภาพหน้าตลกพาสีรุ้ง/ภาพซ้อนสองคนมาด้วย)
   const one = (n, ofk, view, extra) => { const c = HY_CHAR[n], o = c.of[ofk]; const id = refOf(n);
     const pr = [c.id, o[1], view, extra || '', /comedic/.test(view) ? 'anime screencap, flat color, clean lineart, beautiful detailed eyes, good proportions' : ST].filter(Boolean).join(', ');
-    return ['อ้างอิง·' + n + '·' + (/comedic/.test(view) ? 'ตลก' : 'ปกติ') + '·' + o[0], pr, { engine: 'sdxl', w: /upper body/.test(view) ? 1024 : 832, h: /upper body/.test(view) ? 1024 : 1216, steps: 30, seed: 0, loras: [], ...(c.neg ? { neg: c.neg + ', nsfw, nude, nipples, panties' } : { neg: 'nsfw, nude, nipples, panties' }), ...(id ? { refimg: id, rw: 0.45 } : {}) }]; };
+    return ['อ้างอิง·' + n + '·' + (/comedic/.test(view) ? 'ตลก' : 'ปกติ') + '·' + o[0], pr, { engine: 'sdxl', w: /upper body/.test(view) ? 1024 : 832, h: /upper body/.test(view) ? 1024 : 1216, steps: 30, seed: 0, loras: [], ...(c.neg ? { neg: c.neg + ', nsfw, nude, nipples, panties' } : { neg: 'nsfw, nude, nipples, panties' }), ...(id ? { refimg: id, rw: 0.4, ipa_end: 0.7 } : {}), takes: 2, np: c.o ? 0 : 1, qneg: ['two people', 'the same person drawn twice', 'a close-up face next to the full body', 'monochrome black and white drawing', 'deformed body, extra limbs'] }]; };
   const FB = 'full body, standing, front view, arms at sides, gentle smile', TQ = 'full body, standing, three-quarter view, confident pose', UP = g => 'upper body, ' + g;
   const out = [];
   for (const [n, k] of [['โทวะ', 'work'], ['ริน', 'night'], ['ริน', 'bakery'], ['มิโอะ', 'office']]) { out.push(one(n, k, FB), one(n, k, TQ)); }
@@ -3438,7 +3438,7 @@ def get_ref(url, jid, k):
         return None
 
 
-def add_ipa(wf, model_ref, refs, final_node):
+def add_ipa(wf, model_ref, refs, final_node, end_at=1.0):
     # refs = [(ชื่อไฟล์ภาพอ้างอิง, ชื่อไฟล์หน้ากากหรือ None, น้ำหนัก)] → ต่อโมเดลผ่าน IPAdapterAdvanced ทีละตัว
     if not refs:
         return wf
@@ -3448,7 +3448,7 @@ def add_ipa(wf, model_ref, refs, final_node):
     for i, (img, mask, w) in enumerate(refs):
         a, b, c = str(50 + i * 3), str(51 + i * 3), str(52 + i * 3)
         wf[a] = {"class_type": "LoadImage", "inputs": {"image": img}}
-        wf[c] = {"class_type": "IPAdapterAdvanced", "inputs": {"model": pm, "ipadapter": ["40", 0], "image": [a, 0], "weight": w, "weight_type": "linear", "combine_embeds": "concat", "start_at": 0.0, "end_at": 1.0, "embeds_scaling": "V only", "clip_vision": ["41", 0]}}
+        wf[c] = {"class_type": "IPAdapterAdvanced", "inputs": {"model": pm, "ipadapter": ["40", 0], "image": [a, 0], "weight": w, "weight_type": "linear", "combine_embeds": "concat", "start_at": 0.0, "end_at": end_at, "embeds_scaling": "V only", "clip_vision": ["41", 0]}}
         if mask:
             wf[b] = {"class_type": "LoadImageMask", "inputs": {"image": mask, "channel": "red"}}
             wf[c]["inputs"]["attn_mask"] = [b, 0]
@@ -3592,14 +3592,14 @@ def gen_image(j, port=8188):
     else:
         steps = max(16, min(30, int(opt.get("steps") or 24)))
     seed = int(opt.get("seed") or 0) or (int(opt.get("seedLoc") or 0) * 1000 + int(opt.get("jobId") or 0) % 1000 if opt.get("seedLoc") else 0) or random.randint(1, 2 ** 31)
-    takes = max(1, min(3, int(opt.get("takes") or 1))) if engine != "sdxl" else 1  # วาดหลายแบบในรอบเดียว แล้วตรวจเลือกภาพที่ดีที่สุด
+    takes = max(1, min(3, int(opt.get("takes") or 1)))  # SDXL ก็วาดหลายแบบแล้วตรวจเลือกได้ (ภาพอ้างอิง/ชุดฝึก: นับคน + CLIP ตรวจภาพเสีย)  # วาดหลายแบบในรอบเดียว แล้วตรวจเลือกภาพที่ดีที่สุด
     jid = "i%s" % j["id"]
     if engine == "sdxl":
         wf = {
             "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": M["sdxl"]}},
             "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_POS + (j.get("prompt") or "")}},
             "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_NEG}},
-            "4": {"class_type": "EmptyLatentImage", "inputs": {"width": W, "height": H, "batch_size": 1}},
+            "4": {"class_type": "EmptyLatentImage", "inputs": {"width": W, "height": H, "batch_size": takes}},
             "5": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed, "steps": steps, "cfg": 6.0, "sampler_name": "euler_ancestral", "scheduler": "normal", "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0], "denoise": 1.0}},
             "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
             "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "img%s" % jid}},
@@ -3618,7 +3618,7 @@ def gen_image(j, port=8188):
         if opt.get("ref") and ensure_ipa():  # ภาพอ้างอิงที่ผู้ใช้เลือก: ล็อกหน้า/ทรงตัวละครด้วย IP-Adapter
             rimg = get_ref(opt["ref"], jid, 0)
             if rimg:
-                add_ipa(wf, pm, [(rimg, None, float(opt.get("rw") or 0.55))], "5")
+                add_ipa(wf, pm, [(rimg, None, float(opt.get("rw") or 0.55))], "5", float(opt.get("ipa_end") or 1.0))  # ipa_end < 1 = ล็อกหน้า/โครงช่วงต้น ปล่อยลายเส้น/สีช่วงท้าย (กันสไตล์ภาพต้นแบบหลุดมา เช่น พื้นหลังสีรุ้ง ภาพซ้อนสองคน)
         if opt.get("neg"):
             wf["3"]["inputs"]["text"] = IMG_NEG + ", " + str(opt["neg"])
     else:
