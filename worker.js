@@ -375,9 +375,9 @@ async function lsetTick(env, s) {
   let ch = false;
   for (const [nm, o] of Object.entries(L)) {
     const pf = o.pfx || ('ชุดฝึก·' + nm + '·'); // ชุดฝึกที่โชว์ในคลังภาพอ้างอิงด้วย: pfx = 'อ้างอิง·ชื่อ·ปกติ·ฝึก'
-    const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND project LIKE ?").bind(pf + '%').first()).n;
+    const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND instr(project, ?)=1").bind(pf).first()).n; // instr แทน LIKE (D1 ปฏิเสธรูปแบบ LIKE ภาษาไทยที่ยาว)
     if (pend) continue;
-    const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project LIKE ? ORDER BY id").bind(pf + '%').all()).results;
+    const im = (await env.DB.prepare("SELECT id,project FROM images WHERE instr(project, ?)=1 ORDER BY id").bind(pf).all()).results;
     if (im.length < 10) { if (!pend) { delete L[nm]; ch = true; } continue; }
     const trig = 'chr' + o.cid + 'x', imgs = im.map(x => { const k = +((String(x.project).match(/(\d+)$/) || [])[1] || 0); return { id: x.id, cap: trig + ', ' + ((o.caps || [])[k] || '1girl') }; });
     const pj = 'ซีรีส์0·' + nm;
