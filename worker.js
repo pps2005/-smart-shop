@@ -339,23 +339,26 @@ async function charTrain(env, b) {
 }
 // เปลี่ยนสไตล์ทั้งเรื่อง: วาดภาพชุดฝึกของตัวละครที่ LoRA ยังไม่เสร็จใหม่ด้วยสไตล์ปัจจุบัน แล้วส่งเทรนเองเมื่อภาพครบ (สั่งด้วย settings restyle=start)
 // สั่งชุดฝึกจากฐานข้อมูล: settings lset_req = {ชื่อ: {cid, ref, mix:{ชุด:จำนวน}}} → สร้างงานวาด 16 ภาพ/ตัว (โชว์ในคลังภาพอ้างอิง) + lset ให้ส่งเทรนเอง
-function lsetJobs(n, cid, ref, mix, noset, gags) {
+function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั่ง: แบบแผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้าตลกครึ่งตัวพื้นหลังสี (เปลี่ยนชุด) · ไม่มีภาพครอป/มุมเงย
   const C = HY_CHAR[n]; if (!C) return null;
   const ST = 'anime screencap, flat color, clean thin lineart, soft colors, beautiful detailed eyes, perfect anatomy, good proportions, full color';
-  const V = ['full body, standing, front view, gentle smile, simple white background', 'full body, standing, three-quarter view, hand on hip, simple white background', 'full body, walking, from side, simple background', 'upper body, front view, looking at viewer, smile, simple background', 'portrait, close-up, face focus, looking at viewer, simple background', 'upper body, three-quarter view, surprised, simple background', 'cowboy shot, sitting on chair, relaxed, indoors', 'upper body, blush, looking away, simple background'];
-  const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'close-up, face focus', 'eating from a bowl', 'stretching', 'lying on back, playful', 'sitting on a bench, night', 'close-up of tail tip with glowing paper lantern', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing'];
+  const EX = ['gentle smile', 'serious expression', 'shy smile, blush', 'surprised, open mouth', 'pout, annoyed', 'happy, laughing', 'confident smirk', 'sleepy, half-closed eyes'];
+  const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'stretching', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing', 'lying on back, playful'];
+  const GX = C.gx || ['comedic deadpan face, half-closed eyes, flat unimpressed expression, blank stare', 'comedic laughing face, huge wide open mouth, closed happy eyes', 'comedic shocked face, white blank eyes, sweatdrop, mouth wide open', 'comedic smug face, smirk, sharp teeth grin', 'comedic flustered face, blush, steam from ears, wavy mouth'];
   const jobs = [], caps = [], pfx = 'อ้างอิง·' + n + '·ปกติ·' + (noset ? 'ใหม่' : 'ฝึก'); let i = 0;
-  const qn = C.o ? ['two cats', 'a cat without a lantern on its tail', 'monochrome drawing'] : ['two people', 'the same person drawn twice', 'monochrome black and white drawing', 'deformed body, extra limbs'];
-  const neg = (C.neg ? C.neg + ', ' : '') + 'nsfw, nude, nipples, panties, monochrome, greyscale, multiple views' + (C.o ? ', lantern on head, multiple cats' : ', 2girls, 2boys');
-  for (const [k, c] of Object.entries(mix || { [C.def]: 16 })) { const o = C.of[k]; if (!o) continue;
+  const qn = C.o ? ['two cats', 'a cat without a lantern on its tail', 'monochrome drawing'] : ['two people', 'the same person drawn twice', 'monochrome black and white drawing', 'a person whose head is cut off by the image frame', 'a view from below looking up at the legs', 'deformed body, extra limbs'];
+  const neg = (C.neg ? C.neg + ', ' : '') + 'nsfw, nude, nipples, panties, underwear, monochrome, greyscale, multiple views, cropped, head out of frame, from below, close-up' + (C.o ? ', lantern on head, multiple cats' : ', 2girls, 2boys');
+  const ipa = ref ? { refimg: ref, rw: 0.55, ipa_end: 0.8, ref_crop: 'face' } : {};
+  const outs = Object.entries(mix || { [C.def]: 12 }).filter(([k]) => C.of[k]);
+  for (const [k, c] of outs) { const o = C.of[k];
     for (let t = 0; t < c; t++, i++) {
-      const v = C.o ? 'the glowing paper lantern hangs from the end of its tail, full body, ' + PM[i % PM.length] + ', simple white background' : V[i % V.length];
-      const up = C.o || /portrait|upper body|cowboy/.test(v);
-      jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.id, o[1], v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: up ? 1024 : 832, h: up ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg, ...(ref ? { refimg: ref, rw: 0.45, ipa_end: 0.7 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]);
+      const v = C.o ? 'the glowing paper lantern hangs from the end of its tail, full body, ' + PM[i % PM.length] + ', simple white background' : 'full body, standing, ' + (i % 2 ? 'three-quarter view' : 'front view') + ', head to toe, feet visible, ' + EX[i % EX.length] + ', simple white background';
+      jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.id, o[1], v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: C.o ? 1024 : 832, h: C.o ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg, ...ipa, takes: 2, np: C.o ? 0 : 1, qneg: qn }]);
       caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (/^1boy/.test(C.id) ? '1boy, ' : '1girl, ') + o[1] + ', ' + v);
     } }
-  for (const [gi, g] of (gags ? (C.gx || []).slice(0, gags) : []).entries()) { const o = C.of[C.def];
-    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(gi).padStart(2, '0'), [C.id, o[1], 'upper body, ' + g + ', colorful speed lines background, anime screencap, flat color, clean thin lineart, full color'].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg, ...(ref ? { refimg: ref, rw: 0.35, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]); }
+  const ok = Object.keys(C.of); // หน้าตลก: ครึ่งตัว พื้นหลังสีสด เปลี่ยนชุดไปเรื่อยๆ
+  for (let g = 0; g < (gags || 0); g++) { const o = C.of[ok[g % ok.length]];
+    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.id, o[1], 'upper body, head visible, ' + GX[g % GX.length] + ', colorful speed lines background, ' + ST].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg, ...(ref ? { ...ipa, rw: 0.4, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]); }
   return { jobs, set: { cid, caps, pfx } };
 }
 async function lsetReqTick(env, s) {
@@ -3460,15 +3463,44 @@ def ensure_ipa():
     return bool(M.get("ipa"))
 
 
-def get_ref(url, jid, k):
-    # ดึงภาพอ้างอิงที่ผู้ใช้อนุมัติ (ลิงก์มีลายเซ็นจากเว็บ) ลงโฟลเดอร์ input ของ ComfyUI
+def face_crop(im):
+    # ตัดเฉพาะส่วนหัวจากภาพตัวละครเต็มตัวพื้นเรียบ: หาขอบตัวละครจากสีพื้นที่มุมภาพ แล้วตัดสี่เหลี่ยมจัตุรัสช่วงบนสุด
+    # (ส่งแค่หน้า+ผมให้ IP-Adapter → ชุดไม่ติดมาจากภาพต้นแบบ · ผู้ใช้เจอชุดไม่เปลี่ยน)
+    import numpy as np
+    a = np.asarray(im.convert("RGB")).astype(np.int32)
+    H, W = a.shape[:2]
+    cs = np.stack([a[2, 2], a[2, W - 3], a[H - 3, 2], a[H - 3, W - 3]])
+    bg = np.median(cs, axis=0)
+    m = np.abs(a - bg).sum(axis=2) > 60
+    rows = np.where(m.sum(axis=1) > max(3, W * 0.01))[0]
+    if len(rows) < 10:
+        return im
+    y0, y1 = int(rows[0]), int(rows[-1])
+    h = y1 - y0
+    side = int(max(64, min(W, h * (0.24 if h > H * 0.6 else 0.5))))
+    band = m[y0:y0 + side]
+    cols = np.where(band.sum(axis=0) > 0)[0]
+    cx = int((cols[0] + cols[-1]) / 2) if len(cols) else W // 2
+    x0 = max(0, min(W - side, cx - side // 2))
+    yy = max(0, y0 - side // 12)
+    return im.crop((x0, yy, x0 + side, min(H, yy + side))).resize((512, 512))
+
+
+def get_ref(url, jid, k, crop=None):
+    # ดึงภาพอ้างอิงที่ผู้ใช้อนุมัติ (ลิงก์มีลายเซ็นจากเว็บ) ลงโฟลเดอร์ input ของ ComfyUI · crop="face" = ตัดเฉพาะหัว
     nm = "%s_ref%d.png" % (jid, k)
     try:
         from PIL import Image
         import io
         req = urllib.request.Request(url, headers=UA)
         with urllib.request.urlopen(req, timeout=120) as r:
-            Image.open(io.BytesIO(r.read())).convert("RGB").save(os.path.join(COMFY, "input", nm))
+            im = Image.open(io.BytesIO(r.read())).convert("RGB")
+        if crop == "face":
+            try:
+                im = face_crop(im)
+            except Exception as e:
+                log("ตัดหน้าภาพอ้างอิงไม่ได้ ใช้ทั้งภาพ: %s" % str(e)[:80])
+        im.save(os.path.join(COMFY, "input", nm))
         return nm
     except Exception as e:
         log("ดึงภาพอ้างอิงไม่ได้: %s" % str(e)[:120])
@@ -3653,7 +3685,7 @@ def gen_image(j, port=8188):
         wf["3"]["inputs"]["clip"] = pc
         wf["5"]["inputs"]["model"] = pm
         if opt.get("ref") and ensure_ipa():  # ภาพอ้างอิงที่ผู้ใช้เลือก: ล็อกหน้า/ทรงตัวละครด้วย IP-Adapter
-            rimg = get_ref(opt["ref"], jid, 0)
+            rimg = get_ref(opt["ref"], jid, 0, opt.get("ref_crop"))
             if rimg:
                 add_ipa(wf, pm, [(rimg, None, float(opt.get("rw") or 0.55))], "5", float(opt.get("ipa_end") or 1.0))  # ipa_end < 1 = ล็อกหน้า/โครงช่วงต้น ปล่อยลายเส้น/สีช่วงท้าย (กันสไตล์ภาพต้นแบบหลุดมา เช่น พื้นหลังสีรุ้ง ภาพซ้อนสองคน)
         if opt.get("neg"):
