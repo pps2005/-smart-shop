@@ -124,13 +124,13 @@ async function handleFetch(req, env, ctx) {
 }
 async function handleCron(event, env, ctx) {
     await ensureSchema(env);
-    const kv0 = {}; for (const x of ((await env.DB.prepare('SELECT key,value FROM settings WHERE key IN (?,?,?,?,?,?)').bind(readDay(), 'boost_until', 'sb_import', 'sb_redraw', 'lset_req', 'k_status').all().catch(() => ({ results: [] }))).results || [])) kv0[x.key] = x.value;
+    const kv0 = {}; for (const x of ((await env.DB.prepare('SELECT key,value FROM settings WHERE key IN (?,?,?,?,?,?,?)').bind(readDay(), 'boost_until', 'sb_import', 'sb_redraw', 'lset_req', 'k_status', 'lset_req:' + LSET_V).all().catch(() => ({ results: [] }))).results || [])) kv0[x.key] = x.value;
     const rrNow = +kv0[readDay()] || 0;
     // งานที่สั่งอัปเดต (นำเข้าสตอรีบอร์ด/วาดใหม่) = งานด่วน: ไม่ต้องรอรอบที่ชะลอไว้ · เปิดโหมดเร่ง 10 นาทีให้ส่งงานวาดต่อได้ทันที (ยกเว้นเกิน 90% เพื่อกันเว็บล่ม)
     if ((kv0.sb_import || kv0.sb_redraw) && rrNow <= READ_WEB && !(+kv0.boost_until > Date.now())) { kv0.boost_until = String(Date.now() + 10 * 60000); await setSetting(env, 'boost_until', kv0.boost_until); }
     const boost = +kv0.boost_until > Date.now();
     // ภาพอ้างอิงตัวละคร = ผู้ใช้นั่งรอดู: มีคำสั่งใหม่ (lset_req) หรือมีงานรอแต่เครื่องยังไม่วิ่ง → ไม่ต้องรอรอบที่ชะลอไว้ (เคยรอ 2 รอบ × 12 นาที)
-    let urgent = !!kv0.lset_req;
+    let urgent = !!(kv0.lset_req || kv0['lset_req:' + LSET_V]);
     if (!urgent) { const rq = await env.DB.prepare("SELECT COUNT(*) n, MIN(created) t0 FROM vjobs WHERE status='queued' AND kind='img' AND substr(project,1,8)='อ้างอิง·'").first().catch(() => null); urgent = !!(rq && rq.n) && (!/running/.test(String(kv0.k_status || '')) || Date.now() - (+rq.t0 || 0) > 180000); } // เครื่องวิ่งอยู่ = รับงานเองใน 45 วิ · ค้างเกิน 3 นาที = สถานะเครื่องอาจเก่า ให้ตรวจใหม่
     if (rrNow <= READ_STOP && !boost && !urgent) { const pc = readPace(rrNow); if (new Date().getUTCMinutes() % pc.every) return; } // ปุ่มเร่งสตอรีบอร์ด: ไม่เว้นช่วง // ใช้เร็วกว่ากำหนด: เว้นช่วงทำงาน (ทุก 3/6/12 นาที)
     if (rrNow > (boost ? READ_WEB : READ_STOP)) return; // ถึง 85% แล้ว (โหมดเร่ง/งานด่วน: ถึง 90%): งานเบื้องหลังทุกอย่างพักไว้ทำต่อหลังรีเซ็ต 07:00 เพื่อให้หน้าเว็บยังเปิดได้ (เดิมกันแค่คิววาดภาพ งานอื่นยังวิ่งจนทะลุ 100%)
@@ -345,7 +345,7 @@ async function charTrain(env, b) {
 function lsetJobs(n, cid, ref, mix, noset, gags, g0) { // แผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้ามีมครึ่งตัวพื้นหลังสี · แก้ใหญ่ 14 พ.ย.: คำสั่งไม่ตีกันเอง + ตัวตรวจเลือกรูปอ่านสีผม/หน้ามีมจริง
   const C = HY_CHAR[n]; if (!C) return null;
   const ST = 'anime screencap, anime coloring, flat color, clean lineart, bold black outlines, simple cel shading, bright clean colors'; // ลายเส้นที่ผู้ใช้เลือก (14 พ.ย. 13:56): เส้นดำชัด สีเรียบสด เงาน้อย
-  const GST = 'gag manga style, comedy, cute, funny, kawaii, simplified face, flat color, no shading, bold black outlines, bright clean colors, striped background, diagonal stripes, colorful background'; // มีม: ไม่ใส่คำ "สวย/ตาละเอียด" (เคยทับหน้าเพี้ยนจนออกมาหน้าปกติ)
+  const GST = 'anime screencap, anime coloring, tv anime, gag anime, comedy, cute, funny, simplified face, simple eyes, flat color, no shading, clean lineart, ' + ['emphasis lines, simple background, blue background', 'sunburst background, emphasis lines, purple background', 'simple background, yellow background, sparkle background', 'simple background, pink background, emphasis lines'][((g0 || 0) + (gags || 0) + n.length) % 4]; // ผู้ใช้ (15:51): "มีมแบบในอนิเมะ" = หน้าแก๊กแบบอนิเมะทีวี เส้นบางสะอาด หน้าเรียบง่าย พื้นหลังเส้นเน้น/สีเดียว (เลิกพื้นลายทางสีรุ้ง) // มีม: ไม่ใส่คำ "สวย/ตาละเอียด" (เคยทับหน้าเพี้ยนจนออกมาหน้าปกติ)
   const EX = ['gentle smile', 'serious, closed mouth', 'shy smile, blush', 'surprised, open mouth', 'pout, annoyed', 'happy, laughing', 'confident smirk', 'sleepy, half-closed eyes'];
   const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'stretching', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing', 'lying on back, playful'];
   const GXA = HY_GAG[n] || HY_GAG['*'], GX = GXA.map(x => x[0]), GQ = GXA.map(x => x[1]); // หน้ามีมผูกกับบทของตัวละครนั้น (HY_GAG)
@@ -377,9 +377,11 @@ function lsetJobs(n, cid, ref, mix, noset, gags, g0) { // แผ่นตัว�
     jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.o ? '' : 'solo', gid, top, C.o ? 'close-up, animal focus' : 'close-up, portrait, face focus, head and shoulders', GX[f], GST].filter(Boolean).join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg0 + ', full body, lower body, legs, shoes, inset, split screen, realistic, horror, scary, creepy, crazy eyes, yandere, constricted pupils, shaded face, wrinkles, veins, sharp teeth, glitch, noise' + (C.o ? '' : ', detailed eyes, beautiful, bishoujo') + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), takes: 3, np: C.o ? 0 : 1, qref: 1, qc: ['a funny exaggerated cartoon meme face of a ' + subj + ', cute lighthearted silly comedic reaction face, close-up', GQ[f]], qneg: C.o ? ['two cats', 'a human', 'monochrome black and white drawing', 'a calm normal cute kitten sitting still'] : ['a pretty anime ' + who + ' with a normal calm gentle face and beautiful detailed eyes', 'two people', 'two copies of the same person', 'a close-up face next to a small full body figure', 'a full body figure with legs', 'monochrome black and white drawing', 'a scary creepy horror face with crazy eyes', 'a corrupted noisy glitchy smeared image', ...wrongHair] }]); }
   return { jobs, set: { cid, caps, pfx } };
 }
+const LSET_V = 3; // เปลี่ยนคำสั่งวาดภาพอ้างอิงเมื่อไหร่ +1 แล้วสั่งผ่าน lset_req:<รุ่น>
 async function lsetReqTick(env, s) {
-  if (!s.lset_req) return;
-  const got = await env.DB.prepare("DELETE FROM settings WHERE key='lset_req' RETURNING value").first(); if (!got) return; // จองแบบอะตอม (เคยมี 2 รอบทำงานซ้อนกัน สร้างงานซ้ำ 2 เท่า)
+  const RK = s['lset_req:' + LSET_V] ? 'lset_req:' + LSET_V : 'lset_req';
+  if (!s[RK]) return;
+  const got = await env.DB.prepare("DELETE FROM settings WHERE key=? RETURNING value").bind(RK).first(); if (!got) return; // จองแบบอะตอม (เคยมี 2 รอบทำงานซ้อนกัน สร้างงานซ้ำ 2 เท่า)
   let R; try { R = JSON.parse(got.value); } catch { R = {}; }
   let L = {}; try { L = JSON.parse(s.lset || '{}'); } catch { }
   let t = Date.now();
