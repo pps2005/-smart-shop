@@ -342,7 +342,7 @@ async function charTrain(env, b) {
 }
 // เปลี่ยนสไตล์ทั้งเรื่อง: วาดภาพชุดฝึกของตัวละครที่ LoRA ยังไม่เสร็จใหม่ด้วยสไตล์ปัจจุบัน แล้วส่งเทรนเองเมื่อภาพครบ (สั่งด้วย settings restyle=start)
 // สั่งชุดฝึกจากฐานข้อมูล: settings lset_req = {ชื่อ: {cid, ref, mix:{ชุด:จำนวน}}} → สร้างงานวาด 16 ภาพ/ตัว (โชว์ในคลังภาพอ้างอิง) + lset ให้ส่งเทรนเอง
-function lsetJobs(n, cid, ref, mix, noset, gags, g0) { // แผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้ามีมครึ่งตัวพื้นหลังสี · แก้ใหญ่ 14 พ.ย.: คำสั่งไม่ตีกันเอง + ตัวตรวจเลือกรูปอ่านสีผม/หน้ามีมจริง
+function lsetJobs(n, cid, ref, mix, noset, gags, g0, gl) { // แผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้ามีมครึ่งตัวพื้นหลังสี · แก้ใหญ่ 14 พ.ย.: คำสั่งไม่ตีกันเอง + ตัวตรวจเลือกรูปอ่านสีผม/หน้ามีมจริง
   const C = HY_CHAR[n]; if (!C) return null;
   const ST = 'anime screencap, anime coloring, flat color, clean lineart, bold black outlines, simple cel shading, bright clean colors'; // ลายเส้นที่ผู้ใช้เลือก (14 พ.ย. 13:56): เส้นดำชัด สีเรียบสด เงาน้อย
   const GST = 'anime screencap, anime coloring, tv anime, gag anime, comedy, cute, funny, simplified face, simple eyes, flat color, no shading, clean lineart, ' + ['emphasis lines, simple background, blue background', 'sunburst background, emphasis lines, purple background', 'simple background, yellow background, sparkle background', 'simple background, pink background, emphasis lines'][((g0 || 0) + (gags || 0) + n.length) % 4]; // ผู้ใช้ (15:51): "มีมแบบในอนิเมะ" = หน้าแก๊กแบบอนิเมะทีวี เส้นบางสะอาด หน้าเรียบง่าย พื้นหลังเส้นเน้น/สีเดียว (เลิกพื้นลายทางสีรุ้ง) // มีม: ไม่ใส่คำ "สวย/ตาละเอียด" (เคยทับหน้าเพี้ยนจนออกมาหน้าปกติ)
@@ -371,13 +371,14 @@ function lsetJobs(n, cid, ref, mix, noset, gags, g0) { // แผ่นตัว�
   const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้ามีม: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง
   const gid = C.id.split(', ').filter(t => !/^(beautiful|handsome|bishounen|half-closed eyes|long eyelashes|sharp eyes|curvy|slim|slim waist|long legs|tall|tall male|broad shoulders|athletic|slender|red lips|youthful|large breasts|narrow waist|wide hips|toned|toned male|muscular male)$/.test(t)).join(', '); // มีม: ตัดคำความสวย/สัดส่วนออกจากตัวตน เหลือแต่สีผม สีตา จุดเด่น
   const per = Math.max(1, Math.ceil(((g0 || 0) + (gags || 0)) / ok.length)); // หน้ามีมต่อชุด: ทุกชุดได้ครบทุกหน้า (เดิมวนชุดกับหน้าพร้อมกัน บางชุดได้หน้าซ้ำ)
-  for (let g = (g0 || 0); g < (g0 || 0) + (gags || 0); g++) { const o = C.of[ok[Math.floor(g / per) % ok.length]], f = g % GX.length; // g0 = เริ่มจากหน้าแบบที่เท่าไหร่ (วาดเพิ่มเฉพาะแบบที่ยังไม่มี)
+  const GL = gl ? gl.filter(x => C.of[x[0]] && GXA.some(y => y[0] === x[1])) : null; // gl = [[คีย์ชุด, คีย์สีหน้า], ...] ที่เลือกมาแล้วว่าไม่ซ้ำ
+  for (let g = (g0 || 0); g < (GL ? GL.length : (g0 || 0) + (gags || 0)); g++) { const o = GL ? C.of[GL[g][0]] : C.of[ok[Math.floor(g / per) % ok.length]], f = GL ? GXA.findIndex(y => y[0] === GL[g][1]) : g % GX.length; // g0 = เริ่มจากหน้าแบบที่เท่าไหร่ (วาดเพิ่มเฉพาะแบบที่ยังไม่มี)
     const top = fit(o[1]).split(', ').filter(t => !/skirt|pants|slacks|shorts|jeans|pantyhose|tights|thighhighs|socks|heels|boots|shoes|sneakers|sandals|loafers|mary janes|slippers|barefoot|holding|hugging/.test(t)).join(', '); // ตัดคำส่วนล่าง+ของในมือ ไม่ให้วาดคนเต็มตัวโผล่มาอีกคน
     const subj = C.o ? 'white kitten' : 'anime ' + who + ' with ' + HQ[0] + ' hair', chibi = GXA[f][3];
     jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + GXA[f][0] + '·' + String(g).padStart(2, '0'), [C.o ? '' : 'solo', gid, top, C.o ? 'close-up, animal focus' : chibi ? 'upper body' : 'close-up, portrait, face focus, head and shoulders', GX[f], GST].filter(Boolean).join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg0 + (chibi ? '' : ', full body, lower body, legs, shoes') + ', inset, split screen, realistic, horror, scary, creepy, crazy eyes, yandere, constricted pupils, shaded face, wrinkles, veins, sharp teeth, glitch, noise' + (C.o ? '' : ', detailed eyes, beautiful, bishoujo') + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), takes: 3, np: C.o ? 0 : 1, qref: 1, qc: ['a funny exaggerated cartoon meme face of a ' + subj + ', cute lighthearted silly comedic reaction face' + (chibi ? '' : ', close-up'), GQ[f]], qneg: C.o ? ['two cats', 'a human', 'monochrome black and white drawing', 'a calm normal cute kitten sitting still'] : ['a pretty anime ' + who + ' with a normal calm gentle face and beautiful detailed eyes', 'two people', 'two copies of the same person', 'a close-up face next to a small full body figure', 'monochrome black and white drawing', 'a scary creepy horror face with crazy eyes', 'a corrupted noisy glitchy smeared image', ...wrongHair] }]); }
   return { jobs, set: { cid, caps, pfx } };
 }
-const LSET_V = 6; // เปลี่ยนคำสั่งวาดภาพอ้างอิงเมื่อไหร่ +1 แล้วสั่งผ่าน lset_req:<รุ่น>
+const LSET_V = 7; // เปลี่ยนคำสั่งวาดภาพอ้างอิงเมื่อไหร่ +1 แล้วสั่งผ่าน lset_req:<รุ่น>
 async function lsetReqTick(env, s) {
   const RK = s['lset_req:' + LSET_V] ? 'lset_req:' + LSET_V : 'lset_req';
   if (!s[RK]) return;
@@ -385,7 +386,7 @@ async function lsetReqTick(env, s) {
   let R; try { R = JSON.parse(got.value); } catch { R = {}; }
   let L = {}; try { L = JSON.parse(s.lset || '{}'); } catch { }
   let t = Date.now();
-  for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset, +r.gags || 0, +r.g0 || 0); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
+  for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset, +r.gags || 0, +r.g0 || 0, r.gl || null); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
     let q = 0; // test = วาดก่อนแค่ n ภาพให้ผู้ใช้ตรวจ ที่เหลือพักไว้ (hold) จนผู้ใช้อนุมัติ
     for (const [pj, pr, op] of P.jobs) { if (r.fill && (await env.DB.prepare("SELECT (SELECT COUNT(*) FROM images WHERE project=?1) + (SELECT COUNT(*) FROM vjobs WHERE kind='img' AND project=?1 AND status IN ('queued','running','hold')) n").bind(pj).first()).n) continue; // fill = วาดเฉพาะรูปที่ยังไม่มี
       await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,?,0,?,'img',?)").bind(pj, pr, !r.test || q++ < +r.test ? 'queued' : 'hold', t++, JSON.stringify(op)).run(); }
@@ -785,6 +786,20 @@ const HY_FACE = {
   gremlin: ['หน้าซุกซนเจ้าเล่ห์', '(:3:1.3), (fang:1.2), cat smile, (mischievous:1.2), smug, half-closed eyes, sparkle, steepled fingers, scheming', 'a funny mischievous scheming face with a cat-like grin and a little fang', 0, 'the character is plotting something naughty'],
   rage: ['หน้าโกรธแบบจิบิ', '(chibi:1.4), super deformed, (anger vein:1.3), (>_<:1.2), open mouth, puffed cheeks, clenched hands, arms up, steam', 'a cute tiny chibi character throwing an angry tantrum with an anger mark, arms raised', 1, 'the character explodes in comedic anger (use the chibi transformation only at the punchline)'],
   judge: ['สายตาตัดสินคนอื่น', '(jitome:1.4), (looking to the side:1.2), sideways glance, half-closed eyes, (frown:1.2), raised eyebrow, crossed arms', 'a funny judgmental side-eye glance with half-closed eyes, a frown and crossed arms', 0, 'the character silently judges what someone else just did'],
+  sparkle: ['ตาเป็นประกาย', '(sparkling eyes:1.4), +_+, (blush:1.2), open mouth, :d, excited, hands on own cheeks, sparkle', 'a cute excited face with huge sparkling starry eyes, blushing, hands on cheeks', 0, 'the character sees something they secretly love'],
+  grumpy: ['หน้าบึ้ง', '(frown:1.3), (v-shaped eyebrows:1.2), half-closed eyes, annoyed, closed mouth, :<, crossed arms', 'a cute grumpy annoyed frowning face with angled eyebrows and a downturned mouth', 0, 'the character is annoyed or in a bad mood'],
+  sulk: ['หน้างอน', '(pout:1.4), (puffed cheeks:1.3), looking away, blush, closed eyes, turning head away', 'a cute sulking face with puffed cheeks and a pout, turning away with closed eyes', 0, 'the character sulks after being teased or ignored'],
+  cheeky: ['แลบลิ้นกวนๆ', '(tongue out:1.4), :p, (one eye closed:1.2), akanbe, finger to eyelid, teasing', 'a cute cheeky face sticking the tongue out with one eye closed, pulling down an eyelid', 0, 'the character mocks someone playfully'],
+  cry: ['ร้องไห้น้ำตาน้ำตก', '(crying:1.3), (streaming tears:1.4), (>_<:1.2), closed eyes, (open mouth:1.3), wavy mouth', 'a cute funny crying face with waterfall tears, squeezed shut eyes and a big wavy open mouth', 0, 'comedic over-the-top crying'],
+  fluster: ['เขินหน้าแดง', '(full-face blush:1.4), (wavy mouth:1.3), wide-eyed, steam, flying sweatdrops, hands on own cheeks', 'a cute bright red blushing embarrassed face with wide eyes, a wavy mouth and steam', 0, 'the character is flustered or embarrassed by affection'],
+  smug: ['ยิ้มเหนือ', '(smug:1.4), (doyagao:1.2), closed eyes, smile, hand on own chin, sparkle', 'a cute very smug proud face with closed eyes and a satisfied smile, hand on the chin', 0, 'the character is proud of themselves'],
+  sleepy: ['ง่วงน้ำลายยืด', '(nose bubble:1.3), (drooling:1.2), closed eyes, =_=, sleeping, zzz, open mouth', 'a cute funny sleeping face with a snot bubble and drool', 0, 'the character dozes off at a bad moment'],
+  love: ['ตาหัวใจ', '(heart-shaped pupils:1.4), (blush:1.2), open mouth, :d, heart, own hands clasped', 'a cute lovestruck face with heart-shaped eyes, blushing with a big smile, hands clasped', 0, 'the character is smitten with something or someone'],
+  gloom: ['หมดอาลัยตายอยาก', '(turn pale:1.3), depressed, =_=, closed eyes, (sweatdrop:1.2), slumped shoulders, giving up the ghost', 'a cute funny gloomy defeated face, pale with flat closed eyes and a tiny ghost leaving the mouth', 0, 'the character gives up or is utterly exhausted'],
+  catmouth: ['ปากแมวอารมณ์ดี', '(:3:1.4), cat mouth, (^_^:1.2), closed eyes, happy, paw pose', 'a cute happy face with a cat-like mouth and closed smiling eyes, hands in a paw pose', 0, 'the character is pleased and content'],
+  peace: ['ชูสองนิ้วขยิบตา', '(v:1.3), peace sign, (one eye closed:1.2), wink, grin, star (symbol)', 'a cute cool face winking with a grin, making a peace sign near the eye', 0, 'the character shows off playfully'],
+  shy: ['ปิดหน้าแอบมอง', '(covering own face:1.3), peeking through fingers, (blush:1.3), embarrassed', 'a cute shy face hidden behind both hands, peeking through the fingers, blushing', 0, 'the character is too embarrassed to look'],
+  thumbs: ['ยกนิ้วฟันวิ้ง', '(thumbs up:1.3), (grin:1.3), one eye closed, teeth, sparkle, glint, confident', 'a funny overly cool face winking with a big shiny grin, giving a thumbs up with sparkles', 0, 'the character acts overly cool or reassuring'],
   laugh: ['หัวเราะลั่น (Reaction)', '(laughing:1.3), (^_^:1.3), closed eyes, crescent eyes, (open mouth:1.4), wide open mouth, upper teeth only, :d, hands up, open hands', 'a funny face laughing very hard with happy closed crescent eyes and a huge wide open mouth, both hands raised', 0, 'reaction to a joke'],
 };
 function hyAutoFace(en) { // กฎสำรอง (AI ใช้ไม่ได้/ตอนที่นำเข้าไปแล้ว): เฉพาะช่องที่บทเขียนว่าเป็นช่องตลก — ไม่ใช่ช่องตลก = ไม่มีหน้ามีม
@@ -5439,6 +5454,7 @@ async function castApi(req, env, url, body) {
         if (!im || !String(im.project).startsWith('อ้างอิง·')) return json({ error: 'ลบได้เฉพาะภาพอ้างอิง' }, 400);
         await env.DB.prepare('DELETE FROM images WHERE id=?').bind(id).run();
         const cur = (await rd('charref:' + story)) || {};
+        { const pp0 = String(im.project).split('·'), fk = pp0[pp0.length - 2], nm0 = pp0[1]; if (pp0[2] === 'ตลก' && HY_FACE[fk] && !(await env.DB.prepare("SELECT 1 FROM images WHERE instr(project, ?)=1 AND instr(project, ?)>0 LIMIT 1").bind('อ้างอิง·' + nm0 + '·ตลก·', '·' + fk + '·').first())) { cur[nm0] = cur[nm0] || { n: 0, g: [] }; cur[nm0].nf = [...new Set([...(cur[nm0].nf || []), fk])]; } } // ลบมีมสีหน้านี้จนไม่เหลือ = ไม่เอาสีหน้านี้กับตัวนี้ (ปุ่มทำมีมจะไม่วาดซ้ำ)
         { const pp = String(im.project).split('·'), nm = pp[1], C = HY_CHAR[nm], lab = pp.slice(3).join('·'); // ลบรูปชุดสุดท้าย = ผู้ใช้ไม่เอาชุดนี้ → ฉากที่ต้องใช้จะใช้ชุดใกล้เคียงแทน ไม่วาดชุดนี้ซ้ำ
           if (C && pp[2] === 'ปกติ') for (const [k, o] of Object.entries(C.of)) if (lab.includes(o[0]) && !(await env.DB.prepare("SELECT 1 FROM images WHERE instr(project, ?)=1 AND instr(project, ?)>0 LIMIT 1").bind('อ้างอิง·' + nm + '·ปกติ·', o[0]).first()) && !(await env.DB.prepare("SELECT 1 FROM vjobs WHERE kind='img' AND status IN ('queued','running','hold') AND instr(project, ?)=1 AND instr(project, ?)>0 LIMIT 1").bind('อ้างอิง·' + nm + '·ปกติ·', o[0]).first())) { cur[nm] = cur[nm] || { n: 0, g: [] }; cur[nm].no = [...new Set([...(cur[nm].no || []), k])]; } } for (const v of Object.values(cur)) { v.m = (v.m || []).filter(x => x !== id); v.g = (v.g || []).filter(x => x !== id); if (v.n === id) v.n = v.m[0] || 0; if (v.of) for (const k of Object.keys(v.of)) if (v.of[k] === id) delete v.of[k]; }
         await setSetting(env, 'charref:' + story, JSON.stringify(cur)); return json({ ok: true, ok_: cur });
@@ -5448,8 +5464,12 @@ async function castApi(req, env, url, body) {
         if (!C) return json({ error: 'ไม่รู้จักตัวละคร' }, 400);
         const ks = Object.keys(cur.of || {}); if (!ks.length) return json({ error: 'ยังไม่ได้เลือกชุด (ติ๊กภาพชุดที่ชอบก่อน)' }, 400);
         const ch = await env.DB.prepare('SELECT id FROM chars WHERE series_id=0 AND name=?').bind(nm).first();
-        const P = lsetJobs(nm, ch ? ch.id : 0, +cur.n || 0, Object.fromEntries(ks.map(k => [k, 0])), 1, ks.length * 4); let t = Date.now();
-        await env.DB.prepare("DELETE FROM vjobs WHERE kind='img' AND status='queued' AND instr(project, ?)=1").bind('อ้างอิง·' + nm + '·ตลก·').run();
+        const pfm = 'อ้างอิง·' + nm + '·ตลก·', have = [...(await env.DB.prepare("SELECT project FROM images WHERE instr(project, ?)=1").bind(pfm).all()).results, ...(await env.DB.prepare("SELECT project FROM vjobs WHERE kind='img' AND status IN ('queued','running','hold') AND instr(project, ?)=1").bind(pfm).all()).results].map(x => String(x.project));
+        const nf = new Set(cur.nf || []), used = new Set(), cnt = {}; for (const pj of have) { const pp = pj.split('·'), fk = pp[pp.length - 2]; if (HY_FACE[fk]) used.add(fk); for (const k of ks) if (pj.includes('·' + C.of[k][0] + '·')) cnt[k] = (cnt[k] || 0) + 1; }
+        const pool = Object.keys(HY_FACE).filter(f => !nf.has(f)), gl = []; let fresh = pool.filter(f => !used.has(f)), ri = 0;
+        for (const k of ks) { const mine = new Set(have.filter(pj => pj.includes('·' + C.of[k][0] + '·')).map(pj => { const pp = pj.split('·'); return pp[pp.length - 2]; }));
+          for (let i = cnt[k] || 0; i < 4; i++) { let f = fresh.shift(); if (!f) { for (let t2 = 0; t2 < pool.length && (!f || mine.has(f)); t2++) f = pool[ri++ % pool.length]; } if (!f || mine.has(f)) break; mine.add(f); gl.push([k, f]); } } // หน้าใหม่ที่ยังไม่เคยมีก่อน หมดแล้วค่อยวนหน้าที่ชอบ (ไม่ซ้ำในชุดเดียวกัน)
+        const P = lsetJobs(nm, ch ? ch.id : 0, +cur.n || 0, {}, 1, 0, 0, gl); let t = Date.now();
         for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, t++, JSON.stringify(op)).run();
         return json({ ok: true, jobs: P.jobs.length, outfits: ks.length });
       }
