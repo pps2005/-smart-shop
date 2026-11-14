@@ -338,6 +338,25 @@ async function charTrain(env, b) {
   return { ok: true, images: imgs.length };
 }
 // เปลี่ยนสไตล์ทั้งเรื่อง: วาดภาพชุดฝึกของตัวละครที่ LoRA ยังไม่เสร็จใหม่ด้วยสไตล์ปัจจุบัน แล้วส่งเทรนเองเมื่อภาพครบ (สั่งด้วย settings restyle=start)
+// ชุดฝึก LoRA จากภาพที่ผู้ใช้เลือก: settings lset = {ชื่อ: {cid, caps:[...]}} · ภาพ 'ชุดฝึก·ชื่อ·NN' วาดครบ → ส่งเทรนเอง (คำบรรยายภาพตามลำดับ NN)
+async function lsetTick(env, s) {
+  if (!s.lset) return; let L; try { L = JSON.parse(s.lset); } catch { return; }
+  let ch = false;
+  for (const [nm, o] of Object.entries(L)) {
+    const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND project LIKE ?").bind('ชุดฝึก·' + nm + '·%').first()).n;
+    if (pend) continue;
+    const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project LIKE ? ORDER BY id").bind('ชุดฝึก·' + nm + '·%').all()).results;
+    if (im.length < 10) { if (!pend) { delete L[nm]; ch = true; } continue; }
+    const trig = 'chr' + o.cid + 'x', imgs = im.map(x => { const k = +String(x.project).split('·')[2] || 0; return { id: x.id, cap: trig + ', ' + ((o.caps || [])[k] || '1girl') }; });
+    const pj = 'ซีรีส์0·' + nm;
+    await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(o.cid), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
+    const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: o.cid, trigger: trig, images: imgs, pri: 0, dim: 16 })).run();
+    await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(o.cid, r.meta.last_row_id, Date.now()).run();
+    await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('ชุดฝึก ' + nm + ' ครบ ' + imgs.length + ' ภาพ → ส่งเทรน LoRA ' + trig, Date.now()).run().catch(() => { });
+    delete L[nm]; ch = true;
+  }
+  if (ch) { if (Object.keys(L).length) await setSetting(env, 'lset', JSON.stringify(L)); else await env.DB.prepare("DELETE FROM settings WHERE key='lset'").run(); }
+}
 async function restyleTick(env, s) {
   if (!s.restyle) return;
   await animeSchema(env);
@@ -1394,6 +1413,7 @@ async function tick(env, force) {
   }
   if (s.design_cast) { await env.DB.prepare("DELETE FROM settings WHERE key='design_cast'").run(); await designCast(env, s, String(s.design_cast)).catch(() => { }); }
   await restyleTick(tagged(env, 'bg:lora'), s).catch(() => { });
+  await lsetTick(tagged(env, 'bg:lora'), s).catch(() => { });
   await xlTick(tagged(env, 'bg:lora')).catch(() => { });
   await animeAdvance(tagged(env, 'bg:anime'), s).catch(() => {});
   const useK = await kImgOn(env, s, now);
