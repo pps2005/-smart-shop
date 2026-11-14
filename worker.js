@@ -371,7 +371,7 @@ function lsetJobs(n, cid, ref, mix, noset, gags, g0) { // แผ่นตัว�
   const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้ามีม: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง
   const gid = C.id.split(', ').filter(t => !/^(beautiful|handsome|bishounen|half-closed eyes|long eyelashes|sharp eyes|curvy|slim|slim waist|long legs|tall|tall male|broad shoulders|athletic|slender|red lips|youthful|large breasts|narrow waist|wide hips|toned|toned male|muscular male)$/.test(t)).join(', '); // มีม: ตัดคำความสวย/สัดส่วนออกจากตัวตน เหลือแต่สีผม สีตา จุดเด่น
   const per = Math.max(1, Math.ceil(((g0 || 0) + (gags || 0)) / ok.length)); // หน้ามีมต่อชุด: ทุกชุดได้ครบทุกหน้า (เดิมวนชุดกับหน้าพร้อมกัน บางชุดได้หน้าซ้ำ)
-  for (let g = (g0 || 0); g < (g0 || 0) + (gags || 0); g++) { const o = C.of[ok[Math.floor(g / per) % ok.length]], f = (g % per) % GX.length; // g0 = เริ่มจากหน้าแบบที่เท่าไหร่ (วาดเพิ่มเฉพาะแบบที่ยังไม่มี)
+  for (let g = (g0 || 0); g < (g0 || 0) + (gags || 0); g++) { const o = C.of[ok[Math.floor(g / per) % ok.length]], f = g % GX.length; // g0 = เริ่มจากหน้าแบบที่เท่าไหร่ (วาดเพิ่มเฉพาะแบบที่ยังไม่มี)
     const top = fit(o[1]).split(', ').filter(t => !/skirt|pants|slacks|shorts|jeans|pantyhose|tights|thighhighs|socks|heels|boots|shoes|sneakers|sandals|loafers|mary janes|slippers|barefoot|holding|hugging/.test(t)).join(', '); // ตัดคำส่วนล่าง+ของในมือ ไม่ให้วาดคนเต็มตัวโผล่มาอีกคน
     const subj = C.o ? 'white kitten' : 'anime ' + who + ' with ' + HQ[0] + ' hair';
     jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.o ? '' : 'solo', gid, top, C.o ? 'close-up, animal focus' : 'close-up, portrait, face focus, head and shoulders', GX[f], GST].filter(Boolean).join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg0 + ', full body, lower body, legs, shoes, inset, split screen, realistic, horror, scary, creepy, crazy eyes, yandere, constricted pupils, shaded face, wrinkles, veins, sharp teeth, glitch, noise' + (C.o ? '' : ', detailed eyes, beautiful, bishoujo') + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), takes: 3, np: C.o ? 0 : 1, qref: 1, qc: ['a funny exaggerated cartoon meme face of a ' + subj + ', cute lighthearted silly comedic reaction face, close-up', GQ[f]], qneg: C.o ? ['two cats', 'a human', 'monochrome black and white drawing', 'a calm normal cute kitten sitting still'] : ['a pretty anime ' + who + ' with a normal calm gentle face and beautiful detailed eyes', 'two people', 'two copies of the same person', 'a close-up face next to a small full body figure', 'a full body figure with legs', 'monochrome black and white drawing', 'a scary creepy horror face with crazy eyes', 'a corrupted noisy glitchy smeared image', ...wrongHair] }]); }
@@ -739,7 +739,7 @@ const HY_GAG = { // 14 พ.ย. 15:45 ผู้ใช้: "มีมดูน่
   'ริน': [ // คู่กัดของโทวะ: ยิ้มเยาะแซว · หน้าแดงตอนเกือบโดนจับได้ · งอนแก้มป่อง · มองเหยียดหน้าตาย
     ['(smug:1.4), jitome, half-closed eyes, (grin:1.2), fang, hand over own mouth, teasing, :3', 'a cute smug teasing face with half-closed eyes and a cat-like grin, one hand near the mouth'],
     ['(full-face blush:1.4), (wavy mouth:1.3), (>_<:1.2), closed eyes, embarrassed, flying sweatdrops, steam, cute', 'a cute bright red blushing embarrassed face with squeezed shut eyes and a wavy mouth'],
-    ['(pout:1.4), (puffed cheeks:1.3), v-shaped eyebrows, anger vein, blush, looking away, clenched hands, cute', 'a cute sulking face with puffed cheeks, a pout and a small anger mark'],
+    ['(laughing:1.3), (^_^:1.3), closed eyes, (open mouth:1.4), wide open mouth, upper teeth only, pointing at viewer, tears, cute', 'a cute face laughing very hard with closed crescent eyes and a huge open mouth, pointing a finger'],
     ['(jitome:1.4), half-closed eyes, (expressionless:1.2), closed mouth, flat mouth, sweatdrop, (long face:1.1)', 'a cute funny deadpan face with half-closed eyes and a flat mouth']],
   'หัวหน้าซาเอกิ': [ // หัวหน้าดุแต่แอบห่วง: ยิ้มตาปิดมีเครื่องหมายโกรธ · ถอนหายใจหน้าตาย · หลุดเขิน · ยิ้มเหนือ
     ['(closed eyes:1.2), (^_^:1.2), smile, (anger vein:1.4), head tilt, sweatdrop, cute', 'a cute funny forced smile with closed happy eyes and a big anger mark on the forehead'],
@@ -762,6 +762,13 @@ const HY_GAG = { // 14 พ.ย. 15:45 ผู้ใช้: "มีมดูน่
     ['(biting a coffee can:1.3), stubborn, jitome, half-closed eyes, sweatdrop, cute', 'a cute stubborn white kitten biting a coffee can and refusing to let go'],
     ['(sparkling eyes:1.4), huge round eyes, pleading, begging, paws together, head tilt, cute', 'a cute white kitten begging with huge sparkling round eyes']],
 };
+// หน้ากลางที่ผู้ใช้ขอเพิ่ม (15:49): มึนงง · กวนๆ · บึ้ง · งอน → ต่อท้ายทุกตัว (คน) รวมเป็น 8 หน้าต่อตัว · แต่ละชุดได้ 4 หน้า สลับกันจนครบ 8
+const HY_GAG_COMMON = [
+  ['(solid circle eyes:1.3), dot eyes, (triangle mouth:1.2), open mouth, ?, confused, blank stare, head tilt, cute', 'a cute funny dazed confused blank face with tiny dot eyes, a small open mouth and a question mark'],
+  ['(tongue out:1.4), :p, (one eye closed:1.2), (smug:1.2), teasing, akanbe, finger to eyelid, cute', 'a cute cheeky teasing face sticking the tongue out with one eye closed'],
+  ['(frown:1.3), (v-shaped eyebrows:1.2), half-closed eyes, annoyed, closed mouth, :<, crossed arms, cute', 'a cute grumpy annoyed frowning face with angled eyebrows and a downturned mouth'],
+  ['(pout:1.4), (puffed cheeks:1.3), looking away, blush, closed eyes, turning head away, hmph, cute', 'a cute sulking face with puffed cheeks and a pout, turning away with closed eyes']];
+for (const k of Object.keys(HY_GAG)) if (k !== 'โมจิ') HY_GAG[k] = HY_GAG[k].concat(HY_GAG_COMMON);
 HY_GAG['*'] = HY_GAG['มิโอะ'];
 const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 12 ตอน (ผู้ใช้อนุมัติ 14 พ.ย.) · ชุด = [ชื่อ, แท็กชุด+ทรงผม+ลุค+เครื่องประดับ (สี/ลายตายตัว), คำบรรยาย]
   'โทวะ': { id: '1boy, adult, young man, handsome, bishounen, (black hair:1.2), short hair, grey eyes, sharp eyes, mole under eye, tall male, broad shoulders, toned male', neg: 'green hair, blue hair, brown hair, purple hair, grey hair, blonde hair, fat, old man',
