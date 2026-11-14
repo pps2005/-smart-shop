@@ -384,8 +384,8 @@ async function lsetTick(env, s) {
     const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running','hold') AND instr(project, ?)=1").bind(pf).first()).n; // instr แทน LIKE (D1 ปฏิเสธรูปแบบ LIKE ภาษาไทยที่ยาว)
     if (pend) continue;
     const im = (await env.DB.prepare("SELECT id,project FROM images WHERE instr(project, ?)=1 ORDER BY id").bind(pf).all()).results;
-    if (im.length < 10) { if (!pend) { delete L[nm]; ch = true; } continue; }
-    const trig = 'chr' + o.cid + 'x', imgs = im.map(x => { const k = +((String(x.project).match(/(\d+)$/) || [])[1] || 0); return { id: x.id, cap: trig + ', ' + ((o.caps || [])[k] || '1girl') }; });
+    if (im.length + (o.extra || []).length < 10) { if (!pend) { delete L[nm]; ch = true; } continue; }
+    const trig = 'chr' + o.cid + 'x', imgs = im.map(x => { const k = +((String(x.project).match(/(\d+)$/) || [])[1] || 0); return { id: x.id, cap: trig + ', ' + ((o.caps || [])[k] || '1girl') }; }).concat(o.extra || []);
     const pj = 'ซีรีส์0·' + nm;
     await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(o.cid), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
     const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: o.cid, trigger: trig, images: imgs, pri: 0, dim: 16 })).run();
@@ -5150,7 +5150,8 @@ async function castApi(req, env, url, body) {
       if (act === 'refs') { // แผ่นอ้างอิงตัวละคร (ปกติ + หน้าตลก): รายการภาพ + ที่อนุมัติแล้ว + คิวที่ค้าง
         const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project LIKE 'อ้างอิง·%' ORDER BY id").all()).results;
         const q = (await env.DB.prepare("SELECT project,COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND project LIKE 'อ้างอิง·%' GROUP BY project").all()).results;
-        return json({ ok: true, imgs: im, queued: q, ok_: (await rd('charref:' + story)) || {}, map: (await rd('refmap:' + story)) || {}, roles: Object.keys(HY_TAGS).filter(n => n !== 'ริน_d'), names: [...new Set([...Object.keys(HY_TAGS).filter(n => n !== 'ริน_d'), ...im.map(x => String(x.project).split('·')[1])])] });
+        const lst = {}; for (const r of (await env.DB.prepare("SELECT c.name, l.status FROM loras l JOIN chars c ON c.id=l.char_id WHERE c.series_id=0 AND l.status<>'old' ORDER BY l.id").all()).results) lst[r.name] = r.status;
+        return json({ ok: true, lora: lst, imgs: im, queued: q, ok_: (await rd('charref:' + story)) || {}, map: (await rd('refmap:' + story)) || {}, roles: Object.keys(HY_TAGS).filter(n => n !== 'ริน_d'), names: [...new Set([...Object.keys(HY_TAGS).filter(n => n !== 'ริน_d'), ...im.map(x => String(x.project).split('·')[1])])] });
       }
       if (act === 'ref_map') { // ตัวละครในคลัง → ใช้เป็นบทไหน ('' = ไม่ใช้ในเรื่องนี้)
         const m = (await rd('refmap:' + story)) || {}; m[String(b.lib || '')] = String(b.role ?? ''); await setSetting(env, 'refmap:' + story, JSON.stringify(m)); return json({ ok: true, map: m });
@@ -5163,6 +5164,44 @@ async function castApi(req, env, url, body) {
             for (const r of rows) { const lab = String(r.project).split('·').slice(3).join('·'); for (const [k, o] of Object.entries(C.of)) if (lab.includes(o[0]) && !of[k]) of[k] = r.id; } }
           cur[nm].of = of; }
         await setSetting(env, 'charref:' + story, JSON.stringify(cur)); return json({ ok: true, ok_: cur });
+      }
+      if (act === 'ref_del') { // ผู้ใช้ลบภาพอ้างอิงที่ไม่ชอบ (เฉพาะภาพอ้างอิง) + เอาออกจากที่เลือกไว้
+        const id = +b.id, im = await env.DB.prepare('SELECT project FROM images WHERE id=?').bind(id).first();
+        if (!im || !String(im.project).startsWith('อ้างอิง·')) return json({ error: 'ลบได้เฉพาะภาพอ้างอิง' }, 400);
+        await env.DB.prepare('DELETE FROM images WHERE id=?').bind(id).run();
+        const cur = (await rd('charref:' + story)) || {}; for (const v of Object.values(cur)) { v.m = (v.m || []).filter(x => x !== id); v.g = (v.g || []).filter(x => x !== id); if (v.n === id) v.n = v.m[0] || 0; if (v.of) for (const k of Object.keys(v.of)) if (v.of[k] === id) delete v.of[k]; }
+        await setSetting(env, 'charref:' + story, JSON.stringify(cur)); return json({ ok: true, ok_: cur });
+      }
+      if (act === 'ref_memes') { // ยืนยันชุดที่เลือก → วาดร่างมีม 3 แบบต่อชุด (ล็อกหน้าจากภาพหลัก)
+        const nm = String(b.name || ''), C = HY_CHAR[nm], cur = ((await rd('charref:' + story)) || {})[nm] || {};
+        if (!C) return json({ error: 'ไม่รู้จักตัวละคร' }, 400);
+        const ks = Object.keys(cur.of || {}); if (!ks.length) return json({ error: 'ยังไม่ได้เลือกชุด (ติ๊กภาพชุดที่ชอบก่อน)' }, 400);
+        const ch = await env.DB.prepare('SELECT id FROM chars WHERE series_id=0 AND name=?').bind(nm).first();
+        const P = lsetJobs(nm, ch ? ch.id : 0, +cur.n || 0, Object.fromEntries(ks.map(k => [k, 0])), 1, ks.length * 3); let t = Date.now();
+        await env.DB.prepare("DELETE FROM vjobs WHERE kind='img' AND status='queued' AND instr(project, ?)=1").bind('อ้างอิง·' + nm + '·ตลก·').run();
+        for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, t++, JSON.stringify(op)).run();
+        return json({ ok: true, jobs: P.jobs.length, outfits: ks.length });
+      }
+      if (act === 'ref_lora') { // ร่างครบ → เทรน LoRA: ภาพชุดที่เลือก + มีม · ไม่ถึง 12 ภาพ = วาดท่าเพิ่มก่อนแล้วเทรนเอง
+        const nm = String(b.name || ''), C = HY_CHAR[nm], cur = ((await rd('charref:' + story)) || {})[nm] || {};
+        const ch = await env.DB.prepare('SELECT id FROM chars WHERE series_id=0 AND name=?').bind(nm).first(); if (!C || !ch) return json({ error: 'ไม่พบตัวละคร' }, 400);
+        const trig = 'chr' + ch.id + 'x', g1 = /^1boy/.test(C.id) ? '1boy, ' : C.o ? '' : '1girl, ', imgs = [];
+        const lab2k = lab => { for (const [k, o] of Object.entries(C.of)) if (String(lab).includes(o[0])) return k; return C.def; };
+        const sel = [...new Set([...(cur.m || []), cur.n].filter(Boolean))];
+        if (sel.length) for (const r of (await env.DB.prepare(`SELECT id,project FROM images WHERE id IN (${sel.map(() => '?').join(',')})`).bind(...sel).all()).results) { const k = lab2k(String(r.project).split('·').slice(3).join('·')); imgs.push({ id: r.id, cap: trig + ', ' + g1 + C.of[k][1] + ', full body, standing' }); }
+        for (const r of (await env.DB.prepare("SELECT id,project FROM images WHERE instr(project, ?)=1").bind('อ้างอิง·' + nm + '·ตลก·').all()).results) { const k = lab2k(String(r.project).split('·')[3] || ''); imgs.push({ id: r.id, cap: trig + ', ' + g1 + C.of[k][1] + ', upper body, comedic face' }); }
+        if ((await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND instr(project, ?)=1").bind('อ้างอิง·' + nm + '·').first()).n) return json({ error: 'ยังวาดร่างไม่ครบ รอให้เสร็จก่อน' }, 400);
+        if (imgs.length >= 12) {
+          await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind('ซีรีส์0·' + nm)]);
+          const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind('ซีรีส์0·' + nm, Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs.slice(0, 24), pri: 0, dim: 16 })).run();
+          await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(ch.id, r.meta.last_row_id, Date.now()).run();
+          return json({ ok: true, train: imgs.length });
+        }
+        const ks = Object.keys(cur.of || {}).length ? Object.keys(cur.of) : [C.def], need = 12 - imgs.length, mix = {}; ks.forEach((k, i) => mix[k] = Math.floor(need / ks.length) + (i < need % ks.length ? 1 : 0));
+        const P = lsetJobs(nm, ch.id, +cur.n || 0, mix, 0, 0); let t = Date.now();
+        for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, t++, JSON.stringify(op)).run();
+        const L = (await rd('lset')) || {}; L[nm] = { ...P.set, extra: imgs }; await setSetting(env, 'lset', JSON.stringify(L));
+        return json({ ok: true, more: P.jobs.length, have: imgs.length });
       }
       if (act === 'ref_make') { // วาดแผ่นอ้างอิงตามตู้เสื้อผ้า (ชุดหลักที่ใช้ในตอน 1 ก่อน) · name = เฉพาะตัวนั้น · มิโอะใช้หน้าที่ผู้ใช้เลือกเป็นภาพอ้างอิง
         const cr = (await rd('charref:' + story)) || {}; let n = 0;
