@@ -359,8 +359,9 @@ function lsetJobs(n, cid, ref, mix, noset, gags) {
   return { jobs, set: { cid, caps, pfx } };
 }
 async function lsetReqTick(env, s) {
-  if (!s.lset_req) return; let R; try { R = JSON.parse(s.lset_req); } catch { R = {}; }
-  await env.DB.prepare("DELETE FROM settings WHERE key='lset_req'").run();
+  if (!s.lset_req) return;
+  const got = await env.DB.prepare("DELETE FROM settings WHERE key='lset_req' RETURNING value").first(); if (!got) return; // จองแบบอะตอม (เคยมี 2 รอบทำงานซ้อนกัน สร้างงานซ้ำ 2 เท่า)
+  let R; try { R = JSON.parse(got.value); } catch { R = {}; }
   let L = {}; try { L = JSON.parse(s.lset || '{}'); } catch { }
   let t = Date.now();
   for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset, +r.gags || 0); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
