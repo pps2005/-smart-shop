@@ -468,13 +468,13 @@ async function sbImportTick(env, s) {
   const [story, epS] = String(s.sb_import).split('|'), ep = +epS, D = (SBX[story] || {})[String(ep)];
   const cl = await env.DB.prepare("DELETE FROM settings WHERE key='sb_import' AND value=?").bind(String(s.sb_import)).run(); if (!cl.meta || !cl.meta.changes) return; // จองงานแบบอะตอม: เคยนำเข้าซ้อน 2 รอบจนช่องซ้ำ
   const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!D || !sr) return;
-  for (const [sc, list] of Object.entries(D)) {
+  for (const [sc, list] of Object.entries(D)) { hyAutoOutfits(list); // ชุดอัตโนมัติตามสถานที่/เวลา/เหตุการณ์
     const e = await env.DB.prepare('SELECT id,script_id FROM scenes WHERE series_id=? AND ep=? AND sc=?').bind(sr.id, ep, +sc).first(); if (!e || !e.script_id) continue;
     const sid = e.script_id, old = (await env.DB.prepare('SELECT kproj FROM shots WHERE script_id=?').bind(sid).all()).results, st = [];
     for (const o of old) st.push(env.DB.prepare('DELETE FROM images WHERE project=?').bind(o.kproj), env.DB.prepare("DELETE FROM jobs WHERE project=?").bind(o.kproj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'").bind(o.kproj));
     st.push(env.DB.prepare('DELETE FROM shots WHERE script_id=?').bind(sid));
     list.forEach((x, i) => { const ls = (x.lines || []).map(l => ({ who: String(l.who || ''), say: String(l.say || ''), ...(l.ja ? { ja: String(l.ja) } : {}), ...(l.emo ? { emo: String(l.emo) } : {}), ...(l.nv ? { nv: String(l.nv) } : {}), ...(+l.spd ? { spd: +l.spd } : {}), ...(+l.pause ? { pause: +l.pause } : {}), ...(l.pron ? { pron: String(l.pron) } : {}), ...(l.dir ? { dir: String(l.dir).slice(0, 120) } : {}) })); // ja/emo = บทพากย์ญี่ปุ่น + อารมณ์
-      st.push(env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,0,?,?,?,?,?,?,?,?)').bind(sid, i + 1, String(x.th || ''), String(x.en || '').slice(0, 1800), JSON.stringify(x.chars || []), `ฉาก${sid}·${i + 1}`, Date.now(), JSON.stringify({ who: ls[0] ? ls[0].who : '', say: ls[0] ? ls[0].say : '', lines: ls, ...(x.think ? { think: x.think } : {}), ...(x.ono ? { ono: x.ono } : {}), ...(x.thinkTh ? { thinkTh: x.thinkTh } : {}), ...(x.onoTh ? { onoTh: x.onoTh } : {}), ...(x.dir ? { dir: x.dir } : {}), ...(x.s3 ? { s3: x.s3 } : {}) }), x.chain ? 1 : 0, x.loc || null)); }); // dir = ใบสั่งงานผู้กำกับ (ช็อต มุม การเคลื่อนกล้อง แสง อารมณ์ เวลา เสียง ดนตรี พรอมต์วิดีโอ)
+      st.push(env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,0,?,?,?,?,?,?,?,?)').bind(sid, i + 1, String(x.th || ''), String(x.en || '').slice(0, 1800), JSON.stringify(x.chars || []), `ฉาก${sid}·${i + 1}`, Date.now(), JSON.stringify({ who: ls[0] ? ls[0].who : '', say: ls[0] ? ls[0].say : '', lines: ls, ...(x.think ? { think: x.think } : {}), ...(x.ono ? { ono: x.ono } : {}), ...(x.thinkTh ? { thinkTh: x.thinkTh } : {}), ...(x.onoTh ? { onoTh: x.onoTh } : {}), ...(x.dir ? { dir: x.dir } : {}), ...(x.s3 ? { s3: x.s3 } : {}), ...(x.outfit ? { outfit: x.outfit } : {}) }), x.chain ? 1 : 0, x.loc || null)); }); // dir = ใบสั่งงานผู้กำกับ (ช็อต มุม การเคลื่อนกล้อง แสง อารมณ์ เวลา เสียง ดนตรี พรอมต์วิดีโอ)
     for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20));
     await env.DB.prepare('UPDATE scenes SET sb=-1, fin=0, auto=1 WHERE id=?').bind(e.id).run();
     await setSetting(env, 'sbfix:' + sid, '0,0'); await setSetting(env, 'sbsay:' + sid, 'hand');
@@ -734,6 +734,31 @@ const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 1
       festival: ['หมวกเทศกาล', 'wearing a tiny fox festival mask on its head', 'kitten with a tiny fox festival mask'],
       bow: ['โบว์', 'wearing a big pink ribbon bow on its neck', 'kitten with a pink ribbon bow'] }, def: 'def' },
 };
+// ชุดอัตโนมัติ: ป้ายกำกับว่าชุดไหนใส่ที่ไหน/เมื่อไหร่ (จับคำในคำบรรยายช่องภาษาอังกฤษ) · ไม่เข้าข้อไหน = ชุดประจำตัว
+const HY_WHEN = {
+  'โทวะ': { demon: /demon form|glowing red sigils|awaken(ed|s)? (as|into)|mask demon/, disguise: /disguis|black market|under the bridge/, home: /bedroom|apartment|pajama|in bed|bedhead|laundry|at home/, winter: /snow|winter|freezing|cold night/, casual: /day off|weekend|holiday/ },
+  'ริน': { battle: /full combat|battle suit|final battle|giant demon/, disguise: /disguis|black market|under the bridge/, festival: /festival|yukata/, sleep: /bedroom|pajama|in bed/, casual: /day off|weekend|date\b/, bakery: /bakery|apron|counter|morning/, night: /night|hood|rooftop|city wall|barrier/ },
+  'มิโอะ': { battle: /inspector.*(fight|baton|battle)|(fight|battle).*inspector|ink baton/, inspector: /inspector|armband/, sleep: /bedroom|pajama|in bed/, winter: /snow|winter|freezing/, holiday: /day off|weekend|shopping|toy shop|plush shop/ },
+  'หัวหน้าซาเอกิ': { battle: /protect(s|ing)? towa|tactical|barrier of talismans/, dress: /ceremony|gala|evening dress|bell tower rite/, winter: /snow|winter|freezing/, casual: /off duty|after work|\bbar\b/ },
+  'ป้าฮานะ': { sealer: /battle|fight|sealer coat|final battle/, sleep: /bedroom|pajama|in bed/, winter: /snow|winter|freezing/, casual: /day off|kimono|weekend/ },
+  'ไค': { demon: /loses control|horns|demon form/, night: /night|smuggl|black market|tram|rooftop/, winter: /snow|winter|freezing/, casual: /day off|weekend|beach/ },
+};
+function hyAutoOutfit(n, en, prev, newSeg) { // ชุดเดิมทั้งซีน เปลี่ยนเมื่อขึ้นช่วงใหม่ (สถานที่/เวลาเปลี่ยน) หรือบทบอกว่าเปลี่ยนชุด
+  const C = HY_CHAR[n]; if (!C) return null; const lo = String(en || '').toLowerCase();
+  if (prev && !newSeg && !/changes? (into|clothes|outfit)|now wearing|puts on/.test(lo)) return prev;
+  for (const [k, re] of Object.entries(HY_WHEN[n] || {})) if (C.of[k] && re.test(lo)) return k;
+  return C.def;
+}
+function hyAutoOutfits(list) { // ใส่ say.outfit ให้ทุกช่องที่บทยังไม่ได้ระบุ
+  let prev = {}, seg = '';
+  for (const x of list || []) { const lo = String(x.en || '').toLowerCase();
+    const sg = ((lo.match(/setting:\s*([^.]*)/) || [])[1] || '').slice(0, 40) + '|' + (/night|moon|lamp/.test(lo) ? 'n' : /morning|dawn/.test(lo) ? 'm' : 'd'), ns = sg !== seg; seg = sg;
+    const of = { ...(x.outfit || {}) };
+    for (const n of x.chars || []) if (HY_CHAR[n] && !of[n]) of[n] = hyAutoOutfit(n, lo, prev[n], ns);
+    for (const [n, k] of Object.entries(of)) prev[n] = k;
+    if (Object.keys(of).length) x.outfit = of; }
+  return list;
+}
 const HY_TAGS = {}; // ชุดหลักของแต่ละตัว (ใช้กับโค้ดเดิม) + ริน_d = ชุดร้านขนมปัง
 for (const [n, c] of Object.entries(HY_CHAR)) { const o = c.of[c.def]; HY_TAGS[n] = { ...(c.o ? { o: 1 } : {}), tags: [c.id, o[1]].filter(Boolean).join(', '), desc: o[2], ...(c.neg ? { neg: c.neg } : {}) }; }
 HY_TAGS['ริน_d'] = { tags: HY_CHAR['ริน'].id + ', ' + HY_CHAR['ริน'].of.bakery[1], desc: HY_CHAR['ริน'].of.bakery[2], neg: HY_CHAR['ริน'].neg };
@@ -1433,7 +1458,20 @@ async function bridgeImg(env, s) {
       const LIB = {}, MAP = {}, REF = {}; for (const k of Object.keys(s)) { try { if (k.startsWith('charref:')) Object.assign(LIB, JSON.parse(s[k] || '{}')); if (k.startsWith('refmap:')) Object.assign(MAP, JSON.parse(s[k] || '{}')); } catch { } }
       for (const [lib, v] of Object.entries(LIB)) { const role = lib in MAP ? MAP[lib] : lib; if (role && !(role in REF && MAP[lib] === undefined)) REF[role] = v; } // ตัวละครในคลังที่ผู้ใช้จับคู่กับบท (ค่าเริ่มต้น = ชื่อเดียวกัน)
       const gag = /chibi|comedic|gag|meme|deadpan|super-deformed/i.test(shEn);
-      for (const c of hyO.chars) { const R = REF[c.n]; if (!R) continue; const ofId = shOf && shOf[c.n] && R.of && R.of[shOf[c.n]]; const id = gag && (R.g || []).length ? R.g[(j.id || 0) % R.g.length] : (ofId || R.n); if (id) { c.ref = s.self_url + '/vi/' + id + '?s=' + await vvSig(env, 'i' + id); c.rw = gag ? 0.45 : 0.6; if (!ofId && !gag) c.rc = 'face'; } } // มีรูปชุดที่ผู้ใช้เลือก = ล็อกทั้งชุด · ไม่มี = ล็อกเฉพาะหน้า (กันชุดจากภาพหลักติดมา)
+      let wait = false;
+      for (const c of hyO.chars) { const R = REF[c.n]; if (!R) continue; const C = HY_CHAR[c.n], k = shOf && shOf[c.n];
+        let ofId = k && R.of && R.of[k] || 0;
+        if (k && !ofId && C && C.of[k] && !gag) { // ชุดที่ช่องนี้ต้องใช้ แต่ผู้ใช้ยังไม่ได้ติ๊ก → หาเอง/วาดเอง/ใช้ชุดใกล้เคียง
+          const lab = C.of[k][0], no = (R.no || []).includes(k);
+          if (!no) { const lib = await env.DB.prepare("SELECT id FROM images WHERE instr(project, ?)=1 AND instr(project, ?)>0 ORDER BY id DESC LIMIT 1").bind('อ้างอิง·' + c.n + '·ปกติ·', lab).first();
+            if (lib) ofId = lib.id;
+            else { const pend = await env.DB.prepare("SELECT status FROM vjobs WHERE kind='img' AND instr(project, ?)=1 AND instr(project, ?)>0 ORDER BY id DESC LIMIT 1").bind('อ้างอิง·' + c.n + '·ปกติ·', lab).first();
+              if (pend && (pend.status === 'queued' || pend.status === 'running')) wait = true;
+              else if (!pend && R.n) { const P = lsetJobs(c.n, 0, +R.n, { [k]: 1 }, 1, 0); for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, Date.now(), JSON.stringify({ ...op, takes: 3 })).run(); wait = true; } } }
+          if (!ofId && !wait) ofId = (R.of || {})[C.def] || Object.values(R.of || {})[0] || 0; } // ผู้ใช้ลบชุดนี้/วาดไม่สำเร็จ → ชุดที่เลือกไว้ใกล้สุด
+        const id = gag && (R.g || []).length ? R.g[(j.id || 0) % R.g.length] : (ofId || R.n);
+        if (id) { c.ref = s.self_url + '/vi/' + id + '?s=' + await vvSig(env, 'i' + id); c.rw = gag ? 0.45 : 0.6; if (!ofId && !gag) c.rc = 'face'; } }
+      if (wait) { st.push(env.DB.prepare("UPDATE jobs SET status='queued' WHERE id=?").bind(j.id)); continue; } // รอรูปชุดเสร็จก่อนค่อยวาดช่องนี้ (ชุดตรงตั้งแต่ช่องแรก)
     }
     const opt = { ...(hyOn ? { hy: hyO } : {}), ...(s3 ? { s3 } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: s3 ? 's3d' : eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
@@ -5162,14 +5200,16 @@ async function castApi(req, env, url, body) {
         { const ids = [...new Set([...(cur[nm].m || []), cur[nm].n].filter(Boolean))], C = HY_CHAR[nm], of = {}; // ชุดที่ผู้ใช้เลือก → รูปล็อกชุดตอนวาดฉาก (ชุดเดิมทุกช่องที่ใส่ชุดนั้น)
           if (C && ids.length) { const rows = (await env.DB.prepare(`SELECT id,project FROM images WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all()).results;
             for (const r of rows) { const lab = String(r.project).split('·').slice(3).join('·'); for (const [k, o] of Object.entries(C.of)) if (lab.includes(o[0]) && !of[k]) of[k] = r.id; } }
-          cur[nm].of = of; }
+          cur[nm].of = of; cur[nm].no = (cur[nm].no || []).filter(k => !of[k]); }
         await setSetting(env, 'charref:' + story, JSON.stringify(cur)); return json({ ok: true, ok_: cur });
       }
       if (act === 'ref_del') { // ผู้ใช้ลบภาพอ้างอิงที่ไม่ชอบ (เฉพาะภาพอ้างอิง) + เอาออกจากที่เลือกไว้
         const id = +b.id, im = await env.DB.prepare('SELECT project FROM images WHERE id=?').bind(id).first();
         if (!im || !String(im.project).startsWith('อ้างอิง·')) return json({ error: 'ลบได้เฉพาะภาพอ้างอิง' }, 400);
         await env.DB.prepare('DELETE FROM images WHERE id=?').bind(id).run();
-        const cur = (await rd('charref:' + story)) || {}; for (const v of Object.values(cur)) { v.m = (v.m || []).filter(x => x !== id); v.g = (v.g || []).filter(x => x !== id); if (v.n === id) v.n = v.m[0] || 0; if (v.of) for (const k of Object.keys(v.of)) if (v.of[k] === id) delete v.of[k]; }
+        const cur = (await rd('charref:' + story)) || {};
+        { const pp = String(im.project).split('·'), nm = pp[1], C = HY_CHAR[nm], lab = pp.slice(3).join('·'); // ลบรูปชุดสุดท้าย = ผู้ใช้ไม่เอาชุดนี้ → ฉากที่ต้องใช้จะใช้ชุดใกล้เคียงแทน ไม่วาดชุดนี้ซ้ำ
+          if (C && pp[2] === 'ปกติ') for (const [k, o] of Object.entries(C.of)) if (lab.includes(o[0]) && !(await env.DB.prepare("SELECT 1 FROM images WHERE instr(project, ?)=1 AND instr(project, ?)>0 LIMIT 1").bind('อ้างอิง·' + nm + '·ปกติ·', o[0]).first())) { cur[nm] = cur[nm] || { n: 0, g: [] }; cur[nm].no = [...new Set([...(cur[nm].no || []), k])]; } } for (const v of Object.values(cur)) { v.m = (v.m || []).filter(x => x !== id); v.g = (v.g || []).filter(x => x !== id); if (v.n === id) v.n = v.m[0] || 0; if (v.of) for (const k of Object.keys(v.of)) if (v.of[k] === id) delete v.of[k]; }
         await setSetting(env, 'charref:' + story, JSON.stringify(cur)); return json({ ok: true, ok_: cur });
       }
       if (act === 'ref_memes') { // ยืนยันชุดที่เลือก → วาดร่างมีม 3 แบบต่อชุด (ล็อกหน้าจากภาพหลัก)
