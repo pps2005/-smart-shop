@@ -342,7 +342,7 @@ async function charTrain(env, b) {
 }
 // เปลี่ยนสไตล์ทั้งเรื่อง: วาดภาพชุดฝึกของตัวละครที่ LoRA ยังไม่เสร็จใหม่ด้วยสไตล์ปัจจุบัน แล้วส่งเทรนเองเมื่อภาพครบ (สั่งด้วย settings restyle=start)
 // สั่งชุดฝึกจากฐานข้อมูล: settings lset_req = {ชื่อ: {cid, ref, mix:{ชุด:จำนวน}}} → สร้างงานวาด 16 ภาพ/ตัว (โชว์ในคลังภาพอ้างอิง) + lset ให้ส่งเทรนเอง
-function lsetJobs(n, cid, ref, mix, noset, gags) { // แผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้ามีมครึ่งตัวพื้นหลังสี · แก้ใหญ่ 14 พ.ย.: คำสั่งไม่ตีกันเอง + ตัวตรวจเลือกรูปอ่านสีผม/หน้ามีมจริง
+function lsetJobs(n, cid, ref, mix, noset, gags, g0) { // แผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้ามีมครึ่งตัวพื้นหลังสี · แก้ใหญ่ 14 พ.ย.: คำสั่งไม่ตีกันเอง + ตัวตรวจเลือกรูปอ่านสีผม/หน้ามีมจริง
   const C = HY_CHAR[n]; if (!C) return null;
   const ST = 'anime screencap, anime coloring, flat color, clean lineart, bold black outlines, simple cel shading, bright clean colors'; // ลายเส้นที่ผู้ใช้เลือก (14 พ.ย. 13:56): เส้นดำชัด สีเรียบสด เงาน้อย
   const GST = 'gag manga style, comedy, simplified face, flat color, no shading, bold black outlines, bright clean colors, striped background, diagonal stripes, colorful background'; // มีม: ไม่ใส่คำ "สวย/ตาละเอียด" (เคยทับหน้าเพี้ยนจนออกมาหน้าปกติ)
@@ -350,10 +350,12 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // แผ่นตัวล�
   const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'stretching', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing', 'lying on back, playful'];
   const GX = C.gx || [ // หน้ามีมแบบที่ผู้ใช้ส่งมา: ตาครึ่งปิดหนังตาหนัก/ตาเสี้ยวพระจันทร์ หน้ายืด ปากเส้นเดียวหรือปากใหญ่สุดๆ ไม่มีเงา
     '(jitome:1.3), half-closed eyes, heavy eyelids, constricted pupils, (expressionless:1.2), bored, closed mouth, flat mouth, (long face:1.1), elongated face, hands on own head',
-    '(laughing:1.3), (^_^:1.2), closed eyes, crescent eyes, (open mouth:1.3), huge mouth, teeth, :d, hands up, (long face:1.1)',
+    '(laughing:1.3), (^_^:1.3), closed eyes, crescent eyes, (open mouth:1.4), wide open mouth, upper teeth only, :d, (hands up:1.2), open hands, palms, (long face:1.1)', // หัวเราะตาเสี้ยวพระจันทร์ ปากกว้างสุด ยกมือสองข้าง
+    '(blank eyes:1.4), white eyes, no pupils, (open mouth:1.3), shouting, angry, furrowed brow, sweat, sweatdrop, head tilt', // ตาขาวโพลนตะโกน (แบบภาพมิโอะที่ผู้ใช้ชอบ)
+    '(crazy smile:1.2), (laughing:1.3), half-closed eyes, (constricted pupils:1.3), small pupils, looking up, raised eyebrows, (open mouth:1.4), teeth, tongue, (long face:1.1), elongated face', // หัวเราะหลุดโลก ตาเล็กเหลือกขึ้น ปากกว้างเห็นฟัน
     '(smug:1.3), jitome, half-closed eyes, looking down, smirk, sweatdrop, (long face:1.1), elongated face',
     '(solid circle eyes:1.2), dot eyes, (wavy mouth:1.2), blush, embarrassed, sweat, flying sweatdrops'];
-  const GQ = C.gx ? [] : ['a bored deadpan face with heavy half-closed eyes and a flat mouth', 'a face laughing very hard with eyes shut and a huge open mouth', 'a smug face looking down with a tiny smirk', 'a silly embarrassed face with dot eyes and a wavy mouth'];
+  const GQ = C.gx ? [] : ['a bored deadpan face with heavy half-closed eyes and a flat mouth', 'a face laughing very hard with happy closed crescent eyes and a huge wide open mouth, both hands raised', 'an angry shouting face with blank white eyes without pupils and a wide open mouth', 'a crazy laughing face with tiny pupils looking up and a huge open mouth showing teeth', 'a smug face looking down with a tiny smirk', 'a silly embarrassed face with dot eyes and a wavy mouth'];
   const HQ = { 'โทวะ': ['black', 'white, grey or brown'], 'ริน': ['bright red', 'black, pink or orange'], 'มิโอะ': ['black', 'white, grey or silver'], 'หัวหน้าซาเอกิ': ['black', 'white, brown or purple'], 'ป้าฮานะ': ['silver grey', 'black or brown'], 'ไค': ['blonde', 'brown or black'] }[n] || ['', ''];
   const boy = /^1boy/.test(C.id), who = boy ? 'man' : 'woman';
   const MOOD = /^(cute|cool|smirk|grin|smile|shy smile|fierce|fierce smile|sleepy|kawaii|elegant|mature|serious|menacing|wild|relaxed)$/; // คำสีหน้า/อารมณ์ในชุด: ตัดออกตอนวาดแผ่นตัวละคร (สีหน้าสั่งแยก ไม่ให้ตีกัน)
@@ -375,7 +377,7 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // แผ่นตัวล�
     } }
   const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้ามีม: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง
   const gid = C.id.split(', ').filter(t => !/^(beautiful|handsome|bishounen|half-closed eyes|long eyelashes|sharp eyes|curvy|slim|slim waist|long legs|tall|tall male|broad shoulders|athletic|slender|red lips|youthful)$/.test(t)).join(', '); // มีม: ตัดคำความสวย/สัดส่วนออกจากตัวตน เหลือแต่สีผม สีตา จุดเด่น
-  for (let g = 0; g < (gags || 0); g++) { const o = C.of[ok[g % ok.length]];
+  for (let g = (g0 || 0); g < (g0 || 0) + (gags || 0); g++) { const o = C.of[ok[g % ok.length]]; // g0 = เริ่มจากหน้ามีมแบบที่เท่าไหร่ (วาดเพิ่มเฉพาะแบบที่ยังไม่มี)
     const top = fit(o[1]).split(', ').filter(t => !/skirt|pants|slacks|shorts|jeans|pantyhose|tights|thighhighs|socks|heels|boots|shoes|sneakers|sandals|loafers|mary janes|slippers|barefoot|holding|hugging/.test(t)).join(', '); // ตัดคำส่วนล่าง+ของในมือ ไม่ให้วาดคนเต็มตัวโผล่มาอีกคน
     const gx = GX[g % GX.length], gq = GQ[g % (GQ.length || 1)];
     jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), ['solo', gid, top, 'close-up, portrait, face focus, head and shoulders', gx, GST].filter(Boolean).join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg0 + ', full body, lower body, legs, shoes, inset, split screen, realistic, detailed eyes, beautiful, bishoujo' + (/hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), ...(ref ? { ...ipa, rw: 0.3, ipa_end: 0.5 } : {}), takes: 3, np: C.o ? 0 : 1, qref: 1, qc: ['a funny exaggerated cartoon meme face of an anime ' + who + ' with ' + HQ[0] + ' hair, silly comedic reaction face, close-up', gq || 'a very funny exaggerated distorted comedic reaction face'], qneg: ['a pretty anime ' + who + ' with a normal calm gentle face and beautiful detailed eyes', 'two people', 'two copies of the same person', 'a close-up face next to a small full body figure', 'a full body figure with legs', 'monochrome black and white drawing', ...wrongHair] }]); }
@@ -387,7 +389,7 @@ async function lsetReqTick(env, s) {
   let R; try { R = JSON.parse(got.value); } catch { R = {}; }
   let L = {}; try { L = JSON.parse(s.lset || '{}'); } catch { }
   let t = Date.now();
-  for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset, +r.gags || 0); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
+  for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset, +r.gags || 0, +r.g0 || 0); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
     let q = 0; // test = วาดก่อนแค่ n ภาพให้ผู้ใช้ตรวจ ที่เหลือพักไว้ (hold) จนผู้ใช้อนุมัติ
     for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,?,0,?,'img',?)").bind(pj, pr, !r.test || q++ < +r.test ? 'queued' : 'hold', t++, JSON.stringify(op)).run();
     if (!r.noset) L[n] = { ...P.set, wait: 1 }; } // wait = ภาพครบแล้วยังไม่เทรน รอผู้ใช้ยืนยัน
