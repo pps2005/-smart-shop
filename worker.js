@@ -702,7 +702,7 @@ const HY_CHAR = {
   'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, grey hair, red eyes, sharp eyes, long eyelashes, mole under mouth, red lips, curvy', neg: 'blue eyes, brown hair, black hair, white hair',
     of: { bakery: ['ร้านขนมปัง', 'hair bun, white apron, sleeves rolled up, flour on clothes, holding rolling pin', 'grey hair in a bun, white apron dusted with flour, rolling pin'],
       casual: ['นอกร้าน', 'long hair down, purple kimono, obi', 'long grey hair down, purple kimono'],
-      chic: ['ชุดเท่ดำ', 'high ponytail, black turtleneck, black apron, rolled sleeves, arms crossed', 'grey high ponytail, black turtleneck and black apron'],
+      sealer: ['ชุดนักผนึก (อดีต)', 'high ponytail, long black battle coat with red trim, talisman belt, paper talismans, holding rolling pin like a weapon, fierce smile', 'grey high ponytail, black battle coat with red trim and talismans'],
       winter: ['ชุดกันหนาว', 'low side bun, long knit cardigan, scarf, long skirt, holding paper bag of bread', 'grey side bun, knit cardigan and scarf'] }, def: 'bakery', gx: ['comedic angry face, raising rolling pin, anger vein, sharp teeth', 'comedic smug face, smirk, half-closed eyes, hand on hip', 'comedic crying laughing, tears of laughter, open mouth, holding stomach', 'comedic shocked face, white blank eyes, sweatdrop, flour cloud'] },
   'ไค': { id: '1boy, adult, young man, handsome, blonde hair, golden eyes, fang, scar on eyebrow, athletic', neg: '',
     of: { courier: ['คนขนของ', 'short hair, spiky hair, open courier jacket, black t-shirt, cargo pants, large backpack, grin', 'spiky blond hair, open courier jacket, big backpack'],
