@@ -430,7 +430,7 @@ async function restyleTick(env, s) {
 // LoRA ประเภทอื่น: ภาพชุดฝึกครบเมื่อไหร่ ส่งเทรนเอง
 async function xlTick(env) {
   await animeSchema(env);
-  const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE c.series_id=0 AND (c.kind IN ('enemy','place','style') OR (c.kind='char' AND c.story IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
+  const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE c.series_id=0 AND c.kind IN ('enemy','place','style') AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
   for (const c of cs) {
     const pj = charProj(c);
     if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n) continue;
