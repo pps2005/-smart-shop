@@ -5062,7 +5062,7 @@ async function castApi(req, env, url, body) {
       }
       if (act === 'ref_ok') { // อนุมัติภาพอ้างอิง: {name, kind:'n'|'g', id, on}
         const cur = (await rd('charref:' + story)) || {}, nm = String(b.name || ''), k = b.kind === 'g' ? 'g' : 'n'; cur[nm] = cur[nm] || { n: 0, g: [] };
-        if (k === 'n') cur[nm].n = b.on ? +b.id : 0; else { const g = new Set(cur[nm].g || []); b.on ? g.add(+b.id) : g.delete(+b.id); cur[nm].g = [...g]; }
+        if (k === 'n') { const m = new Set(cur[nm].m || (cur[nm].n ? [cur[nm].n] : [])); b.on ? m.add(+b.id) : m.delete(+b.id); cur[nm].m = [...m]; if (!m.has(cur[nm].n)) cur[nm].n = cur[nm].m[0] || 0; } else { const g = new Set(cur[nm].g || []); b.on ? g.add(+b.id) : g.delete(+b.id); cur[nm].g = [...g]; }
         await setSetting(env, 'charref:' + story, JSON.stringify(cur)); return json({ ok: true, ok_: cur });
       }
       if (act === 'ref_make') { // วาดแผ่นอ้างอิงตามตู้เสื้อผ้า (ชุดหลักที่ใช้ในตอน 1 ก่อน) · name = เฉพาะตัวนั้น · มิโอะใช้หน้าที่ผู้ใช้เลือกเป็นภาพอ้างอิง
