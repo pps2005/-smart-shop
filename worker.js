@@ -341,7 +341,7 @@ async function charTrain(env, b) {
 // สั่งชุดฝึกจากฐานข้อมูล: settings lset_req = {ชื่อ: {cid, ref, mix:{ชุด:จำนวน}}} → สร้างงานวาด 16 ภาพ/ตัว (โชว์ในคลังภาพอ้างอิง) + lset ให้ส่งเทรนเอง
 function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั่ง: แบบแผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้าตลกครึ่งตัวพื้นหลังสี (เปลี่ยนชุด) · ไม่มีภาพครอป/มุมเงย
   const C = HY_CHAR[n]; if (!C) return null;
-  const ST = 'anime screencap, modern tv anime style, cel shading, crisp two-tone shading, clean sharp lineart, bold outlines, glossy hair highlights, vibrant saturated colors, detailed eyes, simple solid color background, perfect anatomy, good proportions, full color'; // ลายเส้นที่ผู้ใช้เลือก (14 พ.ย. บ่าย): อนิเมะทีวียุคใหม่ เงาสองชั้นคม ผมเงา สีสด — เอาแค่เทคนิค ไม่ใช้ภาพจากอนิเมะจริงเป็นต้นแบบ
+  const ST = 'anime screencap, flat color, clean lineart, bold black outlines, simple cel shading, bright clean colors, beautiful detailed eyes, perfect anatomy, good proportions, full color, solo'; // ลายเส้นที่ผู้ใช้เลือก (14 พ.ย. 13:56): แบบภาพมีมมิโอะตาขาว — เส้นดำชัด สีเรียบสด เงาน้อย
   const EX = ['gentle smile', 'serious expression', 'shy smile, blush', 'surprised, open mouth', 'pout, annoyed', 'happy, laughing', 'confident smirk', 'sleepy, half-closed eyes'];
   const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'stretching', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing', 'lying on back, playful'];
   const GX = C.gx || [ // หน้ามีมแบบที่ผู้ใช้ส่งมา: ตาเป็นเส้น/จุดเล็ก หนังตาหนัก หน้ายืดผิดสัดส่วน ปากเส้นเดียวหรือปากใหญ่สุดๆ ไม่มีเงา
@@ -363,7 +363,8 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั�
     } }
   const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้าตลก: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง (ไม่ซ้ำชุดในภาพหลัก)
   for (let g = 0; g < (gags || 0); g++) { const o = C.of[ok[g % ok.length]];
-    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.id, '(' + o[1] + ':1.2)', 'upper body, head visible, ' + GX[g % GX.length] + ', gag manga style, simplified features, flat colors, no shading on face, radial speed lines background, ' + ST].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg + ', white eyes, blank eyes, empty white eyes, detailed eyes, realistic' + (/hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), ...(ref ? { ...ipa, rw: 0.4, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]); }
+    const top = o[1].split(', ').filter(t => !/skirt|pants|slacks|shorts|pantyhose|tights|thighhighs|socks|heels|boots|shoes|sneakers|sandals|loafers|mary janes/.test(t)).join(', '); // หน้ามีมครึ่งตัว: ตัดคำส่วนล่าง (กระโปรง/รองเท้า) ไม่ให้วาดคนเต็มตัวโผล่มาอีกคน
+    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.id, '(' + top + ':1.1)', 'solo, close-up, upper body, head and shoulders, ' + GX[g % GX.length] + ', gag manga style, simplified features, flat colors, no shading on face, diagonal colorful stripes background, ' + ST].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg + ', 2girls, 2boys, multiple views, full body, inset, split screen, legs, shoes, realistic' + (/hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), ...(ref ? { ...ipa, rw: 0.4, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: [...qn, 'a close-up face next to a small full body figure', 'two copies of the same girl'] }]); }
   return { jobs, set: { cid, caps, pfx } };
 }
 async function lsetReqTick(env, s) {
