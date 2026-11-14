@@ -345,7 +345,7 @@ async function charTrain(env, b) {
 function lsetJobs(n, cid, ref, mix, noset, gags, g0) { // แผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้ามีมครึ่งตัวพื้นหลังสี · แก้ใหญ่ 14 พ.ย.: คำสั่งไม่ตีกันเอง + ตัวตรวจเลือกรูปอ่านสีผม/หน้ามีมจริง
   const C = HY_CHAR[n]; if (!C) return null;
   const ST = 'anime screencap, anime coloring, flat color, clean lineart, bold black outlines, simple cel shading, bright clean colors'; // ลายเส้นที่ผู้ใช้เลือก (14 พ.ย. 13:56): เส้นดำชัด สีเรียบสด เงาน้อย
-  const GST = 'gag manga style, comedy, simplified face, flat color, no shading, bold black outlines, bright clean colors, striped background, diagonal stripes, colorful background'; // มีม: ไม่ใส่คำ "สวย/ตาละเอียด" (เคยทับหน้าเพี้ยนจนออกมาหน้าปกติ)
+  const GST = 'gag manga style, comedy, cute, funny, kawaii, simplified face, flat color, no shading, bold black outlines, bright clean colors, striped background, diagonal stripes, colorful background'; // มีม: ไม่ใส่คำ "สวย/ตาละเอียด" (เคยทับหน้าเพี้ยนจนออกมาหน้าปกติ)
   const EX = ['gentle smile', 'serious, closed mouth', 'shy smile, blush', 'surprised, open mouth', 'pout, annoyed', 'happy, laughing', 'confident smirk', 'sleepy, half-closed eyes'];
   const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'stretching', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing', 'lying on back, playful'];
   const GXA = HY_GAG[n] || HY_GAG['*'], GX = GXA.map(x => x[0]), GQ = GXA.map(x => x[1]); // หน้ามีมผูกกับบทของตัวละครนั้น (HY_GAG)
@@ -374,7 +374,7 @@ function lsetJobs(n, cid, ref, mix, noset, gags, g0) { // แผ่นตัว�
   for (let g = (g0 || 0); g < (g0 || 0) + (gags || 0); g++) { const o = C.of[ok[Math.floor(g / per) % ok.length]], f = (g % per) % GX.length; // g0 = เริ่มจากหน้าแบบที่เท่าไหร่ (วาดเพิ่มเฉพาะแบบที่ยังไม่มี)
     const top = fit(o[1]).split(', ').filter(t => !/skirt|pants|slacks|shorts|jeans|pantyhose|tights|thighhighs|socks|heels|boots|shoes|sneakers|sandals|loafers|mary janes|slippers|barefoot|holding|hugging/.test(t)).join(', '); // ตัดคำส่วนล่าง+ของในมือ ไม่ให้วาดคนเต็มตัวโผล่มาอีกคน
     const subj = C.o ? 'white kitten' : 'anime ' + who + ' with ' + HQ[0] + ' hair';
-    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.o ? '' : 'solo', gid, top, C.o ? 'close-up, animal focus' : 'close-up, portrait, face focus, head and shoulders', GX[f], GST].filter(Boolean).join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg0 + ', full body, lower body, legs, shoes, inset, split screen, realistic' + (C.o ? '' : ', detailed eyes, beautiful, bishoujo') + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), takes: 3, np: C.o ? 0 : 1, qref: 1, qc: ['a funny exaggerated cartoon meme face of a ' + subj + ', silly comedic reaction face, close-up', GQ[f]], qneg: C.o ? ['two cats', 'a human', 'monochrome black and white drawing', 'a calm normal cute kitten sitting still'] : ['a pretty anime ' + who + ' with a normal calm gentle face and beautiful detailed eyes', 'two people', 'two copies of the same person', 'a close-up face next to a small full body figure', 'a full body figure with legs', 'monochrome black and white drawing', ...wrongHair] }]); }
+    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.o ? '' : 'solo', gid, top, C.o ? 'close-up, animal focus' : 'close-up, portrait, face focus, head and shoulders', GX[f], GST].filter(Boolean).join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg0 + ', full body, lower body, legs, shoes, inset, split screen, realistic, horror, scary, creepy, crazy eyes, yandere, constricted pupils, shaded face, wrinkles, veins, sharp teeth, glitch, noise' + (C.o ? '' : ', detailed eyes, beautiful, bishoujo') + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), takes: 3, np: C.o ? 0 : 1, qref: 1, qc: ['a funny exaggerated cartoon meme face of a ' + subj + ', cute lighthearted silly comedic reaction face, close-up', GQ[f]], qneg: C.o ? ['two cats', 'a human', 'monochrome black and white drawing', 'a calm normal cute kitten sitting still'] : ['a pretty anime ' + who + ' with a normal calm gentle face and beautiful detailed eyes', 'two people', 'two copies of the same person', 'a close-up face next to a small full body figure', 'a full body figure with legs', 'monochrome black and white drawing', 'a scary creepy horror face with crazy eyes', 'a corrupted noisy glitchy smeared image', ...wrongHair] }]); }
   return { jobs, set: { cid, caps, pfx } };
 }
 async function lsetReqTick(env, s) {
@@ -385,7 +385,8 @@ async function lsetReqTick(env, s) {
   let t = Date.now();
   for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset, +r.gags || 0, +r.g0 || 0); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
     let q = 0; // test = วาดก่อนแค่ n ภาพให้ผู้ใช้ตรวจ ที่เหลือพักไว้ (hold) จนผู้ใช้อนุมัติ
-    for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,?,0,?,'img',?)").bind(pj, pr, !r.test || q++ < +r.test ? 'queued' : 'hold', t++, JSON.stringify(op)).run();
+    for (const [pj, pr, op] of P.jobs) { if (r.fill && (await env.DB.prepare("SELECT (SELECT COUNT(*) FROM images WHERE project=?1) + (SELECT COUNT(*) FROM vjobs WHERE kind='img' AND project=?1 AND status IN ('queued','running','hold')) n").bind(pj).first()).n) continue; // fill = วาดเฉพาะรูปที่ยังไม่มี
+      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,?,0,?,'img',?)").bind(pj, pr, !r.test || q++ < +r.test ? 'queued' : 'hold', t++, JSON.stringify(op)).run(); }
     if (!r.noset) L[n] = { ...P.set, wait: 1 }; } // wait = ภาพครบแล้วยังไม่เทรน รอผู้ใช้ยืนยัน
   await setSetting(env, 'lset', JSON.stringify(L));
 }
@@ -724,42 +725,42 @@ const HY_SDXL_STYLE = 'anime screencap, anime coloring, flat color, clean linear
 // ตัวละคร = ตัวตน (หน้า/ตา/สีผม/สัดส่วน ล็อกตายตัว) + ตู้เสื้อผ้า (ชุด+ทรงผม เปลี่ยนตามบท) — ผู้ใช้สั่ง: หล่อ สวย สัดส่วนดี มีจุดขาย วาบหวิวระดับอนิเมะทีวี หลายชุดหลายทรงผม
 // สัตว์อ้างอิงกายวิภาคสัตว์จริง (ผู้ใช้สั่ง) · แก้ทับได้ที่ settings hytags
 // หน้ามีมผูกกับบท (ผู้ใช้สั่ง 14 พ.ย.): 4 แบบต่อตัว ตรงกับมุกของตัวนั้นในเรื่อง · [แท็กวาด, คำบรรยายให้ตัวตรวจเลือกรูป]
-const HY_GAG = {
-  'มิโอะ': [ // หัวหน้านิ่งหน้าตาย · แอบคลั่งกระต่าย · โดนจับได้แล้วโวยวาย (ผู้ใช้เลือกหน้าเองทั้ง 4)
-    ['(jitome:1.3), half-closed eyes, heavy eyelids, constricted pupils, (expressionless:1.2), bored, closed mouth, flat mouth, (long face:1.1), elongated face, hands on own head', 'a bored deadpan face with heavy half-closed eyes and a flat mouth'],
-    ['(laughing:1.3), (^_^:1.3), closed eyes, crescent eyes, (open mouth:1.4), wide open mouth, upper teeth only, :d, (hands up:1.2), open hands, palms, (long face:1.1)', 'a face laughing very hard with happy closed crescent eyes and a huge wide open mouth, both hands raised'],
-    ['(blank eyes:1.4), white eyes, no pupils, (open mouth:1.3), shouting, angry, furrowed brow, sweat, sweatdrop, head tilt', 'an angry shouting face with blank white eyes without pupils and a wide open mouth'],
-    ['(crazy smile:1.2), (laughing:1.3), half-closed eyes, (constricted pupils:1.3), small pupils, looking up, raised eyebrows, (open mouth:1.4), teeth, tongue, (long face:1.1), elongated face', 'a crazy laughing face with tiny pupils looking up and a huge open mouth showing teeth']],
-  'โทวะ': [ // เสมียนหมดแรง: วิญญาณหลุด · นับของจนตาหมุน · โดนเมินจนเป็นหิน · งงตาจุด (มุกในตอน 1–2)
-    ['(giving up the ghost:1.3), soul leaving mouth, (empty eyes:1.2), bags under eyes, turn pale, open mouth, exhausted, (long face:1.1)', 'an exhausted face with empty eyes and a little ghost soul floating out of the open mouth'],
-    ['(@_@:1.4), spiral eyes, (open mouth:1.3), panicking, flying sweatdrops, hands on own head, crooked eyewear', 'a panicking face with dizzy spiral eyes and a wide open mouth, sweat drops flying'],
-    ['(opaque glasses:1.4), blank white glasses, (turn pale:1.3), frozen, shaded face, open mouth, sweatdrop, awkward smile', 'a frozen shocked pale face with blank white opaque glasses'],
-    ['(solid circle eyes:1.3), dot eyes, (open mouth:1.2), triangle mouth, ?, confused, head tilt, (long face:1.1)', 'a confused blank face with tiny dot eyes, an open mouth and a question mark']],
-  'ริน': [ // คู่กัดของโทวะ: แซวเยาะ · เกือบโดนจับได้ว่าเป็นพนักงานร้านขนมปังแล้วหน้าแดง · โมโหตะโกน · มองเหยียดหน้าตาย
-    ['(smug:1.4), jitome, half-closed eyes, (grin:1.2), fang, hand over own mouth, teasing, looking down, (long face:1.1)', 'a smug teasing face with half-closed eyes and a mocking grin, one hand near the mouth'],
-    ['(full-face blush:1.4), (wavy mouth:1.3), o_o, wide-eyed, constricted pupils, embarrassed, flying sweatdrops, steam', 'a bright red blushing embarrassed face with wide round eyes and a wavy mouth'],
-    ['(angry:1.3), (anger vein:1.3), (blank eyes:1.3), white eyes, shouting, (open mouth:1.3), sharp teeth, clenched hand', 'a furious shouting face with blank white eyes, sharp teeth and an anger mark'],
-    ['(jitome:1.4), half-closed eyes, (expressionless:1.2), shaded face, looking at viewer, closed mouth, flat mouth, disgust, (long face:1.1)', 'a cold deadpan face looking down with contempt, half-closed eyes and a flat mouth']],
-  'หัวหน้าซาเอกิ': [ // หัวหน้าน่ากลัวแต่แอบห่วง: ยิ้มสยอง · ถอนหายใจหน้าตาย · หลุดเขินตอนโดนจับได้ว่าห่วง · ยิ้มเหนือ
-    ['(shaded face:1.4), (evil smile:1.2), closed eyes, smile, (anger vein:1.2), dark aura, head tilt', 'a scary threatening smile with closed eyes, a dark shadow over the face and an anger mark'],
-    ['(jitome:1.3), half-closed eyes, (sigh:1.3), expressionless, tired, closed mouth, flat mouth, hand on own forehead, (long face:1.1)', 'a tired deadpan sighing face with half-closed eyes, a hand on the forehead'],
-    ['(blush:1.3), looking away, (wavy mouth:1.2), embarrassed, sweatdrop, averting eyes, pout', 'an embarrassed blushing face looking away with a wavy pouting mouth'],
-    ['(smug:1.4), half-closed eyes, (smirk:1.2), looking down, hand on own chin, sparkle, (long face:1.1)', 'a very smug superior face with half-closed eyes and a smirk, hand on the chin']],
-  'ป้าฮานะ': [ // เจ้าของร้านขนมปัง: โมโหเงื้อไม้นวดแป้ง (ตอน 2) · มองหน้าตาย · หัวเราะลั่น · ยิ้มรู้ทัน
-    ['(angry:1.3), (anger vein:1.3), (sharp teeth:1.2), shouting, blank eyes, white eyes, raising rolling pin, holding rolling pin', 'a furious shouting face with sharp teeth and an anger mark, raising a rolling pin'],
-    ['(jitome:1.3), half-closed eyes, heavy eyelids, constricted pupils, (expressionless:1.2), closed mouth, flat mouth, hand on own hip, (long face:1.1)', 'a bored deadpan face with heavy half-closed eyes and a flat mouth'],
-    ['(laughing:1.3), (^_^:1.3), closed eyes, (open mouth:1.4), wide open mouth, teeth, tears, hand up, (long face:1.1)', 'a face laughing very hard with closed crescent eyes, tears and a huge open mouth'],
-    ['(smug:1.4), half-closed eyes, (smirk:1.2), looking to the side, hand on own cheek, sparkle', 'a smug knowing face with half-closed eyes and a sly smirk']],
+const HY_GAG = { // 14 พ.ย. 15:45 ผู้ใช้: "มีมดูน่ากลัว ไม่ตลก" → ทุกหน้าต้องน่ารัก-ตลก: ไม่มีตาเหลือก/ตาหด/หน้าเงาดำ/ฟันแหลม/รอยย่น/ตะโกนโกรธ
+  'มิโอะ': [ // หัวหน้านิ่งหน้าตาย · หลุดขำ · โดนจับได้ว่าคลั่งกระต่ายแล้วช็อกตาขาว · ตาเป็นประกายเจอตุ๊กตากระต่าย
+    ['(jitome:1.3), half-closed eyes, heavy eyelids, (expressionless:1.2), bored, closed mouth, flat mouth, (long face:1.1), hands on own head', 'a cute funny bored deadpan face with heavy half-closed eyes and a flat mouth'],
+    ['(laughing:1.3), (^_^:1.3), closed eyes, crescent eyes, (open mouth:1.4), wide open mouth, upper teeth only, :d, (hands up:1.2), open hands, palms', 'a cute face laughing very hard with happy closed crescent eyes and a huge wide open mouth, both hands raised'],
+    ['(blank eyes:1.3), white eyes, round eyes, (surprised:1.2), (wavy mouth:1.2), open mouth, sweatdrop, flustered, blush, cute', 'a cute funny shocked face with round blank white eyes, a small wavy open mouth and a sweat drop'],
+    ['(sparkling eyes:1.4), +_+, (blush:1.2), open mouth, :d, excited, hands on own cheeks, sparkle, cute', 'a cute excited face with huge sparkling starry eyes, blushing, hands on cheeks']],
+  'โทวะ': [ // เสมียนหมดแรง: วิญญาณหลุด · นับของจนตาหมุน · โดนเมินจนแว่นขาวตัวแข็ง · งงตาจุด (มุกในตอน 1–2)
+    ['(=_=:1.3), closed eyes, (giving up the ghost:1.2), bags under eyes, open mouth, exhausted, sweatdrop, cute', 'a cute funny exhausted face with flat closed line eyes and a tiny ghost floating out of the mouth'],
+    ['(@_@:1.4), spiral eyes, (open mouth:1.3), wavy mouth, panicking, flying sweatdrops, hands on own head, crooked eyewear', 'a cute funny panicking face with dizzy spiral eyes and a wide open mouth, sweat drops flying'],
+    ['(opaque glasses:1.4), white glasses, frozen, (awkward smile:1.2), sweatdrop, turn pale, cute', 'a cute funny frozen awkward face with blank white opaque glasses and a sweat drop'],
+    ['(solid circle eyes:1.3), dot eyes, (triangle mouth:1.2), open mouth, ?, confused, head tilt', 'a cute funny confused blank face with tiny dot eyes, a small triangle mouth and a question mark']],
+  'ริน': [ // คู่กัดของโทวะ: ยิ้มเยาะแซว · หน้าแดงตอนเกือบโดนจับได้ · งอนแก้มป่อง · มองเหยียดหน้าตาย
+    ['(smug:1.4), jitome, half-closed eyes, (grin:1.2), fang, hand over own mouth, teasing, :3', 'a cute smug teasing face with half-closed eyes and a cat-like grin, one hand near the mouth'],
+    ['(full-face blush:1.4), (wavy mouth:1.3), (>_<:1.2), closed eyes, embarrassed, flying sweatdrops, steam, cute', 'a cute bright red blushing embarrassed face with squeezed shut eyes and a wavy mouth'],
+    ['(pout:1.4), (puffed cheeks:1.3), v-shaped eyebrows, anger vein, blush, looking away, clenched hands, cute', 'a cute sulking face with puffed cheeks, a pout and a small anger mark'],
+    ['(jitome:1.4), half-closed eyes, (expressionless:1.2), closed mouth, flat mouth, sweatdrop, (long face:1.1)', 'a cute funny deadpan face with half-closed eyes and a flat mouth']],
+  'หัวหน้าซาเอกิ': [ // หัวหน้าดุแต่แอบห่วง: ยิ้มตาปิดมีเครื่องหมายโกรธ · ถอนหายใจหน้าตาย · หลุดเขิน · ยิ้มเหนือ
+    ['(closed eyes:1.2), (^_^:1.2), smile, (anger vein:1.4), head tilt, sweatdrop, cute', 'a cute funny forced smile with closed happy eyes and a big anger mark on the forehead'],
+    ['(jitome:1.3), half-closed eyes, (sigh:1.3), expressionless, tired, closed mouth, flat mouth, hand on own forehead', 'a cute funny tired deadpan sighing face with half-closed eyes, a hand on the forehead'],
+    ['(blush:1.3), looking away, (wavy mouth:1.2), embarrassed, sweatdrop, pout, cute', 'a cute embarrassed blushing face looking away with a wavy pouting mouth'],
+    ['(smug:1.4), half-closed eyes, (smirk:1.2), hand on own chin, sparkle, :3', 'a cute very smug face with half-closed eyes and a smirk, hand on the chin']],
+  'ป้าฮานะ': [ // เจ้าของร้านขนมปัง: เงื้อไม้นวดแป้งดุ (ตอน 2) · มองหน้าตาย · หัวเราะลั่น · ยิ้มรู้ทัน
+    ['(anger vein:1.4), v-shaped eyebrows, (open mouth:1.2), scolding, >:o, raising rolling pin, holding rolling pin, cute', 'a cute funny scolding face with an anger mark and an open mouth, raising a rolling pin'],
+    ['(jitome:1.3), half-closed eyes, heavy eyelids, (expressionless:1.2), closed mouth, flat mouth, hand on own hip', 'a cute funny bored deadpan face with heavy half-closed eyes and a flat mouth'],
+    ['(laughing:1.3), (^_^:1.3), closed eyes, (open mouth:1.4), wide open mouth, upper teeth only, tears, hand up', 'a cute face laughing very hard with closed crescent eyes, happy tears and a huge open mouth'],
+    ['(smug:1.4), half-closed eyes, (smirk:1.2), looking to the side, hand on own cheek, sparkle', 'a cute smug knowing face with half-closed eyes and a sly smirk']],
   'ไค': [ // คนส่งของขี้เล่น: โดนตบหน้าแดง · ตาหัวใจ · ร้องไห้น้ำตาน้ำตก · หน้าตาย
-    ['(red handprint on cheek:1.3), slapped, (solid circle eyes:1.2), dot eyes, (wavy mouth:1.2), tears, swollen cheek', 'a silly slapped face with a red handprint on the cheek, dot eyes and a wavy mouth'],
-    ['(heart-shaped pupils:1.4), heart eyes, (blush:1.2), (open mouth:1.2), drooling, hearts, lovestruck', 'a lovestruck face with heart-shaped eyes, blushing and drooling'],
-    ['(crying:1.3), (streaming tears:1.4), waterfall tears, closed eyes, (open mouth:1.4), wailing, snot', 'a wailing crying face with waterfall tears and a huge open mouth'],
-    ['(jitome:1.3), half-closed eyes, heavy eyelids, constricted pupils, (expressionless:1.2), closed mouth, flat mouth, (long face:1.1)', 'a bored deadpan face with heavy half-closed eyes and a flat mouth']],
+    ['(red handprint on cheek:1.3), (solid circle eyes:1.2), dot eyes, (wavy mouth:1.2), tears, cute', 'a cute silly face with a red handprint on the cheek, dot eyes and a wavy mouth'],
+    ['(heart-shaped pupils:1.4), heart eyes, (blush:1.2), (open mouth:1.2), :d, hearts, lovestruck, cute', 'a cute lovestruck face with heart-shaped eyes, blushing with a big smile'],
+    ['(crying:1.3), (streaming tears:1.4), (>_<:1.2), closed eyes, (open mouth:1.4), wavy mouth, cute', 'a cute funny crying face with waterfall tears, squeezed shut eyes and a big open mouth'],
+    ['(jitome:1.3), half-closed eyes, heavy eyelids, (expressionless:1.2), closed mouth, flat mouth, sweatdrop', 'a cute funny bored deadpan face with heavy half-closed eyes and a flat mouth']],
   'โมจิ': [ // วิญญาณแมวติดกาแฟหวาน (ตอน 1): พองตัวโกรธ · ฟินละลายตอนได้กาแฟ · กัดกระป๋องไม่ปล่อย · ตาแป๋วขอ
-    ['(puffed up round ball:1.3), fur bristling, (angry:1.3), tiny angry eyebrows, anger vein, puffed cheeks', 'an angry white kitten puffed up into a round fluffy ball with tiny angry eyebrows'],
-    ['(blissful melting face:1.3), closed eyes, ^_^, open mouth, drooling, sparkle, holding coffee can, drinking', 'a white kitten with a blissful melting happy face and sparkles, drinking from a coffee can'],
-    ['(biting a coffee can:1.3), stubborn, glaring, jitome, half-closed eyes, sweatdrop', 'a stubborn white kitten biting a coffee can and refusing to let go'],
-    ['(sparkling eyes:1.4), huge round eyes, pleading, begging, paws together, head tilt', 'a white kitten begging with huge sparkling round eyes']],
+    ['(puffed up round ball:1.3), fur bristling, tiny angry eyebrows, anger vein, puffed cheeks, cute', 'a cute angry white kitten puffed up into a round fluffy ball with tiny angry eyebrows'],
+    ['(blissful melting face:1.3), closed eyes, ^_^, open mouth, sparkle, holding coffee can, drinking, cute', 'a cute white kitten with a blissful melting happy face and sparkles, drinking from a coffee can'],
+    ['(biting a coffee can:1.3), stubborn, jitome, half-closed eyes, sweatdrop, cute', 'a cute stubborn white kitten biting a coffee can and refusing to let go'],
+    ['(sparkling eyes:1.4), huge round eyes, pleading, begging, paws together, head tilt, cute', 'a cute white kitten begging with huge sparkling round eyes']],
 };
 HY_GAG['*'] = HY_GAG['มิโอะ'];
 const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 12 ตอน (ผู้ใช้อนุมัติ 14 พ.ย.) · ชุด = [ชื่อ, แท็กชุด+ทรงผม+ลุค+เครื่องประดับ (สี/ลายตายตัว), คำบรรยาย]
