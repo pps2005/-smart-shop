@@ -1891,7 +1891,7 @@ async function vRoutes(req, env, url, ctx) {
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
       if (+j.opt.refimg) j.opt.ref = (s.self_url || url.origin) + '/vi/' + (+j.opt.refimg) + '?s=' + await vvSig(env, 'i' + (+j.opt.refimg));
-      { const si = +j.opt.styleimg || (j.kind === 'img' && (String(j.project).startsWith('อ้างอิง·') || j.opt.engine === 's3d') ? +s.style_img || 0 : 0); if (si && !j.opt.sw) j.opt.sw = +s.style_w || 0.6; // 0.8 ดึงโทนพาสเทลจนสีผมเพี้ยน → 0.6 // ลายเส้นกลางของเรื่อง (ผู้ใช้เลือกลายเส้นมิโอะ) ใช้กับทุกภาพตัวละคร/ฉาก
+      { const si = +j.opt.styleimg || (j.kind === 'img' && ((String(j.project).startsWith('อ้างอิง·') && !String(j.project).includes('·ตลก·')) || j.opt.engine === 's3d') ? +s.style_img || 0 : 0); /* หน้ามีมไม่ใช้ลายเส้นกลาง (ภาพสวยดึงหน้ามีมให้อ่อน) */ if (si && !j.opt.sw) j.opt.sw = +s.style_w || 0.6; // 0.8 ดึงโทนพาสเทลจนสีผมเพี้ยน → 0.6 // ลายเส้นกลางของเรื่อง (ผู้ใช้เลือกลายเส้นมิโอะ) ใช้กับทุกภาพตัวละคร/ฉาก
         if (si) j.opt.style_ref = (s.self_url || url.origin) + '/vi/' + si + '?s=' + await vvSig(env, 'i' + si); } // ภาพอ้างอิงที่ผู้ใช้เลือก → ลิงก์มีลายเซ็นให้เครื่องดึง (IP-Adapter)
       if (!hid) await setSetting(env, 'k_seen', String(Date.now()));
       return json({ job: j });
