@@ -348,7 +348,7 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั�
   const jobs = [], caps = [], pfx = 'อ้างอิง·' + n + '·ปกติ·' + (noset ? 'ใหม่' : 'ฝึก'); let i = 0;
   const qn = C.o ? ['two cats', 'a cat without a lantern on its tail', 'monochrome drawing'] : ['two people', 'the same person drawn twice', 'monochrome black and white drawing', 'a person whose head is cut off by the image frame', 'a view from below looking up at the legs', 'deformed body, extra limbs'];
   const neg = (C.neg ? C.neg + ', ' : '') + 'nsfw, nude, nipples, panties, underwear, huge breasts, gigantic breasts, monochrome, greyscale, multiple views, cropped, head out of frame, from below, close-up' + (C.o ? ', lantern on head, multiple cats' : ', 2girls, 2boys');
-  const ipa = ref ? { refimg: ref, rw: 0.45, ipa_end: 0.75, ref_crop: 'face' } : {};
+  const ipa = ref ? { refimg: ref, rw: 0.45, ipa_end: 0.75, ...(C.o ? {} : { ref_crop: 'face' }) } : {}; // สัตว์ไม่ตัดหัว (ภาพหลักโมจิหางอยู่บนสุด ตัดแล้วได้หาง)
   const outs = Object.entries(mix || { [C.def]: 12 }).filter(([k]) => C.of[k]);
   for (const [k, c] of outs) { const o = C.of[k];
     for (let t = 0; t < c; t++, i++) {
@@ -368,8 +368,9 @@ async function lsetReqTick(env, s) {
   let L = {}; try { L = JSON.parse(s.lset || '{}'); } catch { }
   let t = Date.now();
   for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset, +r.gags || 0); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
-    for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, t++, JSON.stringify(op)).run();
-    if (!r.noset) L[n] = P.set; }
+    let q = 0; // test = วาดก่อนแค่ n ภาพให้ผู้ใช้ตรวจ ที่เหลือพักไว้ (hold) จนผู้ใช้อนุมัติ
+    for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,?,0,?,'img',?)").bind(pj, pr, !r.test || q++ < +r.test ? 'queued' : 'hold', t++, JSON.stringify(op)).run();
+    if (!r.noset) L[n] = { ...P.set, wait: 1 }; } // wait = ภาพครบแล้วยังไม่เทรน รอผู้ใช้ยืนยัน
   await setSetting(env, 'lset', JSON.stringify(L));
 }
 // ชุดฝึก LoRA จากภาพที่ผู้ใช้เลือก: settings lset = {ชื่อ: {cid, caps:[...]}} · ภาพ 'ชุดฝึก·ชื่อ·NN' วาดครบ → ส่งเทรนเอง (คำบรรยายภาพตามลำดับ NN)
@@ -377,8 +378,9 @@ async function lsetTick(env, s) {
   if (!s.lset) return; let L; try { L = JSON.parse(s.lset); } catch { return; }
   let ch = false;
   for (const [nm, o] of Object.entries(L)) {
+    if (o.wait) continue; // รอผู้ใช้ดูภาพและยืนยันก่อนเทรน
     const pf = o.pfx || ('ชุดฝึก·' + nm + '·'); // ชุดฝึกที่โชว์ในคลังภาพอ้างอิงด้วย: pfx = 'อ้างอิง·ชื่อ·ปกติ·ฝึก'
-    const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND instr(project, ?)=1").bind(pf).first()).n; // instr แทน LIKE (D1 ปฏิเสธรูปแบบ LIKE ภาษาไทยที่ยาว)
+    const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running','hold') AND instr(project, ?)=1").bind(pf).first()).n; // instr แทน LIKE (D1 ปฏิเสธรูปแบบ LIKE ภาษาไทยที่ยาว)
     if (pend) continue;
     const im = (await env.DB.prepare("SELECT id,project FROM images WHERE instr(project, ?)=1 ORDER BY id").bind(pf).all()).results;
     if (im.length < 10) { if (!pend) { delete L[nm]; ch = true; } continue; }
