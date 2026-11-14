@@ -5307,6 +5307,7 @@ async function castApi(req, env, url, body) {
   if (p === '/api/vcastnow') return json(await castBatch(env, +body.n || 0, true, ['char', 'pet', 'place', 'prop'].includes(body.cat) ? body.cat : ''));
     if (p === '/api/vcastep') { // โครงเรื่อง (.docx ที่อ่านแล้ว) → ใส่บทอัตโนมัติ → ตรวจบทก่อนสร้างทีละตอน
       const b = body || {}, act = b.act || 'get', story = String(b.story || '').trim().slice(0, 60);
+      if (act === 'clog') { const k = 'clog', old = (await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(k).first().catch(() => null)); let L = []; try { L = JSON.parse((old && old.value) || '[]'); } catch { } L.push(new Date().toISOString().slice(11, 19) + ' ' + String(b.m || '').slice(0, 400) + ' | ' + String(b.ua || '').slice(0, 120)); await setSetting(env, k, JSON.stringify(L.slice(-15))); return json({ ok: true }); } // ข้อผิดพลาดจากหน้าเว็บของผู้ใช้ (ไว้ตรวจปัญหาที่จำลองไม่ได้)
       if (!story) return json({ error: 'ไม่มีชื่อเรื่อง' }, 400);
       const rd = async k => { try { const r = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(k).first(); return r ? JSON.parse(r.value) : null; } catch (e) { return null; } };
       const clip = (x, n) => String(x == null ? '' : x).slice(0, n);
