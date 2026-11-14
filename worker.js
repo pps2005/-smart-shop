@@ -339,12 +339,12 @@ async function charTrain(env, b) {
 }
 // เปลี่ยนสไตล์ทั้งเรื่อง: วาดภาพชุดฝึกของตัวละครที่ LoRA ยังไม่เสร็จใหม่ด้วยสไตล์ปัจจุบัน แล้วส่งเทรนเองเมื่อภาพครบ (สั่งด้วย settings restyle=start)
 // สั่งชุดฝึกจากฐานข้อมูล: settings lset_req = {ชื่อ: {cid, ref, mix:{ชุด:จำนวน}}} → สร้างงานวาด 16 ภาพ/ตัว (โชว์ในคลังภาพอ้างอิง) + lset ให้ส่งเทรนเอง
-function lsetJobs(n, cid, ref, mix) {
+function lsetJobs(n, cid, ref, mix, noset) {
   const C = HY_CHAR[n]; if (!C) return null;
   const ST = 'anime screencap, flat color, clean thin lineart, soft colors, beautiful detailed eyes, perfect anatomy, good proportions, full color';
   const V = ['full body, standing, front view, gentle smile, simple white background', 'full body, standing, three-quarter view, hand on hip, simple white background', 'full body, walking, from side, simple background', 'upper body, front view, looking at viewer, smile, simple background', 'portrait, close-up, face focus, looking at viewer, simple background', 'upper body, three-quarter view, surprised, simple background', 'cowboy shot, sitting on chair, relaxed, indoors', 'upper body, blush, looking away, simple background'];
   const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'close-up, face focus', 'eating from a bowl', 'stretching', 'lying on back, playful', 'sitting on a bench, night', 'close-up of tail tip with glowing paper lantern', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing'];
-  const jobs = [], caps = [], pfx = 'อ้างอิง·' + n + '·ปกติ·ฝึก'; let i = 0;
+  const jobs = [], caps = [], pfx = 'อ้างอิง·' + n + '·ปกติ·' + (noset ? 'ใหม่' : 'ฝึก'); let i = 0;
   const qn = C.o ? ['two cats', 'a cat without a lantern on its tail', 'monochrome drawing'] : ['two people', 'the same person drawn twice', 'monochrome black and white drawing', 'deformed body, extra limbs'];
   const neg = (C.neg ? C.neg + ', ' : '') + 'nsfw, nude, nipples, panties, monochrome, greyscale, multiple views' + (C.o ? ', lantern on head, multiple cats' : ', 2girls, 2boys');
   for (const [k, c] of Object.entries(mix || { [C.def]: 16 })) { const o = C.of[k]; if (!o) continue;
@@ -361,9 +361,9 @@ async function lsetReqTick(env, s) {
   await env.DB.prepare("DELETE FROM settings WHERE key='lset_req'").run();
   let L = {}; try { L = JSON.parse(s.lset || '{}'); } catch { }
   let t = Date.now();
-  for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix); if (!P) continue;
+  for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
     for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, t++, JSON.stringify(op)).run();
-    L[n] = P.set; }
+    if (!r.noset) L[n] = P.set; }
   await setSetting(env, 'lset', JSON.stringify(L));
 }
 // ชุดฝึก LoRA จากภาพที่ผู้ใช้เลือก: settings lset = {ชื่อ: {cid, caps:[...]}} · ภาพ 'ชุดฝึก·ชื่อ·NN' วาดครบ → ส่งเทรนเอง (คำบรรยายภาพตามลำดับ NN)
@@ -697,7 +697,7 @@ const HY_CHAR = {
   'หัวหน้าซาเอกิ': { id: '1girl, mature female, beautiful, tall, black hair, streaked hair, silver streak, red eyes, sharp eyes, red lips, curvy', neg: '',
     of: { suit: ['สูทดำ', 'short bob, drop earrings, fitted black pantsuit, black jacket, high collar blouse, black pants, high heels', 'black bob with one silver streak, fitted black pantsuit'],
       casual: ['นอกเวลางาน', 'short bob, sunglasses on head, wine red turtleneck sweater, long beige coat', 'black bob with silver streak, wine turtleneck and long coat'] }, def: 'suit' },
-  'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, grey hair, sharp eyes, curvy', neg: '',
+  'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, grey hair, red eyes, sharp eyes, long eyelashes, mole under mouth, red lips, curvy', neg: 'blue eyes, brown hair, black hair, white hair',
     of: { bakery: ['ร้านขนมปัง', 'hair bun, white apron, sleeves rolled up, flour on clothes, holding rolling pin', 'grey hair in a bun, white apron dusted with flour, rolling pin'],
       casual: ['นอกร้าน', 'long hair down, purple kimono, obi', 'long grey hair down, purple kimono'] }, def: 'bakery' },
   'ไค': { id: '1boy, adult, young man, handsome, blonde hair, golden eyes, fang, scar on eyebrow, athletic', neg: '',
