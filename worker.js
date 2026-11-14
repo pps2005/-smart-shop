@@ -1667,7 +1667,8 @@ async function vRoutes(req, env, url, ctx) {
     if (p.startsWith('/k/prog/')) { // ความคืบหน้าเทรน LoRA จากเครื่อง Kaggle (สเต็ป/ทั้งหมด/บรรทัดล่าสุด)
       const b = await req.json().catch(() => ({}));
       await setSetting(env, 'lprog:' + id, JSON.stringify({ step: +b.step || 0, total: +b.total || 0, tail: String(b.tail || '').slice(-400), at: Date.now() }));
-      return json({ ok: true });
+      const lj = await env.DB.prepare("SELECT status FROM vjobs WHERE id=?").bind(id).first(); // งานถูกยกเลิก (ลบ/ไม่ได้รันอยู่) → บอกเครื่องให้หยุดเทรนทันที ไม่เปลือง GPU
+      return json({ ok: true, ...(!lj || lj.status !== 'running' ? { stop: 1 } : {}) });
     }
     if (p.startsWith('/k/lora/')) { // รับไฟล์ LoRA ที่เทรนเสร็จ → เก็บเป็นก้อนใน D1 (ฟรี ไม่ต้องใช้ที่เก็บเพิ่ม)
       await animeSchema(env);
@@ -4284,7 +4285,12 @@ def sh_prog(cmd, cwd, jid, total):
         if m and "steps" in line and time.time() - last > 15:
             last = time.time()
             try:
-                call("/k/prog/%s" % jid, {"step": int(m.group(1)), "total": int(m.group(2)) or total, "tail": line[-200:]}, timeout=20)
+                rr = call("/k/prog/%s" % jid, {"step": int(m.group(1)), "total": int(m.group(2)) or total, "tail": line[-200:]}, timeout=20)
+                if isinstance(rr, dict) and rr.get("stop"):
+                    p.kill()
+                    raise RuntimeError("ยกเลิกงานเทรนตามคำสั่งจากเว็บ")
+            except RuntimeError:
+                raise
             except Exception:
                 pass
     p.wait()
