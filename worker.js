@@ -355,7 +355,7 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั�
       const v = C.o ? 'the glowing paper lantern hangs from the end of its tail, full body, ' + PM[i % PM.length] + ', simple white background' : 'full body, wide shot, standing, ' + (i % 2 ? 'three-quarter view' : 'front view') + ', whole body in frame from head to shoes, shoes visible, ' + EX[i % EX.length];
       const nego = neg + (C.o ? '' : ', cowboy shot, upper body, portrait, feet out of frame') + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'); // ชุดที่ไม่มีฮู้ด: กันหูกระต่ายจากภาพหลักมิโอะติดมา
       jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.id, o[1] ? '(' + o[1] + ':1.2)' : '', v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: C.o ? 1024 : 832, h: C.o ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg: nego, ...ipa, takes: 2, np: C.o ? 0 : 1, qneg: C.o ? qn : [...qn, 'a person whose feet are cut off by the image frame'] }]);
-      caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (/^1boy/.test(C.id) ? '1boy, ' : '1girl, ') + o[1] + ', ' + v);
+      caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (/^1boy/.test(C.id) ? '1boy, ' : '1girl, ') + 'outfit_' + k + ', ' + o[1] + ', ' + v); // outfit_ชุด = LoRA จำชุดแยกกัน สั่งชุดไหนได้ชุดนั้น
     } }
   const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้าตลก: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง (ไม่ซ้ำชุดในภาพหลัก)
   for (let g = 0; g < (gags || 0); g++) { const o = C.of[ok[g % ok.length]];
@@ -462,13 +462,34 @@ async function sbRedrawTick(env, s) {
   }
 }
 // นำเข้าสตอรีบอร์ดที่เขียนมือจาก sbx.json แทนที่ช็อตเดิมของตอนนั้น (settings sb_import = "เรื่อง|ตอน") แล้วให้ระบบวาดภาพตามปกติ · ไม่ให้ AI ตัดช็อต/เขียนบทพูดทับ
+async function llmOutfits(env, s, story, ep, list) { // AI อ่านบททั้งซีน + ตู้เสื้อผ้า + เรื่องย่อตอน → เลือกชุดให้ทุกช่อง (กฎจับคำเป็นตัวสำรอง)
+  const cs = [...new Set(list.flatMap(x => x.chars || []))].filter(n => HY_CHAR[n] && !HY_CHAR[n].o); if (!cs.length) return;
+  const plan = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('plan:' + story).first().catch(() => null); let epf = ''; try { const P = JSON.parse((plan && plan.value) || '{}'); const E = (P.eps || []).find(e => +e.no === +ep); epf = E ? JSON.stringify(E.f || {}).slice(0, 600) : ''; } catch { }
+  const wr = cs.map(n => n + ': ' + Object.entries(HY_CHAR[n].of).map(([k, o]) => k + '=' + o[0] + ' (' + o[2] + ')').join(' | ')).join('\n');
+  const pn = list.map((x, i) => (i + 1) + ') [' + (x.chars || []).join(',') + '] ' + String(x.en || '').replace(/\s+/g, ' ').slice(0, 230)).join('\n');
+  const q = 'เลือกชุดของตัวละครในแต่ละช่องของซีนอนิเมะนี้ ให้เข้ากับสถานที่ เวลา เหตุการณ์ และความต่อเนื่อง (ชุดเดิมตลอดช่วงเดียวกัน เปลี่ยนเมื่อเวลา/สถานที่เปลี่ยนหรือบทบอกว่าเปลี่ยน)\nเรื่องย่อตอน: ' + epf + '\nตู้เสื้อผ้า (ใช้เฉพาะคีย์นี้):\n' + wr + '\nช่อง:\n' + pn + '\nตอบ JSON เท่านั้น รูปแบบ {"1":{"ชื่อ":"คีย์"},"2":{...}} ครบทุกช่องที่มีตัวละครในตู้เสื้อผ้า';
+  try { const R = await llmJson(env, s, q);
+    list.forEach((x, i) => { const r = R && R[String(i + 1)]; if (!r) return; const of = { ...(x.outfit || {}) };
+      for (const [n, k] of Object.entries(r)) if ((x.chars || []).includes(n) && HY_CHAR[n] && HY_CHAR[n].of[k] && !of[n]) of[n] = k;
+      if (Object.keys(of).length) x.outfit = of; });
+  } catch (e) { } // AI ใช้ไม่ได้/โควตาหมด → กฎจับคำทำต่อเอง
+}
+async function outfitPrep(env, story, list) { // วาดรูปชุดที่ตอนนี้ต้องใช้แต่ยังไม่มี ไว้ล่วงหน้าทันทีตอนนำเข้า (ไม่ต้องรอระหว่างวาดฉาก)
+  const cr = (await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('charref:' + story).first().catch(() => null)); let CR = {}; try { CR = JSON.parse((cr && cr.value) || '{}'); } catch { }
+  const need = new Set(); for (const x of list) for (const [n, k] of Object.entries(x.outfit || {})) need.add(n + '|' + k);
+  for (const nk of need) { const [n, k] = nk.split('|'), C = HY_CHAR[n], R = CR[n] || {}; if (!C || C.o || !C.of[k] || !R.n || (R.of || {})[k] || (R.no || []).includes(k)) continue;
+    const lab = C.of[k][0];
+    if (await env.DB.prepare("SELECT 1 FROM images WHERE instr(project, ?)=1 AND instr(project, ?)>0 LIMIT 1").bind('อ้างอิง·' + n + '·ปกติ·', lab).first()) continue;
+    if (await env.DB.prepare("SELECT 1 FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND instr(project, ?)=1 AND instr(project, ?)>0 LIMIT 1").bind('อ้างอิง·' + n + '·ปกติ·', lab).first()) continue;
+    const P = lsetJobs(n, 0, +R.n, { [k]: 1 }, 1, 0); for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, Date.now(), JSON.stringify({ ...op, takes: 3 })).run(); }
+}
 async function sbImportTick(env, s) {
   if (!s.sb_import) return;
   await animeSchema(env);
   const [story, epS] = String(s.sb_import).split('|'), ep = +epS, D = (SBX[story] || {})[String(ep)];
   const cl = await env.DB.prepare("DELETE FROM settings WHERE key='sb_import' AND value=?").bind(String(s.sb_import)).run(); if (!cl.meta || !cl.meta.changes) return; // จองงานแบบอะตอม: เคยนำเข้าซ้อน 2 รอบจนช่องซ้ำ
   const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!D || !sr) return;
-  for (const [sc, list] of Object.entries(D)) { hyAutoOutfits(list); // ชุดอัตโนมัติตามสถานที่/เวลา/เหตุการณ์
+  for (const [sc, list] of Object.entries(D)) { await llmOutfits(env, s, story, ep, list); hyAutoOutfits(list); await outfitPrep(env, story, list).catch(() => { }); // ชุดอัตโนมัติ: AI อ่านบท → กฎจับคำเติมที่เหลือ → วาดรูปชุดที่ขาดไว้ล่วงหน้า
     const e = await env.DB.prepare('SELECT id,script_id FROM scenes WHERE series_id=? AND ep=? AND sc=?').bind(sr.id, ep, +sc).first(); if (!e || !e.script_id) continue;
     const sid = e.script_id, old = (await env.DB.prepare('SELECT kproj FROM shots WHERE script_id=?').bind(sid).all()).results, st = [];
     for (const o of old) st.push(env.DB.prepare('DELETE FROM images WHERE project=?').bind(o.kproj), env.DB.prepare("DELETE FROM jobs WHERE project=?").bind(o.kproj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'").bind(o.kproj));
@@ -781,8 +802,11 @@ function refPlan(cr) { // [project, prompt, opt] เรียงตามลำ�
   return out;
 }
 function hyLook(n, ofk) { const c = HY_CHAR[n]; const o = c && c.of[ofk]; return o ? { tags: [c.id, o[1]].filter(Boolean).join(', '), desc: o[2], ...(c.neg ? { neg: c.neg } : {}), ...(c.o ? { o: 1 } : {}) } : null; }
-function s3Actor(x, z, pose, face) { // หุ่นคนแบบกล่อง (ยืน/นั่ง/โค้ง/นั่งพื้น/ตัวเล็ก) ให้ภาพความลึก
-  const f = face >= 0 ? 1 : -1, bx = (a, b, c, d, e, g) => [Math.min(a, d), Math.min(b, e), Math.min(c, g), Math.max(a, d), Math.max(b, e), Math.max(c, g)].map(v => Math.round(v * 1000) / 1000);
+const S3BODY = { 'โทวะ': [1.0, 0], 'ไค': [1.03, 0], 'ริน': [0.95, 1], 'หัวหน้าซาเอกิ': [0.97, 0], 'มิโอะ': [0.9, 0], 'ป้าฮานะ': [0.93, 1] }; // ส่วนสูงเทียบ (โทวะ = 1) · ผมยาวด้านหลัง
+function s3Actor(x, z, pose, face, nm) { // หุ่นคน 3D มีแขนขาแยก ปรับสัดส่วนตามตัวละคร (ยืน/นั่ง/โค้ง/นั่งพื้น/ตัวเล็ก) ให้ภาพความลึก
+  const [sc, hair] = S3BODY[nm] || [1, 0];
+  const f = face >= 0 ? 1 : -1, bx = (a, b, c, d, e, g) => [Math.min(a, d), Math.min(b, e) * (pose === 'tiny' ? 1 : sc), Math.min(c, g), Math.max(a, d), Math.max(b, e) * (pose === 'tiny' ? 1 : sc), Math.max(c, g)].map(v => Math.round(v * 1000) / 1000);
+  if (pose === 'stand' || !pose) { const B = [bx(x - .17, 0, z - .07, x - .03, .86, z + .07), bx(x + .03, 0, z - .07, x + .17, .86, z + .07), bx(x - .2, .86, z - .12, x + .2, 1.46, z + .12), bx(x - .29, .9, z - .06, x - .21, 1.42, z + .06), bx(x + .21, .9, z - .06, x + .29, 1.42, z + .06), bx(x - .11, 1.46, z - .11, x + .11, 1.73, z + .11)]; if (hair) B.push(bx(x - .13, 1.15, z - .14 * f, x + .13, 1.7, z - .06 * f)); return B; }
   if (pose === 'sit') return [bx(x - .24, .47, z - .16 * f, x + .24, 1.05, z + .08 * f), bx(x - .11, 1.05, z - .1 * f, x + .11, 1.32, z + .1 * f), bx(x - .2, .45, z, x + .2, .6, z + .45 * f), bx(x - .18, 0, z + .38 * f, x + .18, .45, z + .5 * f)];
   if (pose === 'bow') return [bx(x - .18, 0, z - .12, x + .18, .9, z + .12), bx(x - .24, .85, z, x + .24, 1.15, z + .6 * f), bx(x - .11, .7, z + .55 * f, x + .11, .95, z + .78 * f)];
   if (pose === 'floor') return [bx(x - .3, 0, z - .4, x + .3, .65, z + .4), bx(x - .11, .65, z - .1, x + .11, .9, z + .1)];
@@ -796,7 +820,7 @@ function s3Opt(s3) { // say.s3 = {loc, cam, act:[[ชื่อ, จุดยื�
   if (!cam && /^(close|side):/.test(s3.cam || '')) { const [k, sp, ...m] = s3.cam.split(':'), P = S.spots[sp]; if (!P) return null; const [x, z, pose, f] = P, h = { sit: 1.18, floor: .8, tiny: .62, bow: .9 }[pose] || 1.58, low = m.includes('low');
     cam = k === 'close' ? { p: [x + .15, h - (low ? .35 : .02), z + 1.05 * f], l: [x, h + (low ? .12 : -.04), z], fov: 42 } : { p: [x + 1.15, h - (low ? .35 : 0), z + .1 * f], l: [x - .3, h + (low ? .1 : -.05), z + .05 * f], fov: 44 }; }
   if (!cam) return null;
-  const act = [], actn = [], actc = []; for (const [nm, sp] of (s3.act || [])) { const P = S.spots[sp]; if (P) { const b = s3Actor(P[0], P[1], P[2], P[3]); act.push(...b); actn.push(nm); actc.push(b.length); } }
+  const act = [], actn = [], actc = []; for (const [nm, sp] of (s3.act || [])) { const P = S.spots[sp]; if (P) { const b = s3Actor(P[0], P[1], P[2], P[3], nm); act.push(...b); actn.push(nm); actc.push(b.length); } }
   return { loc: s3.loc, camName: s3.cam, cam, boxes: S.boxes, act, actn, actc };
 }
 function hyOpt(en, names, s, of) {
@@ -1471,9 +1495,13 @@ async function bridgeImg(env, s) {
           if (!ofId && !wait) ofId = (R.of || {})[C.def] || Object.values(R.of || {})[0] || 0; } // ผู้ใช้ลบชุดนี้/วาดไม่สำเร็จ → ชุดที่เลือกไว้ใกล้สุด
         const id = gag && (R.g || []).length ? R.g[(j.id || 0) % R.g.length] : (ofId || R.n);
         if (id) { c.ref = s.self_url + '/vi/' + id + '?s=' + await vvSig(env, 'i' + id); c.rw = gag ? 0.45 : 0.6; if (!ofId && !gag) c.rc = 'face'; } }
-      if (wait) { st.push(env.DB.prepare("UPDATE jobs SET status='queued' WHERE id=?").bind(j.id)); continue; } // รอรูปชุดเสร็จก่อนค่อยวาดช่องนี้ (ชุดตรงตั้งแต่ช่องแรก)
+      if (wait) { st.push(env.DB.prepare("UPDATE jobs SET status='queued' WHERE id=?").bind(j.id)); continue; }
+      { const LR = {}; for (const r of (await env.DB.prepare("SELECT l.id, c.id cid, c.name FROM loras l JOIN chars c ON c.id=l.char_id WHERE c.series_id=0 AND l.status='ready' ORDER BY l.id").all()).results) LR[r.name] = r; // LoRA ตัวละครที่เทรนเสร็จ → ต่อเข้าการวาดฉาก + คำเรียก (chrNx) + ชุด (outfit_x)
+        const pcs = hyO.chars.filter(c => c.p && LR[c.n]), lo = [], tg = [];
+        for (const c of pcs) { const r = LR[c.n], k = shOf && shOf[c.n]; lo.push({ id: r.id, w: pcs.length > 1 ? 0.55 : 0.7 }); const t = 'chr' + r.cid + 'x' + (k ? ', outfit_' + k : ''); tg.push(t); c.tags = t + ', ' + c.tags; }
+        if (lo.length) { hyO.loras = lo; hyO.all = (tg.join(', ') + ', ' + hyO.all).slice(0, 1100); } } // รอรูปชุดเสร็จก่อนค่อยวาดช่องนี้ (ชุดตรงตั้งแต่ช่องแรก)
     }
-    const opt = { ...(hyOn ? { hy: hyO } : {}), ...(s3 ? { s3 } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: s3 ? 's3d' : eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
+    const opt = { ...(hyOn ? { hy: hyO } : {}), ...(hyO && hyO.loras ? { loras: hyO.loras } : {}), ...(s3 ? { s3 } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: s3 ? 's3d' : eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: lo };
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: noChar ? '[[STYLE]]' : j.prompt }, s, noChar ? shEn : /chr\d+x/.test(String(j.prompt || '')) ? shEn : '', { nochar: noChar , color: hyOn }) : withStyle(j.prompt, s)).slice(0, 4000), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -1759,7 +1787,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR json_extract(opt,'$.refimg') IS NULL) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 17 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 16 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR json_extract(opt,'$.refimg') IS NULL) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 18 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 16 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -3605,6 +3633,63 @@ def wf_sdxl_s3d(dep_name, lin_name, pos, neg, seed, prefix, W, H, sd, sl, batch=
     return wf
 
 
+def add_loras(wf, loras, clip_nodes=("2", "3")):
+    # LoRA ตัวละคร (ไฟล์จากเว็บ) ต่อเข้าโมเดล+ตัวเข้ารหัสข้อความ → คืนจุดต่อโมเดลสำหรับ IP-Adapter/KSampler
+    pm, pc = ["1", 0], ["1", 1]
+    for n, lo in enumerate(loras or []):
+        try:
+            fn = ensure_lora(lo["id"])
+        except Exception as e:
+            log("โหลด LoRA %s ไม่ได้ ข้ามไป: %s" % (lo.get("id"), str(e)[:100]))
+            continue
+        nid = str(30 + n)
+        wf[nid] = {"class_type": "LoraLoader", "inputs": {"model": pm, "clip": pc, "lora_name": fn, "strength_model": float(lo.get("w") or 0.65), "strength_clip": 1.0}}
+        pm, pc = [nid, 0], [nid, 1]
+    for k in clip_nodes:
+        wf[k]["inputs"]["clip"] = pc
+    return pm
+
+
+def detail_pass(img_path, chars, masks, pos_style, neg, seed, prefix, port, loras):
+    # วาดซ่อมทีละตัวละคร (inpaint เฉพาะบริเวณตัวนั้น) ล็อกด้วยรูปชุด/หน้าของคนนั้น → ชุด/หน้าตรงขึ้นในช่องที่มีหลายคน
+    from PIL import Image
+    cur = img_path
+    for k, (c, mn) in enumerate(masks):
+        if not c.get("ref"):
+            continue
+        rimg = get_ref(c["ref"], prefix, 90 + k, c.get("rc"))
+        if not rimg:
+            continue
+        nm = "%s_dt%d.png" % (prefix, k)
+        Image.open(cur).convert("RGB").save(os.path.join(COMFY, "input", nm))
+        wf = {
+            "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": M["sdxl"]}},
+            "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_POS + pos_style + ", " + str(c.get("tags") or "")}},
+            "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": neg}},
+            "10": {"class_type": "LoadImage", "inputs": {"image": nm}},
+            "11": {"class_type": "LoadImageMask", "inputs": {"image": mn, "channel": "red"}},
+            "12": {"class_type": "VAEEncode", "inputs": {"pixels": ["10", 0], "vae": ["1", 2]}},
+            "13": {"class_type": "SetLatentNoiseMask", "inputs": {"samples": ["12", 0], "mask": ["11", 0]}},
+            "5": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed + k, "steps": 24, "cfg": 5.5, "sampler_name": "euler_ancestral", "scheduler": "normal", "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["13", 0], "denoise": 0.42}},
+            "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
+            "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "%sD%d" % (prefix, k)}},
+        }
+        if M.get("sdxlvae"):
+            wf["9"] = {"class_type": "VAELoader", "inputs": {"vae_name": M["sdxlvae"]}}
+            wf["6"]["inputs"]["vae"] = ["9", 0]
+            wf["12"]["inputs"]["vae"] = ["9", 0]
+        pm = add_loras(wf, loras)
+        add_ipa(wf, pm, [(rimg, None, max(0.6, float(c.get("rw") or 0.6)))], "5")
+        try:
+            outs = comfy_go(wf, "%sD%d" % (prefix, k), port)
+            if outs:
+                cur = outs[0]
+                log("ภาพ %s: วาดซ่อม %s ตามรูปชุด/หน้าแล้ว" % (prefix, c.get("n")))
+        except Exception as e:
+            log("วาดซ่อม %s ไม่สำเร็จ ใช้ภาพเดิม: %s" % (c.get("n"), str(e)[:120]))
+    return cur
+
+
 def gen_s3d(j, port=8188):
     from PIL import Image
     opt = j.get("opt") or {}
@@ -3634,7 +3719,8 @@ def gen_s3d(j, port=8188):
     Image.fromarray(lin).convert("RGB").resize((W, H), Image.NEAREST).save(os.path.join(COMFY, "input", ln))
     log("ภาพ %s: เรนเดอร์ฉาก 3D %s มุม %s" % (jid, s3.get("loc", "?"), s3.get("camName", "?")))
     # ภาพอ้างอิงตัวละครที่ผู้ใช้อนุมัติ → ป้อนเฉพาะบริเวณของตัวละครนั้น (หน้ากากจากหุ่นในฉาก 3D)
-    refs = []
+    refs, dmasks = [], []
+    loras = opt.get("loras") or []
     if any(c.get("ref") for c in chars) and ensure_ipa():
         import numpy as np
         from PIL import ImageFilter
@@ -3649,6 +3735,7 @@ def gen_s3d(j, port=8188):
                         mn = "%s_mk%d.png" % (jid, ai)
                         Image.fromarray((mk * 255).astype("uint8")).filter(ImageFilter.MaxFilter(15)).resize((W, H), Image.BILINEAR).convert("RGB").save(os.path.join(COMFY, "input", mn))
                         refs.append((rimg, mn, float(c.get("rw") or 0.6)))
+                        dmasks.append((c, mn))
             k0 += nb
         if refs:
             log("ภาพ %s: ใช้ภาพอ้างอิงตัวละคร %d ตัว" % (jid, len(refs)))
@@ -3659,8 +3746,11 @@ def gen_s3d(j, port=8188):
     for rd in range(2):
         pf = "img%sS%d" % (jid, rd)
         wf = wf_sdxl_s3d(dn, ln, pos, neg, seed + rd * 131, pf, W, H, sd, sl, 2)
+        pm = add_loras(wf, loras) if loras else ["1", 0]
         if refs:
-            add_ipa(wf, ["1", 0], refs, "5")
+            add_ipa(wf, pm, refs, "5")
+        elif loras:
+            wf["5"]["inputs"]["model"] = pm
         try:
             outs = comfy_go(wf, pf, port)
         except RuntimeError as e:
@@ -3683,8 +3773,15 @@ def gen_s3d(j, port=8188):
                 pick = (key, pth)
         if pick[0][0] == 1:
             break
+    best = pick[1]
+    if dmasks and opt.get("detail", 1) and not M.get("noipa"):
+        try:
+            best = detail_pass(best, chars, dmasks, style, neg, seed + 777, jid, port, loras)
+            tmp.append(best)
+        except Exception as e:
+            log("ขั้นวาดซ่อมพัง ใช้ภาพก่อนซ่อม: %s" % str(e)[:150])
     comfy_free(port)
-    im = Image.open(pick[1]).convert("RGB")
+    im = Image.open(best).convert("RGB")
     if im.size != (W, H):
         im = im.resize((W, H), Image.LANCZOS)
     jpg = os.path.join(ROOT, "%s.jpg" % jid)
@@ -4630,7 +4727,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=17" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=18" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
@@ -5228,8 +5325,8 @@ async function castApi(req, env, url, body) {
         const trig = 'chr' + ch.id + 'x', g1 = /^1boy/.test(C.id) ? '1boy, ' : C.o ? '' : '1girl, ', imgs = [];
         const lab2k = lab => { for (const [k, o] of Object.entries(C.of)) if (String(lab).includes(o[0])) return k; return C.def; };
         const sel = [...new Set([...(cur.m || []), cur.n].filter(Boolean))];
-        if (sel.length) for (const r of (await env.DB.prepare(`SELECT id,project FROM images WHERE id IN (${sel.map(() => '?').join(',')})`).bind(...sel).all()).results) { const k = lab2k(String(r.project).split('·').slice(3).join('·')); imgs.push({ id: r.id, cap: trig + ', ' + g1 + C.of[k][1] + ', full body, standing' }); }
-        for (const r of (await env.DB.prepare("SELECT id,project FROM images WHERE instr(project, ?)=1").bind('อ้างอิง·' + nm + '·ตลก·').all()).results) { const k = lab2k(String(r.project).split('·')[3] || ''); imgs.push({ id: r.id, cap: trig + ', ' + g1 + C.of[k][1] + ', upper body, comedic face' }); }
+        if (sel.length) for (const r of (await env.DB.prepare(`SELECT id,project FROM images WHERE id IN (${sel.map(() => '?').join(',')})`).bind(...sel).all()).results) { const k = lab2k(String(r.project).split('·').slice(3).join('·')); imgs.push({ id: r.id, cap: trig + ', ' + g1 + 'outfit_' + k + ', ' + C.of[k][1] + ', full body, standing' }); }
+        for (const r of (await env.DB.prepare("SELECT id,project FROM images WHERE instr(project, ?)=1").bind('อ้างอิง·' + nm + '·ตลก·').all()).results) { const k = lab2k(String(r.project).split('·')[3] || ''); imgs.push({ id: r.id, cap: trig + ', ' + g1 + 'outfit_' + k + ', ' + C.of[k][1] + ', upper body, comedic face' }); }
         if ((await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND instr(project, ?)=1").bind('อ้างอิง·' + nm + '·').first()).n) return json({ error: 'ยังวาดร่างไม่ครบ รอให้เสร็จก่อน' }, 400);
         if (imgs.length >= 12) {
           await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind('ซีรีส์0·' + nm)]);
