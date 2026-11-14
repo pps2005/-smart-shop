@@ -341,7 +341,7 @@ async function charTrain(env, b) {
 // สั่งชุดฝึกจากฐานข้อมูล: settings lset_req = {ชื่อ: {cid, ref, mix:{ชุด:จำนวน}}} → สร้างงานวาด 16 ภาพ/ตัว (โชว์ในคลังภาพอ้างอิง) + lset ให้ส่งเทรนเอง
 function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั่ง: แบบแผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้าตลกครึ่งตัวพื้นหลังสี (เปลี่ยนชุด) · ไม่มีภาพครอป/มุมเงย
   const C = HY_CHAR[n]; if (!C) return null;
-  const ST = 'anime screencap, flat color, clean thin lineart, soft muted colors, simple solid color background, beautiful detailed eyes, perfect anatomy, good proportions, full color';
+  const ST = 'anime screencap, modern tv anime style, cel shading, crisp two-tone shading, clean sharp lineart, bold outlines, glossy hair highlights, vibrant saturated colors, detailed eyes, simple solid color background, perfect anatomy, good proportions, full color'; // ลายเส้นที่ผู้ใช้เลือก (14 พ.ย. บ่าย): อนิเมะทีวียุคใหม่ เงาสองชั้นคม ผมเงา สีสด — เอาแค่เทคนิค ไม่ใช้ภาพจากอนิเมะจริงเป็นต้นแบบ
   const EX = ['gentle smile', 'serious expression', 'shy smile, blush', 'surprised, open mouth', 'pout, annoyed', 'happy, laughing', 'confident smirk', 'sleepy, half-closed eyes'];
   const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'stretching', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing', 'lying on back, playful'];
   const GX = C.gx || ['comedic deadpan face, half-closed eyes, flat unimpressed expression, blank stare', 'comedic laughing face, huge wide open mouth, closed happy eyes', 'comedic shocked face, white blank eyes, sweatdrop, mouth wide open', 'comedic smug face, smirk, sharp teeth grin', 'comedic flustered face, blush, steam from ears, wavy mouth'];
@@ -359,7 +359,7 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั�
     } }
   const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้าตลก: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง (ไม่ซ้ำชุดในภาพหลัก)
   for (let g = 0; g < (gags || 0); g++) { const o = C.of[ok[g % ok.length]];
-    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.id, '(' + o[1] + ':1.2)', 'upper body, head visible, ' + GX[g % GX.length] + ', colorful speed lines background, ' + ST].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg + (/hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), ...(ref ? { ...ipa, rw: 0.4, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]); }
+    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.id, '(' + o[1] + ':1.2)', 'upper body, head visible, ' + GX[g % GX.length] + ', simplified gag face, comedic chibi-like expression, colorful speed lines background, ' + ST].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg + (/hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), ...(ref ? { ...ipa, rw: 0.4, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]); }
   return { jobs, set: { cid, caps, pfx } };
 }
 async function lsetReqTick(env, s) {
