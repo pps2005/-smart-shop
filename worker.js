@@ -363,13 +363,13 @@ function lsetJobs(n, cid, ref, mix, noset, gags, g0) { // แผ่นตัว�
   for (const [k, c] of outs) { const o = C.of[k];
     for (let t = 0; t < c; t++, i++) {
       const v = C.o ? 'the glowing paper lantern hangs from the end of its tail, full body, ' + PM[i % PM.length] + ', simple background, white background' : 'full body, standing, ' + (i % 2 ? 'three-quarter view, hand on own hip' : 'straight-on, arms at sides') + ', feet apart, looking at viewer, head to toe, shoes visible, ' + EX[i % EX.length] + ', simple background, grey background';
-      const nego = neg + (C.o ? '' : ', cowboy shot, upper body, portrait, feet out of frame, long legs, lanky, skinny, long neck, long torso, elongated body, bad proportions, crossed legs, twisted torso' + (boy ? '' : ', flat chest, small breasts')) + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'); // ชุดที่ไม่มีฮู้ด: กันหูกระต่ายติดมา
-      const qc = C.o ? ['a cute fluffy white kitten with a small glowing lantern on the tip of its tail, anime drawing'] : ['a full body anime drawing of one ' + who + ' with ' + HQ[0] + ' hair standing, the whole body visible from head to shoes', 'anime ' + who + ' wearing ' + o[2], boy ? 'a handsome well proportioned man with broad shoulders and a normal sized head' : 'a beautiful well proportioned curvy woman with a large bust, a narrow waist and wide hips'];
+      const nego = neg + (C.o ? '' : ', cowboy shot, upper body, portrait, feet out of frame, lanky, skinny, long neck, long torso, elongated body, bad proportions, crossed legs, twisted torso' + (boy ? ', narrow shoulders, short, small, androgynous, feminine, otoko no ko, child' : ', long legs, flat chest, small breasts')) + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'); // ชุดที่ไม่มีฮู้ด: กันหูกระต่ายติดมา
+      const qc = C.o ? ['a cute fluffy white kitten with a small glowing lantern on the tip of its tail, anime drawing'] : ['a full body anime drawing of one ' + who + ' with ' + HQ[0] + ' hair standing, the whole body visible from head to shoes', 'anime ' + who + ' wearing ' + o[2], boy ? 'a tall handsome man with a strong well built body, broad shoulders and a cool good-looking face' : 'a beautiful well proportioned curvy woman with a large bust, a narrow waist and wide hips'];
       jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.o ? '' : 'solo', C.id, fit(o[1]), v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: C.o ? 1024 : 896, h: C.o ? 1024 : 1152, steps: 30, seed: 0, loras: [], neg: nego, ...ipa, takes: 3, np: C.o ? 0 : 1, qref: 1, qc, qneg: C.o ? qn : [...qn, 'a person whose feet are cut off by the image frame', 'a close-up portrait showing only the upper body', 'a very tall thin stretched lanky figure with a tiny head and extremely long legs'] }]);
       caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (boy ? '1boy, ' : '1girl, ') + 'outfit_' + k + ', ' + o[1] + ', ' + v); // outfit_ชุด = LoRA จำชุดแยกกัน สั่งชุดไหนได้ชุดนั้น
     } }
   const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้ามีม: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง
-  const gid = C.id.split(', ').filter(t => !/^(beautiful|handsome|bishounen|half-closed eyes|long eyelashes|sharp eyes|curvy|slim|slim waist|long legs|tall|tall male|broad shoulders|athletic|slender|red lips|youthful|large breasts|narrow waist|wide hips|toned)$/.test(t)).join(', '); // มีม: ตัดคำความสวย/สัดส่วนออกจากตัวตน เหลือแต่สีผม สีตา จุดเด่น
+  const gid = C.id.split(', ').filter(t => !/^(beautiful|handsome|bishounen|half-closed eyes|long eyelashes|sharp eyes|curvy|slim|slim waist|long legs|tall|tall male|broad shoulders|athletic|slender|red lips|youthful|large breasts|narrow waist|wide hips|toned|toned male|muscular male)$/.test(t)).join(', '); // มีม: ตัดคำความสวย/สัดส่วนออกจากตัวตน เหลือแต่สีผม สีตา จุดเด่น
   const per = Math.max(1, Math.ceil(((g0 || 0) + (gags || 0)) / ok.length)); // หน้ามีมต่อชุด: ทุกชุดได้ครบทุกหน้า (เดิมวนชุดกับหน้าพร้อมกัน บางชุดได้หน้าซ้ำ)
   for (let g = (g0 || 0); g < (g0 || 0) + (gags || 0); g++) { const o = C.of[ok[Math.floor(g / per) % ok.length]], f = (g % per) % GX.length; // g0 = เริ่มจากหน้าแบบที่เท่าไหร่ (วาดเพิ่มเฉพาะแบบที่ยังไม่มี)
     const top = fit(o[1]).split(', ').filter(t => !/skirt|pants|slacks|shorts|jeans|pantyhose|tights|thighhighs|socks|heels|boots|shoes|sneakers|sandals|loafers|mary janes|slippers|barefoot|holding|hugging/.test(t)).join(', '); // ตัดคำส่วนล่าง+ของในมือ ไม่ให้วาดคนเต็มตัวโผล่มาอีกคน
@@ -763,7 +763,7 @@ const HY_GAG = {
 };
 HY_GAG['*'] = HY_GAG['มิโอะ'];
 const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 12 ตอน (ผู้ใช้อนุมัติ 14 พ.ย.) · ชุด = [ชื่อ, แท็กชุด+ทรงผม+ลุค+เครื่องประดับ (สี/ลายตายตัว), คำบรรยาย]
-  'โทวะ': { id: '1boy, adult, young man, handsome, bishounen, (black hair:1.2), short hair, grey eyes, mole under eye, slim, broad shoulders', neg: 'green hair, blue hair, brown hair, purple hair, grey hair, blonde hair, fat, old man',
+  'โทวะ': { id: '1boy, adult, young man, handsome, bishounen, (black hair:1.2), short hair, grey eyes, sharp eyes, mole under eye, tall male, broad shoulders, toned male', neg: 'green hair, blue hair, brown hair, purple hair, grey hair, blonde hair, fat, old man',
     of: { work: ['เสมียนคลัง (ประจำตัว)', 'messy hair, ahoge, round eyewear, thin glasses, white collared shirt, sleeves rolled up, loose dark necktie, grey sweater vest, black slacks, brown loafers, cute', 'archive clerk: grey knit vest, loose tie, round glasses'],
       casual: ['ลำลอง', 'messy hair, round eyewear, navy cardigan, white t-shirt, beige wide pants, white sneakers', 'navy cardigan, white tee, beige pants'],
       disguise: ['ปลอมตัวพ่อค้า (ตอน 3)', 'messy hair under black flat cap, round eyewear, brown work vest, rolled shirt sleeves, merchant apron with pockets, cargo pants, boots', 'black-market merchant disguise with flat cap'],
@@ -797,7 +797,7 @@ const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 1
       sealer: ['อดีตนักผนึก (ตอน 12)', 'high ponytail, long black battle coat with red trim, talisman belt, paper talismans, black pants, black boots, holding rolling pin like a weapon, fierce smile', 'black battle coat with red trim and talismans'],
       winter: ['หน้าหนาว', 'low side bun, long grey knit cardigan, wool scarf, long skirt, brown boots, holding paper bag of bread', 'knit cardigan and scarf'],
       sleep: ['ชุดนอนยูกาตะ', 'hair loose, light blue sleeping yukata, barefoot, relaxed, mature', 'light blue sleeping yukata'] }, def: 'bakery' },
-  'ไค': { id: '1boy, adult, young man, handsome, (blonde hair:1.3), yellow eyes, fang, scar on eyebrow, athletic', neg: 'brown hair, black hair, orange hair',
+  'ไค': { id: '1boy, adult, young man, handsome, bishounen, (blonde hair:1.3), yellow eyes, sharp eyes, fang, scar on eyebrow, tall male, broad shoulders, muscular male, athletic', neg: 'brown hair, black hair, orange hair',
     of: { courier: ['คนส่งของ (ประจำตัว)', 'short hair, spiky hair, open yellow and black courier jacket, black t-shirt, grey cargo pants, black sneakers, large backpack, grin', 'courier jacket, big backpack'],
       night: ['ขนของกลางคืน (ตอน 3, 5)', 'spiky hair, hair slicked back, black bomber jacket, face mask pulled down, cargo pants, black boots, fingerless gloves, small lantern on belt', 'black bomber jacket, mask pulled down'],
       demon: ['ร่างอสูรคลั่ง (ตอน 9)', 'spiky hair, glowing golden eyes, black horns, cracked dark skin on one arm, torn courier jacket, torn pants, boots, dark aura, wild', 'half-demon: black horns, cracked dark arm'],
@@ -856,7 +856,7 @@ function refPlan(cr) { // [project, prompt, opt] เรียงตามลำ�
   return out;
 }
 function hyLook(n, ofk) { const c = HY_CHAR[n]; const o = c && c.of[ofk]; return o ? { tags: [c.id, o[1]].filter(Boolean).join(', '), desc: o[2], ...(c.neg ? { neg: c.neg } : {}), ...(c.o ? { o: 1 } : {}) } : null; }
-const S3BODY = { 'โทวะ': [1.0, 0], 'ไค': [1.03, 0], 'ริน': [0.95, 1], 'หัวหน้าซาเอกิ': [0.97, 0], 'มิโอะ': [0.9, 0], 'ป้าฮานะ': [0.93, 1] }; // ส่วนสูงเทียบ (โทวะ = 1) · ผมยาวด้านหลัง
+const S3BODY = { 'โทวะ': [1.0, 0], 'ไค': [1.04, 0], 'ริน': [0.9, 1], 'หัวหน้าซาเอกิ': [0.93, 0], 'มิโอะ': [0.86, 0], 'ป้าฮานะ': [0.88, 1] }; // ส่วนสูงเทียบ (โทวะ = 1) · ผมยาวด้านหลัง
 function s3Actor(x, z, pose, face, nm) { // หุ่นคน 3D มีแขนขาแยก ปรับสัดส่วนตามตัวละคร (ยืน/นั่ง/โค้ง/นั่งพื้น/ตัวเล็ก) ให้ภาพความลึก
   const [sc, hair] = S3BODY[nm] || [1, 0];
   const f = face >= 0 ? 1 : -1, bx = (a, b, c, d, e, g) => [Math.min(a, d), Math.min(b, e) * (pose === 'tiny' ? 1 : sc), Math.min(c, g), Math.max(a, d), Math.max(b, e) * (pose === 'tiny' ? 1 : sc), Math.max(c, g)].map(v => Math.round(v * 1000) / 1000);
