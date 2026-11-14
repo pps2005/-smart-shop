@@ -5361,12 +5361,14 @@ async function castApi(req, env, url, body) {
         const L = (await rd('lset')) || {}; L[nm] = { ...P.set, extra: imgs }; await setSetting(env, 'lset', JSON.stringify(L));
         return json({ ok: true, more: P.jobs.length, have: imgs.length });
       }
-      if (act === 'ref_make') { // วาดแผ่นอ้างอิงตามตู้เสื้อผ้า (ชุดหลักที่ใช้ในตอน 1 ก่อน) · name = เฉพาะตัวนั้น · มิโอะใช้หน้าที่ผู้ใช้เลือกเป็นภาพอ้างอิง
-        const cr = (await rd('charref:' + story)) || {}; let n = 0;
-        for (const r of refPlan(cr)) { if (b.name && !r[0].startsWith('อ้างอิง·' + b.name + '·')) continue;
-          await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)").bind(r[0], '', '0', r[1], Date.now() + n, JSON.stringify(r[2])).run(); n++; }
-        return json({ ok: true, jobs: n });
+      if (act === 'ref_make') { // ปุ่ม ↻ วาดชุดใหม่: วาดแค่ 2 รูป (ชุดประจำตัว ลายเส้นปัจจุบัน) — ผู้ใช้สั่ง: ทีละ 1–2 รูปต่อตัว ไม่เผาโควต้า
+        const nm = String(b.name || ''), C = HY_CHAR[nm]; if (!C) return json({ error: 'ไม่รู้จักตัวละคร' }, 400);
+        const cur = ((await rd('charref:' + story)) || {})[nm] || {}, P = lsetJobs(nm, 0, +cur.n || 0, { [C.def]: 2 }, 1, 0); let t = Date.now();
+        await env.DB.prepare("DELETE FROM vjobs WHERE kind='img' AND status IN ('queued','hold') AND instr(project, ?)=1").bind('อ้างอิง·' + nm + '·').run();
+        for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, t++, JSON.stringify(op)).run();
+        return json({ ok: true, jobs: P.jobs.length });
       }
+
       if (act === 'qcrep') { // รายงานตรวจความต่อเนื่อง/คุณภาพของตอน (สร้างโดยสคริปต์ตรวจก่อนส่งวาด)
         return json({ ok: true, rep: await rd('qcrep:' + story + '|' + (+b.ep || 1)), canon: await rd('canon:' + story) });
       }
