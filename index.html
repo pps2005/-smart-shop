@@ -520,17 +520,18 @@ async function load(){
   clearTimeout(POLL);window._staleAt=0;window._staleErr='';if(document.hidden){window._needLoad=1;return;}
   if(botCfg().url&&!ST.story){try{const r=await botApi('/api/anime',{act:'series_list'});const L=(r.series||[]).map(x=>x.title).filter(Boolean);if(L.length){ST.story=L[0];localStorage.setItem('ss_story',ST.story);}}catch(e){}} /* เครื่องใหม่ (เช่น iPad) ยังไม่เคยเลือกเรื่อง: ใช้เรื่องล่าสุดในบอท */
   if(!botCfg().url||!ST.story){render();return;}
-  if(!ST._booted){ST._booted=1;try{const c=JSON.parse(localStorage.getItem('ss_get_'+ST.story)||'null');if(c){ST.plan=c.plan;ST.cands=c.cands||[];ST.epst=c.epst||{};ST.voq=c.voq||{};ST.meter=c.meter||null;render();}}catch(e){}} /* เปิดเว็บ: แสดงข้อมูลล่าสุดที่จำไว้ทันที แล้วค่อยอัปเดตเบื้องหลัง (เดิมจอว่างรอโหลด) */
+  if(!ST._booted){ST._booted=1;try{const c=JSON.parse(localStorage.getItem('ss_get_'+ST.story)||'null');if(c){ST.plan=c.plan;ST.cands=c.cands||[];ST.epst=c.epst||{};ST.voq=c.voq||{};ST.meter=c.meter||null;const sg=(act,o)=>snapGet('/api/vcastep',{story:ST.story,act,...(o||{})});try{const sid0=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean),e0=sid0&&snapGet('/api/anime',{story:'',act:'eps',series_id:sid0});if(e0){ST.fin=e0.efinal||{};ST.scn=e0.eps||[];}const l0=sg('lib');if(l0){ST.lib=l0.loras||[];ST.weights=l0.weights||{};}const t0=sg('training');if(t0){ST.train=t0.items||[];ST.autos=t0.autos||null;}const x0=sg('xl_list');if(x0)ST.xl=x0.items||[];const q0=sg('quota');if(q0)ST.quota=q0;const sb0={};for(const n of sbList()){const v=sg('sb',{ep:n});if(v)sb0[n]=v;}ST.sbs=sb0;ST.sb=sb0[sbCur()]||null;}catch(e){}render();}}catch(e){}} /* เปิดเว็บ: แสดงข้อมูลล่าสุดที่จำไว้ทันที แล้วค่อยอัปเดตเบื้องหลัง (เดิมจอว่างรอโหลด) */
   try{const r=await api('get');try{localStorage.setItem('ss_get_'+ST.story,JSON.stringify({plan:r.plan,cands:r.cands,epst:r.epst,voq:r.voq,meter:r.meter}));}catch(e){}ST.plan=r.plan;ST.cands=r.cands||[];ST.epst=r.epst||{};ST.voq=r.voq||{};ST.best=+r.best||0;if(r.kind)ST.kind=r.kind;ST.reads=+r.reads||0;ST.meter=r.meter||null;document.documentElement.classList.toggle('sbdraft',r.draft!==false);ST.boost=+r.boost||0;ST.err='';}catch(e){ST.err=botErr(e);}
   {const lv=ST.meter?ST.meter.total/ST.meter.cap:(ST.reads||0)/100;ST.save=ST.force?0:lv>=0.99?3:lv>=0.98?2:lv>=0.97?1:0;ST.force=0;} /* 85% ขึ้นไป: หน้าเว็บประหยัดการอ่านเพื่อไม่ให้ล่ม */
   const cached=(act,o)=>ST.save?snapGet('/api/vcastep',{story:ST.story,act,...(o||{})}):null;
-  if(!ST.qAt||Date.now()-ST.qAt>300000||ST.qForce){ST.qForce=0;try{const r=(ST.save>=1&&snapGet('/api/vcastep',{story:ST.story,act:'quota'}))||await api('quota');ST.quota=r;ST.qAt=Date.now();}catch(e){}} /* โควตาอื่นๆ: ดึงทุก 5 นาที */
-  const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);ST.fin={};ST.scn=[];
-  if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}
-  try{const r=cached('lib')||await api('lib');ST.lib=r.loras||[];ST.weights=r.weights||{};}catch(e){ST.lib=[];}
-  try{const r=cached('training')||await api('training');ST.train=r.items||[];ST.autos=r.autos||null;}catch(e){ST.train=[];}
-  try{const r=cached('xl_list')||await api('xl_list');ST.xl=r.items||[];}catch(e){ST.xl=[];}
-  const gl=sbList(),g=sbCur(),sbs={};for(const n of gl){if(ST.epst[n].status==='running'){try{sbs[n]=(ST.save>=2&&cached('sb',{ep:n}))||await api('sb',{ep:n});}catch(e){}}}
+  const sid=Object.values(ST.epst).map(v=>v&&v.series).find(Boolean);if(!ST.fin)ST.fin={};if(!ST.scn)ST.scn=[];
+  await Promise.all([ /* ดึงพร้อมกันทั้งหมด (เดิมรอทีละคำขอต่อกัน 6–8 รอบ → เปิดเว็บช้า) */
+    (async()=>{if(!ST.qAt||Date.now()-ST.qAt>300000||ST.qForce){ST.qForce=0;try{const r=(ST.save>=1&&snapGet('/api/vcastep',{story:ST.story,act:'quota'}))||await api('quota');ST.quota=r;ST.qAt=Date.now();}catch(e){}}})(), /* โควตาอื่นๆ: ดึงทุก 5 นาที */
+    (async()=>{if(sid){try{const r=await botApi('/api/anime',{act:'eps',series_id:sid});ST.fin=r.efinal||{};ST.scn=r.eps||[];}catch(e){}}else{ST.fin={};ST.scn=[];}})(),
+    (async()=>{try{const r=cached('lib')||await api('lib');ST.lib=r.loras||[];ST.weights=r.weights||{};}catch(e){ST.lib=ST.lib||[];}})(),
+    (async()=>{try{const r=cached('training')||await api('training');ST.train=r.items||[];ST.autos=r.autos||null;}catch(e){ST.train=ST.train||[];}})(),
+    (async()=>{try{const r=cached('xl_list')||await api('xl_list');ST.xl=r.items||[];}catch(e){ST.xl=ST.xl||[];}})()]);
+  const gl=sbList(),g=sbCur(),sbs={};await Promise.all(gl.map(async n=>{if(ST.epst[n].status==='running'){try{sbs[n]=(ST.save>=2&&cached('sb',{ep:n}))||await api('sb',{ep:n});}catch(e){}}}));
   ST.sbs=sbs;ST.sb=sbs[g]||null;
   const idleOf=n=>sbs[n]&&sbs[n].ready&&ST.epst[n].gate==='sb'&&!sbs[n].scenes.some(x=>x.shots.some(v=>v.pending||!v.say)); /* สตอรีบอร์ดครบแล้ว รอคนกดอนุมัติ: ไม่ต้องรีเฟรชเอง */
   await autoLora();render();
