@@ -725,7 +725,7 @@ const HY_SDXL_STYLE = 'anime screencap, anime coloring, flat color, clean linear
 // ตัวละคร = ตัวตน (หน้า/ตา/สีผม/สัดส่วน ล็อกตายตัว) + ตู้เสื้อผ้า (ชุด+ทรงผม เปลี่ยนตามบท) — ผู้ใช้สั่ง: หล่อ สวย สัดส่วนดี มีจุดขาย วาบหวิวระดับอนิเมะทีวี หลายชุดหลายทรงผม
 // สัตว์อ้างอิงกายวิภาคสัตว์จริง (ผู้ใช้สั่ง) · แก้ทับได้ที่ settings hytags
 // หน้ามีมผูกกับบท (ผู้ใช้สั่ง 14 พ.ย.): 4 แบบต่อตัว ตรงกับมุกของตัวนั้นในเรื่อง · [แท็กวาด, คำบรรยายให้ตัวตรวจเลือกรูป]
-const HY_GAG = { // 14 พ.ย. 15:45 ผู้ใช้: "มีมดูน่ากลัว ไม่ตลก" → ทุกหน้าต้องน่ารัก-ตลก: ไม่มีตาเหลือก/ตาหด/หน้าเงาดำ/ฟันแหลม/รอยย่น/ตะโกนโกรธ
+const HY_GAG = { // 14 พ.ย. 15:45 ผู้ใช้: "มีมดูน่ากลัว ไม่ตลก · เอาน่ารักๆ ตลกๆ เท่ๆ ตลกๆ" → ทุกหน้าต้องน่ารัก-ตลก หรือ เท่-ตลก: ไม่มีตาเหลือก/ตาหด/หน้าเงาดำ/ฟันแหลม/รอยย่น/ตะโกนโกรธ
   'มิโอะ': [ // หัวหน้านิ่งหน้าตาย · หลุดขำ · โดนจับได้ว่าคลั่งกระต่ายแล้วช็อกตาขาว · ตาเป็นประกายเจอตุ๊กตากระต่าย
     ['(jitome:1.3), half-closed eyes, heavy eyelids, (expressionless:1.2), bored, closed mouth, flat mouth, (long face:1.1), hands on own head', 'a cute funny bored deadpan face with heavy half-closed eyes and a flat mouth'],
     ['(laughing:1.3), (^_^:1.3), closed eyes, crescent eyes, (open mouth:1.4), wide open mouth, upper teeth only, :d, (hands up:1.2), open hands, palms', 'a cute face laughing very hard with happy closed crescent eyes and a huge wide open mouth, both hands raised'],
@@ -735,7 +735,7 @@ const HY_GAG = { // 14 พ.ย. 15:45 ผู้ใช้: "มีมดูน่
     ['(=_=:1.3), closed eyes, (giving up the ghost:1.2), bags under eyes, open mouth, exhausted, sweatdrop, cute', 'a cute funny exhausted face with flat closed line eyes and a tiny ghost floating out of the mouth'],
     ['(@_@:1.4), spiral eyes, (open mouth:1.3), wavy mouth, panicking, flying sweatdrops, hands on own head, crooked eyewear', 'a cute funny panicking face with dizzy spiral eyes and a wide open mouth, sweat drops flying'],
     ['(opaque glasses:1.4), white glasses, frozen, (awkward smile:1.2), sweatdrop, turn pale, cute', 'a cute funny frozen awkward face with blank white opaque glasses and a sweat drop'],
-    ['(solid circle eyes:1.3), dot eyes, (triangle mouth:1.2), open mouth, ?, confused, head tilt', 'a cute funny confused blank face with tiny dot eyes, a small triangle mouth and a question mark']],
+    ['(adjusting eyewear:1.3), (opaque glasses:1.2), glasses glint, (smirk:1.2), smug, sparkle, cool, hand on own face', 'a funny overly cool face pushing up shining opaque glasses with a confident smirk and sparkles']],
   'ริน': [ // คู่กัดของโทวะ: ยิ้มเยาะแซว · หน้าแดงตอนเกือบโดนจับได้ · งอนแก้มป่อง · มองเหยียดหน้าตาย
     ['(smug:1.4), jitome, half-closed eyes, (grin:1.2), fang, hand over own mouth, teasing, :3', 'a cute smug teasing face with half-closed eyes and a cat-like grin, one hand near the mouth'],
     ['(full-face blush:1.4), (wavy mouth:1.3), (>_<:1.2), closed eyes, embarrassed, flying sweatdrops, steam, cute', 'a cute bright red blushing embarrassed face with squeezed shut eyes and a wavy mouth'],
@@ -755,7 +755,7 @@ const HY_GAG = { // 14 พ.ย. 15:45 ผู้ใช้: "มีมดูน่
     ['(red handprint on cheek:1.3), (solid circle eyes:1.2), dot eyes, (wavy mouth:1.2), tears, cute', 'a cute silly face with a red handprint on the cheek, dot eyes and a wavy mouth'],
     ['(heart-shaped pupils:1.4), heart eyes, (blush:1.2), (open mouth:1.2), :d, hearts, lovestruck, cute', 'a cute lovestruck face with heart-shaped eyes, blushing with a big smile'],
     ['(crying:1.3), (streaming tears:1.4), (>_<:1.2), closed eyes, (open mouth:1.4), wavy mouth, cute', 'a cute funny crying face with waterfall tears, squeezed shut eyes and a big open mouth'],
-    ['(jitome:1.3), half-closed eyes, heavy eyelids, (expressionless:1.2), closed mouth, flat mouth, sweatdrop', 'a cute funny bored deadpan face with heavy half-closed eyes and a flat mouth']],
+    ['(thumbs up:1.3), (grin:1.3), one eye closed, wink, fang, teeth, sparkle, glint, cool, smug', 'a funny overly cool face winking with a big shiny grin, giving a thumbs up with sparkles']],
   'โมจิ': [ // วิญญาณแมวติดกาแฟหวาน (ตอน 1): พองตัวโกรธ · ฟินละลายตอนได้กาแฟ · กัดกระป๋องไม่ปล่อย · ตาแป๋วขอ
     ['(puffed up round ball:1.3), fur bristling, tiny angry eyebrows, anger vein, puffed cheeks, cute', 'a cute angry white kitten puffed up into a round fluffy ball with tiny angry eyebrows'],
     ['(blissful melting face:1.3), closed eyes, ^_^, open mouth, sparkle, holding coffee can, drinking, cute', 'a cute white kitten with a blissful melting happy face and sparkles, drinking from a coffee can'],
