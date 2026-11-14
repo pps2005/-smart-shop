@@ -628,16 +628,57 @@ async function autoFill(env, s) {
 // ===== ภาพแบบผสม: ฉาก (FLUX) + ตัวละคร/ของสำคัญ (SDXL Animagine XL 4.0, ใบอนุญาต Open RAIL++-M ใช้หารายได้ได้) =====
 const HY_FLUX_STYLE = 'high quality full colour TV anime background art and key frame, clean consistent line art, flat cel colours with soft gradients, detailed real architecture and furniture with textures, correct perspective and depth, believable lighting and cast shadows, every sign, label, screen and paper is blank with no letters.';
 const HY_SDXL_STYLE = 'anime screencap, anime coloring, flat color, clean lineart, cel shading, detailed background';
-const HY_TAGS = { // แท็กประจำตัว (SDXL) — แก้ได้ที่ settings hytags (JSON ชื่อ → {tags, desc})
-  'โทวะ': { neg: 'green hair, blue hair, brown hair', tags: '1boy, adult, young man, handsome, black hair, messy hair, ahoge, round eyewear, thin glasses, mole under eye, white shirt, collared shirt, sleeves rolled up, loose necktie, dark necktie, grey sweater vest, black pants', desc: 'a young man with messy black hair and round glasses in a grey knit vest and loose necktie' },
-  'ริน': { neg: 'black hair, brown hair, blonde hair', tags: '1girl, adult, young woman, beautiful, red hair, long hair, high ponytail, sharp eyes, oversized black hoodie, black shorts, black pantyhose, sneakers', desc: 'a young woman with a long red ponytail in an oversized black hoodie and black tights' },
-  'ริน_d': { neg: 'black hair, brown hair, blonde hair', tags: '1girl, adult, young woman, beautiful, red hair, braided bun, low bun, large round eyewear, white apron, cream blouse, smile', desc: 'a young woman with a red braided bun, big round glasses and a white bakery apron' },
-  'มิโอะ': { neg: 'sweater vest, vest, cardigan, school uniform, pleated skirt, necktie, brown hair, blue hair, red hair', tags: '1girl, adult, young woman, office lady, black hair, short bob, blunt bangs, rabbit hair ornament, half-closed eyes, white blouse, collared blouse, long sleeves, dark long skirt', desc: 'a young office woman with a short black bob, blunt bangs, a rabbit hair clip and a white long-sleeve blouse' },
-  'หัวหน้าซาเอกิ': { tags: '1girl, mature female, beautiful, black hair, short bob, streaked hair, silver streak, drop earrings, black pantsuit, formal suit, black jacket, black pants, high collar blouse', desc: 'an elegant woman with a black bob with one silver streak in a black pantsuit' },
-  'ป้าฮานะ': { tags: '1girl, mature female, beautiful, youthful, grey hair, hair bun, sharp eyes, white apron, flour on clothes', desc: 'a youthful pretty woman baker with grey hair in a bun and a white apron' },
-  'ไค': { tags: '1boy, adult, young man, handsome, blonde hair, short hair, spiky hair, scar on eyebrow, open jacket, courier jacket, large backpack, grin', desc: 'a young man with spiky blond hair in an open courier jacket with a big backpack' },
-  'โมจิ': { o: 1, tags: 'no humans, small round fluffy white creature, cat ears, big round eyes, stubby paws, long thin tail, glowing paper lantern on tail tip, chibi', desc: 'a small round fluffy cat-like spirit with a lantern tail' },
+// ตัวละคร = ตัวตน (หน้า/ตา/สีผม/สัดส่วน ล็อกตายตัว) + ตู้เสื้อผ้า (ชุด+ทรงผม เปลี่ยนตามบท) — ผู้ใช้สั่ง: หล่อ สวย สัดส่วนดี มีจุดขาย วาบหวิวระดับอนิเมะทีวี หลายชุดหลายทรงผม
+// สัตว์อ้างอิงกายวิภาคสัตว์จริง (ผู้ใช้สั่ง) · แก้ทับได้ที่ settings hytags
+const HY_CHAR = {
+  'โทวะ': { id: '1boy, adult, young man, handsome, bishounen, black hair, dark grey eyes, sharp eyes, mole under eye, tall, slim, broad shoulders', neg: 'green hair, blue hair, brown hair, blonde hair, fat, old man',
+    of: { work: ['ชุดทำงาน', 'messy hair, ahoge, round eyewear, thin glasses, white collared shirt, sleeves rolled up, loose necktie, dark necktie, grey sweater vest, black pants', 'messy black hair, round glasses, grey knit vest and loose necktie'],
+      casual: ['วันหยุด', 'messy hair, round eyewear, navy cardigan, white t-shirt, beige pants, sneakers', 'messy black hair, round glasses, navy cardigan over a white tee'],
+      home: ['อยู่บ้าน', 'very messy hair, bedhead, no eyewear, oversized grey t-shirt, sweatpants, slippers', 'bed-head black hair, no glasses, baggy grey tee and sweatpants'],
+      cool: ['หล่อเท่ (ถอดแว่น)', 'slicked back hair, no eyewear, black suit, black jacket, white shirt, black necktie, serious, cool', 'slicked-back black hair, no glasses, sharp black suit'] }, def: 'work' },
+  'ริน': { id: '1girl, adult, young woman, beautiful, red hair, long hair, amber eyes, sharp eyes, slender, curvy, slim waist, long legs', neg: 'black hair, brown hair, blonde hair, short hair',
+    of: { night: ['นักผนึก (กลางคืน)', 'high ponytail, cropped black hoodie, hood down, midriff, navel, black shorts, black thighhighs, fingerless gloves, sneakers', 'long red high ponytail, cropped black hoodie showing her waist, shorts and black thigh-highs'],
+      bakery: ['ร้านขนมปัง', 'braided bun, low bun, large round eyewear, cream blouse, white apron, smile', 'red braided bun, big round glasses, cream blouse and white bakery apron'],
+      casual: ['เดินเล่นวันหยุด', 'long hair down, hair over shoulder, off-shoulder white sweater, bare shoulders, denim skirt, ankle boots', 'long loose red hair, off-shoulder white sweater, denim skirt'],
+      sleep: ['ชุดนอน', 'side braid, oversized white t-shirt, short shorts, barefoot, sleepy', 'red side braid, oversized white sleep tee and shorts'] }, def: 'night' },
+  'มิโอะ': { id: '1girl, adult, young woman, beautiful, black hair, purple eyes, half-closed eyes, long eyelashes, curvy, slim waist', neg: 'brown hair, blue hair, red hair, school uniform, serafuku, pleated skirt, sweater vest, vest, necktie',
+    of: { office: ['ชุดออฟฟิศ', 'short bob, blunt bangs, rabbit hair ornament, fitted white blouse, collared blouse, long sleeves, black pencil skirt, black pantyhose', 'short black bob, blunt bangs, rabbit hair clip, fitted white blouse and black pencil skirt'],
+      inspector: ['สารวัตรอาคม', 'bob cut, hair slicked to one side, hairpin, black military coat, white gloves, armband, black pencil skirt, knee boots, serious', 'black bob pinned to one side, black inspector coat with armband and white gloves'],
+      holiday: ['วันหยุดสีหวาน', 'short bob, blunt bangs, rabbit hair ornament, pastel pink knit sweater, white flared skirt, holding stuffed bunny', 'short black bob, pink knit sweater, white skirt, hugging a toy rabbit'],
+      sleep: ['ชุดนอนกระต่าย', 'short bob, messy hair, rabbit print pajamas, animal hood, rabbit ears hood, hugging pillow', 'messy black bob, rabbit-print pyjamas with a bunny-ear hood'] }, def: 'office' },
+  'หัวหน้าซาเอกิ': { id: '1girl, mature female, beautiful, tall, black hair, streaked hair, silver streak, red eyes, sharp eyes, red lips, curvy', neg: '',
+    of: { suit: ['สูทดำ', 'short bob, drop earrings, fitted black pantsuit, black jacket, high collar blouse, black pants, high heels', 'black bob with one silver streak, fitted black pantsuit'],
+      casual: ['นอกเวลางาน', 'short bob, sunglasses on head, wine red turtleneck sweater, long beige coat', 'black bob with silver streak, wine turtleneck and long coat'] }, def: 'suit' },
+  'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, grey hair, sharp eyes, curvy', neg: '',
+    of: { bakery: ['ร้านขนมปัง', 'hair bun, white apron, sleeves rolled up, flour on clothes, holding rolling pin', 'grey hair in a bun, white apron dusted with flour, rolling pin'],
+      casual: ['นอกร้าน', 'long hair down, purple kimono, obi', 'long grey hair down, purple kimono'] }, def: 'bakery' },
+  'ไค': { id: '1boy, adult, young man, handsome, blonde hair, golden eyes, fang, scar on eyebrow, athletic', neg: '',
+    of: { courier: ['คนขนของ', 'short hair, spiky hair, open courier jacket, black t-shirt, cargo pants, large backpack, grin', 'spiky blond hair, open courier jacket, big backpack'],
+      casual: ['ชุดเล่น', 'spiky hair, hawaiian shirt, open shirt, shorts, sandals, grin', 'spiky blond hair, open hawaiian shirt and shorts'] }, def: 'courier' },
+  'โมจิ': { o: 1, id: 'no humans, animal focus, white kitten, fluffy fur, realistic cat anatomy, real cat proportions, chubby round body, short legs, pink nose, whiskers, big blue eyes, long fluffy tail, small glowing paper lantern at tail tip', neg: 'human, humanoid, standing on two legs, anthro, clothes',
+    of: { def: ['ปกติ', '', 'a fluffy round white kitten with real cat anatomy and a tiny glowing lantern on its tail tip'] }, def: 'def' },
 };
+const HY_TAGS = {}; // ชุดหลักของแต่ละตัว (ใช้กับโค้ดเดิม) + ริน_d = ชุดร้านขนมปัง
+for (const [n, c] of Object.entries(HY_CHAR)) { const o = c.of[c.def]; HY_TAGS[n] = { ...(c.o ? { o: 1 } : {}), tags: [c.id, o[1]].filter(Boolean).join(', '), desc: o[2], ...(c.neg ? { neg: c.neg } : {}) }; }
+HY_TAGS['ริน_d'] = { tags: HY_CHAR['ริน'].id + ', ' + HY_CHAR['ริน'].of.bakery[1], desc: HY_CHAR['ริน'].of.bakery[2], neg: HY_CHAR['ริน'].neg };
+function refPlan(cr) { // [project, prompt, opt] เรียงตามลำดับความสำคัญ: ชุดที่ใช้ในตอน 1 → ชุดอื่น → ตัวรอง
+  const GAG = ['comedic deadpan face, half-closed eyes, flat unimpressed expression, blank stare, colorful speed lines background', 'comedic shocked face, white blank eyes, sweatdrop, mouth wide open, exaggerated, colorful speed lines background', 'comedic laughing face, huge wide open mouth, closed happy eyes, exaggerated expression, colorful burst background', 'comedic flustered face, blush, steam from ears, wavy mouth, embarrassed, sparkles background'];
+  const ST = 'simple white background, anime screencap, flat color, clean lineart, character design, beautiful detailed eyes, perfect anatomy, good proportions';
+  const refOf = n => { const v = cr[n]; return v ? (+v.n || (v.g || [])[0] || 0) : 0; };
+  const one = (n, ofk, view, extra) => { const c = HY_CHAR[n], o = c.of[ofk]; const id = refOf(n);
+    const pr = [c.id, o[1], view, extra || '', ST].filter(Boolean).join(', ');
+    return ['อ้างอิง·' + n + '·' + (/comedic/.test(view) ? 'ตลก' : 'ปกติ') + '·' + o[0], pr, { engine: 'sdxl', w: /upper body/.test(view) ? 1024 : 832, h: /upper body/.test(view) ? 1024 : 1216, steps: 30, seed: 0, loras: [], ...(c.neg ? { neg: c.neg + ', nsfw, nude, nipples, panties' } : { neg: 'nsfw, nude, nipples, panties' }), ...(id ? { refimg: id, rw: 0.45 } : {}) }]; };
+  const FB = 'full body, standing, front view, arms at sides, gentle smile', TQ = 'full body, standing, three-quarter view, confident pose', UP = g => 'upper body, ' + g;
+  const out = [];
+  for (const [n, k] of [['โทวะ', 'work'], ['ริน', 'night'], ['ริน', 'bakery'], ['มิโอะ', 'office']]) { out.push(one(n, k, FB), one(n, k, TQ)); }
+  out.push(one('มิโอะ', 'office', 'cowboy shot, hand on cheek, looking at viewer, slight blush'), one('มิโอะ', 'office', 'full body, sitting on office chair, crossed legs, hugging plush rabbit'));
+  for (const n of ['โทวะ', 'ริน', 'มิโอะ']) out.push(one(n, HY_CHAR[n].def, UP(GAG[1])), one(n, HY_CHAR[n].def, UP(GAG[3])));
+  out.push(one('โมจิ', 'def', 'full body, sitting, front view, cute'), one('โมจิ', 'def', 'full body, loaf pose, lying, from side, cute'));
+  for (const n of ['โทวะ', 'ริน', 'มิโอะ']) for (const k of Object.keys(HY_CHAR[n].of)) if (k !== HY_CHAR[n].def && !(n === 'ริน' && k === 'bakery')) out.push(one(n, k, FB));
+  for (const n of ['หัวหน้าซาเอกิ', 'ไค', 'ป้าฮานะ']) { const c = HY_CHAR[n]; out.push(one(n, c.def, FB), one(n, c.def, UP(GAG[0]))); for (const k of Object.keys(c.of)) if (k !== c.def) out.push(one(n, k, FB)); }
+  return out;
+}
+function hyLook(n, ofk) { const c = HY_CHAR[n]; const o = c && c.of[ofk]; return o ? { tags: [c.id, o[1]].filter(Boolean).join(', '), desc: o[2], ...(c.neg ? { neg: c.neg } : {}), ...(c.o ? { o: 1 } : {}) } : null; }
 function s3Actor(x, z, pose, face) { // หุ่นคนแบบกล่อง (ยืน/นั่ง/โค้ง/นั่งพื้น/ตัวเล็ก) ให้ภาพความลึก
   const f = face >= 0 ? 1 : -1, bx = (a, b, c, d, e, g) => [Math.min(a, d), Math.min(b, e), Math.min(c, g), Math.max(a, d), Math.max(b, e), Math.max(c, g)].map(v => Math.round(v * 1000) / 1000);
   if (pose === 'sit') return [bx(x - .24, .47, z - .16 * f, x + .24, 1.05, z + .08 * f), bx(x - .11, 1.05, z - .1 * f, x + .11, 1.32, z + .1 * f), bx(x - .2, .45, z, x + .2, .6, z + .45 * f), bx(x - .18, 0, z + .38 * f, x + .18, .45, z + .5 * f)];
@@ -656,12 +697,12 @@ function s3Opt(s3) { // say.s3 = {loc, cam, act:[[ชื่อ, จุดยื�
   const act = [], actn = [], actc = []; for (const [nm, sp] of (s3.act || [])) { const P = S.spots[sp]; if (P) { const b = s3Actor(P[0], P[1], P[2], P[3]); act.push(...b); actn.push(nm); actc.push(b.length); } }
   return { loc: s3.loc, camName: s3.cam, cam, boxes: S.boxes, act, actn, actc };
 }
-function hyOpt(en, names, s) {
+function hyOpt(en, names, s, of) {
   let HT = HY_TAGS; try { HT = { ...HY_TAGS, ...JSON.parse(s.hytags || '{}') }; } catch { }
   const e = String(en || ''), lo = e.toLowerCase();
   const day = /braided low bun|bakery apron/.test(lo); // รินตอนกลางวัน (พนักงานร้านขนมปัง)
   const chars = [];
-  for (const n of names || []) { const t = HT[n === 'ริน' && day ? 'ริน_d' : n]; if (t) chars.push({ n, p: t.o ? 0 : 1, tags: t.tags, desc: t.desc, ...(t.neg ? { neg: t.neg } : {}) }); }
+  for (const n of names || []) { const t = (of && of[n] && hyLook(n, of[n])) || HT[n === 'ริน' && day ? 'ริน_d' : n]; if (t) chars.push({ n, p: t.o ? 0 : 1, tags: t.tags, desc: t.desc, ...(t.neg ? { neg: t.neg } : {}) }); }
   const chibi = /chibi/.test(lo), hands = /only (his|her|the two) hands?|hand(s)? (is|are) visible/.test(lo);
   if (chibi) for (const c of chars) c.tags = 'chibi, ' + c.tags;
   if (hands) for (const c of chars) c.p = 0; // ช่องเห็นแค่มือ: ไม่วาดทั้งตัว
@@ -679,7 +720,7 @@ function hyOpt(en, names, s) {
     chars, bg, mode: contact || chibi || hands ? 'over' : 'comp', style: s.hy_style || HY_SDXL_STYLE,
     pose: /from behind|back view|back to the viewer/.test(lo) ? 'from behind' : /side view|profile/.test(lo) ? 'from side' : '',
     all: [cntT, chars.map(c => c.tags.replace(/^(chibi, )?\d?(boy|girl|1boy|1girl), /, '$1')).join(', '), place, litT, 'consistent lighting, full color', plush].filter(Boolean).join(', ').slice(0, 900),
-    neg: (() => { const T = chars.map(c => c.tags).join(', ').toLowerCase(), N = ['monochrome, greyscale, sketch, english text, japanese text, letters, logo, watermark, school uniform, serafuku, floating objects, multicolored hair, streaked hair, colored inner hair', ...chars.map(c => c.neg || '')].join(', ').split(',').map(x => x.trim()).filter(x => x && !T.includes(x.toLowerCase())); return [...new Set(N)].join(', '); })(), // คำห้ามของตัวละครหนึ่งที่ชนกับชุด/ผมของอีกตัวในช่องเดียวกันถูกตัดออก
+    neg: (() => { const T = chars.map(c => c.tags).join(', ').toLowerCase(), N = ['nsfw, nude, nipples, panties, underwear, monochrome, greyscale, sketch, english text, japanese text, letters, logo, watermark, school uniform, serafuku, floating objects, multicolored hair, streaked hair, colored inner hair', ...chars.map(c => c.neg || '')].join(', ').split(',').map(x => x.trim()).filter(x => x && !T.includes(x.toLowerCase())); return [...new Set(N)].join(', '); })(), // คำห้ามของตัวละครหนึ่งที่ชนกับชุด/ผมของอีกตัวในช่องเดียวกันถูกตัดออก
     props: plush ? { 88: 'small cute plush toy, stuffed animal' } : {}, dc: 0.62, dn: 1.0, cs: 0.75, // SDXL วาดจากศูนย์ทั้งภาพ ใช้แค่เส้นโครงของ FLUX (ไม่เอาสี/ลายเส้น FLUX ปน → สไตล์ไม่แกว่ง ชุดไม่เพี้ยนตามแบบร่าง)
     ...(plush ? { plush: ['long-eared white rabbit plush toy', 'brown teddy bear plush toy', 'grey seal plush toy, round seal', 'small cat plush toy', 'yellow chick plush toy, baby bird'] } : {}),
   };
@@ -1309,8 +1350,8 @@ async function bridgeImg(env, s) {
     const eg = hyOn ? (s.img_hy_mode === 'paste' ? 'hybrid' : 'cn') : draft ? fluxEng(s) : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
     const npExp = !draft || /chibi/i.test(shEn) || /only (his|her|the two) hands?|hand(s)? (is|are) visible/i.test(shEn) ? null : /No people in the picture/.test(shEn) ? 0 : /Exactly one person/.test(shEn) ? 1 : /Exactly two people/.test(shEn) ? 2 : null; // จำนวนคนที่บทกำหนด ให้เครื่องตรวจภาพนับเทียบ
     const plushBad = draft && /talisman archive office/.test(shEn) && !/plush toys/.test(shEn) ? ['a person holding a teddy bear or stuffed toy', 'stuffed toys lying on the floor'] : [];
-    let shChars = [], s3 = null; if (hyOn) { const cr = await env.DB.prepare('SELECT chars,say FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { shChars = JSON.parse((cr && cr.chars) || '[]'); } catch { shChars = []; } try { const sy = JSON.parse((cr && cr.say) || '{}'); if (sy.s3 && s.img_3d !== '0') s3 = s3Opt(sy.s3); } catch { s3 = null; } }
-    let hyO = hyOn ? hyOpt(shEn, shChars, s) : null;
+    let shChars = [], s3 = null, shOf = null; if (hyOn) { const cr = await env.DB.prepare('SELECT chars,say FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { shChars = JSON.parse((cr && cr.chars) || '[]'); } catch { shChars = []; } try { const sy = JSON.parse((cr && cr.say) || '{}'); shOf = sy.outfit || null; if (sy.s3 && s.img_3d !== '0') s3 = s3Opt(sy.s3); } catch { s3 = null; } }
+    let hyO = hyOn ? hyOpt(shEn, shChars, s, shOf) : null;
     if (hyO && s.self_url) { // ภาพอ้างอิงตัวละครที่ผู้ใช้อนุมัติ (ปกติ / หน้าตลกในช่องตลก) → ลิงก์มีลายเซ็นให้เครื่อง Kaggle ดึง
       const LIB = {}, MAP = {}, REF = {}; for (const k of Object.keys(s)) { try { if (k.startsWith('charref:')) Object.assign(LIB, JSON.parse(s[k] || '{}')); if (k.startsWith('refmap:')) Object.assign(MAP, JSON.parse(s[k] || '{}')); } catch { } }
       for (const [lib, v] of Object.entries(LIB)) { const role = lib in MAP ? MAP[lib] : lib; if (role && !(role in REF && MAP[lib] === undefined)) REF[role] = v; } // ตัวละครในคลังที่ผู้ใช้จับคู่กับบท (ค่าเริ่มต้น = ชื่อเดียวกัน)
@@ -1601,10 +1642,11 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 13 ? 1 : 0, kv0 < 14 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR json_extract(opt,'$.refimg') IS NULL) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 13 ? 1 : 0, kv0 < 14 ? 1 : 0, kv0 < 15 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
+      if (+j.opt.refimg) j.opt.ref = (s.self_url || url.origin) + '/vi/' + (+j.opt.refimg) + '?s=' + await vvSig(env, 'i' + (+j.opt.refimg)); // ภาพอ้างอิงที่ผู้ใช้เลือก → ลิงก์มีลายเซ็นให้เครื่องดึง (IP-Adapter)
       if (!hid) await setSetting(env, 'k_seen', String(Date.now()));
       return json({ job: j });
     }
@@ -3551,6 +3593,12 @@ def gen_image(j, port=8188):
         wf["2"]["inputs"]["clip"] = pc
         wf["3"]["inputs"]["clip"] = pc
         wf["5"]["inputs"]["model"] = pm
+        if opt.get("ref") and ensure_ipa():  # ภาพอ้างอิงที่ผู้ใช้เลือก: ล็อกหน้า/ทรงตัวละครด้วย IP-Adapter
+            rimg = get_ref(opt["ref"], jid, 0)
+            if rimg:
+                add_ipa(wf, pm, [(rimg, None, float(opt.get("rw") or 0.55))], "5")
+        if opt.get("neg"):
+            wf["3"]["inputs"]["text"] = IMG_NEG + ", " + str(opt["neg"])
     else:
         wf = {
             "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["flux_s" if engine == "schnell" else "flux"]}},
@@ -4422,7 +4470,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=14" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=15" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
@@ -4990,14 +5038,10 @@ async function castApi(req, env, url, body) {
         if (k === 'n') cur[nm].n = b.on ? +b.id : 0; else { const g = new Set(cur[nm].g || []); b.on ? g.add(+b.id) : g.delete(+b.id); cur[nm].g = [...g]; }
         await setSetting(env, 'charref:' + story, JSON.stringify(cur)); return json({ ok: true, ok_: cur });
       }
-      if (act === 'ref_make') { // วาดแผ่นอ้างอิงด้วย SDXL (Animagine) — ปกติ 2 แบบ + หน้าตลก 4 แบบ ต่อตัว (ระบุ name = ทำเฉพาะตัวนั้น)
-        const HT = { ...HY_TAGS }; let n = 0;
-        const GAG = ['comedic deadpan face, half-closed eyes, flat unimpressed expression, blank stare, colorful speed lines background', 'comedic laughing face, huge wide open mouth, closed happy eyes, exaggerated expression, colorful burst background', 'comedic shocked face, white blank eyes, sweatdrop, mouth wide open, exaggerated, colorful speed lines background', 'comedic smug face, smirk, half-closed eyes, raised eyebrow, sparkles background'];
-        for (const [nm, t] of Object.entries(HT)) { if (nm === 'ริน_d' || (b.name && b.name !== nm)) continue;
-          const base = t.tags.replace(/^(chibi, )?/, '');
-          const jobs = [['ปกติ', `${base}, full body, standing, front view, arms at sides, neutral expression, simple white background, anime screencap, flat color, clean lineart, character design`, 832, 1216], ['ปกติ', `${base}, full body, standing, three-quarter view, gentle expression, simple white background, anime screencap, flat color, clean lineart, character design`, 832, 1216], ...(t.o ? GAG.slice(0, 2) : GAG).map(g => ['ตลก', `${base}, upper body, ${g}, anime screencap, flat color, clean lineart`, 1024, 1024])];
-          for (const [k, pr, w, h] of jobs) { await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)").bind('อ้างอิง·' + nm + '·' + k, '', '0', pr, Date.now(), JSON.stringify({ engine: 'sdxl', w, h, steps: 30, seed: 0, loras: [] })).run(); n++; }
-        }
+      if (act === 'ref_make') { // วาดแผ่นอ้างอิงตามตู้เสื้อผ้า (ชุดหลักที่ใช้ในตอน 1 ก่อน) · name = เฉพาะตัวนั้น · มิโอะใช้หน้าที่ผู้ใช้เลือกเป็นภาพอ้างอิง
+        const cr = (await rd('charref:' + story)) || {}; let n = 0;
+        for (const r of refPlan(cr)) { if (b.name && !r[0].startsWith('อ้างอิง·' + b.name + '·')) continue;
+          await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)").bind(r[0], '', '0', r[1], Date.now() + n, JSON.stringify(r[2])).run(); n++; }
         return json({ ok: true, jobs: n });
       }
       if (act === 'qcrep') { // รายงานตรวจความต่อเนื่อง/คุณภาพของตอน (สร้างโดยสคริปต์ตรวจก่อนส่งวาด)
