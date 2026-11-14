@@ -666,7 +666,7 @@ function refPlan(cr) { // [project, prompt, opt] เรียงตามลำ�
   const ST = 'simple white background, anime screencap, flat color, clean lineart, character design, beautiful detailed eyes, perfect anatomy, good proportions';
   const refOf = n => { const v = cr[n]; return v ? (+v.n || (v.g || [])[0] || 0) : 0; };
   const one = (n, ofk, view, extra) => { const c = HY_CHAR[n], o = c.of[ofk]; const id = refOf(n);
-    const pr = [c.id, o[1], view, extra || '', ST].filter(Boolean).join(', ');
+    const pr = [c.id, o[1], view, extra || '', /comedic/.test(view) ? 'anime screencap, flat color, clean lineart, beautiful detailed eyes, good proportions' : ST].filter(Boolean).join(', ');
     return ['อ้างอิง·' + n + '·' + (/comedic/.test(view) ? 'ตลก' : 'ปกติ') + '·' + o[0], pr, { engine: 'sdxl', w: /upper body/.test(view) ? 1024 : 832, h: /upper body/.test(view) ? 1024 : 1216, steps: 30, seed: 0, loras: [], ...(c.neg ? { neg: c.neg + ', nsfw, nude, nipples, panties' } : { neg: 'nsfw, nude, nipples, panties' }), ...(id ? { refimg: id, rw: 0.45 } : {}) }]; };
   const FB = 'full body, standing, front view, arms at sides, gentle smile', TQ = 'full body, standing, three-quarter view, confident pose', UP = g => 'upper body, ' + g;
   const out = [];
@@ -675,7 +675,8 @@ function refPlan(cr) { // [project, prompt, opt] เรียงตามลำ�
   for (const n of ['โทวะ', 'ริน', 'มิโอะ']) out.push(one(n, HY_CHAR[n].def, UP(GAG[1])), one(n, HY_CHAR[n].def, UP(GAG[3])));
   out.push(one('โมจิ', 'def', 'full body, sitting, front view, cute'), one('โมจิ', 'def', 'full body, loaf pose, lying, from side, cute'));
   for (const n of ['โทวะ', 'ริน', 'มิโอะ']) for (const k of Object.keys(HY_CHAR[n].of)) if (k !== HY_CHAR[n].def && !(n === 'ริน' && k === 'bakery')) out.push(one(n, k, FB));
-  for (const n of ['หัวหน้าซาเอกิ', 'ไค', 'ป้าฮานะ']) { const c = HY_CHAR[n]; out.push(one(n, c.def, FB), one(n, c.def, UP(GAG[0]))); for (const k of Object.keys(c.of)) if (k !== c.def) out.push(one(n, k, FB)); }
+  const GX = { 'หัวหน้าซาเอกิ': 'comedic menacing face, dark aura, glowing red eyes, shadowed face, colorful speed lines background', 'ไค': 'comedic face, red handprint on cheek, slapped, teary eyes, colorful speed lines background', 'ป้าฮานะ': 'comedic angry face, raising rolling pin, anger vein, sharp teeth, colorful speed lines background' };
+  for (const n of ['หัวหน้าซาเอกิ', 'ไค', 'ป้าฮานะ']) { const c = HY_CHAR[n]; out.push(one(n, c.def, FB), one(n, c.def, UP(GX[n]))); for (const k of Object.keys(c.of)) if (k !== c.def) out.push(one(n, k, FB)); }
   return out;
 }
 function hyLook(n, ofk) { const c = HY_CHAR[n]; const o = c && c.of[ofk]; return o ? { tags: [c.id, o[1]].filter(Boolean).join(', '), desc: o[2], ...(c.neg ? { neg: c.neg } : {}), ...(c.o ? { o: 1 } : {}) } : null; }
