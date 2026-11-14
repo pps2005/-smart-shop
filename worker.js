@@ -124,12 +124,15 @@ async function handleFetch(req, env, ctx) {
 }
 async function handleCron(event, env, ctx) {
     await ensureSchema(env);
-    const kv0 = {}; for (const x of ((await env.DB.prepare('SELECT key,value FROM settings WHERE key IN (?,?,?,?)').bind(readDay(), 'boost_until', 'sb_import', 'sb_redraw').all().catch(() => ({ results: [] }))).results || [])) kv0[x.key] = x.value;
+    const kv0 = {}; for (const x of ((await env.DB.prepare('SELECT key,value FROM settings WHERE key IN (?,?,?,?,?,?)').bind(readDay(), 'boost_until', 'sb_import', 'sb_redraw', 'lset_req', 'k_status').all().catch(() => ({ results: [] }))).results || [])) kv0[x.key] = x.value;
     const rrNow = +kv0[readDay()] || 0;
     // งานที่สั่งอัปเดต (นำเข้าสตอรีบอร์ด/วาดใหม่) = งานด่วน: ไม่ต้องรอรอบที่ชะลอไว้ · เปิดโหมดเร่ง 10 นาทีให้ส่งงานวาดต่อได้ทันที (ยกเว้นเกิน 90% เพื่อกันเว็บล่ม)
     if ((kv0.sb_import || kv0.sb_redraw) && rrNow <= READ_WEB && !(+kv0.boost_until > Date.now())) { kv0.boost_until = String(Date.now() + 10 * 60000); await setSetting(env, 'boost_until', kv0.boost_until); }
     const boost = +kv0.boost_until > Date.now();
-    if (rrNow <= READ_STOP && !boost) { const pc = readPace(rrNow); if (new Date().getUTCMinutes() % pc.every) return; } // ปุ่มเร่งสตอรีบอร์ด: ไม่เว้นช่วง // ใช้เร็วกว่ากำหนด: เว้นช่วงทำงาน (ทุก 3/6/12 นาที)
+    // ภาพอ้างอิงตัวละคร = ผู้ใช้นั่งรอดู: มีคำสั่งใหม่ (lset_req) หรือมีงานรอแต่เครื่องยังไม่วิ่ง → ไม่ต้องรอรอบที่ชะลอไว้ (เคยรอ 2 รอบ × 12 นาที)
+    let urgent = !!kv0.lset_req;
+    if (!urgent) { const rq = await env.DB.prepare("SELECT COUNT(*) n, MIN(created) t0 FROM vjobs WHERE status='queued' AND kind='img' AND substr(project,1,8)='อ้างอิง·'").first().catch(() => null); urgent = !!(rq && rq.n) && (!/running/.test(String(kv0.k_status || '')) || Date.now() - (+rq.t0 || 0) > 180000); } // เครื่องวิ่งอยู่ = รับงานเองใน 45 วิ · ค้างเกิน 3 นาที = สถานะเครื่องอาจเก่า ให้ตรวจใหม่
+    if (rrNow <= READ_STOP && !boost && !urgent) { const pc = readPace(rrNow); if (new Date().getUTCMinutes() % pc.every) return; } // ปุ่มเร่งสตอรีบอร์ด: ไม่เว้นช่วง // ใช้เร็วกว่ากำหนด: เว้นช่วงทำงาน (ทุก 3/6/12 นาที)
     if (rrNow > (boost ? READ_WEB : READ_STOP)) return; // ถึง 85% แล้ว (โหมดเร่ง/งานด่วน: ถึง 90%): งานเบื้องหลังทุกอย่างพักไว้ทำต่อหลังรีเซ็ต 07:00 เพื่อให้หน้าเว็บยังเปิดได้ (เดิมกันแค่คิววาดภาพ งานอื่นยังวิ่งจนทะลุ 100%)
     ctx.waitUntil(tick(tagged(env, 'bg:tick'), false).then(r => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ' + JSON.stringify(r).slice(0, 200))).catch(e => setSetting(env, 'tick_dbg', new Date().toISOString() + ' ERR ' + String(e && e.stack || e).slice(0, 400))));
     ctx.waitUntil(autoHeal(tagged(env, 'bg:heal')).catch(() => {}).then(() => vTick(tagged(env, 'bg:kaggle'), false)).catch(e => setSetting(env, 'k_error', String(e.message || e).slice(0, 300))));
@@ -2058,10 +2061,10 @@ async function vTick(env, force) {
   if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return { skipped: 'no kaggle' };
   await ensureSchema(env);
   const s = await getSettings(env), now = Date.now(), cpuOff = s.v_cpu !== '0';
-  const q = await env.DB.prepare("SELECT COUNT(*) n, MIN(created) t0 FROM vjobs WHERE status='queued' AND (?1=0 OR kind NOT IN ('epcat','concat','tts'))").bind(cpuOff ? 1 : 0).first();
+  const q = await env.DB.prepare("SELECT COUNT(*) n, MIN(created) t0, SUM(kind='img' AND substr(project,1,8)='อ้างอิง·') r FROM vjobs WHERE status='queued' AND (?1=0 OR kind NOT IN ('epcat','concat','tts'))").bind(cpuOff ? 1 : 0).first();
   if (!q.n) return { skipped: 'empty' };
   // รวมงานก่อนเปิดเครื่อง: เปิดแต่ละรอบเสียเวลาโหลดโมเดล ~15 นาที (นับเป็นโควตา) → รอให้มีงาน ≥6 ชิ้น หรืองานแรกรอเกิน 20 นาที
-  if (!force && q.n < 6 && now - (+q.t0 || now) < 20 * 60000 && !/running|queued|starting/.test(String(s.k_status || ''))) return { skipped: 'batching ' + q.n };
+  if (!force && !q.r && q.n < 6 && now - (+q.t0 || now) < 20 * 60000 && !/running|queued|starting/.test(String(s.k_status || ''))) return { skipped: 'batching ' + q.n };
   if (!force && now - (+s.k_checked || 0) < 120000) return { skipped: 'wait' };
   if (now < (+s.k_pause || 0)) return { skipped: 'paused' };
   await setSetting(env, 'k_checked', String(now));
@@ -4776,10 +4779,16 @@ def claim_wait(stat):
     # การ์ดว่าง: รองานใหม่ระหว่างที่การ์ดอื่นยังทำงานอยู่ (สูงสุด 15 นาที) แทนที่จะปิดทิ้ง ให้ใช้การ์ดคู่ได้เต็ม
     job = J(claim_path()).get("job")
     waited = 0
-    while not job and stat.get("busy", 0) > 0 and time.time() - T0 < MAXH * 3600:
+    # รอบที่มีงานภาพอ้างอิงตัวละคร (ผู้ใช้กำลังนั่งดู/สั่งแก้): คิวว่างแล้วเปิดค้างรองานต่ออีก 20 นาที ไม่ต้องโหลดโมเดลใหม่
+    while not job and (stat.get("busy", 0) > 0 or (stat.get("ref") and waited < 1200)) and time.time() - T0 < MAXH * 3600:
+        if stat.get("ref") and stat.get("busy", 0) <= 0 and not stat.get("said"):
+            stat["said"] = 1
+            log("คิวว่างแล้ว เปิดเครื่องค้างรองานต่ออีก 20 นาที (สั่งแก้ได้เลย ไม่ต้องรอโหลดโมเดลใหม่)")
         time.sleep(45)
         waited += 45
         job = J(claim_path()).get("job")
+    if job:
+        stat["said"] = 0
     return job
 
 
@@ -4788,6 +4797,8 @@ def worker(port, first, stat):
     healed = None
     while job:
         stat["busy"] = stat.get("busy", 0) + 1
+        if str(job.get("project") or "").startswith("อ้างอิง·"):
+            stat["ref"] = 1
         try:
             mp4, sec, W, H = work(job, port)
             data = open(mp4, "rb").read()
