@@ -357,7 +357,7 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั�
       jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.id, o[1] ? '(' + o[1] + ':1.2)' : '', v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: C.o ? 1024 : 832, h: C.o ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg: nego, ...ipa, takes: 2, np: C.o ? 0 : 1, qneg: C.o ? qn : [...qn, 'a person whose feet are cut off by the image frame'] }]);
       caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (/^1boy/.test(C.id) ? '1boy, ' : '1girl, ') + o[1] + ', ' + v);
     } }
-  const ok = Object.keys(C.of); // หน้าตลก: ครึ่งตัว พื้นหลังสีสด เปลี่ยนชุดไปเรื่อยๆ
+  const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้าตลก: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง (ไม่ซ้ำชุดในภาพหลัก)
   for (let g = 0; g < (gags || 0); g++) { const o = C.of[ok[g % ok.length]];
     jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.id, '(' + o[1] + ':1.2)', 'upper body, head visible, ' + GX[g % GX.length] + ', colorful speed lines background, ' + ST].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg + (/hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), ...(ref ? { ...ipa, rw: 0.4, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]); }
   return { jobs, set: { cid, caps, pfx } };
@@ -705,7 +705,9 @@ const HY_CHAR = {
       sleep: ['ชุดนอนกระต่าย', 'short bob, messy hair, rabbit print pajamas, animal hood, rabbit ears hood, hugging pillow', 'messy black bob, rabbit-print pyjamas with a bunny-ear hood'] }, def: 'office' },
   'หัวหน้าซาเอกิ': { id: '1girl, mature female, beautiful, tall, black hair, streaked hair, silver streak, red eyes, sharp eyes, red lips, curvy', neg: '',
     of: { suit: ['สูทดำ', 'short bob, drop earrings, fitted black pantsuit, black jacket, high collar blouse, black pants, high heels', 'black bob with one silver streak, fitted black pantsuit'],
-      casual: ['นอกเวลางาน', 'short bob, sunglasses on head, wine red turtleneck sweater, long beige coat', 'black bob with silver streak, wine turtleneck and long coat'] }, def: 'suit' },
+      casual: ['นอกเวลางาน', 'short bob, sunglasses on head, wine red turtleneck sweater, long beige coat', 'black bob with silver streak, wine turtleneck and long coat'],
+      coat: ['ชุดสืบสวน', 'short bob, long black trench coat, belted, black leather gloves, black boots, serious', 'black bob with silver streak, long black belted trench coat'],
+      dress: ['ชุดราตรี', 'hair swept to one side, elegant black evening dress, long dress, off-shoulder, pearl earrings, high heels', 'black bob swept aside, elegant black evening dress'] }, def: 'suit' },
   'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, grey hair, red eyes, sharp eyes, long eyelashes, mole under mouth, red lips, curvy', neg: 'blue eyes, brown hair, black hair, white hair',
     of: { bakery: ['ร้านขนมปัง', 'hair bun, white apron, sleeves rolled up, flour on clothes, holding rolling pin', 'grey hair in a bun, white apron dusted with flour, rolling pin'],
       casual: ['นอกร้าน', 'long hair down, purple kimono, obi', 'long grey hair down, purple kimono'],
