@@ -345,10 +345,10 @@ function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั�
   const EX = ['gentle smile', 'serious expression', 'shy smile, blush', 'surprised, open mouth', 'pout, annoyed', 'happy, laughing', 'confident smirk', 'sleepy, half-closed eyes'];
   const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'stretching', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing', 'lying on back, playful'];
   const GX = C.gx || [ // หน้ามีมแบบที่ผู้ใช้ส่งมา: ตาเป็นเส้น/จุดเล็ก หนังตาหนัก หน้ายืดผิดสัดส่วน ปากเส้นเดียวหรือปากใหญ่สุดๆ ไม่มีเงา
-    'jitome, deadpan, half-closed eyes, heavy eyelids, tiny pupils, flat unimpressed expression, small flat mouth, elongated face, hands on head',
-    'laughing, crescent eyes, ^_^, huge wide open mouth, teeth, exaggerated laugh, hands raised beside face, distorted face',
-    'smug, half-closed eyes, looking down, tiny smirk, sweatdrop, elongated face, unimpressed',
-    'derp face, distorted face, simple dot eyes, wavy mouth, comedic, embarrassed'];
+    '(jitome:1.4), (deadpan:1.3), half-closed eyes, heavy eyelids, tiny pupils, (flat unimpressed expression:1.3), small flat mouth, (elongated face:1.2), hands on head',
+    '(laughing:1.3), (crescent eyes:1.3), ^_^, (huge wide open mouth:1.4), teeth, (exaggerated laugh:1.3), hands raised beside face, (distorted face:1.2)',
+    '(smug:1.3), half-closed eyes, looking down, tiny smirk, sweatdrop, (elongated face:1.2), unimpressed',
+    '(derp face:1.3), (distorted face:1.3), simple dot eyes, wavy mouth, comedic, embarrassed'];
   const jobs = [], caps = [], pfx = 'อ้างอิง·' + n + '·ปกติ·' + (noset ? 'ใหม่' : 'ฝึก'); let i = 0;
   const qn = C.o ? ['two cats', 'a cat without a lantern on its tail', 'monochrome drawing'] : ['two people', 'the same person drawn twice', 'monochrome black and white drawing', 'a person whose head is cut off by the image frame', 'a view from below looking up at the legs', 'deformed body, extra limbs'];
   const neg = (C.neg ? C.neg + ', ' : '') + 'nsfw, nude, nipples, panties, underwear, huge breasts, gigantic breasts, monochrome, greyscale, multiple views, cropped, head out of frame, from below, close-up' + (C.o ? ', lantern on head, multiple cats' : ', 2girls, 2boys');
@@ -729,7 +729,7 @@ const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 1
       casual: ['ลำลอง', 'long hair down, hair over shoulder, off-shoulder white sweater, bare shoulders, denim skirt, ankle boots', 'off-shoulder white sweater, denim skirt'],
       festival: ['ยูกาตะเทศกาล', 'hair up, flower hair ornament, red yukata with white goldfish pattern, yellow obi, holding paper fan, wooden sandals', 'red goldfish yukata, flower in hair'],
       sleep: ['ชุดนอน', 'side braid, oversized white t-shirt, short shorts, barefoot, sleepy', 'oversized sleep tee and shorts'] }, def: 'night' },
-  'มิโอะ': { id: '1girl, adult, young woman, beautiful, (black hair:1.2), purple eyes, half-closed eyes, long eyelashes, curvy, slim waist', neg: 'brown hair, blue hair, red hair, school uniform, serafuku, pleated skirt, sweater vest, necktie',
+  'มิโอะ': { id: '1girl, adult, young woman, beautiful, (jet black hair:1.4), purple eyes, half-closed eyes, long eyelashes, curvy, slim waist', neg: 'white hair, grey hair, silver hair, brown hair, blue hair, red hair, school uniform, serafuku, pleated skirt, sweater vest, necktie',
     of: { office: ['ออฟฟิศ (ประจำตัว)', 'short bob, blunt bangs, small white hair clip, fitted white blouse, black collar, long sleeves, black pencil skirt, black pantyhose, black heels', 'office: white blouse, black pencil skirt, rabbit clip'],
       inspector: ['สารวัตรอาคม (ตอน 4)', 'bob cut, hair pinned to one side, silver hairpin, black military uniform jacket with gold buttons, red armband, white gloves, black pencil skirt, knee boots, serious, cool', 'inspector uniform: black jacket, red armband'],
       battle: ['ต่อสู้สารวัตร (ตอน 4, 9)', 'bob cut, hair pinned, long black inspector coat flowing, red armband, white gloves, holding ink baton with glowing talisman, knee boots, fierce', 'inspector battle coat with ink baton'],
@@ -5199,13 +5199,13 @@ async function castApi(req, env, url, body) {
       if (!story) return json({ error: 'ไม่มีชื่อเรื่อง' }, 400);
       const rd = async k => { try { const r = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(k).first(); return r ? JSON.parse(r.value) : null; } catch (e) { return null; } };
       const clip = (x, n) => String(x == null ? '' : x).slice(0, n);
-      if (act === 'get') { // แผน + นักแสดงในคลัง (พร้อมสถานะ LoRA ของแต่ละคน)
+      if (act === 'get') { // แผน + นักแสดงในคลัง (พร้อมสถานะ LoRA ของแต่ละคน) · ถามฐานข้อมูลพร้อมกัน (เดิมทีละตัว → เปิดเว็บช้า)
         const cs = (await env.DB.prepare('SELECT id,name,age,role,cast_role,cast_story,char_id FROM aud_cands WHERE COALESCE(kept,0)=1 ORDER BY id DESC').all()).results;
-        for (const c of cs) {
+        await Promise.all(cs.map(async c => {
           const R = AUD_ROLES.find(x => x.key === c.role); c.g = R ? (/woman/.test(R.g) ? 'f' : 'm') : ''; c.lora = '';
           if (+c.char_id) { const l = await env.DB.prepare("SELECT status,error FROM loras WHERE char_id=? AND status<>'old' ORDER BY id DESC LIMIT 1").bind(c.char_id).first(); c.lora = l ? l.status : 'none'; c.lora_err = l && l.status === 'failed' ? String(l.error || '').slice(-400) : ''; }
-          const pf = `ออดิชัน·${c.role}·${c.id}·`, fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project >= ? AND project < ? AND scene=1').bind(pf, pf + '\uffff').first(); c.face = (fr && fr.id) || 0; // ช่วงแทน LIKE ให้ใช้ดัชนีได้ (เดิมสแกนภาพทั้งตารางต่อคน = ~18,000 แถวต่อครั้ง)
-        }
+          const pf = `ออดิชัน·${c.role}·${c.id}·`, fr = await env.DB.prepare('SELECT MAX(id) id FROM images WHERE project >= ? AND project < ? AND scene=1').bind(pf, pf + '\uffff').first(); c.face = (fr && fr.id) || 0;
+        }));
         const epst = (await rd('epst:' + story)) || {}, sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first();
         if (sr) for (const [no, v] of Object.entries(epst)) {
           if (!v || v.status !== 'running') continue;
