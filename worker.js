@@ -338,6 +338,34 @@ async function charTrain(env, b) {
   return { ok: true, images: imgs.length };
 }
 // เปลี่ยนสไตล์ทั้งเรื่อง: วาดภาพชุดฝึกของตัวละครที่ LoRA ยังไม่เสร็จใหม่ด้วยสไตล์ปัจจุบัน แล้วส่งเทรนเองเมื่อภาพครบ (สั่งด้วย settings restyle=start)
+// สั่งชุดฝึกจากฐานข้อมูล: settings lset_req = {ชื่อ: {cid, ref, mix:{ชุด:จำนวน}}} → สร้างงานวาด 16 ภาพ/ตัว (โชว์ในคลังภาพอ้างอิง) + lset ให้ส่งเทรนเอง
+function lsetJobs(n, cid, ref, mix) {
+  const C = HY_CHAR[n]; if (!C) return null;
+  const ST = 'anime screencap, flat color, clean thin lineart, soft colors, beautiful detailed eyes, perfect anatomy, good proportions, full color';
+  const V = ['full body, standing, front view, gentle smile, simple white background', 'full body, standing, three-quarter view, hand on hip, simple white background', 'full body, walking, from side, simple background', 'upper body, front view, looking at viewer, smile, simple background', 'portrait, close-up, face focus, looking at viewer, simple background', 'upper body, three-quarter view, surprised, simple background', 'cowboy shot, sitting on chair, relaxed, indoors', 'upper body, blush, looking away, simple background'];
+  const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'close-up, face focus', 'eating from a bowl', 'stretching', 'lying on back, playful', 'sitting on a bench, night', 'close-up of tail tip with glowing paper lantern', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing'];
+  const jobs = [], caps = [], pfx = 'อ้างอิง·' + n + '·ปกติ·ฝึก'; let i = 0;
+  const qn = C.o ? ['two cats', 'a cat without a lantern on its tail', 'monochrome drawing'] : ['two people', 'the same person drawn twice', 'monochrome black and white drawing', 'deformed body, extra limbs'];
+  const neg = (C.neg ? C.neg + ', ' : '') + 'nsfw, nude, nipples, panties, monochrome, greyscale, multiple views' + (C.o ? ', lantern on head, multiple cats' : ', 2girls, 2boys');
+  for (const [k, c] of Object.entries(mix || { [C.def]: 16 })) { const o = C.of[k]; if (!o) continue;
+    for (let t = 0; t < c; t++, i++) {
+      const v = C.o ? 'the glowing paper lantern hangs from the end of its tail, full body, ' + PM[i % PM.length] + ', simple white background' : V[i % V.length];
+      const up = C.o || /portrait|upper body|cowboy/.test(v);
+      jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.id, o[1], v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: up ? 1024 : 832, h: up ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg, ...(ref ? { refimg: ref, rw: 0.45, ipa_end: 0.7 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]);
+      caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (/^1boy/.test(C.id) ? '1boy, ' : '1girl, ') + o[1] + ', ' + v);
+    } }
+  return { jobs, set: { cid, caps, pfx } };
+}
+async function lsetReqTick(env, s) {
+  if (!s.lset_req) return; let R; try { R = JSON.parse(s.lset_req); } catch { R = {}; }
+  await env.DB.prepare("DELETE FROM settings WHERE key='lset_req'").run();
+  let L = {}; try { L = JSON.parse(s.lset || '{}'); } catch { }
+  let t = Date.now();
+  for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix); if (!P) continue;
+    for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, t++, JSON.stringify(op)).run();
+    L[n] = P.set; }
+  await setSetting(env, 'lset', JSON.stringify(L));
+}
 // ชุดฝึก LoRA จากภาพที่ผู้ใช้เลือก: settings lset = {ชื่อ: {cid, caps:[...]}} · ภาพ 'ชุดฝึก·ชื่อ·NN' วาดครบ → ส่งเทรนเอง (คำบรรยายภาพตามลำดับ NN)
 async function lsetTick(env, s) {
   if (!s.lset) return; let L; try { L = JSON.parse(s.lset); } catch { return; }
@@ -1414,6 +1442,7 @@ async function tick(env, force) {
   }
   if (s.design_cast) { await env.DB.prepare("DELETE FROM settings WHERE key='design_cast'").run(); await designCast(env, s, String(s.design_cast)).catch(() => { }); }
   await restyleTick(tagged(env, 'bg:lora'), s).catch(() => { });
+  await lsetReqTick(tagged(env, 'bg:lora'), s).catch(() => { });
   await lsetTick(tagged(env, 'bg:lora'), s).catch(() => { });
   await xlTick(tagged(env, 'bg:lora')).catch(() => { });
   await animeAdvance(tagged(env, 'bg:anime'), s).catch(() => {});
