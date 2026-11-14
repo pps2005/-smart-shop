@@ -339,32 +339,43 @@ async function charTrain(env, b) {
 }
 // เปลี่ยนสไตล์ทั้งเรื่อง: วาดภาพชุดฝึกของตัวละครที่ LoRA ยังไม่เสร็จใหม่ด้วยสไตล์ปัจจุบัน แล้วส่งเทรนเองเมื่อภาพครบ (สั่งด้วย settings restyle=start)
 // สั่งชุดฝึกจากฐานข้อมูล: settings lset_req = {ชื่อ: {cid, ref, mix:{ชุด:จำนวน}}} → สร้างงานวาด 16 ภาพ/ตัว (โชว์ในคลังภาพอ้างอิง) + lset ให้ส่งเทรนเอง
-function lsetJobs(n, cid, ref, mix, noset, gags) { // ผู้ใช้สั่ง: แบบแผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้าตลกครึ่งตัวพื้นหลังสี (เปลี่ยนชุด) · ไม่มีภาพครอป/มุมเงย
+function lsetJobs(n, cid, ref, mix, noset, gags) { // แผ่นตัวละครเต็มตัว (เปลี่ยนชุด+สีหน้า) + หน้ามีมครึ่งตัวพื้นหลังสี · แก้ใหญ่ 14 พ.ย.: คำสั่งไม่ตีกันเอง + ตัวตรวจเลือกรูปอ่านสีผม/หน้ามีมจริง
   const C = HY_CHAR[n]; if (!C) return null;
-  const ST = 'anime screencap, flat color, clean lineart, bold black outlines, simple cel shading, bright clean colors, beautiful detailed eyes, perfect anatomy, good proportions, full color, solo'; // ลายเส้นที่ผู้ใช้เลือก (14 พ.ย. 13:56): แบบภาพมีมมิโอะตาขาว — เส้นดำชัด สีเรียบสด เงาน้อย
-  const EX = ['gentle smile', 'serious expression', 'shy smile, blush', 'surprised, open mouth', 'pout, annoyed', 'happy, laughing', 'confident smirk', 'sleepy, half-closed eyes'];
+  const ST = 'anime screencap, anime coloring, flat color, clean lineart, bold black outlines, simple cel shading, bright clean colors'; // ลายเส้นที่ผู้ใช้เลือก (14 พ.ย. 13:56): เส้นดำชัด สีเรียบสด เงาน้อย
+  const GST = 'gag manga style, comedy, simplified face, flat color, no shading, bold black outlines, bright clean colors, striped background, diagonal stripes, colorful background'; // มีม: ไม่ใส่คำ "สวย/ตาละเอียด" (เคยทับหน้าเพี้ยนจนออกมาหน้าปกติ)
+  const EX = ['gentle smile', 'serious, closed mouth', 'shy smile, blush', 'surprised, open mouth', 'pout, annoyed', 'happy, laughing', 'confident smirk', 'sleepy, half-closed eyes'];
   const PM = ['sitting, front view', 'loaf pose, lying, from side', 'walking, from side', 'curled up sleeping', 'jumping, playful', 'sitting, back view, looking back', 'stretching', 'sitting, three-quarter view', 'standing on all fours, alert', 'yawning', 'pouncing', 'lying on back, playful'];
-  const GX = C.gx || [ // หน้ามีมแบบที่ผู้ใช้ส่งมา: ตาเป็นเส้น/จุดเล็ก หนังตาหนัก หน้ายืดผิดสัดส่วน ปากเส้นเดียวหรือปากใหญ่สุดๆ ไม่มีเงา
-    '(jitome:1.4), (deadpan:1.3), half-closed eyes, heavy eyelids, tiny pupils, (flat unimpressed expression:1.3), small flat mouth, (elongated face:1.2), hands on head',
-    '(laughing:1.3), (crescent eyes:1.3), ^_^, (huge wide open mouth:1.4), teeth, (exaggerated laugh:1.3), hands raised beside face, (distorted face:1.2)',
-    '(smug:1.3), half-closed eyes, looking down, tiny smirk, sweatdrop, (elongated face:1.2), unimpressed',
-    '(derp face:1.3), (distorted face:1.3), simple dot eyes, wavy mouth, comedic, embarrassed'];
+  const GX = C.gx || [ // หน้ามีมแบบที่ผู้ใช้ส่งมา: ตาครึ่งปิดหนังตาหนัก/ตาเสี้ยวพระจันทร์ หน้ายืด ปากเส้นเดียวหรือปากใหญ่สุดๆ ไม่มีเงา
+    '(jitome:1.3), half-closed eyes, heavy eyelids, constricted pupils, (expressionless:1.2), bored, closed mouth, flat mouth, (long face:1.1), elongated face, hands on own head',
+    '(laughing:1.3), (^_^:1.2), closed eyes, crescent eyes, (open mouth:1.3), huge mouth, teeth, :d, hands up, (long face:1.1)',
+    '(smug:1.3), jitome, half-closed eyes, looking down, smirk, sweatdrop, (long face:1.1), elongated face',
+    '(solid circle eyes:1.2), dot eyes, (wavy mouth:1.2), blush, embarrassed, sweat, flying sweatdrops'];
+  const GQ = C.gx ? [] : ['a bored deadpan face with heavy half-closed eyes and a flat mouth', 'a face laughing very hard with eyes shut and a huge open mouth', 'a smug face looking down with a tiny smirk', 'a silly embarrassed face with dot eyes and a wavy mouth'];
+  const HQ = { 'โทวะ': ['black', 'white, grey or brown'], 'ริน': ['bright red', 'black, pink or orange'], 'มิโอะ': ['black', 'white, grey or silver'], 'หัวหน้าซาเอกิ': ['black', 'white, brown or purple'], 'ป้าฮานะ': ['silver grey', 'black or brown'], 'ไค': ['blonde', 'brown or black'] }[n] || ['', ''];
+  const boy = /^1boy/.test(C.id), who = boy ? 'man' : 'woman';
+  const MOOD = /^(cute|cool|smirk|grin|smile|shy smile|fierce|fierce smile|sleepy|kawaii|elegant|mature|serious|menacing|wild|relaxed)$/; // คำสีหน้า/อารมณ์ในชุด: ตัดออกตอนวาดแผ่นตัวละคร (สีหน้าสั่งแยก ไม่ให้ตีกัน)
+  const fit = t => t.split(', ').filter(x => !MOOD.test(x)).join(', ');
   const jobs = [], caps = [], pfx = 'อ้างอิง·' + n + '·ปกติ·' + (noset ? 'ใหม่' : 'ฝึก'); let i = 0;
-  const qn = C.o ? ['two cats', 'a cat without a lantern on its tail', 'monochrome drawing'] : ['two people', 'the same person drawn twice', 'monochrome black and white drawing', 'a person whose head is cut off by the image frame', 'a view from below looking up at the legs', 'deformed body, extra limbs'];
-  const neg = (C.neg ? C.neg + ', ' : '') + 'nsfw, nude, nipples, panties, underwear, huge breasts, gigantic breasts, monochrome, greyscale, multiple views, cropped, head out of frame, from below, close-up' + (C.o ? ', lantern on head, multiple cats' : ', 2girls, 2boys');
+  const wrongHair = HQ[1] ? ['an anime ' + who + ' with ' + HQ[1] + ' hair'] : [];
+  const qn = C.o ? ['two cats', 'a cat without a lantern on its tail', 'monochrome drawing'] : ['two people', 'the same person drawn twice', 'monochrome black and white drawing', 'a person whose head is cut off by the image frame', 'deformed body, extra limbs', ...wrongHair];
+  const neg0 = (C.neg ? C.neg + ', ' : '') + 'nsfw, nude, nipples, panties, underwear, huge breasts, gigantic breasts, monochrome, greyscale, multiple views' + (C.o ? ', lantern on head, multiple cats' : ', 2girls, 2boys, multiple girls, multiple boys');
+  const neg = neg0 + ', head out of frame, from below, close-up';
   const ipa = ref ? { refimg: ref, rw: 0.35, ipa_end: 0.75, ...(C.o ? {} : { ref_crop: 'face' }) } : {}; // สัตว์ไม่ตัดหัว (ภาพหลักโมจิหางอยู่บนสุด ตัดแล้วได้หาง)
   const outs = Object.entries(mix || { [C.def]: 12 }).filter(([k]) => C.of[k]);
   for (const [k, c] of outs) { const o = C.of[k];
     for (let t = 0; t < c; t++, i++) {
-      const v = C.o ? 'the glowing paper lantern hangs from the end of its tail, full body, ' + PM[i % PM.length] + ', simple white background' : 'full body, wide shot, standing, ' + (i % 2 ? 'three-quarter view' : 'front view') + ', whole body in frame from head to shoes, shoes visible, ' + EX[i % EX.length];
-      const nego = neg + (C.o ? '' : ', cowboy shot, upper body, portrait, feet out of frame') + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'); // ชุดที่ไม่มีฮู้ด: กันหูกระต่ายจากภาพหลักมิโอะติดมา
-      jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.id, o[1] ? '(' + o[1] + ':1.2)' : '', v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: C.o ? 1024 : 832, h: C.o ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg: nego, ...ipa, takes: 2, np: C.o ? 0 : 1, qneg: C.o ? qn : [...qn, 'a person whose feet are cut off by the image frame'] }]);
-      caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (/^1boy/.test(C.id) ? '1boy, ' : '1girl, ') + 'outfit_' + k + ', ' + o[1] + ', ' + v); // outfit_ชุด = LoRA จำชุดแยกกัน สั่งชุดไหนได้ชุดนั้น
+      const v = C.o ? 'the glowing paper lantern hangs from the end of its tail, full body, ' + PM[i % PM.length] + ', simple background, white background' : 'full body, standing, ' + (i % 2 ? 'three-quarter view' : 'straight-on') + ', looking at viewer, head to toe, shoes visible, ' + EX[i % EX.length] + ', simple background, grey background';
+      const nego = neg + (C.o ? '' : ', cowboy shot, upper body, portrait, feet out of frame') + (C.o || /hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'); // ชุดที่ไม่มีฮู้ด: กันหูกระต่ายติดมา
+      const qc = C.o ? ['a cute fluffy white kitten with a small glowing lantern on the tip of its tail, anime drawing'] : ['a full body anime drawing of one ' + who + ' with ' + HQ[0] + ' hair standing, the whole body visible from head to shoes', 'anime ' + who + ' wearing ' + o[2]];
+      jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.o ? '' : 'solo', C.id, fit(o[1]), v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: C.o ? 1024 : 832, h: C.o ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg: nego, ...ipa, takes: 3, np: C.o ? 0 : 1, qref: 1, qc, qneg: C.o ? qn : [...qn, 'a person whose feet are cut off by the image frame', 'a close-up portrait showing only the upper body'] }]);
+      caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (boy ? '1boy, ' : '1girl, ') + 'outfit_' + k + ', ' + o[1] + ', ' + v); // outfit_ชุด = LoRA จำชุดแยกกัน สั่งชุดไหนได้ชุดนั้น
     } }
-  const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้าตลก: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง (ไม่ซ้ำชุดในภาพหลัก)
+  const ok = outs.length ? outs.map(x => x[0]) : Object.keys(C.of); // หน้ามีม: ครึ่งตัว พื้นหลังสีสด ใช้เฉพาะชุดที่สั่ง
+  const gid = C.id.split(', ').filter(t => !/^(beautiful|handsome|bishounen|half-closed eyes|long eyelashes|sharp eyes|curvy|slim|slim waist|long legs|tall|tall male|broad shoulders|athletic|slender|red lips|youthful)$/.test(t)).join(', '); // มีม: ตัดคำความสวย/สัดส่วนออกจากตัวตน เหลือแต่สีผม สีตา จุดเด่น
   for (let g = 0; g < (gags || 0); g++) { const o = C.of[ok[g % ok.length]];
-    const top = o[1].split(', ').filter(t => !/skirt|pants|slacks|shorts|pantyhose|tights|thighhighs|socks|heels|boots|shoes|sneakers|sandals|loafers|mary janes/.test(t)).join(', '); // หน้ามีมครึ่งตัว: ตัดคำส่วนล่าง (กระโปรง/รองเท้า) ไม่ให้วาดคนเต็มตัวโผล่มาอีกคน
-    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), [C.id, '(' + top + ':1.1)', 'solo, close-up, upper body, head and shoulders, ' + GX[g % GX.length] + ', gag manga style, simplified features, flat colors, no shading on face, diagonal colorful stripes background, ' + ST].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg + ', 2girls, 2boys, multiple views, full body, inset, split screen, legs, shoes, realistic' + (/hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), ...(ref ? { ...ipa, rw: 0.4, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: [...qn, 'a close-up face next to a small full body figure', 'two copies of the same girl'] }]); }
+    const top = fit(o[1]).split(', ').filter(t => !/skirt|pants|slacks|shorts|jeans|pantyhose|tights|thighhighs|socks|heels|boots|shoes|sneakers|sandals|loafers|mary janes|slippers|barefoot|holding|hugging/.test(t)).join(', '); // ตัดคำส่วนล่าง+ของในมือ ไม่ให้วาดคนเต็มตัวโผล่มาอีกคน
+    const gx = GX[g % GX.length], gq = GQ[g % (GQ.length || 1)];
+    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(g).padStart(2, '0'), ['solo', gid, top, 'close-up, portrait, face focus, head and shoulders', gx, GST].filter(Boolean).join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg: neg0 + ', full body, lower body, legs, shoes, inset, split screen, realistic, detailed eyes, beautiful, bishoujo' + (/hood/.test(o[1]) ? '' : ', hood, animal hood, animal ears, rabbit ears'), ...(ref ? { ...ipa, rw: 0.3, ipa_end: 0.5 } : {}), takes: 3, np: C.o ? 0 : 1, qref: 1, qc: ['a funny exaggerated cartoon meme face of an anime ' + who + ' with ' + HQ[0] + ' hair, silly comedic reaction face, close-up', gq || 'a very funny exaggerated distorted comedic reaction face'], qneg: ['a pretty anime ' + who + ' with a normal calm gentle face and beautiful detailed eyes', 'two people', 'two copies of the same person', 'a close-up face next to a small full body figure', 'a full body figure with legs', 'monochrome black and white drawing', ...wrongHair] }]); }
   return { jobs, set: { cid, caps, pfx } };
 }
 async function lsetReqTick(env, s) {
@@ -714,46 +725,46 @@ const HY_SDXL_STYLE = 'anime screencap, anime coloring, flat color, clean linear
 // ตัวละคร = ตัวตน (หน้า/ตา/สีผม/สัดส่วน ล็อกตายตัว) + ตู้เสื้อผ้า (ชุด+ทรงผม เปลี่ยนตามบท) — ผู้ใช้สั่ง: หล่อ สวย สัดส่วนดี มีจุดขาย วาบหวิวระดับอนิเมะทีวี หลายชุดหลายทรงผม
 // สัตว์อ้างอิงกายวิภาคสัตว์จริง (ผู้ใช้สั่ง) · แก้ทับได้ที่ settings hytags
 const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 12 ตอน (ผู้ใช้อนุมัติ 14 พ.ย.) · ชุด = [ชื่อ, แท็กชุด+ทรงผม+ลุค+เครื่องประดับ (สี/ลายตายตัว), คำบรรยาย]
-  'โทวะ': { id: '1boy, adult, young man, handsome, bishounen, (jet black hair:1.3), dark grey eyes, sharp eyes, mole under eye, tall, slim, broad shoulders', neg: 'green hair, blue hair, brown hair, purple hair, grey hair, blonde hair, fat, old man',
+  'โทวะ': { id: '1boy, adult, young man, handsome, bishounen, (black hair:1.2), short hair, grey eyes, mole under eye, tall male, slim, broad shoulders', neg: 'green hair, blue hair, brown hair, purple hair, grey hair, blonde hair, fat, old man',
     of: { work: ['เสมียนคลัง (ประจำตัว)', 'messy hair, ahoge, round eyewear, thin glasses, white collared shirt, sleeves rolled up, loose dark necktie, grey sweater vest, black slacks, brown loafers, cute', 'archive clerk: grey knit vest, loose tie, round glasses'],
       casual: ['ลำลอง', 'messy hair, round eyewear, navy cardigan, white t-shirt, beige wide pants, white sneakers', 'navy cardigan, white tee, beige pants'],
       disguise: ['ปลอมตัวพ่อค้า (ตอน 3)', 'messy hair under black flat cap, round eyewear, brown work vest, rolled shirt sleeves, merchant apron with pockets, cargo pants, boots', 'black-market merchant disguise with flat cap'],
-      winter: ['หน้าหนาว', 'messy hair, round eyewear, long charcoal wool coat, red knitted scarf, grey turtleneck, black slacks, holding canned coffee', 'long charcoal coat, red scarf'],
-      demon: ['ร่างอสูรตื่น (ตอน 12)', 'hair swept back, no eyewear, glowing red eyes, glowing red sigils on skin, long torn black coat, black shirt, dark aura, cool, menacing', 'awakened mask-demon: torn black coat, glowing red sigils'],
+      winter: ['หน้าหนาว', 'messy hair, round eyewear, long charcoal wool coat, red knitted scarf, grey turtleneck, black slacks, black shoes, holding canned coffee', 'long charcoal coat, red scarf'],
+      demon: ['ร่างอสูรตื่น (ตอน 12)', 'hair swept back, no eyewear, glowing red eyes, glowing red sigils on skin, long torn black coat, black shirt, black pants, black boots, dark aura, cool, menacing', 'awakened mask-demon: torn black coat, glowing red sigils'],
       home: ['ชุดนอน', 'very messy hair, bedhead, no eyewear, oversized grey t-shirt, grey sweatpants, slippers, sleepy', 'baggy grey tee and sweatpants, bedhead'] }, def: 'work' },
-  'ริน': { id: '1girl, adult, young woman, beautiful, (vivid bright red hair:1.3), long hair, amber eyes, sharp eyes, slender, curvy, slim waist, long legs', neg: 'black hair, brown hair, pink hair, orange hair, blonde hair, short hair',
+  'ริน': { id: '1girl, adult, young woman, beautiful, (red hair:1.2), long hair, amber eyes, sharp eyes, slender, curvy, slim waist, long legs', neg: 'black hair, brown hair, pink hair, orange hair, blonde hair, short hair',
     of: { night: ['นักผนึก (ประจำตัว)', 'high ponytail, cropped black hoodie, hood down, midriff, black shorts, black thighhighs, fingerless gloves, red sneakers, talisman pouch on belt, cool', 'night sealer: cropped black hoodie, shorts, thigh-highs'],
-      bakery: ['ร้านขนมปัง', 'braided bun, large round eyewear, cream blouse, white frilled apron, brown long skirt, smile, cute', 'bakery clerk: red braided bun, round glasses, white apron'],
+      bakery: ['ร้านขนมปัง', 'braided bun, large round eyewear, cream blouse, white frilled apron, brown long skirt, brown loafers, smile, cute', 'bakery clerk: red braided bun, round glasses, white apron'],
       battle: ['ต่อสู้เต็มยศ (ตอน 6, 12)', 'high ponytail, red ribbon, black and red sealer combat suit, sleeveless, talisman straps on thighs, armored gloves, black boots, holding glowing talisman, fierce', 'full sealer combat suit black and red, talisman thigh straps'],
       disguise: ['ปลอมตัวภรรยาพ่อค้า (ตอน 3)', 'low side bun, hair ornament, red and white market kimono, apron sash, wooden sandals, shy smile', 'merchant-wife disguise: red-white kimono'],
       casual: ['ลำลอง', 'long hair down, hair over shoulder, off-shoulder white sweater, bare shoulders, denim skirt, ankle boots', 'off-shoulder white sweater, denim skirt'],
       festival: ['ยูกาตะเทศกาล', 'hair up, flower hair ornament, red yukata with white goldfish pattern, yellow obi, holding paper fan, wooden sandals', 'red goldfish yukata, flower in hair'],
       sleep: ['ชุดนอน', 'side braid, oversized white t-shirt, short shorts, barefoot, sleepy', 'oversized sleep tee and shorts'] }, def: 'night' },
-  'มิโอะ': { id: '1girl, adult, young woman, beautiful, (jet black hair:1.4), purple eyes, half-closed eyes, long eyelashes, curvy, slim waist', neg: 'white hair, grey hair, silver hair, brown hair, blue hair, red hair, school uniform, serafuku, pleated skirt, sweater vest, necktie',
-    of: { office: ['ออฟฟิศ (ประจำตัว)', 'short bob, blunt bangs, small white hair clip, fitted white blouse, black collar, long sleeves, black pencil skirt, black pantyhose, black heels', 'office: white blouse, black pencil skirt, rabbit clip'],
+  'มิโอะ': { id: '1girl, adult, young woman, beautiful, (black hair:1.3), short hair, purple eyes, half-closed eyes, long eyelashes, curvy, slim waist', neg: 'white hair, grey hair, silver hair, brown hair, blue hair, red hair, school uniform, serafuku, pleated skirt, sweater vest, necktie',
+    of: { office: ['ออฟฟิศ (ประจำตัว)', 'bob cut, blunt bangs, hairclip, white blouse, long sleeves, black pencil skirt, black pantyhose, black heels', 'office: white blouse, black pencil skirt, black tights, hair clip'],
       inspector: ['สารวัตรอาคม (ตอน 4)', 'bob cut, hair pinned to one side, silver hairpin, black military uniform jacket with gold buttons, red armband, white gloves, black pencil skirt, knee boots, serious, cool', 'inspector uniform: black jacket, red armband'],
-      battle: ['ต่อสู้สารวัตร (ตอน 4, 9)', 'bob cut, hair pinned, long black inspector coat flowing, red armband, white gloves, holding ink baton with glowing talisman, knee boots, fierce', 'inspector battle coat with ink baton'],
-      holiday: ['ลำลอง (ซื้อตุ๊กตา)', 'short bob, blunt bangs, small white hair clip, pastel pink knit sweater, white flared skirt, white socks, mary janes, holding stuffed bunny, kawaii', 'pink knit sweater, white skirt, toy bunny'],
-      winter: ['หน้าหนาว', 'short bob, white earmuffs, cream duffle coat, pink scarf, black tights, brown boots, cute', 'cream duffle coat, earmuffs, pink scarf'],
-      sleep: ['ชุดนอนกระต่าย', 'short bob, messy hair, white rabbit print pajamas, rabbit ears hood, hugging pillow, sleepy', 'rabbit pajamas with bunny-ear hood'] }, def: 'office' },
-  'หัวหน้าซาเอกิ': { id: '1girl, mature female, beautiful, tall, (jet black hair:1.3), streaked hair, (one silver streak:1.2), red eyes, sharp eyes, red lips, curvy', neg: 'red streak, pink hair, brown hair, purple hair',
+      battle: ['ต่อสู้สารวัตร (ตอน 4, 9)', 'bob cut, hair pinned, long black inspector coat flowing, red armband, white gloves, black pencil skirt, holding ink baton with glowing talisman, knee boots, fierce', 'inspector battle coat with ink baton'],
+      holiday: ['ลำลอง (ซื้อตุ๊กตา)', 'bob cut, blunt bangs, hairclip, pastel pink knit sweater, white flared skirt, white socks, mary janes, holding stuffed bunny, kawaii', 'pink knit sweater, white skirt, toy bunny'],
+      winter: ['หน้าหนาว', 'short bob, white earmuffs, cream duffle coat, pink scarf, black skirt, black tights, brown boots, cute', 'cream duffle coat, earmuffs, pink scarf'],
+      sleep: ['ชุดนอนกระต่าย', 'short bob, messy hair, white rabbit print pajamas, rabbit ears hood, slippers, hugging pillow, sleepy', 'rabbit pajamas with bunny-ear hood'] }, def: 'office' },
+  'หัวหน้าซาเอกิ': { id: '1girl, mature female, beautiful, tall, (black hair:1.2), short hair, streaked hair, (single silver streak in bangs:1.1), red eyes, sharp eyes, red lips, curvy', neg: 'red streak, pink hair, brown hair, purple hair',
     of: { suit: ['สูทดำ (ประจำตัว)', 'short bob, drop earrings, fitted black pantsuit, black jacket, white high collar blouse, black heels', 'black pantsuit'],
-      casual: ['นอกเวลางาน', 'short bob, sunglasses on head, wine red turtleneck sweater, long beige coat, black pants', 'wine turtleneck, beige long coat'],
-      battle: ['ต่อสู้ปกป้องโทวะ (ตอน 10)', 'short bob, long black tactical coat lined with talismans, black gloves, black boots, talisman barrier glowing, fierce', 'talisman-lined black tactical coat'],
+      casual: ['นอกเวลางาน', 'short bob, sunglasses on head, wine red turtleneck sweater, long beige coat, black pants, black heels', 'wine turtleneck, beige long coat'],
+      battle: ['ต่อสู้ปกป้องโทวะ (ตอน 10)', 'short bob, long black tactical coat lined with talismans, black gloves, black pants, black boots, talisman barrier glowing, fierce', 'talisman-lined black tactical coat'],
       dress: ['ชุดราตรีงานพิธี', 'hair swept to one side, elegant black evening dress, long dress, off-shoulder, pearl earrings, silver necklace, high heels, elegant', 'black evening dress, pearls'],
-      winter: ['หน้าหนาว', 'short bob, black coat with white fur collar, black leather gloves, black boots, mature', 'black coat with fur collar'] }, def: 'suit' },
-  'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, (silver grey hair:1.3), red eyes, sharp eyes, long eyelashes, mole under mouth, red lips, curvy', neg: 'blue eyes, brown hair, black hair, white hair, huge breasts',
-    of: { bakery: ['ร้านขนมปัง (ประจำตัว)', 'hair bun, white apron with flour stains, dark blouse, rolled sleeves, holding rolling pin, smirk', 'bakery owner: white apron, rolling pin'],
+      winter: ['หน้าหนาว', 'short bob, black coat with white fur collar, black leather gloves, black pants, black boots, mature', 'black coat with fur collar'] }, def: 'suit' },
+  'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, (grey hair:1.3), red eyes, sharp eyes, long eyelashes, mole under mouth, red lips, curvy', neg: 'blue eyes, brown hair, black hair, white hair, huge breasts',
+    of: { bakery: ['ร้านขนมปัง (ประจำตัว)', 'hair bun, white apron, navy blue blouse, rolled sleeves, long black skirt, brown shoes, holding rolling pin, smirk', 'bakery owner: white apron, rolling pin'],
       casual: ['กิโมโน', 'long hair down, wine purple kimono, light green obi, sandals, elegant', 'purple kimono'],
-      sealer: ['อดีตนักผนึก (ตอน 12)', 'high ponytail, long black battle coat with red trim, talisman belt, paper talismans, holding rolling pin like a weapon, fierce smile', 'black battle coat with red trim and talismans'],
-      winter: ['หน้าหนาว', 'low side bun, long grey knit cardigan, wool scarf, long skirt, holding paper bag of bread', 'knit cardigan and scarf'],
-      sleep: ['ชุดนอนยูกาตะ', 'hair loose, light blue sleeping yukata, relaxed, mature', 'light blue sleeping yukata'] }, def: 'bakery', gx: ['angry, raising rolling pin, anger vein, sharp teeth, distorted face', 'jitome, deadpan, heavy eyelids, tiny pupils, small flat mouth, hand on hip, elongated face', 'laughing, crescent eyes, huge open mouth, teeth, tears of laughter, distorted face', 'smug, half-closed eyes, tiny smirk, sweatdrop, flour cloud'] },
-  'ไค': { id: '1boy, adult, young man, handsome, (bright golden blonde hair:1.3), golden eyes, fang, scar on eyebrow, athletic', neg: 'brown hair, black hair, orange hair',
-    of: { courier: ['คนส่งของ (ประจำตัว)', 'short hair, spiky hair, open yellow and black courier jacket, black t-shirt, cargo pants, large backpack, grin', 'courier jacket, big backpack'],
-      night: ['ขนของกลางคืน (ตอน 3, 5)', 'spiky hair, black bomber jacket, face mask pulled down, cargo pants, fingerless gloves, small lantern on belt', 'black bomber jacket, mask pulled down'],
-      demon: ['ร่างอสูรคลั่ง (ตอน 9)', 'spiky hair, glowing golden eyes, black horns, cracked dark skin on one arm, torn courier jacket, dark aura, wild', 'half-demon: black horns, cracked dark arm'],
+      sealer: ['อดีตนักผนึก (ตอน 12)', 'high ponytail, long black battle coat with red trim, talisman belt, paper talismans, black pants, black boots, holding rolling pin like a weapon, fierce smile', 'black battle coat with red trim and talismans'],
+      winter: ['หน้าหนาว', 'low side bun, long grey knit cardigan, wool scarf, long skirt, brown boots, holding paper bag of bread', 'knit cardigan and scarf'],
+      sleep: ['ชุดนอนยูกาตะ', 'hair loose, light blue sleeping yukata, barefoot, relaxed, mature', 'light blue sleeping yukata'] }, def: 'bakery', gx: ['angry, raising rolling pin, anger vein, sharp teeth, distorted face', 'jitome, deadpan, heavy eyelids, tiny pupils, small flat mouth, hand on hip, elongated face', 'laughing, crescent eyes, huge open mouth, teeth, tears of laughter, distorted face', 'smug, half-closed eyes, tiny smirk, sweatdrop, flour cloud'] },
+  'ไค': { id: '1boy, adult, young man, handsome, (blonde hair:1.3), yellow eyes, fang, scar on eyebrow, athletic', neg: 'brown hair, black hair, orange hair',
+    of: { courier: ['คนส่งของ (ประจำตัว)', 'short hair, spiky hair, open yellow and black courier jacket, black t-shirt, grey cargo pants, black sneakers, large backpack, grin', 'courier jacket, big backpack'],
+      night: ['ขนของกลางคืน (ตอน 3, 5)', 'spiky hair, black bomber jacket, face mask pulled down, cargo pants, black boots, fingerless gloves, small lantern on belt', 'black bomber jacket, mask pulled down'],
+      demon: ['ร่างอสูรคลั่ง (ตอน 9)', 'spiky hair, glowing golden eyes, black horns, cracked dark skin on one arm, torn courier jacket, torn pants, boots, dark aura, wild', 'half-demon: black horns, cracked dark arm'],
       casual: ['ลำลอง', 'spiky hair, open hawaiian shirt, white tank top, shorts, sandals, grin', 'open hawaiian shirt, shorts'],
-      winter: ['หน้าหนาว', 'spiky hair, oversized grey hoodie, long striped scarf, beanie, hands in pockets', 'hoodie, striped scarf, beanie'] }, def: 'courier', gx: ['red handprint on cheek, slapped, dot eyes, wavy mouth, distorted face', 'heart-shaped eyes, blush, drooling, distorted face', 'crying, waterfall tears, wailing, huge open mouth', 'jitome, deadpan, heavy eyelids, tiny pupils, small flat mouth, elongated face'] },
+      winter: ['หน้าหนาว', 'spiky hair, oversized grey hoodie, long striped scarf, beanie, jeans, sneakers, hands in pockets', 'hoodie, striped scarf, beanie'] }, def: 'courier', gx: ['red handprint on cheek, slapped, dot eyes, wavy mouth, distorted face', 'heart-shaped eyes, blush, drooling, distorted face', 'crying, waterfall tears, wailing, huge open mouth', 'jitome, deadpan, heavy eyelids, tiny pupils, small flat mouth, elongated face'] },
   'โมจิ': { o: 1, id: 'no humans, animal focus, white kitten, fluffy fur, realistic cat anatomy, real cat proportions, chubby round body, short legs, pink nose, whiskers, big blue eyes, long fluffy tail, small glowing paper lantern at tail tip', neg: 'human, humanoid, standing on two legs, anthro, clothes',
     of: { def: ['ปกติ', '', 'a fluffy round white kitten with a tiny glowing lantern on its tail tip'],
       scarf: ['ผ้าพันคอ', 'wearing a small red knitted scarf', 'kitten with a small red scarf'],
@@ -1792,7 +1803,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 19 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 19 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND NOT (kind='lora' AND EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running')) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 19 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -2952,6 +2963,7 @@ def ensure_lora(lid):
 
 _CLIP = None
 _QNEG = []
+_QREF = [0]  # งานภาพอ้างอิงตัวละคร (ภาพสี พื้นเรียบ): ใช้ชุดตรวจของตัวเอง + อ่านข้อห้ามจากงาน (qneg)
 
 
 def clip_pick(paths, pos):
@@ -2992,12 +3004,19 @@ def clip_scores(paths, pos):
             _CLIP = (CLIPModel.from_pretrained(nm).eval(), CLIPProcessor.from_pretrained(nm))
         m, pr = _CLIP
         ims = [Image.open(x).convert("RGB") for x in paths]
-        tx = [str(t)[:300] for t in pos if t] + neg
+        qn = []
+        if _QREF[0]:
+            neg = ["a blurry messy unfinished sketch", "deformed hands with extra fingers", "text, letters and speech bubbles", "two copies of the same person side by side", "a person with two heads"]
+            qn = [str(t)[:200] for t in _QNEG if t]
+        tx = [str(t)[:300] for t in pos if t] + neg + qn
         inp = pr(text=tx, images=ims, return_tensors="pt", padding=True, truncation=True)
         with torch.no_grad():
             lg = m(**inp).logits_per_image
-        npos = len(tx) - len(neg)
-        sc = lg[:, :npos].mean(1) - lg[:, npos:].mean(1) * 0.5
+        npos = len(tx) - len(neg) - len(qn)
+        sc = lg[:, :npos].mean(1) - lg[:, npos:npos + len(neg)].mean(1) * 0.5
+        if qn:
+            q = lg[:, npos + len(neg):]
+            sc = sc - (q - q.mean(0, keepdim=True)).max(1).values - q.mean(1) * 0.25  # ข้อห้ามเฉพาะงาน: แบบที่เข้าข่ายข้อห้ามข้อใดข้อหนึ่งมากกว่าแบบอื่น โดนหักหนัก
         return [float(v) for v in sc], ""
     except Exception as e:
         log("ตรวจด้วย CLIP ไม่ได้: %s" % str(e)[:120])
@@ -3812,6 +3831,7 @@ def gen_s3d(j, port=8188):
 
 def gen_image(j, port=8188):
     opt = j.get("opt") or {}
+    _QREF[0] = 1 if opt.get("qref") else 0
     if opt.get("engine") == "s3d":
         return gen_s3d(j, port)
     if opt.get("engine") == "cn":
@@ -4749,7 +4769,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=19" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=20" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
