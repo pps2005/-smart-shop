@@ -339,7 +339,7 @@ async function charTrain(env, b) {
 }
 // เปลี่ยนสไตล์ทั้งเรื่อง: วาดภาพชุดฝึกของตัวละครที่ LoRA ยังไม่เสร็จใหม่ด้วยสไตล์ปัจจุบัน แล้วส่งเทรนเองเมื่อภาพครบ (สั่งด้วย settings restyle=start)
 // สั่งชุดฝึกจากฐานข้อมูล: settings lset_req = {ชื่อ: {cid, ref, mix:{ชุด:จำนวน}}} → สร้างงานวาด 16 ภาพ/ตัว (โชว์ในคลังภาพอ้างอิง) + lset ให้ส่งเทรนเอง
-function lsetJobs(n, cid, ref, mix, noset) {
+function lsetJobs(n, cid, ref, mix, noset, gags) {
   const C = HY_CHAR[n]; if (!C) return null;
   const ST = 'anime screencap, flat color, clean thin lineart, soft colors, beautiful detailed eyes, perfect anatomy, good proportions, full color';
   const V = ['full body, standing, front view, gentle smile, simple white background', 'full body, standing, three-quarter view, hand on hip, simple white background', 'full body, walking, from side, simple background', 'upper body, front view, looking at viewer, smile, simple background', 'portrait, close-up, face focus, looking at viewer, simple background', 'upper body, three-quarter view, surprised, simple background', 'cowboy shot, sitting on chair, relaxed, indoors', 'upper body, blush, looking away, simple background'];
@@ -354,6 +354,8 @@ function lsetJobs(n, cid, ref, mix, noset) {
       jobs.push([pfx + '·' + o[0] + '·' + String(i).padStart(2, '0'), [C.id, o[1], v, ST].filter(Boolean).join(', '), { engine: 'sdxl', w: up ? 1024 : 832, h: up ? 1024 : 1216, steps: 30, seed: 0, loras: [], neg, ...(ref ? { refimg: ref, rw: 0.45, ipa_end: 0.7 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]);
       caps.push(C.o ? 'no humans, white kitten, glowing lantern on tail tip, ' + PM[i % PM.length] : (/^1boy/.test(C.id) ? '1boy, ' : '1girl, ') + o[1] + ', ' + v);
     } }
+  for (const [gi, g] of (gags ? (C.gx || []).slice(0, gags) : []).entries()) { const o = C.of[C.def];
+    jobs.push(['อ้างอิง·' + n + '·ตลก·' + o[0] + '·' + String(gi).padStart(2, '0'), [C.id, o[1], 'upper body, ' + g + ', colorful speed lines background, anime screencap, flat color, clean thin lineart, full color'].join(', '), { engine: 'sdxl', w: 1024, h: 1024, steps: 30, seed: 0, loras: [], neg, ...(ref ? { refimg: ref, rw: 0.35, ipa_end: 0.6 } : {}), takes: 2, np: C.o ? 0 : 1, qneg: qn }]); }
   return { jobs, set: { cid, caps, pfx } };
 }
 async function lsetReqTick(env, s) {
@@ -361,7 +363,7 @@ async function lsetReqTick(env, s) {
   await env.DB.prepare("DELETE FROM settings WHERE key='lset_req'").run();
   let L = {}; try { L = JSON.parse(s.lset || '{}'); } catch { }
   let t = Date.now();
-  for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
+  for (const [n, r] of Object.entries(R)) { const P = lsetJobs(n, +r.cid, +r.ref || 0, r.mix, r.noset, +r.gags || 0); if (!P) continue; // noset = วาดภาพอ้างอิงให้เลือกก่อน ยังไม่ส่งเทรน
     for (const [pj, pr, op] of P.jobs) await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, pr, t++, JSON.stringify(op)).run();
     if (!r.noset) L[n] = P.set; }
   await setSetting(env, 'lset', JSON.stringify(L));
@@ -699,10 +701,14 @@ const HY_CHAR = {
       casual: ['นอกเวลางาน', 'short bob, sunglasses on head, wine red turtleneck sweater, long beige coat', 'black bob with silver streak, wine turtleneck and long coat'] }, def: 'suit' },
   'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, grey hair, red eyes, sharp eyes, long eyelashes, mole under mouth, red lips, curvy', neg: 'blue eyes, brown hair, black hair, white hair',
     of: { bakery: ['ร้านขนมปัง', 'hair bun, white apron, sleeves rolled up, flour on clothes, holding rolling pin', 'grey hair in a bun, white apron dusted with flour, rolling pin'],
-      casual: ['นอกร้าน', 'long hair down, purple kimono, obi', 'long grey hair down, purple kimono'] }, def: 'bakery' },
+      casual: ['นอกร้าน', 'long hair down, purple kimono, obi', 'long grey hair down, purple kimono'],
+      chic: ['ชุดเท่ดำ', 'high ponytail, black turtleneck, black apron, rolled sleeves, arms crossed', 'grey high ponytail, black turtleneck and black apron'],
+      winter: ['ชุดกันหนาว', 'low side bun, long knit cardigan, scarf, long skirt, holding paper bag of bread', 'grey side bun, knit cardigan and scarf'] }, def: 'bakery', gx: ['comedic angry face, raising rolling pin, anger vein, sharp teeth', 'comedic smug face, smirk, half-closed eyes, hand on hip', 'comedic crying laughing, tears of laughter, open mouth, holding stomach', 'comedic shocked face, white blank eyes, sweatdrop, flour cloud'] },
   'ไค': { id: '1boy, adult, young man, handsome, blonde hair, golden eyes, fang, scar on eyebrow, athletic', neg: '',
     of: { courier: ['คนขนของ', 'short hair, spiky hair, open courier jacket, black t-shirt, cargo pants, large backpack, grin', 'spiky blond hair, open courier jacket, big backpack'],
-      casual: ['ชุดเล่น', 'spiky hair, hawaiian shirt, open shirt, shorts, sandals, grin', 'spiky blond hair, open hawaiian shirt and shorts'] }, def: 'courier' },
+      casual: ['ชุดเล่น', 'spiky hair, hawaiian shirt, open shirt, shorts, sandals, grin', 'spiky blond hair, open hawaiian shirt and shorts'],
+      winter: ['ชุดกันหนาว', 'spiky hair, oversized hoodie, long scarf, beanie, hands in pockets', 'spiky blond hair, hoodie, scarf and beanie'],
+      night: ['ชุดขนของกลางคืน', 'spiky hair, black bomber jacket, face mask pulled down, cargo pants, fingerless gloves, lantern on belt', 'spiky blond hair, black bomber jacket, mask pulled down'] }, def: 'courier', gx: ['comedic face, red handprint on cheek, slapped, teary eyes', 'comedic lovestruck face, heart-shaped eyes, blush, drooling', 'comedic crying, waterfall tears, wailing', 'comedic smug grin, sparkling teeth, thumbs up'] },
   'โมจิ': { o: 1, id: 'no humans, animal focus, white kitten, fluffy fur, realistic cat anatomy, real cat proportions, chubby round body, short legs, pink nose, whiskers, big blue eyes, long fluffy tail, small glowing paper lantern at tail tip', neg: 'human, humanoid, standing on two legs, anthro, clothes',
     of: { def: ['ปกติ', '', 'a fluffy round white kitten with real cat anatomy and a tiny glowing lantern on its tail tip'] }, def: 'def' },
 };
