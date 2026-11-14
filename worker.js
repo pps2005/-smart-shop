@@ -343,11 +343,12 @@ async function lsetTick(env, s) {
   if (!s.lset) return; let L; try { L = JSON.parse(s.lset); } catch { return; }
   let ch = false;
   for (const [nm, o] of Object.entries(L)) {
-    const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND project LIKE ?").bind('ชุดฝึก·' + nm + '·%').first()).n;
+    const pf = o.pfx || ('ชุดฝึก·' + nm + '·'); // ชุดฝึกที่โชว์ในคลังภาพอ้างอิงด้วย: pfx = 'อ้างอิง·ชื่อ·ปกติ·ฝึก'
+    const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running') AND project LIKE ?").bind(pf + '%').first()).n;
     if (pend) continue;
-    const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project LIKE ? ORDER BY id").bind('ชุดฝึก·' + nm + '·%').all()).results;
+    const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project LIKE ? ORDER BY id").bind(pf + '%').all()).results;
     if (im.length < 10) { if (!pend) { delete L[nm]; ch = true; } continue; }
-    const trig = 'chr' + o.cid + 'x', imgs = im.map(x => { const k = +String(x.project).split('·')[2] || 0; return { id: x.id, cap: trig + ', ' + ((o.caps || [])[k] || '1girl') }; });
+    const trig = 'chr' + o.cid + 'x', imgs = im.map(x => { const k = +((String(x.project).match(/(\d+)$/) || [])[1] || 0); return { id: x.id, cap: trig + ', ' + ((o.caps || [])[k] || '1girl') }; });
     const pj = 'ซีรีส์0·' + nm;
     await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(o.cid), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
     const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: o.cid, trigger: trig, images: imgs, pri: 0, dim: 16 })).run();
