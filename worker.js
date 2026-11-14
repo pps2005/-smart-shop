@@ -4338,11 +4338,19 @@ def ace_setup():
         return ACE
     d = os.path.join(ROOT, "ace")
     py = os.path.join(d, "venv", "bin", "python")
-    if not os.path.exists(py):
+    vd = os.path.join(d, "venv")
+    if not os.path.exists(os.path.join(vd, "bin", "pip")):
         log("กำลังติดตั้ง ACE-Step 1.5 (ครั้งแรกประมาณ 10–15 นาที)")
         if not os.path.isdir(os.path.join(d, "repo")):
             sh("git clone --depth 1 https://github.com/ace-step/ACE-Step-1.5 " + os.path.join(d, "repo"))
-        sh("python3 -m venv --system-site-packages " + os.path.join(d, "venv"))
+        sh("rm -rf " + vd, check=False)
+        sh("python3 -m venv --system-site-packages " + vd, check=False)
+        if not os.path.exists(os.path.join(vd, "bin", "pip")):  # Kaggle ตัด ensurepip → venv ไม่มี pip (รอบก่อนพังตรงนี้)
+            sh("rm -rf " + vd, check=False)
+            sh("python3 -m pip install -q virtualenv", check=False)
+            sh("python3 -m virtualenv --system-site-packages " + vd, check=False)
+        if not os.path.exists(os.path.join(vd, "bin", "pip")):
+            raise RuntimeError("สร้าง venv สำหรับ ACE-Step ไม่ได้")
         sh('"%s" -m pip install -q -e "%s"' % (py, os.path.join(d, "repo")), check=False)
         sh('"%s" -m pip install -q gdown huggingface_hub soundfile' % py, check=False)
     ck = os.path.join(d, "repo", "checkpoints")
