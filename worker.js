@@ -709,14 +709,14 @@ const HY_SDXL_STYLE = 'anime screencap, anime coloring, flat color, clean linear
 // ตัวละคร = ตัวตน (หน้า/ตา/สีผม/สัดส่วน ล็อกตายตัว) + ตู้เสื้อผ้า (ชุด+ทรงผม เปลี่ยนตามบท) — ผู้ใช้สั่ง: หล่อ สวย สัดส่วนดี มีจุดขาย วาบหวิวระดับอนิเมะทีวี หลายชุดหลายทรงผม
 // สัตว์อ้างอิงกายวิภาคสัตว์จริง (ผู้ใช้สั่ง) · แก้ทับได้ที่ settings hytags
 const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 12 ตอน (ผู้ใช้อนุมัติ 14 พ.ย.) · ชุด = [ชื่อ, แท็กชุด+ทรงผม+ลุค+เครื่องประดับ (สี/ลายตายตัว), คำบรรยาย]
-  'โทวะ': { id: '1boy, adult, young man, handsome, bishounen, black hair, dark grey eyes, sharp eyes, mole under eye, tall, slim, broad shoulders', neg: 'green hair, blue hair, brown hair, blonde hair, fat, old man',
+  'โทวะ': { id: '1boy, adult, young man, handsome, bishounen, (jet black hair:1.3), dark grey eyes, sharp eyes, mole under eye, tall, slim, broad shoulders', neg: 'green hair, blue hair, brown hair, purple hair, grey hair, blonde hair, fat, old man',
     of: { work: ['เสมียนคลัง (ประจำตัว)', 'messy hair, ahoge, round eyewear, thin glasses, white collared shirt, sleeves rolled up, loose dark necktie, grey sweater vest, black slacks, brown loafers, cute', 'archive clerk: grey knit vest, loose tie, round glasses'],
       casual: ['ลำลอง', 'messy hair, round eyewear, navy cardigan, white t-shirt, beige wide pants, white sneakers', 'navy cardigan, white tee, beige pants'],
       disguise: ['ปลอมตัวพ่อค้า (ตอน 3)', 'messy hair under black flat cap, round eyewear, brown work vest, rolled shirt sleeves, merchant apron with pockets, cargo pants, boots', 'black-market merchant disguise with flat cap'],
       winter: ['หน้าหนาว', 'messy hair, round eyewear, long charcoal wool coat, red knitted scarf, grey turtleneck, black slacks, holding canned coffee', 'long charcoal coat, red scarf'],
       demon: ['ร่างอสูรตื่น (ตอน 12)', 'hair swept back, no eyewear, glowing red eyes, glowing red sigils on skin, long torn black coat, black shirt, dark aura, cool, menacing', 'awakened mask-demon: torn black coat, glowing red sigils'],
       home: ['ชุดนอน', 'very messy hair, bedhead, no eyewear, oversized grey t-shirt, grey sweatpants, slippers, sleepy', 'baggy grey tee and sweatpants, bedhead'] }, def: 'work' },
-  'ริน': { id: '1girl, adult, young woman, beautiful, red hair, long hair, amber eyes, sharp eyes, slender, curvy, slim waist, long legs', neg: 'black hair, brown hair, blonde hair, short hair',
+  'ริน': { id: '1girl, adult, young woman, beautiful, (vivid bright red hair:1.3), long hair, amber eyes, sharp eyes, slender, curvy, slim waist, long legs', neg: 'black hair, brown hair, pink hair, orange hair, blonde hair, short hair',
     of: { night: ['นักผนึก (ประจำตัว)', 'high ponytail, cropped black hoodie, hood down, midriff, black shorts, black thighhighs, fingerless gloves, red sneakers, talisman pouch on belt, cool', 'night sealer: cropped black hoodie, shorts, thigh-highs'],
       bakery: ['ร้านขนมปัง', 'braided bun, large round eyewear, cream blouse, white frilled apron, brown long skirt, smile, cute', 'bakery clerk: red braided bun, round glasses, white apron'],
       battle: ['ต่อสู้เต็มยศ (ตอน 6, 12)', 'high ponytail, red ribbon, black and red sealer combat suit, sleeveless, talisman straps on thighs, armored gloves, black boots, holding glowing talisman, fierce', 'full sealer combat suit black and red, talisman thigh straps'],
@@ -724,26 +724,26 @@ const HY_CHAR = { // ตู้เสื้อผ้าผูกกับบท 1
       casual: ['ลำลอง', 'long hair down, hair over shoulder, off-shoulder white sweater, bare shoulders, denim skirt, ankle boots', 'off-shoulder white sweater, denim skirt'],
       festival: ['ยูกาตะเทศกาล', 'hair up, flower hair ornament, red yukata with white goldfish pattern, yellow obi, holding paper fan, wooden sandals', 'red goldfish yukata, flower in hair'],
       sleep: ['ชุดนอน', 'side braid, oversized white t-shirt, short shorts, barefoot, sleepy', 'oversized sleep tee and shorts'] }, def: 'night' },
-  'มิโอะ': { id: '1girl, adult, young woman, beautiful, black hair, purple eyes, half-closed eyes, long eyelashes, curvy, slim waist', neg: 'brown hair, blue hair, red hair, school uniform, serafuku, pleated skirt, sweater vest, necktie',
+  'มิโอะ': { id: '1girl, adult, young woman, beautiful, (black hair:1.2), purple eyes, half-closed eyes, long eyelashes, curvy, slim waist', neg: 'brown hair, blue hair, red hair, school uniform, serafuku, pleated skirt, sweater vest, necktie',
     of: { office: ['ออฟฟิศ (ประจำตัว)', 'short bob, blunt bangs, small white hair clip, fitted white blouse, black collar, long sleeves, black pencil skirt, black pantyhose, black heels', 'office: white blouse, black pencil skirt, rabbit clip'],
       inspector: ['สารวัตรอาคม (ตอน 4)', 'bob cut, hair pinned to one side, silver hairpin, black military uniform jacket with gold buttons, red armband, white gloves, black pencil skirt, knee boots, serious, cool', 'inspector uniform: black jacket, red armband'],
       battle: ['ต่อสู้สารวัตร (ตอน 4, 9)', 'bob cut, hair pinned, long black inspector coat flowing, red armband, white gloves, holding ink baton with glowing talisman, knee boots, fierce', 'inspector battle coat with ink baton'],
       holiday: ['ลำลอง (ซื้อตุ๊กตา)', 'short bob, blunt bangs, small white hair clip, pastel pink knit sweater, white flared skirt, white socks, mary janes, holding stuffed bunny, kawaii', 'pink knit sweater, white skirt, toy bunny'],
       winter: ['หน้าหนาว', 'short bob, white earmuffs, cream duffle coat, pink scarf, black tights, brown boots, cute', 'cream duffle coat, earmuffs, pink scarf'],
       sleep: ['ชุดนอนกระต่าย', 'short bob, messy hair, white rabbit print pajamas, rabbit ears hood, hugging pillow, sleepy', 'rabbit pajamas with bunny-ear hood'] }, def: 'office' },
-  'หัวหน้าซาเอกิ': { id: '1girl, mature female, beautiful, tall, black hair, streaked hair, silver streak, red eyes, sharp eyes, red lips, curvy', neg: 'red streak, pink hair',
+  'หัวหน้าซาเอกิ': { id: '1girl, mature female, beautiful, tall, (jet black hair:1.3), streaked hair, (one silver streak:1.2), red eyes, sharp eyes, red lips, curvy', neg: 'red streak, pink hair, brown hair, purple hair',
     of: { suit: ['สูทดำ (ประจำตัว)', 'short bob, drop earrings, fitted black pantsuit, black jacket, white high collar blouse, black heels', 'black pantsuit'],
       casual: ['นอกเวลางาน', 'short bob, sunglasses on head, wine red turtleneck sweater, long beige coat, black pants', 'wine turtleneck, beige long coat'],
       battle: ['ต่อสู้ปกป้องโทวะ (ตอน 10)', 'short bob, long black tactical coat lined with talismans, black gloves, black boots, talisman barrier glowing, fierce', 'talisman-lined black tactical coat'],
       dress: ['ชุดราตรีงานพิธี', 'hair swept to one side, elegant black evening dress, long dress, off-shoulder, pearl earrings, silver necklace, high heels, elegant', 'black evening dress, pearls'],
       winter: ['หน้าหนาว', 'short bob, black coat with white fur collar, black leather gloves, black boots, mature', 'black coat with fur collar'] }, def: 'suit' },
-  'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, grey hair, red eyes, sharp eyes, long eyelashes, mole under mouth, red lips, curvy', neg: 'blue eyes, brown hair, black hair, white hair, huge breasts',
+  'ป้าฮานะ': { id: '1girl, mature female, beautiful, youthful, (silver grey hair:1.3), red eyes, sharp eyes, long eyelashes, mole under mouth, red lips, curvy', neg: 'blue eyes, brown hair, black hair, white hair, huge breasts',
     of: { bakery: ['ร้านขนมปัง (ประจำตัว)', 'hair bun, white apron with flour stains, dark blouse, rolled sleeves, holding rolling pin, smirk', 'bakery owner: white apron, rolling pin'],
       casual: ['กิโมโน', 'long hair down, wine purple kimono, light green obi, sandals, elegant', 'purple kimono'],
       sealer: ['อดีตนักผนึก (ตอน 12)', 'high ponytail, long black battle coat with red trim, talisman belt, paper talismans, holding rolling pin like a weapon, fierce smile', 'black battle coat with red trim and talismans'],
       winter: ['หน้าหนาว', 'low side bun, long grey knit cardigan, wool scarf, long skirt, holding paper bag of bread', 'knit cardigan and scarf'],
       sleep: ['ชุดนอนยูกาตะ', 'hair loose, light blue sleeping yukata, relaxed, mature', 'light blue sleeping yukata'] }, def: 'bakery', gx: ['comedic angry face, raising rolling pin, anger vein, sharp teeth', 'comedic smug face, smirk, half-closed eyes, hand on hip', 'comedic crying laughing, tears of laughter, open mouth', 'comedic shocked face, white blank eyes, sweatdrop, flour cloud'] },
-  'ไค': { id: '1boy, adult, young man, handsome, blonde hair, golden eyes, fang, scar on eyebrow, athletic', neg: '',
+  'ไค': { id: '1boy, adult, young man, handsome, (bright golden blonde hair:1.3), golden eyes, fang, scar on eyebrow, athletic', neg: 'brown hair, black hair, orange hair',
     of: { courier: ['คนส่งของ (ประจำตัว)', 'short hair, spiky hair, open yellow and black courier jacket, black t-shirt, cargo pants, large backpack, grin', 'courier jacket, big backpack'],
       night: ['ขนของกลางคืน (ตอน 3, 5)', 'spiky hair, black bomber jacket, face mask pulled down, cargo pants, fingerless gloves, small lantern on belt', 'black bomber jacket, mask pulled down'],
       demon: ['ร่างอสูรคลั่ง (ตอน 9)', 'spiky hair, glowing golden eyes, black horns, cracked dark skin on one arm, torn courier jacket, dark aura, wild', 'half-demon: black horns, cracked dark arm'],
@@ -1792,7 +1792,7 @@ async function vRoutes(req, env, url, ctx) {
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
       if (+j.opt.refimg) j.opt.ref = (s.self_url || url.origin) + '/vi/' + (+j.opt.refimg) + '?s=' + await vvSig(env, 'i' + (+j.opt.refimg));
-      { const si = +j.opt.styleimg || (j.kind === 'img' && (String(j.project).startsWith('อ้างอิง·') || j.opt.engine === 's3d') ? +s.style_img || 0 : 0); // ลายเส้นกลางของเรื่อง (ผู้ใช้เลือกลายเส้นมิโอะ) ใช้กับทุกภาพตัวละคร/ฉาก
+      { const si = +j.opt.styleimg || (j.kind === 'img' && (String(j.project).startsWith('อ้างอิง·') || j.opt.engine === 's3d') ? +s.style_img || 0 : 0); if (si && !j.opt.sw) j.opt.sw = +s.style_w || 0.6; // 0.8 ดึงโทนพาสเทลจนสีผมเพี้ยน → 0.6 // ลายเส้นกลางของเรื่อง (ผู้ใช้เลือกลายเส้นมิโอะ) ใช้กับทุกภาพตัวละคร/ฉาก
         if (si) j.opt.style_ref = (s.self_url || url.origin) + '/vi/' + si + '?s=' + await vvSig(env, 'i' + si); } // ภาพอ้างอิงที่ผู้ใช้เลือก → ลิงก์มีลายเซ็นให้เครื่องดึง (IP-Adapter)
       if (!hid) await setSetting(env, 'k_seen', String(Date.now()));
       return json({ job: j });
