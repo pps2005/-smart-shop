@@ -469,12 +469,13 @@ async function xlNew(env, story, kind, name, desc) {
 // วาดช่องที่มีตัวละครของตอนนั้นใหม่ทั้งหมด (settings sb_redraw = "เรื่อง|ตอน") — ใช้หลังแก้ตัวสั่งวาดหรือ LoRA เพิ่งเสร็จ · ช่องฉากหลังล้วนไม่แตะ
 async function sbRedrawTick(env, s) {
   if (!s.sb_redraw) return;
-  const [story, epS, mode, scOnly] = String(s.sb_redraw).split('|'); // ตัวที่สาม 'all' = วาดใหม่ทุกช่องรวมฉากหลัง · ตัวที่สี่ = เฉพาะซีนนั้น
+  const [story, epS, mode, scOnly, idxS] = String(s.sb_redraw).split('|'); // ตัวที่สาม 'all' = วาดใหม่ทุกช่องรวมฉากหลัง · ตัวที่สี่ = เฉพาะซีนนั้น · ตัวที่ห้า = เฉพาะช่องลำดับที่ (เช่น 5,8,10) ไว้ทดสอบ
+  const ONLY = new Set(String(idxS || '').split(',').map(Number).filter(Boolean));
   const cl = await env.DB.prepare("DELETE FROM settings WHERE key='sb_redraw' AND value=?").bind(String(s.sb_redraw)).run(); if (!cl.meta || !cl.meta.changes) return; // จองงานแบบอะตอม: กันรอบที่ทำงานซ้อนกันทำซ้ำ
   const sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first(); if (!sr) return;
   const scs = (await env.DB.prepare('SELECT script_id,sc FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +epS).all()).results;
   for (const sc of scs) { if (!sc.script_id || (scOnly && +sc.sc !== +scOnly)) continue;
-    const l = (await env.DB.prepare("SELECT id,kproj FROM shots WHERE script_id=? AND (?='all' OR (chars IS NOT NULL AND chars<>'[]' AND chars<>''))").bind(sc.script_id, mode || '').all()).results; if (!l.length) continue;
+    const l = (await env.DB.prepare("SELECT id,idx,kproj FROM shots WHERE script_id=? AND (?='all' OR (chars IS NOT NULL AND chars<>'[]' AND chars<>''))").bind(sc.script_id, mode || '').all()).results.filter(x => !ONLY.size || ONLY.has(+x.idx)); if (!l.length) continue;
     await env.DB.prepare('DELETE FROM settings WHERE key=?').bind('sbdone:' + sc.script_id).run();
     for (let i = 0; i < l.length; i += 20) await env.DB.batch(l.slice(i, i + 20).flatMap(sh => [env.DB.prepare("DELETE FROM jobs WHERE project=? AND status='queued'").bind(sh.kproj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj)]));
     await animeApi(env, { act: 'kf', script_id: +sc.script_id, ids: l.map(x => x.id) });
