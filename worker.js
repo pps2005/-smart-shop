@@ -1908,7 +1908,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND NOT (kind='lora' AND ((SELECT COUNT(*) FROM vjobs r WHERE r.kind='lora' AND r.status='running') >= 2 OR EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running' AND COALESCE(r.helper,0)=COALESCE(?2,0)))) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 19 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND NOT (kind='lora' AND ((SELECT COUNT(*) FROM vjobs r WHERE r.kind='lora' AND r.status='running') >= 2 OR EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running' AND COALESCE(r.helper,0)=COALESCE(?2,0)))) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 21 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -3568,15 +3568,18 @@ def gen_cn(j, port=8188):
     pos = IMG_POS + style + ", " + (hy.get("all") or "")
     dn, stg = float(hy.get("dn") or 0.82), float(hy.get("cs") or 0.7)
     pick, union = None, True
+    loras = opt.get("loras") or []  # LoRA ตัวละครของช่องนี้ (หน้า/ทรงผม/ชุดตรงตัวละคร)
+    if loras:
+        log("ภาพ %s: ใช้ LoRA ตัวละคร %d ตัว" % (jid, len(loras)))
     for rd in range(2):
         pf = "img%sC%d" % (jid, rd)
         try:
-            outs = comfy_go(wf_sdxl_cn(lay, pos, neg, seed + 501 + rd * 97, dn, stg, pf, 2, union), pf, port)
+            outs = comfy_go(wf_sdxl_cn(lay, pos, neg, seed + 501 + rd * 97, dn, stg, pf, 2, union, loras), pf, port)
         except RuntimeError as e:
             if union and "SetUnionControlNetType" in str(e) or (union and "node" in str(e).lower()):
                 log("ComfyUI รุ่นนี้ไม่มีตัวเลือกชนิด ControlNet ใช้แบบทั่วไปแทน")
                 union = False
-                outs = comfy_go(wf_sdxl_cn(lay, pos, neg, seed + 501 + rd * 97, dn, stg, pf, 2, union), pf, port)
+                outs = comfy_go(wf_sdxl_cn(lay, pos, neg, seed + 501 + rd * 97, dn, stg, pf, 2, union, loras), pf, port)
             else:
                 raise
         tmp += outs
@@ -3587,7 +3590,8 @@ def gen_cn(j, port=8188):
             idok, mg = ident_check(pth, chars)
             ok = not bad and idok
             log("ภาพ %s SDXL %d/%d: คะแนน %.1f · คน %s/%s · ตัวละคร %s %s" % (jid, rd + 1, k + 1, sc, "-" if cnt is None else cnt, "-" if exp is None else exp, "ตรง" if idok else "สลับ", "ผ่าน" if ok else "ไม่ผ่าน"))
-            key = (1 if ok else 0, sc)
+            seen = 1 if (not exp or (cnt or 0) >= 1) else 0  # บทมีคน แต่ตรวจไม่เจอคนในภาพ = เลือกแบบอื่นก่อน
+            key = (1 if ok else 0, seen, sc)
             if pick is None or key > pick[0]:
                 pick = (key, pth)
         if pick[0][0] == 1:
@@ -4874,7 +4878,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=20" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=21" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
