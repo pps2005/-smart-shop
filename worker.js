@@ -440,8 +440,94 @@ function serOutlinePrompt(px, kind, topic) {
 - beats = 3 ข้อ บอกว่า 3 ช่วงของซีนนั้นพูดเรื่องอะไร (ไทย 1 ประโยค) ช่วงละประมาณ 1.5 นาที ต้องมีทั้งเนื้อหา${cook ? 'ขั้นตอน' : 'เรื่องเล่า'}และเรื่องคุยเล่นสลับกัน
 ตอบ JSON เท่านั้น: {"title":"ชื่อตอนภาษาไทย","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","scenes":[{"title":"ชื่อซีน","summary":"สรุปซีน 1 ประโยค","settings":[{"t":"...","f":0,"m":"..."}],"beats":["...","...","..."]}]}`;
 }
+// อนุมัติบท → คิวงานวาดภาพทั้งตอน (ใช้ทั้งปุ่ม "อนุมัติ" และโหมด "บทของฉัน" ที่ไปต่อเองอัตโนมัติ)
+async function presGoRun(env, s, ep) {
+  let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; }
+  const L = Array.isArray(P.list) ? P.list : [], xi = L.findIndex(x => x.k === ep.pk), px = L[xi];
+  if (!px) throw new Error('ไม่พบพรีเซนเตอร์ของคลิปนี้');
+  const l = await env.DB.prepare("SELECT id FROM loras WHERE char_id=? AND status='ready' ORDER BY id DESC LIMIT 1").bind(-(100 + xi)).first();
+  if (!l) throw new Error('LoRA ของ ' + (px.name || 'พรีเซนเตอร์') + ' ยังไม่เสร็จ');
+  if (!px.voice) throw new Error('ยังไม่ได้เลือกเสียงของ ' + (px.name || 'พรีเซนเตอร์'));
+  const trig = 'prs' + px.k + 'x';
+  let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; }
+  const pj = 'พรีเซนเตอร์·ตอน·' + ep.id, SH = ['medium close-up portrait, head and shoulders, facing the camera, talking', 'medium shot from the waist up, facing the camera, gesturing with one hand while talking']; let t = Date.now();
+  await env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj).run();
+  await env.DB.batch(sc.series ? serImgJobs(env, px, sc, l, pj, t, trig) : (sc.settings || []).map((g, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${trig} woman, ${presWho(px, sc.hair)}, ${SH[i % 2]}, friendly natural expression, wearing ${sc.outfit}, ${g}, vertical composition, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(832, 1216, i + 1, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman talking to the camera', 'a woman wearing ' + sc.outfit] })))));
+  await env.DB.prepare("UPDATE pres_eps SET status='imgs', err=NULL WHERE id=?").bind(ep.id).run();
+}
+
+// ===== โหมด "บทของฉัน": ผู้ใช้วางบทเอง → แบ่ง 3 ซีน × 3 ช่วง (ไม่แก้ข้อความ) → AI ออกแบบภาพ + แปลเป็นบทเกาหลี/ซับไทย → ทำคลิปอัตโนมัติ =====
+function ownUnits(t) {
+  let u = String(t).split(/\n+/).map(x => x.trim()).filter(Boolean);
+  if (u.length < 9) u = String(t).split(/(?<=[.!?。…])\s+|\n+/).map(x => x.trim()).filter(Boolean);
+  return u;
+}
+function ownBalance(units, n) { // แบ่งเป็น n กลุ่มต่อเนื่อง ความยาวใกล้เคียงกัน (ทุกกลุ่มมีอย่างน้อย 1 รายการ)
+  const tot = units.reduce((a, x) => a + x.length, 0), out = []; let cur = [], cum = 0;
+  units.forEach((x, i) => {
+    cur.push(x); cum += x.length;
+    const left = units.length - 1 - i, need = n - 1 - out.length;
+    if (need > 0 && (left === need || (cum >= tot * (out.length + 1) / n && left >= need))) { out.push(cur.join('\n')); cur = []; }
+  });
+  if (cur.length) out.push(cur.join('\n'));
+  return out;
+}
+function ownSplit(text) {
+  const t = String(text || '').replace(/\r/g, '').trim(); let parts = null;
+  const mk = [...t.matchAll(/(?:^|\n)[ \t]*[#*\[(]*\s*(?:ซีน|ฉาก|scene)\s*(?:ที่)?\s*([0-9๑-๙])[^\n]*/gi)];
+  if (mk.length === 3) parts = mk.map((m, i) => { const a = m.index + m[0].length, b = i < 2 ? mk[i + 1].index : t.length, ti = m[0].replace(/^[\s#*\[(]*(?:ซีน|ฉาก|scene)\s*(?:ที่)?\s*[0-9๑-๙]\s*[\]):.\-–—]*\s*/i, '').trim(); return { title: ti.slice(0, 80), text: t.slice(a, b).trim() }; });
+  if (!parts) { const sp = t.split(/\n\s*(?:-{3,}|={3,}|\*{3,})\s*\n/).map(x => x.trim()).filter(Boolean); if (sp.length === 3) parts = sp.map(x => ({ title: '', text: x })); }
+  if (!parts) { const un = ownUnits(t); if (un.length < 9) throw new Error('บทสั้นเกินไป ต้องมีอย่างน้อย 9 บรรทัด/ประโยค (3 ซีน × 3 ช่วง)'); parts = ownBalance(un, 3).map(x => ({ title: '', text: x })); }
+  return parts.map(p => { const un = ownUnits(p.text); if (un.length < 3) throw new Error('ซีนหนึ่งสั้นเกินไป (ต้องมีอย่างน้อย 3 บรรทัด/ประโยค)'); const ch = ownBalance(un, 3); if (ch.length < 3) throw new Error('ซีนหนึ่งสั้นเกินไป'); if (ch.some(c => c.length > 3500)) throw new Error('บทยาวเกินไป: แต่ละซีนควรไม่เกินประมาณ 10,000 ตัวอักษร'); return { title: p.title, chunks: ch }; });
+}
+async function serOwn(env, s, px, text, epno) {
+  const sp = ownSplit(text);
+  const prompt = `ผู้ใช้เขียนบทรายการ TikTok แนวตั้งชื่อ "${SHOW_NAME(px)}" 1 ตอน ยาว 3 ซีน ซีนละประมาณ 5 นาที พิธีกรคือพรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} อยู่ในครัว (บุคลิก: ${PRES_TONE[px.tone] || PRES_TONE.bright})
+งานของคุณ: อ่านบทของผู้ใช้ แล้วออกแบบ "ภาพประกอบ" ให้ตรงกับเนื้อหาที่พูดในแต่ละซีนตามลำดับ (ห้ามแก้ ห้ามเพิ่มเนื้อหาของบท)
+${sp.map((S, i) => `--- ซีน ${i + 1}${S.title ? ' (' + S.title + ')' : ''} ---\n${S.chunks.join('\n').slice(0, 3600)}`).join('\n')}
+กติกา:
+- แต่ละซีนมี settings 12 ภาพ (ภาพละประมาณ 25 วินาที) เรียงตามเวลาในซีนและตรงกับสิ่งที่กำลังพูดในบทช่วงนั้น: t = คำบรรยายภาพเป็นภาษาอังกฤษสั้นๆ ไม่เกิน 120 ตัวอักษร, f = 1 ถ้าเป็นภาพโคลสอัพอาหาร/วัตถุดิบ/กระทะ/จานโดยไม่มีคนในภาพ, f = 0 ถ้าเห็นพรีเซนเตอร์ (บอกว่ากำลังทำอะไรในครัวหรือที่โต๊ะ) ผสม f = 1 ประมาณ 4–5 ภาพต่อซีน · m = ท่าทางและการเคลื่อนไหวต่อเนื่องในภาพนั้นเป็นภาษาอังกฤษสั้นๆ ไม่เกิน 100 ตัวอักษร ตรงกับที่พูด (เช่น stirs the pan and glances at the camera, leans toward the camera and lowers her voice) ส่วน f = 1 บอกสิ่งที่เคลื่อนไหวในภาพอาหาร ห้าม m ซ้ำกันติดๆ
+- title = ชื่อซีนไทยสั้นๆ, summary = สรุปซีน 1 ประโยค
+- menu = ชื่อเมนูไทยสั้นๆ ที่ปรากฏในบท (ถ้าไม่มีให้ว่าง), mystery = ชื่อเรื่องปริศนา/เรื่องเล่าสั้นๆ ที่ปรากฏในบท (ถ้าไม่มีให้ว่าง), caption = แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน จากเนื้อหาในบท
+ตอบ JSON เท่านั้น: {"menu":"","mystery":"","caption":"","scenes":[{"title":"","summary":"","settings":[{"t":"...","f":0,"m":"..."}]}]}`;
+  const r = await llmJson(env, s, prompt, 6200);
+  const raw = Array.isArray(r && r.scenes) ? r.scenes : [];
+  const scenes = sp.map((S, i) => { const o = raw[i] || {}; return { title: String(S.title || o.title || ('ซีน ' + (i + 1))).slice(0, 80), summary: String(o.summary || '').slice(0, 200), settings: (Array.isArray(o.settings) ? o.settings : []).map(serSet).filter(g => g.t).slice(0, 14), beats: S.chunks.map(c => c.replace(/\s+/g, ' ').slice(0, 80)), src: S.chunks, lines: [], done: 0 }; });
+  if (scenes.some(S => S.settings.length < 4)) throw new Error('AI ออกแบบภาพไม่ครบ ลองกดใหม่อีกครั้ง');
+  const menu = String((r && r.menu) || '').trim().slice(0, 60), mystery = String((r && r.mystery) || '').trim().slice(0, 80), title = SHOW_NAME(px) + ' EP' + epno + (menu ? ' · ' + menu : '');
+  return { sc: { series: 1, kind: 'show', epno, menu, mystery, title, scenes, outfit: presOutfit(px), hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)], auto: 1, own: 1 }, title, caption: title + '\n' + String((r && r.caption) || '').slice(0, 1800) };
+}
+async function serWriteOwn(env, s, px, sc, si) { // แปลงบทของผู้ใช้ 1 ช่วง → เกาหลี + ซับไทย (ไม่แต่งเพิ่ม)
+  const S = sc.scenes[si], k = S.done || 0, [a, b] = serRange(S.settings.length, k), chunk = S.src[k];
+  const prev = (S.lines || []).slice(-3).map(l => l.ko + ' (' + l.th + ')').join(' / ');
+  const shots = S.settings.slice(a, b + 1).map((g, i) => (a + i) + ': ' + (g.f ? '[โคลสอัพอาหาร ไม่เห็นคน] ' : '[เห็นพรีเซนเตอร์] ') + g.t + (g.m ? ' — กำลัง: ' + g.m : '')).join('\n');
+  const r = await llmJson(env, s, `แปลงบทที่ผู้ใช้เขียนเองให้เป็นบทพูดของคลิปรายการ "${sc.title}" ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} พูดกับกล้องเป็นภาษาเกาหลี (คนดูอ่านซับไทย)
+ซีนที่ ${si + 1}/${sc.scenes.length}: ${S.title} · ช่วงที่ ${k + 1}/${SER_CH}
+บุคลิกพรีเซนเตอร์ (ซับไทยพูดตามบุคลิกนี้): ${PRES_TONE[px.tone] || PRES_TONE.bright}
+${prev ? 'ประโยคท้ายของช่วงก่อนหน้า (ให้ต่อเนื่อง ห้ามซ้ำ): ' + prev : ''}
+บทต้นฉบับของผู้ใช้ (ใช้ตามนี้ทุกประโยค ตามลำดับ):
+"""
+${chunk}
+"""
+ภาพที่แสดงในช่วงนี้ (img = เลขภาพ):
+${shots}
+กติกา:
+- ใช้เนื้อหาตามบทต้นฉบับให้ครบ ห้ามเพิ่มเรื่อง/ข้อเท็จจริง/ตัวเลขที่ผู้ใช้ไม่ได้เขียน ห้ามตัดสาระทิ้ง ห้ามสลับลำดับ
+- ถ้าต้นฉบับเป็นภาษาไทย ให้แปลเป็นเกาหลีภาษาพูดสุภาพเป็นกันเอง (해요체) ถ้าเป็นเกาหลีอยู่แล้วให้ใช้ตามเดิมแล้วแปลซับไทย ถ้ามีสองภาษาคู่กันให้ใช้ตามที่เขียน
+- แบ่งเป็นประโยคสั้นๆ ประโยคละ 1 ความคิด (พูดจบในไม่เกิน ~6 วินาที) ข้ามชื่อซีน/หัวข้อ/คำกำกับในวงเล็บ เช่น (หัวเราะ) (ชิม) ไม่ต้องพูดออกเสียง
+- th = ซับไทยสั้น อ่านทันใน 3 วินาที ผู้พูดเป็นผู้หญิง ใช้ "ฉัน/เรา" ลงท้าย "ค่ะ/นะคะ/นะ" ห้ามใช้ "ผม/ครับ"
+- img = เลขภาพที่แสดงตอนพูดประโยคนั้น เลือกจากรายการด้านบน เรียงจากน้อยไปมาก และใช้ให้ครบทุกภาพ
+ตอบ JSON array เท่านั้น: [{"ko":"...","th":"...","img":${a}}]`, 6000);
+  const arr = Array.isArray(r) ? r : (r && Array.isArray(r.lines) ? r.lines : []);
+  const raw = arr.map(x => ({ ko: String((x && x.ko) || '').trim().slice(0, 160), th: thFem(String((x && x.th) || '').trim().slice(0, 160)), img: Number.isFinite(+(x && x.img)) ? Math.max(a, Math.min(b, Math.round(+x.img))) : a })).filter(x => x.ko && x.th).slice(0, 80);
+  if (raw.length < 3) throw new Error('แปลบทช่วงนี้ไม่สำเร็จ');
+  const spread = new Set(raw.map(x => x.img)).size >= Math.min(2, b - a + 1); let cur = a;
+  raw.forEach((x, i) => { x.img = spread ? Math.max(cur, x.img) : a + Math.floor(i * (b - a + 1) / raw.length); cur = x.img; });
+  S.lines = (S.lines || []).concat(raw); S.done = k + 1;
+}
 async function serWrite(env, s, px, sc, si) { // เขียนบทต่อ 1 ช่วง (~20 ประโยค) ของซีนที่ si
   const S = sc.scenes[si], k = S.done || 0, show = sc.kind === 'show', cook = sc.kind === 'cook' || show, [a, b] = serRange(S.settings.length, k);
+  if (S.src && S.src[k]) return serWriteOwn(env, s, px, sc, si); // บทของผู้ใช้ → แปลอย่างเดียว ไม่แต่งเพิ่ม
   const prev = (S.lines || []).slice(-3).map(l => l.ko + ' (' + l.th + ')').join(' / ');
   const shots = S.settings.slice(a, b + 1).map((g, i) => (a + i) + ': ' + (g.f ? '[โคลสอัพอาหาร ไม่เห็นคน] ' : '[เห็นพรีเซนเตอร์] ') + g.t + (g.m ? ' — กำลัง: ' + g.m : '')).join('\n');
   const last = k === SER_CH - 1;
@@ -479,7 +565,10 @@ async function serStep(env, s, ep, px) { // ทุก 2 นาที: ซีน�
   const fin = sc.scenes.every(S => (S.done || 0) >= SER_CH);
   if (!fin && (sc.fails || 0) >= 6) { await env.DB.prepare("UPDATE pres_eps SET status='failed', script=?, err=? WHERE id=?").bind(JSON.stringify(sc), 'AI เขียนบทไม่สำเร็จ: ' + String((bad && bad.reason && bad.reason.message) || '').slice(0, 160), ep.id).run(); return; }
   await env.DB.prepare('UPDATE pres_eps SET status=?, script=? WHERE id=?').bind(fin ? 'draft' : 'writing', JSON.stringify(sc), ep.id).run();
-  if (fin) await notify(env, '📺 AI เขียนบทซีรีส์ "' + (ep.title || '') + '" ครบ 3 ซีนแล้ว รอคุณอนุมัติ');
+  if (fin && sc.auto) { // โหมดบทของฉัน: ไม่ต้องรออนุมัติ ไปวาดภาพ → ทำเสียง/ซับ/ขยับปาก → รวมคลิปเอง
+    try { await presGoRun(env, s, { ...ep, script: JSON.stringify(sc) }); await notify(env, '📺 แปลบท "' + (ep.title || '') + '" ครบ 3 ซีนแล้ว กำลังวาดภาพและทำคลิปให้เอง'); }
+    catch (e) { await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind(String((e && e.message) || e).slice(0, 200), ep.id).run(); }
+  } else if (fin) await notify(env, '📺 AI เขียนบทซีรีส์ "' + (ep.title || '') + '" ครบ 3 ซีนแล้ว รอคุณอนุมัติ');
 }
 function serImgJobs(env, px, sc, l, pj, t, trig) { // วาดภาพทั้งตอน: ภาพเห็นพรีเซนเตอร์ใช้ LoRA ล็อกหน้า · ภาพโคลสอัพอาหารไม่ใช้ LoRA ไม่มีคน
   const SH = ['medium close-up portrait, head and shoulders, facing the camera, talking', 'medium shot from the waist up, facing the camera, gesturing with one hand while talking'], st = []; let n = 0;
@@ -6121,20 +6210,23 @@ async function castApi(req, env, url, body) {
           await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'writing',?,?,?)").bind(px.k, topic || 'สอนทำอาหาร + เล่าเรื่องปริศนา', o.title, JSON.stringify(o.sc), o.caption.slice(0, 2000), Date.now()).run();
         }
 
+        if (act === 'pres_own') { // บทของผู้ใช้ → 1 ตอนอัตโนมัติ (แบ่งซีน → แปลเกาหลี+ซับไทย → วาดภาพ → เสียง/ขยับปาก → รวมคลิป)
+          const px = L.find(x => x.k === String(b.k || '')); if (!px) return json({ error: 'เลือกพรีเซนเตอร์ก่อน' }, 400);
+          const xi = L.indexOf(px), l = await env.DB.prepare("SELECT id FROM loras WHERE char_id=? AND status='ready' ORDER BY id DESC LIMIT 1").bind(cidOf(xi)).first();
+          if (!l) return json({ error: 'LoRA ของ ' + (px.name || 'พรีเซนเตอร์') + ' ยังไม่เสร็จ — ระบบทำต่ออัตโนมัติไม่ได้' }, 400);
+          if (!px.voice) return json({ error: 'ยังไม่ได้เลือกเสียงของ ' + (px.name || 'พรีเซนเตอร์') }, 400);
+          const text = String(b.text || '').trim().slice(0, 30000); if (text.length < 200) return json({ error: 'บทสั้นเกินไป วางบทให้ครบก่อน' }, 400);
+          const epno = await serNextEp(env, px.k); let o;
+          try { o = await serOwn(env, s, px, text, epno); } catch (e) { return json({ error: String(e.message || e).slice(0, 200) }, 500); }
+          o.sc.motion = [0, 2, 3].includes(+b.motion) ? +b.motion : 2;
+          await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'writing',?,?,?)").bind(px.k, 'บทของผู้ใช้', o.title, JSON.stringify(o.sc), o.caption.slice(0, 2000), Date.now()).run();
+        }
         if (act === 'pres_go' || act === 'pres_del' || act === 'pres_post') {
           const ep = await env.DB.prepare('SELECT * FROM pres_eps WHERE id=?').bind(+b.id).first(); if (!ep) return json({ error: 'ไม่พบคลิปนี้' }, 404);
           const xi = L.findIndex(x => x.k === ep.pk), px = L[xi];
           if (act === 'pres_del') { await env.DB.batch([env.DB.prepare('DELETE FROM pres_eps WHERE id=?').bind(ep.id), env.DB.prepare("DELETE FROM vjobs WHERE (project IN (?,?) OR (project >= ? AND project < ?)) AND status<>'running'").bind('พรีเซนเตอร์·ตอน·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id + '·ซีน', 'พรีเซนเตอร์·คลิป·' + ep.id + '·ซีน\uffff'), env.DB.prepare('DELETE FROM images WHERE project=?').bind('พรีเซนเตอร์·ตอน·' + ep.id)]); }
-          if (act === 'pres_go') { // อนุมัติบท → วาดภาพประกอบด้วย LoRA (ชุด/ทรงผมเดียวทั้งคลิป) → ระบบทำเสียง ขยับปาก ซับไทย รวมคลิปให้เอง (presTick)
-            if (!px) return json({ error: 'ไม่พบพรีเซนเตอร์ของคลิปนี้' }, 400);
-            const l = await env.DB.prepare("SELECT id FROM loras WHERE char_id=? AND status='ready' ORDER BY id DESC LIMIT 1").bind(cidOf(xi)).first();
-            if (!l) return json({ error: 'LoRA ของ ' + (px.name || 'พรีเซนเตอร์') + ' ยังไม่เสร็จ' }, 400);
-            if (!px.voice) return json({ error: 'ยังไม่ได้เลือกเสียงของ ' + (px.name || 'พรีเซนเตอร์') }, 400);
-            let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; }
-            const pj = 'พรีเซนเตอร์·ตอน·' + ep.id, SH = ['medium close-up portrait, head and shoulders, facing the camera, talking', 'medium shot from the waist up, facing the camera, gesturing with one hand while talking']; let t = Date.now();
-            await env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj).run();
-            await env.DB.batch(sc.series ? serImgJobs(env, px, sc, l, pj, t, trigOf(px)) : (sc.settings || []).map((g, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${trigOf(px)} woman, ${presWho(px, sc.hair)}, ${SH[i % 2]}, friendly natural expression, wearing ${sc.outfit}, ${g}, vertical composition, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(832, 1216, i + 1, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman talking to the camera', 'a woman wearing ' + sc.outfit] })))));
-            await env.DB.prepare("UPDATE pres_eps SET status='imgs', err=NULL WHERE id=?").bind(ep.id).run();
+          if (act === 'pres_go') { // อนุมัติบท → วาดภาพประกอบด้วย LoRA → ระบบทำเสียง ขยับปาก ซับไทย รวมคลิปให้เอง (presTick)
+            try { await presGoRun(env, s, ep); } catch (e) { return json({ error: String(e.message || e).slice(0, 200) }, 400); }
           }
           if (act === 'pres_post') { try { const r = await ttPost(env, ep); await env.DB.prepare('UPDATE pres_eps SET posted=? WHERE id=?').bind(r, ep.id).run(); } catch (e) { return json({ error: 'ส่งเข้า TikTok ไม่สำเร็จ: ' + String(e.message || e).slice(0, 200) }, 500); } }
         }
