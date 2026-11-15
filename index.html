@@ -1,4 +1,4 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Xiress Studio</title><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="Xiress Studio">
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Xiress Studio</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-title" content="Xiress Studio">
 <style>
 :root{color-scheme:light;--bg:#faf9fe;--fg:#1c1c24;--card:#fff;--mu:#6b6980;--ac:#7c5cff;--ac2:#ff7aa8;--ok:#1a9d5c;--warn:#c77700;--bad:#d33;--bd:#ddd9ee}
 *{box-sizing:border-box}body{margin:0;padding:14px;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom));background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Noto Sans Thai",sans-serif;max-width:720px;margin:auto}
@@ -25,9 +25,38 @@ input[type=text],input[type=password]{width:100%;padding:11px;border-radius:10px
 .dir{margin:6px 18px;font-size:12.5px;color:#555;line-height:1.55}.dir summary{cursor:pointer;color:#6b5fd0}.dir b{color:#333;font-weight:600}.sbdraft .wp img,.sbdraft #anp .fr img,.sbdraft .sbimg{filter:grayscale(1) contrast(1.05)}.nv{margin:10px 18px;font-size:15px;line-height:1.7;color:#2a2a35;font-style:italic;font-family:Georgia,'Sarabun',serif}.tk{margin:8px 18px 8px 34px;font-size:14.5px;line-height:1.6;color:#4a4a5a;font-style:italic}.tk b{display:block;font-size:11.5px;color:#8a7fc8;font-style:normal}.nr{width:fit-content;max-width:88%;margin:8px 16px;padding:7px 11px;border:1.5px solid #1c1c24;background:#fff8dc;font-size:14px;line-height:1.4;color:#1c1c24}
 .fx1,.fx2{position:absolute;font-weight:800;-webkit-text-stroke:3px #fff;paint-order:stroke fill;pointer-events:none;line-height:1.1}.fx1{top:6%;left:5%;color:#ff4fa3;font-size:17px;transform:rotate(-7deg);max-width:55%}.fx2{top:8%;right:5%;color:#2f8cff;font-size:27px;transform:rotate(9deg)}
 .stp{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--ac);color:#fff;font-size:14px;margin-right:6px}
-a.btn{display:inline-block;text-decoration:none;border:1px solid var(--bd);color:var(--fg);padding:9px 13px;border-radius:10px;margin:3px 4px 3px 0}
+a.btn{display:inline-block;text-decoration:none;border:1px solid var(--bd);color:var(--fg);padding:9px 13px;border-radius:6px;margin:3px 4px 3px 0;background:var(--paper)}
+
+/* ===== ธีมสตูดิโอ (15 พ.ย.): กระดาษเลย์เอาต์แอนิเมชัน · ดินสอสีฟ้าร่าง · ดินสอแดงแก้งาน · หัวกระดาษมีรูหมุดเพกบาร์ ===== */
+:root{--bg:#eef1f5;--paper:#fbfcfe;--fg:#23262d;--card:#fbfcfe;--mu:#687082;--ac:#2f62c9;--ac2:#2f62c9;--red:#d8432f;--ok:#21865a;--warn:#b86e00;--bad:#d8432f;--bd:#d5dbe6;--grid:#e3e8f1}
+body{font-family:"IBM Plex Sans Thai",system-ui,-apple-system,"Noto Sans Thai",sans-serif;background:var(--bg) linear-gradient(var(--grid) 1px,transparent 1px) 0 0/100% 28px;line-height:1.6}
+h1,h2,.stp,button.go,.kd button b{font-family:"Chakra Petch","IBM Plex Sans Thai",system-ui,sans-serif}
+h2{font-size:17px;font-weight:600;letter-spacing:.01em}
+.c{background:var(--paper);border:1px solid var(--bd);border-radius:6px;box-shadow:none;position:relative;padding:16px 15px 15px}
+.c::before{content:'';position:absolute;left:14px;right:14px;top:0;height:2px;background:var(--ac);opacity:.55}
+button{border-radius:6px;border-color:var(--bd);background:var(--paper)}
+button:focus-visible,a.btn:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+button.on{background:var(--ac);border-color:var(--ac)}
+button.go{background:var(--ac);border-radius:6px;letter-spacing:.02em;box-shadow:inset 0 -3px 0 #0003}
+button.go:active{transform:translateY(1px);box-shadow:none}
+input[type=text],input[type=password]{border-radius:6px;background:var(--paper)}
+.drop{border-color:var(--ac);border-radius:8px;background:var(--paper)}
+.bar{border-radius:2px;background:var(--grid)}.bar i{background:var(--ac)}
+.stp{background:transparent;color:var(--ac);border:2px solid var(--ac);line-height:22px;font-weight:700}
+#toast{background:var(--fg);border-radius:6px;border-left:4px solid var(--ac)}
+.wth{border-top-color:var(--ac)}
+/* หัวกระดาษ: รูหมุด 3 รูแบบกระดาษแอนิเมชัน + ช่องลงชื่องานแบบใบคุมงาน */
+.slate{position:relative;background:var(--paper);border:1px solid var(--bd);border-radius:6px;margin:2px 0 14px;padding:30px 16px 12px;overflow:hidden}
+.slate .peg{position:absolute;top:9px;left:50%;transform:translateX(-50%);display:flex;gap:22px;align-items:center}
+.slate .peg i{display:block;width:13px;height:13px;border-radius:50%;background:var(--bg);box-shadow:inset 0 1px 2px #0002}
+.slate .peg i:nth-child(1),.slate .peg i:nth-child(3){width:24px;height:9px;border-radius:5px}
+.slate h1{margin:0;font-size:26px;font-weight:700;letter-spacing:.01em;line-height:1.15}
+.slate .ln{display:grid;grid-template-columns:auto 1fr auto auto;gap:0 10px;align-items:baseline;margin:10px 0 0;padding:9px 0 0;border-top:1px dashed var(--bd);font-size:14px}
+.slate .ln dt{font-size:12px;color:var(--mu)}.slate .ln dd{margin:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slate .ln dd#sl_ep{font-family:"Chakra Petch",sans-serif;color:var(--ac)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style></head><body>
-<h1>🎬 Xiress Studio</h1><div class="mu">เลือกประเภทงาน → ใส่บทและเลือก LoRA → ดูสตอรีบอร์ด 1 ตอนก่อน แล้วค่อยสั่งทำทั้งตอน</div>
+<header class="slate"><div class="peg" aria-hidden="true"><i></i><i></i><i></i></div><h1>Xiress Studio</h1><dl class="ln"><dt>เรื่อง</dt><dd id="sl_st">ยังไม่ได้เลือกเรื่อง</dd><dt>ตอน</dt><dd id="sl_ep">–</dd></dl></header>
 <div id="app"></div><div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -604,7 +633,7 @@ async function pickBest(no){try{await api('pick',{ep:no});ST.best=no;toast('เ�
 async function dl(id,name){try{toast('กำลังโหลดไฟล์…');const r=await fetch(botU('/vid/'+id));if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);}catch(e){window.open(botU('/vid/'+id),'_blank');}}
 function bestEp(){const q=ST.qc;if(!q||!q.eps)return 0;const c=q.eps.filter(E=>E.final&&!E.fixing&&!E.bad);if(!c.length)return 0;c.sort((a,b)=>(b.avg==null?50:b.avg)-(a.avg==null?50:a.avg));return c[0].no;}
 /* ---------- หน้าจอ ---------- */
-function render(){const A=$('#app');
+function render(){const A=$('#app');try{const st=$('#sl_st'),ep=$('#sl_ep');if(st)st.textContent=ST.story||'ยังไม่ได้เลือกเรื่อง';if(ep){const E=(ST.plan&&ST.plan.eps)||[],done=Object.values(ST.fin||{}).filter(Boolean).length;ep.textContent=E.length?done+'/'+E.length:'–';}}catch(e){} /* ใบคุมงาน: ชื่อเรื่อง + ตอนที่เสร็จ */
   /* ช่องกรอกในการ์ด (key ผู้ช่วย ฯลฯ): ระหว่างพิมพ์ ไม่วาดหน้าใหม่ทับ · ค่าที่พิมพ์ค้างไว้คงอยู่หลังวาดใหม่ */
   {const ae=document.activeElement;if(ae&&A.contains(ae)&&ae.tagName==='INPUT'&&ae.closest('[data-hcard]')&&!window._forceRender){clearTimeout(window._rdT);window._rdT=setTimeout(render,4000);return;}window._forceRender=0;
    window._keep=window._keep||{};A.querySelectorAll('[data-hcard] input').forEach(x=>{const k=[...x.attributes].filter(a=>a.name.startsWith('data-')).map(a=>a.name+'='+a.value).join('&');if(k)window._keep[k]=x.value;});}
