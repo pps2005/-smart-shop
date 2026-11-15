@@ -56,6 +56,7 @@ export default {
   },
   async scheduled(event, env0, ctx) {
     const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) }, jobs = [];
+    await presSeed(env).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
     await handleCron(event, env, { waitUntil: p => jobs.push(p) });
     ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare('DELETE FROM rmeter WHERE day < ?').bind(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
   },
@@ -290,6 +291,42 @@ async function audDaily(env) {
   const total = Math.min(8, Math.max(4, +s.aud_daily || 6)), per = {};
   for (let k = 0; k < total; k++) { const R = open[k % open.length]; per[R.key] = (per[R.key] || 0) + 1; }
   for (const [role, n] of Object.entries(per)) await audApi(env, { act: 'gen', role, n });
+}
+// ===== แถบเล่าเรื่อง: พรีเซนเตอร์ภาพเหมือนจริง (RealVisXL + IP-Adapter Face → ชุดฝึก → LoRA บน Kaggle) =====
+// ชุดฝึก 28 ภาพ: มุมกล้อง × สีหน้า × ชุด × ฉาก × แสง (หน้า+ผมคงเดิม ชุดเปลี่ยน → LoRA จำหน้า ไม่จำชุด)
+const PRS_VW = [['close-up portrait, face focus, looking at the camera', 1024, 1024], ['head and shoulders portrait, three-quarter view', 1024, 1024], ['side profile portrait, head and shoulders', 1024, 1024], ['medium shot from the waist up, talking to the camera', 896, 1152], ['medium shot, three-quarter view, looking slightly away from the camera', 896, 1152], ['full body shot, standing, the whole body visible from head to shoes', 832, 1216], ['full body shot, walking toward the camera', 832, 1216]];
+const PRS_EX = ['gentle closed-mouth smile', 'bright happy smile showing teeth', 'calm neutral expression', 'surprised expression with raised eyebrows', 'thoughtful serious expression', 'talking mid-sentence with the mouth slightly open', 'soft playful pout'];
+const PRS_OF = ['a white puff-sleeve blouse and light blue wide-leg jeans', 'a black fitted t-shirt and grey wide-leg jeans', 'a cream cable-knit sweater', 'a navy tailored blazer over a white shirt', 'a beige trench coat over a white top', 'a pastel pink cardigan over a white top', 'an elegant black midi dress', 'a soft grey hoodie', 'a light blue linen shirt', 'a sage green knit vest over a white shirt'];
+const PRS_BG = ['plain light grey studio backdrop', 'cozy cafe interior', 'city street in Seoul in the daytime', 'modern office with glass walls', 'park with trees at golden hour', 'minimal bright living room', 'bookstore aisle'];
+const PRS_LT = ['soft window light', 'soft studio lighting', 'warm golden hour sunlight', 'overcast daylight'];
+const presDsVar = i => ({ v: PRS_VW[i % 7], e: PRS_EX[(i + Math.floor(i / 7)) % 7], o: PRS_OF[i % 10], g: PRS_BG[(i * 3 + 1) % 7], l: PRS_LT[i % 4] });
+const presWho = x => `a beautiful young Korean woman in her early twenties, ${x.hair || 'long straight dark hair'}, ${x.face || 'soft pretty face, natural makeup'}, slender graceful figure`;
+const presOpt = (w, h, sc, extra) => ({ engine: 'sdxl', base: 'real', w, h, steps: 30, seed: 0, loras: [], scene: sc, takes: 2, np: 1, neg: '', qneg: ['two people', 'an anime cartoon drawing', 'a deformed distorted face', 'a blurry low quality photo'], ...extra });
+async function presQueueDs(env, pr, redo) { // วาดชุดฝึกบน Kaggle: RealVisXL + IP-Adapter Plus Face (ล็อกหน้าจากภาพต้นแบบที่ตัดเฉพาะหน้า)
+  const pj = 'พรีเซนเตอร์·ชุดฝึก·' + pr.k;
+  if (redo) await env.DB.batch([env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND status='queued'").bind(pj)]);
+  const have = redo ? [] : (await env.DB.prepare('SELECT scene FROM images WHERE project=?').bind(pj).all()).results.map(r => +r.scene), q = (await env.DB.prepare("SELECT json_extract(opt,'$.scene') sc FROM vjobs WHERE project=? AND status IN ('queued','running')").bind(pj).all()).results.map(r => +r.sc);
+  const st = []; let t = Date.now();
+  for (let i = 0; i < 28; i++) { if (have.includes(i + 1) || q.includes(i + 1)) continue; const d = presDsVar(i);
+    st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${presWho(pr)}, ${d.v[0]}, ${d.e}, wearing ${d.o}, ${d.g}, ${d.l}, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(d.v[1], d.v[2], i + 1, { refimg: pr.face, ipa: 'face', rw: 0.7, ipa_end: 1.0, qc: ['a realistic photo of one young Korean woman with ' + (pr.hair || 'long dark hair'), 'a woman wearing ' + d.o] })))); }
+  if (st.length) await env.DB.batch(st);
+  return st.length;
+}
+// ตั้งพรีเซนเตอร์ 2 คนแรกจากภาพที่ผู้ใช้ส่งมา (ไฟล์ใน repo โฟลเดอร์ pres/) → เก็บเป็นภาพต้นแบบ แล้วเริ่มวาดชุดฝึกเอง · ทำครั้งเดียว (settings pres_seed)
+const PRES_SEED = [{ k: 'a', name: 'ซอ ฮาริน', hair: 'long straight chestnut brown hair with a center part and two small silver hair clips', face: 'soft sweet oval face, gentle almond eyes, light natural makeup, soft pink lips' }, { k: 'b', name: '', hair: 'long straight black hair with loose face-framing strands', face: 'elegant refined face, soft brown eyes, natural makeup, faint freckles, rosy lips' }];
+async function presSeed(env) {
+  const s = await getSettings(env); if (String(s.pres_seed || '').startsWith('done') || (+String(s.pres_seed || '').split(':')[1] || 0) >= 20) return;
+  const get = async f => { for (const base of ['https://xiress-studio.pages.dev/pres/', 'https://raw.githubusercontent.com/pps2005/-smart-shop/main/pres/']) { try { const r = await fetch(base + f); if (r.ok && (r.headers.get('content-type') || '').includes('image')) return bytesToB64(new Uint8Array(await r.arrayBuffer())); } catch (e) { } } return null; };
+  let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; } P.list = Array.isArray(P.list) ? P.list : [];
+  for (const sd of PRES_SEED) { if (P.list.some(x => x.k === sd.k)) continue;
+    const full = await get(sd.k + '_full.jpg'), face = await get(sd.k + '_face.jpg');
+    if (!full || !face) { await setSetting(env, 'pres_seed', 'fail:' + ((+String(s.pres_seed || '').split(':')[1] || 0) + 1)); return; }
+    const ins = async (d, t) => (await env.DB.prepare('INSERT INTO images (job_id,project,scene,prompt,data,starred,created) VALUES (0,?,?,?,?,1,?)').bind('พรีเซนเตอร์·ต้นแบบ·' + sd.k, t, '', d, Date.now()).run()).meta.last_row_id;
+    const x = { ...sd, full: await ins(full, 1), face: await ins(face, 2), picked: [] }; P.list.push(x);
+    await setSetting(env, 'pres', JSON.stringify(P));
+    await presQueueDs(env, x, false);
+    await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('พรีเซนเตอร์ ' + (x.name || x.k) + ': ตั้งภาพต้นแบบแล้ว → ส่งวาดชุดฝึก 28 ภาพ (ภาพเหมือนจริง)', Date.now()).run().catch(() => { }); }
+  await setSetting(env, 'pres_seed', 'done');
 }
 // ---------- ตัวละคร LoRA: เลือกผู้สมัคร → สร้างชุดภาพ 12 ภาพ → ⭐ เลือกภาพ → ฝึก LoRA (ตัวละครที่ series_id=0 ใช้ได้ทุกเรื่อง จับคู่ด้วยชื่อ) ----------
 async function charList(env) {
@@ -1930,7 +1967,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND NOT (kind='lora' AND ((SELECT COUNT(*) FROM vjobs r WHERE r.kind='lora' AND r.status='running') >= 2 OR EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running' AND COALESCE(r.helper,0)=COALESCE(?2,0)))) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 21 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0).first(); // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND (?12=0 OR json_extract(opt,'$.base') IS NOT 'real') AND NOT (kind='lora' AND ((SELECT COUNT(*) FROM vjobs r WHERE r.kind='lora' AND r.status='running') >= 2 OR EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running' AND COALESCE(r.helper,0)=COALESCE(?2,0)))) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'พรีเซนเตอร์·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 21 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0, kv0 < 22 ? 1 : 0).first(); // ภาพเหมือนจริง (opt.base='real' · RealVisXL) ต้องใช้สคริปต์รุ่น 22 // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -2984,6 +3021,10 @@ IMG_MODELS = [
     ("cagliostrolab/animagine-xl-4.0", "animagine-xl-4.0-opt.safetensors"),
     ("cagliostrolab/animagine-xl-4.0", "animagine-xl-4.0.safetensors"),
 ]
+# ภาพเหมือนจริง (แถบเล่าเรื่อง: พรีเซนเตอร์) — RealVisXL V5.0 (openrail++ ใช้หารายได้ได้) · ใช้เมื่องานส่ง opt.base = "real"
+REAL_MODELS = [("SG161222/RealVisXL_V5.0", "RealVisXL_V5.0_fp16.safetensors")]
+REAL_POS = "RAW photo, photorealistic, ultra realistic, natural skin texture, detailed eyes, sharp focus, high detail, "
+REAL_NEG = "anime, cartoon, illustration, drawing, painting, 3d render, cgi, doll, plastic skin, airbrushed, oversaturated, lowres, blurry, jpeg artifacts, bad anatomy, bad hands, extra fingers, missing fingers, deformed, disfigured, mutated, extra limbs, cloned face, two people, multiple views, collage, text, watermark, signature, logo, nsfw, nude, topless, lingerie"
 IMG_POS = "masterpiece, high score, great score, absurdres, "
 IMG_NEG = "crowd, 4girls, 5girls, 6+girls, 4boys, 6+boys, clone, identical faces, multiple views, collage, grid, split screen, comic panels, character sheet, reference sheet, turnaround, lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry"
 IMG_QUANTS = ["Q5_K_S", "Q4_K_S", "Q4_0", "Q8_0"]
@@ -3059,9 +3100,36 @@ def ensure_flux(model_spec="", quant="", schnell=False):
     log("โมเดลภาพ FLUX พร้อม: " + got)
 
 
-def ensure_image(engine="dev", model_spec="", quant=""):
+def ensure_real():
+    if M.get("real"):
+        return
+    log("กำลังโหลดโมเดลภาพเหมือนจริง RealVisXL (ครั้งแรกประมาณ 4–8 นาที)")
+    got = None
+    for repo, f in REAL_MODELS:
+        try:
+            fetch([("checkpoints", repo, f)])
+            got = os.path.basename(f)
+            break
+        except Exception as e:
+            log("โหลด %s ไม่ได้: %s" % (f, str(e)[:200]))
+    if not got:
+        raise RuntimeError("โหลดโมเดลภาพเหมือนจริงไม่สำเร็จ")
+    if "sdxlvae" not in M:
+        try:
+            fetch([("vae", "madebyollin/sdxl-vae-fp16-fix", "sdxl_vae.safetensors", "sdxl_vae_fp16fix.safetensors")])
+            M["sdxlvae"] = "sdxl_vae_fp16fix.safetensors"
+        except Exception as e:
+            log("โหลด VAE แก้ภาพดำไม่ได้: " + str(e)[:160])
+            M["sdxlvae"] = ""
+    M["real"] = got
+    log("โมเดลภาพเหมือนจริงพร้อม: " + got)
+
+
+def ensure_image(engine="dev", model_spec="", quant="", base=""):
     with LOCK:
-        if engine == "sdxl":
+        if engine == "sdxl" and base == "real":
+            ensure_real()
+        elif engine == "sdxl":
             ensure_sdxl(model_spec)
         else:
             ensure_flux(model_spec, quant, engine == "schnell")
@@ -3684,6 +3752,25 @@ IPA_FILES = (("ipadapter", "h94/IP-Adapter", "sdxl_models/ip-adapter-plus_sdxl_v
              ("clip_vision", "h94/IP-Adapter", "models/image_encoder/model.safetensors", "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"))
 
 
+IPA_FACE = ("ipadapter", "h94/IP-Adapter", "sdxl_models/ip-adapter-plus-face_sdxl_vit-h.safetensors", "ip-adapter-plus-face_sdxl_vit-h.safetensors")
+
+
+def ensure_ipa_face():
+    # IP-Adapter Plus Face SDXL (h94, Apache-2.0 · ไม่ใช้ insightface) ล็อกหน้าจากภาพที่ตัดเฉพาะหน้า · ใช้ไม่ได้ = ใช้ตัวปกติแทน
+    if not ensure_ipa():
+        return False
+    if M.get("ipaf") or M.get("noipaf"):
+        return bool(M.get("ipaf"))
+    with LOCK:
+        try:
+            fetch([IPA_FACE])
+            M["ipaf"] = IPA_FACE[3]
+        except Exception as e:
+            M["noipaf"] = 1
+            log("โหลด IP-Adapter หน้าไม่ได้ ใช้ตัวปกติแทน: %s" % str(e)[:160])
+    return bool(M.get("ipaf"))
+
+
 def ensure_ipa():
     # IP-Adapter Plus SDXL (h94, Apache-2.0) + ตัวเข้ารหัสภาพ ViT-H · ใช้ไม่ได้ = ข้าม (วาดแบบไม่มีภาพอ้างอิง)
     if M.get("ipa") or M.get("noipa"):
@@ -3748,11 +3835,11 @@ def get_ref(url, jid, k, crop=None):
         return None
 
 
-def add_ipa(wf, model_ref, refs, final_node, end_at=1.0):
+def add_ipa(wf, model_ref, refs, final_node, end_at=1.0, ipa_file=None):
     # refs = [(ชื่อไฟล์ภาพอ้างอิง, ชื่อไฟล์หน้ากากหรือ None, น้ำหนัก)] → ต่อโมเดลผ่าน IPAdapterAdvanced ทีละตัว
     if not refs:
         return wf
-    wf["40"] = {"class_type": "IPAdapterModelLoader", "inputs": {"ipadapter_file": M["ipa"]}}
+    wf["40"] = {"class_type": "IPAdapterModelLoader", "inputs": {"ipadapter_file": ipa_file or M["ipa"]}}
     wf["41"] = {"class_type": "CLIPVisionLoader", "inputs": {"clip_name": M["clipv"]}}
     pm = model_ref
     for i, r in enumerate(refs):
@@ -3970,7 +4057,8 @@ def gen_image(j, port=8188):
     if opt.get("engine") == "hybrid":
         return gen_hybrid(j, port)
     engine = opt.get("engine") if opt.get("engine") in ("sdxl", "schnell") else "dev"
-    ensure_image(engine, opt.get("model") or "", opt.get("quant") or "")
+    real = engine == "sdxl" and opt.get("base") == "real"
+    ensure_image(engine, opt.get("model") or "", opt.get("quant") or "", "real" if real else "")
     q = 8 if engine == "sdxl" else 16
     W = max(512, min(1536, int(opt.get("w") or 1024))) // q * q
     H = max(512, min(1536, int(opt.get("h") or 1024))) // q * q
@@ -3985,11 +4073,11 @@ def gen_image(j, port=8188):
     jid = "i%s" % j["id"]
     if engine == "sdxl":
         wf = {
-            "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": M["sdxl"]}},
-            "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_POS + (j.get("prompt") or "")}},
-            "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": IMG_NEG}},
+            "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": M["real"] if real else M["sdxl"]}},
+            "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": (REAL_POS if real else IMG_POS) + (j.get("prompt") or "")}},
+            "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": REAL_NEG if real else IMG_NEG}},
             "4": {"class_type": "EmptyLatentImage", "inputs": {"width": W, "height": H, "batch_size": takes}},
-            "5": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed, "steps": steps, "cfg": 6.0, "sampler_name": "euler_ancestral", "scheduler": "normal", "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0], "denoise": 1.0}},
+            "5": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "seed": seed, "steps": steps, "cfg": 5.0 if real else 6.0, "sampler_name": "dpmpp_2m_sde" if real else "euler_ancestral", "scheduler": "karras" if real else "normal", "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0], "denoise": 1.0}},
             "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
             "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "img%s" % jid}},
         }
@@ -4013,9 +4101,9 @@ def gen_image(j, port=8188):
             if simg:
                 rl.append((simg, None, float(opt.get("sw") or 0.8), "style transfer"))
             if rl:
-                add_ipa(wf, pm, rl, "5", float(opt.get("ipa_end") or 1.0))  # ipa_end < 1 = ล็อกหน้า/โครงช่วงต้น ปล่อยลายเส้น/สีช่วงท้าย (กันสไตล์ภาพต้นแบบหลุดมา เช่น พื้นหลังสีรุ้ง ภาพซ้อนสองคน)
+                add_ipa(wf, pm, rl, "5", float(opt.get("ipa_end") or 1.0), M["ipaf"] if opt.get("ipa") == "face" and ensure_ipa_face() else None)  # ipa_end < 1 = ล็อกหน้า/โครงช่วงต้น ปล่อยลายเส้น/สีช่วงท้าย (กันสไตล์ภาพต้นแบบหลุดมา เช่น พื้นหลังสีรุ้ง ภาพซ้อนสองคน)
         if opt.get("neg"):
-            wf["3"]["inputs"]["text"] = IMG_NEG + ", " + str(opt["neg"])
+            wf["3"]["inputs"]["text"] = (REAL_NEG if real else IMG_NEG) + ", " + str(opt["neg"])
     else:
         wf = {
             "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": M["flux_s" if engine == "schnell" else "flux"]}},
@@ -4620,7 +4708,8 @@ def train_lora(job, port):
     if len(imgs) < 8:
         raise RuntimeError("ภาพสำหรับเทรนน้อยกว่า 8 ภาพ")
     prog(job["id"], 0, 0, "กำลังเตรียมโมเดลและตัวเทรน (ครั้งแรกอาจนาน 5–10 นาที)")
-    ensure_image("sdxl", "", "")
+    real = opt.get("base") == "real"  # LoRA พรีเซนเตอร์: เทรนบนฐานภาพเหมือนจริง (ต้องใช้กับฐานเดียวกันตอนวาด)
+    ensure_image("sdxl", "", "", "real" if real else "")
     ensure_kohya()
     trig = opt.get("trigger") or "chr"
     d = os.path.join(ROOT, "lora%s" % job["id"])
@@ -4641,18 +4730,21 @@ def train_lora(job, port):
                 comfy("/free", {"unload_models": True, "free_memory": True}, port=port)
             except Exception:
                 pass
-        steps = max(1200, min(2000, len(imgs) * 100))  # ชุดแรกเทรน 960 สเต็ปแล้วแทบไม่มีผลกับภาพ → เพิ่มสเต็ป + แรงขึ้น
-        ldim = max(2, min(32, int(opt.get("dim") or 8)))  # ตัวละคร 8 · ศัตรู/สถานที่/สไตล์ 4 (ไฟล์เล็กลงครึ่งหนึ่ง)
-        ckpt = os.path.join(COMFY, "models", "checkpoints", M["sdxl"])
+        steps = max(1200, min(1800 if real else 2000, len(imgs) * 100))  # ภาพจริง 896px ช้ากว่า → สูงสุด 1800 (ให้จบก่อนระบบดึงงานคืนที่ 150 นาที)  # ชุดแรกเทรน 960 สเต็ปแล้วแทบไม่มีผลกับภาพ → เพิ่มสเต็ป + แรงขึ้น
+        ldim = max(2, min(32, int(opt.get("dim") or 8)))
+        lalpha = max(1, min(ldim, int(opt.get("alpha") or ldim)))
+        res = max(512, min(1024, int(opt.get("res") or 768))) // 64 * 64
+        lr = float(opt.get("lr") or 2e-4)  # ตัวละคร 8 · ศัตรู/สถานที่/สไตล์ 4 (ไฟล์เล็กลงครึ่งหนึ่ง)
+        ckpt = os.path.join(COMFY, "models", "checkpoints", M["real"] if real else M["sdxl"])
         vae = os.path.join(COMFY, "models", "vae", M["sdxlvae"]) if M.get("sdxlvae") else ""
         cmd = ('CUDA_VISIBLE_DEVICES=%d %s "%s/sdxl_train_network.py" --pretrained_model_name_or_path "%s" %s'
                ' --train_data_dir "%s" --output_dir "%s" --output_name lora --caption_extension .txt'
                ' --network_module networks.lora --network_dim %d --network_alpha %d --network_train_unet_only'
-               ' --resolution 768,768 --enable_bucket --train_batch_size 1 --max_train_steps %d'
-               ' --learning_rate 2e-4 --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
+               ' --resolution %d,%d --enable_bucket --train_batch_size 1 --max_train_steps %d'
+               ' --learning_rate %g --lr_scheduler cosine --lr_warmup_steps 50 --optimizer_type AdamW8bit'
                ' --mixed_precision fp16 --save_precision fp16 --gradient_checkpointing --cache_latents --sdpa --no_half_vae --seed 1'
                ' --shuffle_caption --keep_tokens 1 --min_snr_gamma 5 --noise_offset 0.05 --max_grad_norm 1.0'
-               % (max(0, (port or 8188) - 8188), M.get("kpy") or ('"%s/venv/bin/python"' % KV), KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, ldim, ldim, steps))
+               % (max(0, (port or 8188) - 8188), M.get("kpy") or ('"%s/venv/bin/python"' % KV), KV, ckpt, ('--vae "%s"' % vae) if vae else "", os.path.join(d, "data"), out, ldim, lalpha, res, res, steps, lr))
         log("เริ่มเทรน LoRA %s (%d ภาพ · %d สเต็ป)" % (trig, len(imgs), steps))
         t0 = time.time()
         prog(job["id"], 0, steps, "เริ่มเทรน")
@@ -4900,7 +4992,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=21" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=22" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
@@ -5355,13 +5447,39 @@ async function castApi(req, env, url, body) {
   if (p === '/api/vcastnow') return json(await castBatch(env, +body.n || 0, true, ['char', 'pet', 'place', 'prop'].includes(body.cat) ? body.cat : ''));
     if (p === '/api/vcastep') { // โครงเรื่อง (.docx ที่อ่านแล้ว) → ใส่บทอัตโนมัติ → ตรวจบทก่อนสร้างทีละตอน
       const b = body || {}, act = b.act || 'get', story = String(b.story || '').trim().slice(0, 60);
-      if (act === 'pres' || act === 'pres_set' || act === 'pres_more') { // แถบเล่าเรื่อง: พรีเซนเตอร์เสมือน (ช่องแยกจากอนิเมะ)
-        const cur = (() => { try { return JSON.parse((s0p && s0p.value) || '{}'); } catch { return {}; } }), s0p = await env.DB.prepare("SELECT value FROM settings WHERE key='pres'").first().catch(() => null); let P = cur();
-        if (act === 'pres_set') { if (b.main !== undefined) P.main = +b.main || 0; if (b.name !== undefined) P.name = String(b.name || '').slice(0, 40); await setSetting(env, 'pres', JSON.stringify(P)); }
+      if (act === 'pres' || act === 'pres_set' || act === 'pres_more' || act === 'pres_ds' || act === 'pres_pick' || act === 'pres_train' || act === 'pres_test') { // แถบเล่าเรื่อง: พรีเซนเตอร์เสมือน (ช่องแยกจากอนิเมะ) · หลายคน (P.list) · ภาพเหมือนจริง RealVisXL + LoRA บน Kaggle
+        const s0p = await env.DB.prepare("SELECT value FROM settings WHERE key='pres'").first().catch(() => null); let P = {}; try { P = JSON.parse((s0p && s0p.value) || '{}'); } catch { P = {}; }
+        const L = Array.isArray(P.list) ? P.list : (P.list = []), pi = L.findIndex(x => x.k === String(b.k || '')), pr = pi >= 0 ? L[pi] : null, save = () => setSetting(env, 'pres', JSON.stringify(P));
+        const s = await getSettings(env), PJ = (x, t) => 'พรีเซนเตอร์·' + t + '·' + x.k, cidOf = i => -(100 + i), trigOf = x => 'prs' + x.k + 'x';
+        if (act === 'pres_set') { if (pr) { if (b.name !== undefined) pr.name = String(b.name || '').slice(0, 40); } else { if (b.main !== undefined) P.main = +b.main || 0; if (b.name !== undefined) P.name = String(b.name || '').slice(0, 40); } await save(); }
+        if (act === 'pres_pick' && pr) { const id = +b.id, s1 = new Set(pr.picked || []); s1.has(id) ? s1.delete(id) : s1.add(id); pr.picked = [...s1]; await save(); }
+        if (act === 'pres_ds' && pr) { if (b.redo) { pr.picked = []; await save(); } await presQueueDs(env, pr, !!b.redo); }
+        if (act === 'pres_train' && pr) { // เทรน LoRA ภาพเหมือนจริง (ฐาน RealVisXL) — ใช้ภาพที่ติดดาว
+          const ims = (await env.DB.prepare('SELECT id,scene FROM images WHERE project=? ORDER BY scene').bind(PJ(pr, 'ชุดฝึก')).all()).results, pk = new Set(pr.picked || []), use = ims.filter(x => pk.has(x.id));
+          if (use.length < 12) return json({ error: 'เลือกภาพที่หน้าเหมือนอย่างน้อย 12 ภาพก่อน (ตอนนี้ ' + use.length + ')' }, 400);
+          const cid = cidOf(pi), trig = trigOf(pr), imgs = use.map(x => { const d = presDsVar((+x.scene || 1) - 1); return { id: x.id, cap: `${trig} woman, ${d.v[0]}, ${d.e}, wearing ${d.o}, ${d.g}, ${d.l}` }; }), pj = PJ(pr, 'LoRA');
+          await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(cid), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
+          const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: cid, trigger: trig, images: imgs, pri: 0, dim: 32, alpha: 16, lr: 1e-4, res: 896, base: 'real' })).run();
+          await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(cid, r.meta.last_row_id, Date.now()).run();
+          if (s.lora_go !== '1') await setSetting(env, 'lora_go', '1');
+        }
+        if (act === 'pres_test' && pr) { // ภาพทดสอบ LoRA: ชุด/ฉากที่ไม่เคยอยู่ในชุดฝึก ไม่ใช้ภาพอ้างอิง (ดูว่า LoRA จำหน้าได้เอง)
+          const l = await env.DB.prepare("SELECT id FROM loras WHERE char_id=? AND status='ready' ORDER BY id DESC LIMIT 1").bind(cidOf(pi)).first(); if (!l) return json({ error: 'LoRA ยังไม่เสร็จ' }, 400);
+          const pj = PJ(pr, 'ทดสอบ'), T = [['medium shot from the waist up, talking to the camera, friendly smile', 'a cream blazer and wide trousers', 'bright podcast studio with a microphone', 896, 1152], ['full body shot, standing, the whole body visible from head to shoes', 'a modest navy sportswear set and white sneakers', 'riverside park in the morning', 832, 1216], ['close-up portrait, face focus, warm smile', 'a white turtleneck', 'warm cafe at night with bokeh lights', 1024, 1024], ['medium shot, three-quarter view, laughing', 'an elegant champagne satin evening dress', 'hotel ballroom', 896, 1152], ['medium shot from the waist up, explaining something with one hand raised', 'a soft lavender pajama set', 'cozy bedroom', 896, 1152], ['full body shot, walking', 'an oversized white shirt, denim shorts and a straw hat', 'seaside town street in summer', 832, 1216]];
+          await env.DB.batch([env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND status='queued'").bind(pj)]); let t = Date.now();
+          await env.DB.batch(T.map((x, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${trigOf(pr)} woman, ${presWho(pr)}, ${x[0]}, wearing ${x[1]}, ${x[2]}, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(x[3], x[4], i + 1, { loras: [{ id: l.id, w: 0.9 }], qc: ['a realistic photo of one young Korean woman', 'a woman wearing ' + x[1]] })))));
+        }
         if (act === 'pres_more') { const V = [['long straight black hair with a soft side part', 'ivory silk blouse under a navy tailored blazer', 'modern office lobby with glass walls'], ['long soft brown waves', 'camel wool coat over a cream knit', 'Seoul street in autumn'], ['elegant shoulder-length layered bob', 'crisp white button-up shirt', 'bright minimalist studio with plants'], ['sleek low bun with face-framing strands', 'black tailored blazer', 'warm-lit talk show set'], ['long dark hair with curtain bangs', 'beige knit cardigan over a white tee', 'cozy bookstore cafe'], ['medium-length chestnut hair tucked behind one ear', 'soft grey turtleneck', 'home office with a bookshelf'], ['long ash-brown waves', 'light blue linen shirt', 'Han river park at golden hour'], ['loose low ponytail', 'olive trench coat', 'cafe window on a rainy night']], n = Math.min(8, Math.max(1, +b.n || 4)); let t = Date.now();
           for (let i = 0; i < n; i++) { const v = V[(t + i) % V.length]; await env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng) VALUES (?,?,?,'queued',?,8,'flux')").bind('พรีเซนเตอร์·ร่างหน้า·' + String((t + i) % 1000).padStart(3, '0'), i + 1, `Cinematic still from a Korean drama, photorealistic, an original fictional Korean woman around 28 years old, clearly adult mature features, elegant confident professional presenter, beautiful, defined cheekbones, warm intelligent eyes, natural K-beauty makeup with healthy glowing skin, ${v[0]}, wearing a ${v[1]}, medium close-up speaking to camera with a friendly smile, ${v[2]}, soft diffused natural light, shallow depth of field, creamy bokeh, gentle film color grade, 35mm film look, subtle film grain, high detail, not a celebrity, not a student`, t + i).run(); } } // ไม่ใช้คำบรรยายสัดส่วนหน้าอก: ตัวกรองของ FLUX บน Cloudflare ปฏิเสธว่าเป็นเนื้อหาไม่เหมาะสม
-        const im = (await env.DB.prepare("SELECT id,project FROM images WHERE instr(project,'พรีเซนเตอร์·')=1 ORDER BY id").all()).results, q = (await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE instr(project,'พรีเซนเตอร์·')=1 AND status IN ('queued','running')").first()).n;
-        return json({ ok: true, pres: P, imgs: im, queued: q });
+        const im = (await env.DB.prepare("SELECT id,project FROM images WHERE project>='พรีเซนเตอร์·ร่างหน้า·' AND project<'พรีเซนเตอร์·ร่างหน้า·~' ORDER BY id").all()).results, q = (await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE instr(project,'พรีเซนเตอร์·')=1 AND status IN ('queued','running')").first()).n;
+        const out = [];
+        for (let i = 0; i < L.length; i++) { const x = L[i], pjs = [PJ(x, 'ชุดฝึก'), PJ(x, 'ทดสอบ')];
+          const rows = (await env.DB.prepare('SELECT id,project,scene FROM images WHERE project IN (?,?) ORDER BY scene').bind(...pjs).all()).results, vq = (await env.DB.prepare("SELECT project,status,COUNT(*) n FROM vjobs WHERE project IN (?,?) GROUP BY project,status").bind(...pjs).all()).results;
+          const lo = await env.DB.prepare("SELECT id,vjob,status,error FROM loras WHERE char_id=? AND status<>'old' ORDER BY id DESC LIMIT 1").bind(cidOf(i)).first(); let lp = null;
+          if (lo && lo.status === 'queued') { const vs = await env.DB.prepare('SELECT status FROM vjobs WHERE id=?').bind(lo.vjob).first(); if (vs && vs.status === 'running') { lo.status = 'training'; try { lp = JSON.parse(s['lprog:' + lo.vjob] || 'null'); } catch { lp = null; } } }
+          const cnt = (pj, st) => vq.filter(r => r.project === pj && (!st || r.status === st)).reduce((n, r) => n + r.n, 0);
+          out.push({ k: x.k, name: x.name || '', full: x.full, face: x.face, picked: x.picked || [], ds: rows.filter(r => r.project === pjs[0]).map(r => ({ id: r.id, sc: r.scene })), test: rows.filter(r => r.project === pjs[1]).map(r => ({ id: r.id, sc: r.scene })), dsq: cnt(pjs[0]), dsrun: cnt(pjs[0], 'running'), tq: cnt(pjs[1]), lora: lo ? { id: lo.id, status: lo.status, error: lo.error || '', prog: lp } : null }); }
+        return json({ ok: true, pres: P, imgs: im, queued: q, list: out });
       }
       if (act === 'clog') { const k = 'clog', old = (await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(k).first().catch(() => null)); let L = []; try { L = JSON.parse((old && old.value) || '[]'); } catch { } L.push(new Date().toISOString().slice(11, 19) + ' ' + String(b.m || '').slice(0, 400) + ' | ' + String(b.ua || '').slice(0, 120)); await setSetting(env, k, JSON.stringify(L.slice(-15))); return json({ ok: true }); } // ข้อผิดพลาดจากหน้าเว็บของผู้ใช้ (ไว้ตรวจปัญหาที่จำลองไม่ได้)
       if (!story) return json({ error: 'ไม่มีชื่อเรื่อง' }, 400);
