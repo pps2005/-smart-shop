@@ -142,6 +142,7 @@ async function handleCron(event, env, ctx) {
     ctx.waitUntil(cpuKTick(tagged(env, 'bg:kaggle')).catch(() => { })); // ผู้ช่วย (ครอบครัว) ที่ผูก API ของ Kaggle ไว้: เปิดเครื่องบัญชีเขาเองเมื่อคิวงานเยอะ
     ctx.waitUntil(castBatch(tagged(env, 'bg:cast'), 0, false).catch(() => {}));
     ctx.waitUntil(audDaily(tagged(env, 'bg:aud')).catch(() => {}));
+    ctx.waitUntil(kdPlaceTick(tagged(env, 'bg:kdplace')).catch(() => {}));
 }
 
 // ---------- ซ่อมงานที่พังอัตโนมัติ ----------
@@ -714,7 +715,7 @@ async function loraPri(env, charId) { // 0 = ตัวหลัก (เทรน
 }
 // ตัวเทรน LoRA: อนิเมะ = dim 8 (ตัวละคร) / 4 (อื่นๆ) · คนจริง = dim 16/8 + ฐาน RealVisXL ความละเอียด 896 (ใช้ฐานเดียวกับตอนวาดช็อต) · ไฟล์ ~100 MB/ตัวละคร เก็บใน Supabase ฟรี 1 GB ได้ราว 9 ตัว
 async function lookRealOpt(env, ch) {
-  const real = await env.DB.prepare("SELECT value FROM settings WHERE key='img_look'").first().then(r => !!r && r.value === 'real').catch(() => false), isChar = xlKind(ch) === 'char';
+  const real = isKdStory(ch && ch.story) || await env.DB.prepare("SELECT value FROM settings WHERE key='img_look'").first().then(r => !!r && r.value === 'real').catch(() => false), isChar = xlKind(ch) === 'char';
   return real ? { dim: isChar ? 16 : 8, alpha: isChar ? 8 : 4, lr: 1e-4, res: 896, base: 'real' } : { dim: isChar ? 8 : 4 };
 }
 async function charTrain(env, b) {
@@ -876,6 +877,74 @@ async function placeSetup(env, story) {
       await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, 'no humans, scenery, ' + tags + ', ' + v + ', detailed background, anime screencap, anime coloring, flat color, clean lineart, simple cel shading, bright clean colors', t++, JSON.stringify({ engine: 'sdxl', w: 1344, h: 768, steps: 30, seed: 0, loras: [], scene: i + 1, neg: '1girl, 1boy, people, person, human, crowd, text, letters, signature, monochrome, greyscale, blurry', takes: 2, np: 0, qref: 1, qc: ['a detailed anime background painting of ' + tags.split(', ').slice(1, 6).join(', ') + ' with no people', 'anime scenery, ' + v], qneg: ['a person standing in the picture', 'words and letters written on signs', 'a blurry messy unfinished picture'] })).run(); }
     made.push(name + ':' + Math.max(0, 16 - have)); }
   return made;
+}
+// ===== ฉากซีรี่ย์เกาหลี (คนจริง): สุ่มสร้าง LoRA ฉากเรื่อยๆ เอง (ผู้ใช้สั่ง 16 พ.ย.) =====
+// ภาพถ่ายสมจริง ไม่มีคน 16 มุม → xlTick เทรน LoRA ฉากให้เอง · ตัวละครใช้โหมดภาพ real (act=look)
+const KD_STORY = 'ซีรี่ย์เกาหลี'; // เรื่องที่ชื่อมีคำว่า "เกาหลี" = ลุคคนจริงเสมอ (ไม่ขึ้นกับสวิตช์ลุคทั้งระบบ) · เรื่องอื่น (อนิเมะ) ยังเป็นไปตามสวิตช์เดิม
+const isKdStory = t => String(t || '').indexOf('เกาหลี') >= 0;
+const KD_PLACES = [
+  ['สนามบาสกลางแจ้ง', 'outdoors, public basketball court in Seoul, blue and red painted court, chain-link fence, concrete bleachers, green trees, afternoon sun'],
+  ['ร้านกาแฟมินิมอลฮงแด', 'indoors, minimalist Korean cafe in Hongdae, white walls, wooden tables, large window, hanging plants, pastry display counter'],
+  ['ออฟฟิศสตาร์ทอัพโซล', 'indoors, modern startup open-plan office in Seoul, glass meeting room, rows of white desks, monitors, city skyline window'],
+  ['ห้องเพนต์เฮาส์หรู', 'indoors, luxury penthouse living room, floor-to-ceiling windows, Han River night view, cream sofa, marble floor'],
+  ['ซอยอพาร์ตเมนต์เก่า', 'outdoors, narrow Korean residential alley, brick villa buildings, tangled power lines, small potted plants, evening light'],
+  ['ร้านสะดวกซื้อกลางคืน', 'outdoors, Korean convenience store at night, glowing storefront, plastic table and chairs outside, neon signs, light rain'],
+  ['ร้านปิ้งย่างริมถนน', 'indoors, Korean BBQ restaurant, grill table with smoke, green soju bottles, warm lights, lively crowd blurred in background'],
+  ['ตลาดนัมแดมุน', 'outdoors, busy Korean traditional market, food stalls, hanging lanterns, steam from street food, narrow aisle'],
+  ['ริมแม่น้ำฮัน', 'outdoors, Hangang riverside park at dusk, bicycle path, bridge lights, city skyline, picnic benches'],
+  ['ทางเดินมหาวิทยาลัยฤดูใบไม้ร่วง', 'outdoors, Korean university campus path, ginkgo trees with yellow leaves, brick lecture hall, stone steps'],
+  ['ห้องสมุดมหาวิทยาลัย', 'indoors, grand university library, tall bookshelves, long reading tables with lamps, warm light'],
+  ['หลังคาตึกพระอาทิตย์ตก', 'outdoors, apartment rooftop, water tank, laundry lines, city skyline at golden hour sunset'],
+  ['สถานีรถไฟใต้ดินโซล', 'indoors, Seoul subway platform, screen doors, tiled walls, bright fluorescent lights, route map signs'],
+  ['ห้องนั่งเล่นอพาร์ตเมนต์เล็ก', 'indoors, cozy small Korean studio apartment, low table, floor cushions, single bed, warm lamp, window with curtains'],
+  ['ห้องครัวอพาร์ตเมนต์', 'indoors, Korean apartment kitchen, white cabinets, small dining table, rice cooker, morning sunlight'],
+  ['โรงพยาบาลทางเดิน', 'indoors, modern hospital corridor, clean white floor, waiting chairs, soft cool light'],
+  ['ร้านหนังสือเก่า', 'indoors, old secondhand bookstore, crowded wooden shelves, ladder, dusty window light, reading nook'],
+  ['สวนสนุกตอนค่ำ', 'outdoors, amusement park at night, ferris wheel lit up, colorful lights, cotton candy stall'],
+  ['ชายหาดกังนึง', 'outdoors, Gangneung beach at sunrise, calm sea, wooden pier, empty sand, pastel sky'],
+  ['เกาะเชจูทุ่งส้ม', 'outdoors, Jeju island tangerine orchard, stone wall, volcanic rock, blue sky, country road'],
+  ['หมู่บ้านฮันอก', 'outdoors, Bukchon hanok village, traditional tiled roofs, narrow stone lane, hill view of the city'],
+  ['ห้างสรรพสินค้าหรู', 'indoors, upscale Seoul department store atrium, glossy floors, escalators, boutique windows, bright lights'],
+  ['โรงแรมล็อบบี้หรู', 'indoors, five-star hotel lobby, marble floor, crystal chandelier, reception desk, flower arrangement'],
+  ['ร้านอาหารหรูห้องส่วนตัว', 'indoors, private fine-dining room, round table with white tablecloth, soft pendant lights, traditional screen partition'],
+  ['ที่จอดรถใต้ดิน', 'indoors, underground parking garage, concrete pillars, parked cars, dim fluorescent lights, painted lane numbers'],
+  ['บันไดหน้าบ้านลาดชัน', 'outdoors, steep stairs alley in a hillside neighborhood, graffiti walls, street cats, warm street lamp at dusk'],
+  ['ร้านขายของชำหัวมุมถนน', 'outdoors, small Korean grocery shop at a street corner, crates of fruit, hand-written signs, bicycle parked'],
+  ['สระว่ายน้ำในร่ม', 'indoors, public indoor swimming pool, lane ropes, bright tiled walls, big windows, reflection on water'],
+  ['ฟิตเนสยามเช้า', 'indoors, modern gym, rows of treadmills and weights, mirror wall, morning light through windows'],
+  ['ศาลาริมสวนวัด', 'outdoors, Korean temple garden pavilion, wooden pillars, stone lanterns, autumn maple trees, quiet mist'],
+  ['ร้านอาหารรถเข็นตุ๊กตุ๊กโซล', 'outdoors, pojangmacha street tent at night, orange tent, steaming fish cakes and tteokbokki, plastic stools, string lights'],
+  ['ห้องประชุมบริษัท', 'indoors, corporate meeting room, long glossy table, leather chairs, projector screen, city view windows'],
+  ['สนามหญ้ามหาวิทยาลัย', 'outdoors, university lawn in spring, cherry blossoms, students blurred far away, benches, soft sunlight'],
+  ['ร้านทำผมสไตล์เกาหลี', 'indoors, Korean hair salon, mirror stations, pastel walls, wash basins, plants, soft light'],
+  ['ปั๊มน้ำมันยามดึก', 'outdoors, gas station at midnight, bright canopy lights, empty road, convenience shop glow'],
+  ['ทางเดินโรงเรียนมัธยม', 'indoors, Korean high school hallway, lockers, shoe racks, afternoon light through windows, wooden floor'],
+  ['สนามเด็กเล่นตอนเย็น', 'outdoors, small apartment playground, swings, slide, sandpit, orange evening light, apartment blocks behind'],
+  ['เรือนกระจกคาเฟ่ดอกไม้', 'indoors, greenhouse flower cafe, glass roof, hanging ferns, wrought iron chairs, soft diffused daylight'],
+  ['สะพานข้ามแม่น้ำยามหิมะ', 'outdoors, pedestrian bridge over a river in winter snowfall, street lamps, snow on railings, quiet blue evening'],
+];
+const KD_REAL_PRE = 'RAW photo, cinematic still from a Korean drama, 35mm film, natural color grading, shallow depth of field, realistic, no humans, ';
+async function kdPlaceAdd(env, story, n) {
+  await animeSchema(env); const made = [];
+  const have = new Set((await env.DB.prepare("SELECT name FROM chars WHERE series_id=0 AND kind='place'").all()).results.map(r => r.name));
+  const pool = KD_PLACES.filter(p => !have.has(p[0]));
+  for (let k = 0; k < n && pool.length; k++) {
+    const [name, tags] = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    const r = await env.DB.prepare("INSERT INTO chars (series_id,name,desc,created,kind,story) VALUES (0,?,?,?,'place',?)").bind(name, tags, Date.now(), KD_STORY).run();
+    const c = { id: r.meta.last_row_id, name, desc: tags, kind: 'place', series_id: 0, story: KD_STORY }, pj = charProj(c); let t = Date.now();
+    for (let i = 0; i < 16; i++) { const v = xlVar(c, i);
+      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, KD_REAL_PRE + tags + ', ' + v, t++, JSON.stringify({ engine: 'sdxl', base: 'real', w: 1344, h: 768, steps: 30, seed: 0, loras: [], scene: i + 1, neg: 'people, person, human, crowd, face, text, letters, watermark, signature, anime, cartoon, illustration, painting, blurry, low quality', takes: 2, np: 0, qref: 1, qc: ['a realistic photograph of ' + tags.split(', ').slice(1, 6).join(', ') + ' with no people', 'cinematic realistic photo, ' + v], qneg: ['a person in the picture', 'words and letters written on signs', 'an anime or cartoon drawing', 'a blurry low quality photo'] })).run(); }
+    made.push(name); }
+  return made;
+}
+// รอบ cron: เปิดอยู่ (kd_place_on=1) → เติมฉากใหม่เมื่อไม่มีชุดฝึกฉากค้าง และยังไม่เกินโควตาต่อวัน (kd_place_per_day, ค่าเริ่ม 3)
+async function kdPlaceTick(env) {
+  const S = await getSettings(env); if (S.kd_place_on !== '1') return;
+  const day = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10), per = Math.max(1, Math.min(10, +S.kd_place_per_day || 3));
+  const [d0, n0] = String(S.kd_place_cnt || '').split('|'), done = d0 === day ? (+n0 || 0) : 0; if (done >= per) return;
+  const pend = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND status IN ('queued','running','hold') AND instr(project,'ซีรีส์0·')=1 AND EXISTS (SELECT 1 FROM chars c WHERE c.kind='place' AND instr(vjobs.project,'ซีรีส์0·'||c.name)=1)").first().catch(() => ({ n: 1 }))).n;
+  if (pend) return;
+  const m = await kdPlaceAdd(env, KD_STORY, 1); if (m.length) await setSetting(env, 'kd_place_cnt', day + '|' + (done + 1));
 }
 async function xlNew(env, story, kind, name, desc) {
   await animeSchema(env);
@@ -1489,7 +1558,7 @@ const realRefOpt = (c, scene) => { const k = xlKind(c), wide = k === 'place' || 
 async function charRefs(env, cid, n) {
   const c = await env.DB.prepare('SELECT * FROM chars WHERE id=?').bind(cid).first(); if (!c) throw new Error('ไม่พบตัวละคร');
   const pj = charProj(c);
-  const real = await env.DB.prepare("SELECT value FROM settings WHERE key='img_look'").first().then(r => !!r && r.value === 'real').catch(() => false);
+  const real = isKdStory(c.story) || await env.DB.prepare("SELECT value FROM settings WHERE key='img_look'").first().then(r => !!r && r.value === 'real').catch(() => false);
   if (real) { // คนจริง: ทุกภาพเข้าคิว Kaggle (SDXL RealVisXL) พร้อมเลขมุม (scene) ให้ตรงกับคำบรรยายตอนเทรน
     const have = (await env.DB.prepare("SELECT (SELECT COUNT(*) FROM images WHERE project=?1)+(SELECT COUNT(*) FROM vjobs WHERE kind='img' AND project=?1 AND status IN ('queued','running','hold')) n").bind(pj).first()).n || 0;
     const st = []; let t = Date.now();
@@ -6834,7 +6903,7 @@ async function castApi(req, env, url, body) {
         const have = new Set((await env.DB.prepare("SELECT name FROM chars WHERE series_id=0 AND kind='place' AND story=?").bind(story).all()).results.map(x => x.name));
         const todo = (plan.locs || []).filter(L => L && L.name && !have.has(nm(L.name))).slice(0, Math.max(1, Math.min(12, +b.max || 12)));
         if (!todo.length) return json({ ok: true, made: [], note: 'สถานที่ในบทมี LoRA ครบแล้ว' });
-        const real = isReal(S);
+        const real = isKdStory(story) || isReal(S);
         const o = await llmJson(env, S, `เรื่อง: ${plan.title || story}\nสถานที่ในเรื่อง:\n${todo.map((L, i) => `${i + 1}. ${L.name}${L.note ? ' — ' + L.note : ''}`).join('\n').slice(0, 2400)}\n\nแปลงแต่ละสถานที่เป็นคำสั่งวาดภาพภาษาอังกฤษสั้นกระชับ ${real ? 'แบบเซ็ตถ่ายทำซีรีส์เกาหลีของจริง (วัสดุจริง แสงธรรมชาติ ของตกแต่งสมจริง)' : 'แบบอนิเมะ'} ไม่มีคน บอกโครงสร้างห้อง วัสดุ สี ของตกแต่งหลัก แสง · ห้ามอ้างถึงสถานที่/ฉากจากเรื่องอื่น\nตอบเป็น JSON: {"items":[{"i":1,"en":"..."}]}`, 3000);
         const made = [], fail = [];
         for (const x of (Array.isArray(o.items) ? o.items : [])) { const L = todo[(+x.i || 0) - 1]; if (!L || !x.en) continue; const r = await xlNew(env, story, 'place', L.name, String(x.en).slice(0, 500)); (r.ok ? made : fail).push(L.name); }
@@ -6844,6 +6913,12 @@ async function castApi(req, env, url, body) {
         await animeSchema(env);
         const rows = (await env.DB.prepare("SELECT c.id,c.name,c.kind,c.desc,(SELECT COUNT(*) FROM images i WHERE i.project='ซีรีส์0·'||c.name) img,(SELECT MIN(i.id) FROM images i WHERE i.project='ซีรีส์0·'||c.name) face,(SELECT COUNT(*) FROM jobs j WHERE j.project='ซีรีส์0·'||c.name AND j.status IN ('queued','running','kaggle')) pend,(SELECT l.status FROM loras l WHERE l.char_id=c.id AND l.status<>'old' ORDER BY l.id DESC LIMIT 1) lora,(SELECT l.size FROM loras l WHERE l.char_id=c.id AND l.status='ready' ORDER BY l.id DESC LIMIT 1) size FROM chars c WHERE c.series_id=0 AND c.story=? AND c.kind IN ('enemy','place','style') ORDER BY c.kind,c.id").bind(story).all()).results;
         return json({ ok: true, items: rows });
+      }
+      if (act === 'kd_place') { // ฉากซีรี่ย์เกาหลีคนจริง: {on:0|1, per_day, n (สร้างทันที n ฉาก), story}
+        if (b.on !== undefined) await setSetting(env, 'kd_place_on', b.on ? '1' : '0');
+        if (b.per_day !== undefined) await setSetting(env, 'kd_place_per_day', String(Math.max(1, Math.min(10, +b.per_day || 3))));
+        const made = +b.n ? await kdPlaceAdd(env, KD_STORY, Math.min(10, +b.n)) : [];
+        return json({ ok: true, made, left: KD_PLACES.length - (await env.DB.prepare("SELECT COUNT(*) n FROM chars WHERE series_id=0 AND kind='place'").first()).n });
       }
       if (act === 'xl_new') { // สร้างเอง: พิมพ์ชื่อ + คำอธิบายภาษาไทย → AI แปลงเป็นคำสั่งวาดภาษาอังกฤษ
         const kind = String(b.kind || ''), S = await getSettings(env); let en = '';
