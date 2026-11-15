@@ -429,7 +429,7 @@ async function presTick(env, ctx) {
   const s = await getSettings(env); let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; } const L = P.list || [];
   for (const ep of eps) {
     const pj = 'พรีเซนเตอร์·ตอน·' + ep.id, cj = 'พรีเซนเตอร์·คลิป·' + ep.id, px = L.find(x => x.k === ep.pk) || {};
-    const vq = (await env.DB.prepare("SELECT status,error FROM vjobs WHERE project IN (?,?) OR project LIKE ?").bind(pj, cj, cj + '·ซีน%').all()).results, busy = vq.filter(r => r.status === 'queued' || r.status === 'running').length, bad = vq.find(r => r.status === 'failed');
+    const vq = (await env.DB.prepare("SELECT status,error FROM vjobs WHERE project IN (?,?) OR (project >= ? AND project < ?)").bind(pj, cj, cj + '·ซีน', cj + '·ซีน\uffff').all()).results, busy = vq.filter(r => r.status === 'queued' || r.status === 'running').length, bad = vq.find(r => r.status === 'failed');
     if (ep.status === 'writing') { const job = serStep(env, s, ep, px).catch(() => { }); if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job; continue; }
     if (ep.status === 'imgs') {
       if (busy) continue;
@@ -438,7 +438,7 @@ async function presTick(env, ctx) {
       if (sc.series) { // ซีรีส์: ภาพครบทุกซีน → ส่งงานทำเสียง+ซับ+ขยับปาก 3 งาน (ซีนละคลิป)
         let gi = 0, miss = false; const ids = (sc.scenes || []).map(S => S.settings.map(() => { gi++; if (!by[gi]) miss = true; return by[gi] || 0; }));
         if (!ids.length || miss) { await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind('วาดภาพประกอบไม่ครบ' + (bad ? ': ' + String(bad.error || '').slice(0, 160) : ''), ep.id).run(); continue; }
-        const st = [env.DB.prepare("DELETE FROM vjobs WHERE project LIKE ? AND status IN ('failed','done')").bind(cj + '·ซีน%')];
+        const st = [env.DB.prepare("DELETE FROM vjobs WHERE project >= ? AND project < ? AND status IN ('failed','done')").bind(cj + '·ซีน', cj + '·ซีน\uffff')];
         sc.scenes.forEach((S, i) => st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj + '·ซีน' + (i + 1), String(S.title || ep.title || ''), Date.now() + i, JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: (S.lines || []).map(x => ({ ko: x.ko, th: x.th, img: x.img })), imgids: ids[i], nolip: S.settings.map((g, j) => g.f ? j : -1).filter(j => j >= 0), lips: s.pres_lips !== '0', motion: sc.motion === undefined ? 2 : sc.motion, mprompts: S.settings.map(g => g.m || g.t), subc: px.sc || '#FFFFFF', pri: 0 }))));
         st.push(env.DB.prepare("UPDATE pres_eps SET status='render' WHERE id=?").bind(ep.id));
         await env.DB.batch(st); continue;
@@ -6040,7 +6040,7 @@ async function castApi(req, env, url, body) {
         if (act === 'pres_go' || act === 'pres_del' || act === 'pres_post') {
           const ep = await env.DB.prepare('SELECT * FROM pres_eps WHERE id=?').bind(+b.id).first(); if (!ep) return json({ error: 'ไม่พบคลิปนี้' }, 404);
           const xi = L.findIndex(x => x.k === ep.pk), px = L[xi];
-          if (act === 'pres_del') { await env.DB.batch([env.DB.prepare('DELETE FROM pres_eps WHERE id=?').bind(ep.id), env.DB.prepare("DELETE FROM vjobs WHERE (project IN (?,?) OR project LIKE ?) AND status<>'running'").bind('พรีเซนเตอร์·ตอน·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id + '·ซีน%'), env.DB.prepare('DELETE FROM images WHERE project=?').bind('พรีเซนเตอร์·ตอน·' + ep.id)]); }
+          if (act === 'pres_del') { await env.DB.batch([env.DB.prepare('DELETE FROM pres_eps WHERE id=?').bind(ep.id), env.DB.prepare("DELETE FROM vjobs WHERE (project IN (?,?) OR (project >= ? AND project < ?)) AND status<>'running'").bind('พรีเซนเตอร์·ตอน·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id + '·ซีน', 'พรีเซนเตอร์·คลิป·' + ep.id + '·ซีน\uffff'), env.DB.prepare('DELETE FROM images WHERE project=?').bind('พรีเซนเตอร์·ตอน·' + ep.id)]); }
           if (act === 'pres_go') { // อนุมัติบท → วาดภาพประกอบด้วย LoRA (ชุด/ทรงผมเดียวทั้งคลิป) → ระบบทำเสียง ขยับปาก ซับไทย รวมคลิปให้เอง (presTick)
             if (!px) return json({ error: 'ไม่พบพรีเซนเตอร์ของคลิปนี้' }, 400);
             const l = await env.DB.prepare("SELECT id FROM loras WHERE char_id=? AND status='ready' ORDER BY id DESC LIMIT 1").bind(cidOf(xi)).first();
