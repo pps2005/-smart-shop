@@ -298,7 +298,7 @@ async function audDaily(env) {
 const PRS_VW = [['close-up portrait, face focus, looking at the camera', 1024, 1024], ['head and shoulders portrait, three-quarter view', 1024, 1024], ['side profile portrait, head and shoulders', 1024, 1024], ['medium shot from the waist up, talking to the camera', 896, 1152], ['medium shot, three-quarter view, looking slightly away from the camera', 896, 1152], ['full body shot, standing, the whole body visible from head to shoes', 832, 1216], ['full body shot, walking toward the camera', 832, 1216]];
 const PRS_EX = ['gentle closed-mouth smile', 'bright happy smile showing teeth', 'calm neutral expression', 'surprised expression with raised eyebrows', 'thoughtful serious expression', 'talking mid-sentence with the mouth slightly open', 'soft playful pout'];
 // ชุดตามภาพตัวอย่างที่ผู้ใช้ส่ง (Korean cute · Chinese sweet · coquette · soft casual · princess cute · sporty cute · fairycore) — ห้ามชุดเครื่องแบบเด็ดขาด
-const PRS_OF = ['a pastel blue oversized knit cardigan over a white blouse, a light grey tiered mini skirt, white socks and chunky white sneakers', 'a cream cable-knit sweater with small bow details, a white ruffled tiered mini skirt, white ankle socks and cream loafers', 'a pink puff-sleeve ribbon-laced dress with tiered ruffles, lace ankle socks and pink Mary Jane shoes', 'an oversized black knit sweater with a small bow print, denim shorts, white socks and black lace-up boots', 'a pastel pink puff-sleeve dress with bows and a ruffled hem, lace socks and black Mary Jane shoes', 'a pink zip-up hoodie jacket over a white crop top, a white tennis skirt, white socks and white sneakers', 'a lavender floral chiffon dress with sheer puff sleeves and a ruffled hem, lace socks and cream platform shoes', 'a white lace puff-sleeve top with pink ribbons and a pink ruffled mini skirt, white socks and pink sneakers', 'a beige knit vest over a white puff-sleeve blouse, a brown corduroy mini skirt and brown loafers', 'a mint green cropped cardigan with pearl buttons, a white A-line mini skirt and white sneakers', 'a pale blue layered tulle dress with tiny embroidered flowers and white platform sandals', 'a white off-shoulder ruffle blouse, a pink tiered tulle skirt and white ballet flats', 'a lilac cropped sweatshirt, a light grey tennis skirt, white socks and chunky sneakers', 'a soft pink knit cardigan with bow buttons over a white lace dress and white Mary Jane shoes',
+const PRS_OF = ['a fitted black short-sleeve t-shirt with high-waisted gray wide-leg jeans and white platform sneakers, a small black shoulder bag', 'a white puff-sleeve ruffled blouse with a tie front, high-waisted light-wash wide-leg jeans, white sneakers and a tan tote bag', 'a cream knit cardigan over a fitted white tee with wide-leg blue jeans and white sneakers', 'a soft pink fitted cropped tee with high-waisted wide-leg jeans and a small white shoulder bag', 'a pastel blue oversized knit cardigan over a white blouse, a light grey tiered mini skirt, white socks and chunky white sneakers', 'a cream cable-knit sweater with small bow details, a white ruffled tiered mini skirt, white ankle socks and cream loafers', 'a pink puff-sleeve ribbon-laced dress with tiered ruffles, lace ankle socks and pink Mary Jane shoes', 'an oversized black knit sweater with a small bow print, denim shorts, white socks and black lace-up boots', 'a pastel pink puff-sleeve dress with bows and a ruffled hem, lace socks and black Mary Jane shoes', 'a pink zip-up hoodie jacket over a white crop top, a white tennis skirt, white socks and white sneakers', 'a lavender floral chiffon dress with sheer puff sleeves and a ruffled hem, lace socks and cream platform shoes', 'a white lace puff-sleeve top with pink ribbons and a pink ruffled mini skirt, white socks and pink sneakers', 'a beige knit vest over a white puff-sleeve blouse, a brown corduroy mini skirt and brown loafers', 'a mint green cropped cardigan with pearl buttons, a white A-line mini skirt and white sneakers', 'a pale blue layered tulle dress with tiny embroidered flowers and white platform sandals', 'a white off-shoulder ruffle blouse, a pink tiered tulle skirt and white ballet flats', 'a lilac cropped sweatshirt, a light grey tennis skirt, white socks and chunky sneakers', 'a soft pink knit cardigan with bow buttons over a white lace dress and white Mary Jane shoes',
   // ชุดเพิ่มจากภาพตัวอย่างชุดที่ 2 (ตัดชุดเชิ้ต+โบว์ผูกคอ+กระโปรงลายสก๊อตออก เพราะเหมือนเครื่องแบบ)
   'a cream oversized off-shoulder knit sweater with a cute bunny print, light blue denim shorts, cream leg warmers and chunky white sneakers', 'a white crop tank top with a tiny bow, an open grey zip-up hoodie, grey wide-leg sweatpants with white side stripes and white sneakers', 'a sheer pink cardigan over a cream floral ruffled tiered mini dress, white socks with bows and cream platform shoes', 'a black off-shoulder knit sweater with a star patch, grey denim ruffle-hem shorts with a chain belt, black leg warmers and black platform boots', 'a cream puff-sleeve chiffon dress with ribbons and a lace ruffled hem, white socks with bows and cream platform shoes', 'a black and grey striped off-shoulder sweater, a black mini skirt with a studded belt and chain, sheer black socks, black combat boots and headphones around the neck', 'a pastel blue fuzzy off-shoulder sweater with a teddy bear print, matching lounge shorts, white socks and fluffy bear slippers',
   // ชุดเพิ่มจากภาพตัวอย่างชุดที่ 3–4 (สตรีท/กรันจ์ ดำเทา + หวานลำลอง)
@@ -398,6 +398,9 @@ async function presSeed(env) {
 }
 // เสียงประจำตัวพรีเซนเตอร์ (Qwen3-TTS VoiceDesign) · ประโยคอ้างอิง = ใช้เป็นข้อความกำกับตอนโคลนเสียง
 let presEpReady = false;
+const CLIP_PLACES = ['a sunlit Korean hanok cafe courtyard', 'a pastel flower market', 'a quiet bookstore with warm lamps', 'a cherry blossom path in spring', 'a rooftop garden at golden hour', 'a cozy rainy-day window seat in a loft', 'a lakeside wooden deck in morning mist', 'a minimalist white studio apartment with big windows', 'a lavender field at sunset', 'a snowy street with warm string lights', 'a seaside promenade at sunset', 'a bright glass greenhouse cafe', 'an autumn ginkgo-lined street', 'a traditional tea house garden', 'a pastel picnic lawn in a park', 'a Scandinavian-style living room with a big sofa', 'a ceramic pottery studio', 'a bamboo forest path', 'a night market with soft lanterns', 'a vintage record shop', 'a sunny balcony full of plants', 'a modern art gallery with white walls'];
+const CLIP_THEMES = ['วันพักผ่อนสบายๆ ของเธอกับแมว', 'แมวทำให้แผนของวันนี้เปลี่ยนไป', 'พาแมวไปเที่ยวที่ใหม่ๆ', 'สอนแมวทำสิ่งใหม่ (ล้มเหลวน่ารัก)', 'ถ่ายรูปแฟชั่นกับแมวจอมซน', 'ทำขนมหรือชงเครื่องดื่มโดยมีแมวคอยป่วน', 'เช้าแรกของฤดูกาลใหม่กับแมว', 'แมวหายไปแล้วไปเจออยู่ที่ไม่คาดคิด', 'เล่าเรื่องเล่าน่าสนใจไปพร้อมกับเล่นกับแมว', 'ลองแต่งตัวหลายลุคแล้วให้แมวเลือก', 'วันฝนตกอยู่ในบ้านกับแมว', 'เก็บของสวยๆ ใส่กระเป๋าแล้วออกไปเดินเล่นกับแมว'];
+const PRES_VREF_ZH = '大家好！今天我给大家带来一个特别有趣的小故事，一定要听到最后哦，你一定会觉得很温暖。';
 const PRES_VREF = '안녕하세요, 여러분! 오늘도 재미있고 신기한 이야기를 하나 가져왔어요. 끝까지 들어 보시면 깜짝 놀라실 거예요.';
 const PRES_VOICE = { a: 'Female, early 20s, Korean, sweet soft bright voice, gentle and friendly storyteller, clear natural pronunciation, a warm smile in the voice, medium-high pitch', b: 'Female, early 20s, Korean, calm elegant voice with a slight husky texture, composed and confident storyteller, clear natural pronunciation, medium-low pitch, soothing' };
 // ===== ซีรีส์อาหาร: 1 ตอน = 3 ซีน × ~5 นาที · คนจริงสอนทำอาหาร/เล่าเรื่องอาหาร คุยเรื่อยเปื่อย · เขียนบทอัตโนมัติทีละช่วงผ่าน presTick =====
@@ -452,7 +455,7 @@ async function presGoRun(env, s, ep) {
   let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; }
   const pj = 'พรีเซนเตอร์·ตอน·' + ep.id, SH = ['medium close-up portrait, head and shoulders, facing the camera, talking', 'medium shot from the waist up, facing the camera, gesturing with one hand while talking']; let t = Date.now();
   await env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj).run();
-  await env.DB.batch(sc.series ? serImgJobs(env, px, sc, l, pj, t, trig) : (sc.settings || []).map((g, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${trig} woman, ${presWho(px, sc.hair)}, ${SH[i % 2]}, friendly natural expression, wearing ${sc.outfit}, ${g}, vertical composition, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(832, 1216, i + 1, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman talking to the camera', 'a woman wearing ' + sc.outfit] })))));
+  await env.DB.batch(sc.clip ? clipImgJobs(env, px, sc, l, pj, t, trig) : sc.series ? serImgJobs(env, px, sc, l, pj, t, trig) : (sc.settings || []).map((g, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${trig} woman, ${presWho(px, sc.hair)}, ${SH[i % 2]}, friendly natural expression, wearing ${sc.outfit}, ${g}, vertical composition, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(832, 1216, i + 1, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman talking to the camera', 'a woman wearing ' + sc.outfit] })))));
   await env.DB.prepare("UPDATE pres_eps SET status='imgs', err=NULL WHERE id=?").bind(ep.id).run();
 }
 
@@ -579,6 +582,15 @@ function serImgJobs(env, px, sc, l, pj, t, trig) { // วาดภาพทั�
   return st;
 }
 
+function clipImgJobs(env, px, sc, l, pj, t, trig) { // ซีนยาว ~3 นาที: รูปที่เห็นตัวละคร (p=1) = LoRA ล็อกหน้า · รูปแมว/ฉาก (p=0) = ไม่ใช้ LoRA ไม่มีคน
+  const st = []; let n = 0;
+  for (const S of sc.scenes) for (const g of S.settings) { n++;
+    const prompt = g.p ? `photo of ${trig} woman, ${presWho(px, sc.hair)}, wearing ${sc.outfit}, ${g.t}, beautiful natural light, candid lifestyle photo, shallow depth of field, realistic, no text, vertical composition` : `photo of ${g.t}, beautiful natural light, shallow depth of field, realistic photo, no people, no text, vertical composition`;
+    const opt = g.p ? presOpt(832, 1216, n, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman', 'a woman wearing ' + sc.outfit] }) : presOpt(832, 1216, n, { qc: ['a realistic photo of a cat or a pretty scenery with no people'] });
+    st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(n), prompt, t++, JSON.stringify(opt))); }
+  return st;
+}
+
 // ทุก 2 นาที: คลิปที่อนุมัติแล้ว → ภาพครบ → ส่งงานทำเสียง+ขยับปาก+ซับ (ptts) → คลิปเสร็จ → แจ้งเตือน / ส่งเข้า TikTok อัตโนมัติ (ถ้าเปิด)
 async function presTick(env, ctx) {
   if (new Date().getUTCMinutes() % 2) return;
@@ -597,7 +609,7 @@ async function presTick(env, ctx) {
         let gi = 0, miss = false; const ids = (sc.scenes || []).map(S => S.settings.map(() => { gi++; if (!by[gi]) miss = true; return by[gi] || 0; }));
         if (!ids.length || miss) { await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind('วาดภาพประกอบไม่ครบ' + (bad ? ': ' + String(bad.error || '').slice(0, 160) : ''), ep.id).run(); continue; }
         const st = [env.DB.prepare("DELETE FROM vjobs WHERE project >= ? AND project < ? AND status IN ('failed','done')").bind(cj + '·ซีน', cj + '·ซีน\uffff')];
-        sc.scenes.forEach((S, i) => st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj + '·ซีน' + (i + 1), String(S.title || ep.title || ''), Date.now() + i, JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: (S.lines || []).map(x => ({ ko: x.ko, th: x.th, img: x.img })), imgids: ids[i], nolip: S.settings.map((g, j) => g.f ? j : -1).filter(j => j >= 0), lips: s.pres_lips !== '0', motion: sc.motion === undefined ? 2 : sc.motion, mprompts: S.settings.map(g => g.m || g.t), subc: px.sc || '#FFFFFF', pri: 0 }))));
+        sc.scenes.forEach((S, i) => st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj + '·ซีน' + (i + 1), String(S.title || ep.title || ''), Date.now() + i, JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: (S.lines || []).map(x => ({ ko: x.ko, th: x.th, en: x.en || '', dur: x.dur || 0, img: x.img })), imgids: ids[i], nolip: S.settings.map((g, j) => g.f ? j : -1).filter(j => j >= 0), lips: s.pres_lips !== '0', motion: sc.motion === undefined ? 2 : sc.motion, mprompts: S.settings.map(g => g.m || g.t), subc: px.sc || '#FFFFFF', vlog: sc.clip ? 1 : 0, lang: sc.lang || undefined, pri: 0 }))));
         st.push(env.DB.prepare("UPDATE pres_eps SET status='render' WHERE id=?").bind(ep.id));
         await env.DB.batch(st); continue;
       }
@@ -2350,7 +2362,7 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND (?12=0 OR json_extract(opt,'$.base') IS NOT 'real') AND (?13=0 OR kind<>'ptts') AND NOT (kind='lora' AND ((SELECT COUNT(*) FROM vjobs r WHERE r.kind='lora' AND r.status='running') >= 2 OR EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running' AND COALESCE(r.helper,0)=COALESCE(?2,0)))) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'พรีเซนเตอร์·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 21 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0, kv0 < 22 ? 1 : 0, kv0 < 23 ? 1 : 0).first(); // ภาพเหมือนจริง (opt.base='real' · RealVisXL) ต้องใช้สคริปต์รุ่น 22 // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND (?12=0 OR json_extract(opt,'$.base') IS NOT 'real') AND (?13=0 OR kind<>'ptts') AND (?14=0 OR (json_extract(opt,'$.vlog') IS NOT 1 AND json_extract(opt,'$.lang') IS NULL)) AND NOT (kind='lora' AND ((SELECT COUNT(*) FROM vjobs r WHERE r.kind='lora' AND r.status='running') >= 2 OR EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running' AND COALESCE(r.helper,0)=COALESCE(?2,0)))) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'พรีเซนเตอร์·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 21 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0, kv0 < 22 ? 1 : 0, kv0 < 23 ? 1 : 0, kv0 < 24 ? 1 : 0).first(); // ภาพเหมือนจริง (opt.base='real' · RealVisXL) ต้องใช้สคริปต์รุ่น 22 // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
@@ -5342,13 +5354,13 @@ spec = json.load(open(sys.argv[1]))
 kw = dict(device_map="cuda:0", dtype=torch.float32)
 if spec["mode"] == "design":
     m = Qwen3TTSModel.from_pretrained("Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", **kw)
-    wavs, sr = m.generate_voice_design(text=spec["text"], language="Korean", instruct=spec["instruct"])
+    wavs, sr = m.generate_voice_design(text=spec["text"], language=spec.get("lang", "Korean"), instruct=spec["instruct"])
     sf.write(spec["out"], wavs[0], sr)
 else:
     m = Qwen3TTSModel.from_pretrained("Qwen/Qwen3-TTS-12Hz-1.7B-Base", **kw)
     pr = m.create_voice_clone_prompt(ref_audio=spec["ref"], ref_text=spec["ref_text"])
     for i, t in enumerate(spec["lines"]):
-        wavs, sr = m.generate_voice_clone(text=t, language="Korean", voice_clone_prompt=pr)
+        wavs, sr = m.generate_voice_clone(text=t, language=spec.get("lang", "Korean"), voice_clone_prompt=pr)
         sf.write(spec["outs"][i], wavs[0], sr)
         print("line %d ok" % i, flush=True)
 """
@@ -5543,6 +5555,9 @@ def ass_col(h):
 def motion_prompt(o, g, nolip, c):
     ms = o.get("mprompts") or []
     m = str(ms[g]).strip() if 0 <= g < len(ms) and ms[g] else ""
+    if o.get("vlog"):
+        # คลิปสั้นแนวหนังสั้น: ใช้ท่าทางที่ AI เขียนไว้ต่อช็อตตรงๆ (คน/สัตว์เลี้ยง/ของ) ไม่ใส่ฉากครัว
+        return "%s. cinematic film still coming to life, natural realistic motion, soft natural light, subtle handheld camera feel, smooth stable video" % (m or "gentle natural movement")
     if g in nolip:
         return "%s. close-up food video, steam rising softly, ingredients moving and sizzling naturally, slow gentle camera push-in, realistic smooth motion" % (m or "cooking food")
     more = ["", "she glances down at the food, then looks back at the camera and smiles, "][c % 2]
@@ -5615,7 +5630,7 @@ def pres_job(j, port):
     os.makedirs(d, exist_ok=True)
     ff = ffmpeg_bin()
     if o.get("mode") == "design":
-        run_qtts(py, {"mode": "design", "text": j.get("prompt") or "", "instruct": o.get("instruct") or "", "out": d + "/v.wav"}, d, gpu)
+        run_qtts(py, {"mode": "design", "lang": o.get("lang") or "Korean", "text": j.get("prompt") or "", "instruct": o.get("instruct") or "", "out": d + "/v.wav"}, d, gpu)
         mf = os.path.join(ROOT, "pv%s.m4a" % j["id"])
         sh('"%s" -y -loglevel error -i "%s/v.wav" -af "loudnorm=I=-16:TP=-1.5:LRA=11" -ac 1 -ar 44100 -c:a aac -b:a 128k "%s"' % (ff, d, mf))
         shutil.rmtree(d, ignore_errors=True)
@@ -5628,15 +5643,27 @@ def pres_job(j, port):
         open(d + "/ref.m4a", "wb").write(r.read())
     sh('"%s" -y -loglevel error -i "%s/ref.m4a" -ac 1 -ar 24000 "%s/ref.wav"' % (ff, d, d))
     outs = [d + "/l%03d.wav" % i for i in range(len(lines))]
-    log("ทำเสียงพากย์เกาหลี %d ประโยค" % len(lines))
-    run_qtts(py, {"mode": "clone", "ref": d + "/ref.wav", "ref_text": o.get("voice_text") or "", "lines": [x.get("ko") or "" for x in lines], "outs": outs}, d, gpu)
+    sp_idx = [i for i, x in enumerate(lines) if str(x.get("ko") or "").strip()]  # ช็อตเงียบ (ไม่มีบทพูด) ข้ามการทำเสียง
+    sp_set = set(sp_idx)
+    log("ทำเสียงพากย์เกาหลี %d ประโยค (เงียบ %d ช็อต)" % (len(sp_idx), len(lines) - len(sp_idx)))
+    if sp_idx:
+        run_qtts(py, {"mode": "clone", "lang": o.get("lang") or "Korean", "ref": d + "/ref.wav", "ref_text": o.get("voice_text") or "", "lines": [lines[i].get("ko") or "" for i in sp_idx], "outs": [outs[i] for i in sp_idx]}, d, gpu)
     # ต่อเสียงเป็นเส้นเดียว + จับเวลาซับทีละประโยค
     SR, LEAD, GAP, TAIL = 24000, 0.35, 0.28, 0.8
     sil = lambda s: b"\x00\x00" * int(SR * s)
     pcm, t, tm = sil(LEAD), LEAD, []
     for i, f in enumerate(outs):
-        a = wav_pcm(ff, f, d + "/p.raw")
-        du = len(a) / 2.0 / SR
+        if i in sp_set:
+            a = wav_pcm(ff, f, d + "/p.raw")
+            du = len(a) / 2.0 / SR
+            if o.get("vlog"):
+                want = max(0.0, min(8.0, float(lines[i].get("dur") or 0)))
+                if want > du:
+                    a = a + sil(want - du)
+                    du = want
+        else:
+            du = max(1.5, min(8.0, float(lines[i].get("dur") or 3.5)))
+            a = sil(du)
         tm.append((t, t + du))
         pcm += a + sil(GAP)
         t += du + GAP
@@ -5684,7 +5711,7 @@ def pres_job(j, port):
         sw = d + "/s%d.wav" % k
         pcm_wav(pcm[int(a * SR) * 2:int(b * SR) * 2], sw)
         bv = base.get(g)
-        lv = run_muse(mpy, bv or ipaths[g], sw, d, gpu, str(k)) if (mpy and g not in nolip) else None
+        lv = run_muse(mpy, bv or ipaths[g], sw, d, gpu, str(k)) if (mpy and g not in nolip and any(q in sp_set for q in range(sg[1], sg[2] + 1))) else None
         pv = d + "/v%02d.mp4" % k
         vf = cam_vf(k, du, live=not bv)
         if lv:
@@ -5706,7 +5733,13 @@ def pres_job(j, port):
            "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
     for i, x in enumerate(lines):
         a, b = tm[i]
-        ass.append("Dialogue: 0,%s,%s,S,,0,0,0,,%s" % (ass_time(a - 0.05), ass_time(b + 0.15), th_wrap(ass_esc(x.get("th") or ""))))
+        txt = th_wrap(ass_esc(x.get("th") or "")) if x.get("th") else ""
+        if o.get("vlog") and x.get("en"):
+            import textwrap
+            txt = "\\N".join(textwrap.wrap(ass_esc(x.get("en")), 24)) + ("\\N" + txt if txt else "")
+        if not txt:
+            continue
+        ass.append("Dialogue: 0,%s,%s,S,,0,0,0,,%s" % (ass_time(a - 0.05), ass_time(b + 0.15), txt))
     open(d + "/s.ass", "w", encoding="utf-8").write("\n".join(ass) + "\n")
     fsub = ff_sub() or ff
     fdopt = (":fontsdir='%s'" % fn["dir"]) if fn["dir"] else ""
@@ -5762,7 +5795,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=23" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=24" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
@@ -6225,7 +6258,7 @@ async function castApi(req, env, url, body) {
         if (!presEpReady) { await env.DB.prepare("CREATE TABLE IF NOT EXISTS pres_eps (id INTEGER PRIMARY KEY AUTOINCREMENT, pk TEXT, topic TEXT, title TEXT, status TEXT, script TEXT, caption TEXT, vid INTEGER DEFAULT 0, err TEXT, posted TEXT, created INTEGER)").run(); presEpReady = true; }
         if (act === 'pres_voice' && pr) { // ออกแบบเสียง 3 แบบจากคำบรรยาย (ไม่ลอกเสียงคนจริง) → ผู้ใช้ฟังแล้วเลือก 1 = เสียงประจำตัว (โคลนจากเสียงนี้ทุกคลิป)
           const base = PRES_VOICE[pr.k] || PRES_VOICE.a, V = ['', ', slightly breathy and intimate like a vlog', ', lively and expressive like a TV presenter']; let t = Date.now();
-          await env.DB.batch(V.map((x, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'ptts',?)").bind(PJ(pr, 'เสียง'), String(i + 1), PRES_VREF, t++, JSON.stringify({ mode: 'design', instruct: base + x, pri: 0 }))));
+          await env.DB.batch(V.map((x, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'ptts',?)").bind(PJ(pr, 'เสียง'), String(i + 1), PRES_VREF_ZH, t++, JSON.stringify({ mode: 'design', lang: 'Chinese', instruct: (base + x).replace(/Korean/g, 'Mandarin Chinese'), pri: 0 }))));
         }
         if (act === 'pres_vpick' && pr) { const v = await env.DB.prepare('SELECT id,prompt FROM videos WHERE id=? AND project=?').bind(+b.vid, PJ(pr, 'เสียง')).first(); if (v) { pr.voice = v.id; pr.vtext = v.prompt; await save(); } }
         if (act === 'pres_script') { // AI เขียนบท 1 นาที (เกาหลี + ซับไทย) → รออนุมัติ
@@ -6237,6 +6270,33 @@ async function castApi(req, env, url, body) {
           if (lines.length < 4 || !st.length) return json({ error: 'AI เขียนบทไม่ครบ ลองกดใหม่อีกครั้ง' }, 500);
           const sc = { settings: st, lines, outfit: presOutfit(px), hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
           await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'draft',?,?,?)").bind(px.k, topic, String(r.title || topic).slice(0, 120), JSON.stringify(sc), String(r.caption || '').slice(0, 2000), Date.now()).run();
+        }
+        if (act === 'pres_clip') { // ซีนยาว ~3 นาที: AI วางโครง 8–16 ภาพ (สาว + แมว + ฉากสวย ไม่ซ้ำกับครั้งก่อน) → เขียนบทพากย์จีน + ซับไทย → รออนุมัติ → ระบบทำต่อเอง
+          if (!pr) return json({ error: 'เลือกตัวละครก่อน' }, 400);
+          const n = Math.max(8, Math.min(16, Math.round(+b.shots || 12))), idea = String(b.idea || '').trim().slice(0, 300);
+          const pets = String(b.pets !== undefined ? b.pets : (pr.pets || '')).trim().slice(0, 300) || 'a cute fluffy cream and white cat with big round eyes';
+          if (b.pets !== undefined && String(b.pets || '').trim() !== (pr.pets || '')) { pr.pets = String(b.pets || '').trim().slice(0, 300); await save(); }
+          const prev = (await env.DB.prepare('SELECT title,script FROM pres_eps WHERE pk=? ORDER BY id DESC LIMIT 14').bind(pr.k).all()).results, usedPl = new Set(), usedTi = [];
+          for (const e of prev) { usedTi.push(String(e.title || '')); try { const q = JSON.parse(e.script || '{}'); if (q.place) usedPl.add(q.place); } catch { } }
+          const free = CLIP_PLACES.filter(x => !usedPl.has(x)), pool = free.length ? free : CLIP_PLACES, place = pool[Math.floor(Math.random() * pool.length)];
+          const theme = idea || CLIP_THEMES[Math.floor(Math.random() * CLIP_THEMES.length)];
+          const o = await llmJson(env, s, `วางโครงซีนคลิป TikTok แนวตั้ง ยาวประมาณ 3 นาที สไตล์ไลฟ์สไตล์สวยๆ ภาพเหมือนจริง ตัวเอกเป็นสาวเกาหลีชื่อ ${pr.name || 'ตัวเอก'} อยู่กับแมว: ${pets}\nสถานที่หลักของซีน: ${place}\nเรื่อง: ${theme}\n${usedTi.length ? 'ห้ามซ้ำกับชื่อคลิปที่เคยทำแล้ว: ' + usedTi.join(' / ') + '\n' : ''}กติกา:\n- ${n} ภาพ (ภาพละประมาณ 15 วินาที) เล่าเรื่องต่อเนื่อง มีต้น กลาง จบ ภาพแรกต้องดึงความสนใจ เปลี่ยนมุมกล้องและจุดในสถานที่ไปเรื่อยๆ ไม่ซ้ำกันติดๆ (wide, medium, close-up ใบหน้า, โคลสอัพแมว, สิ่งของ/วิวสวยๆ, มุมหลังไหล่)\n- p = 1 ถ้าเห็นตัวเอกในภาพ, p = 0 ถ้าเป็นภาพแมวหรือวิวสวยๆ ล้วนไม่มีคน (ใช้ p = 0 ประมาณ 3–4 ภาพ)\n- f = 1 ถ้าภาพนั้นไม่ควรขยับปาก (เช่น แมว วิว หรือตัวเอกหันหลัง/ไม่ได้มองกล้อง), f = 0 ถ้าตัวเอกมองกล้องพูดอยู่\n- t = คำสั่งวาดภาพเป็นภาษาอังกฤษ ไม่เกิน 190 ตัวอักษร ระบุมุมกล้อง จุดในสถานที่ การกระทำ แสง ถ้ามีแมวให้เขียนลักษณะแมวซ้ำให้เหมือนเดิมทุกภาพ ห้ามมีตัวหนังสือ โลโก้ หรือคนอื่น\n- m = การเคลื่อนไหวในภาพเป็นภาษาอังกฤษสั้นๆ ไม่เกิน 100 ตัวอักษร เช่น she gently strokes the cat and smiles, the cat blinks slowly and the tail sways\n- beat = เรื่องที่พูดในภาพนั้น (ไทย 1 ประโยค)\n- title = ชื่อคลิปภาษาไทย · caption = แคปชันไทยชวนอ่านต่อ 1 บรรทัด แล้วขึ้นบรรทัดใหม่ตามด้วยแฮชแท็ก 4-6 อัน · outfit = ชุดของตัวเอกเป็นภาษาอังกฤษสั้นๆ แนวแฟชั่นเกาหลีสะอาดตา (เช่น เสื้อเข้ารูปกับยีนส์ขากว้าง หรือเสื้อแขนพองสีขาว) ชุดเดียวทั้งซีน\nตอบ JSON เท่านั้น: {"title":"...","caption":"...","outfit":"...","shots":[{"t":"...","p":1,"f":0,"m":"...","beat":"..."}]}`, 4000);
+          const sh = (Array.isArray(o.shots) ? o.shots : []).slice(0, n).map(x => ({ t: String(x.t || '').trim().slice(0, 220), p: +x.p ? 1 : 0, f: +x.f ? 1 : 0, m: String(x.m || '').trim().slice(0, 130), beat: String(x.beat || '').trim().slice(0, 200) })).filter(x => x.t);
+          if (sh.length < 6) return json({ error: 'AI วางโครงคลิปไม่ครบ ลองกดใหม่อีกครั้ง' }, 500);
+          sh.forEach(x => { if (!x.p) x.f = 1; });
+          const title = String(o.title || theme).slice(0, 120), CH = 4, groups = []; for (let i = 0; i < sh.length; i += CH) groups.push([i, Math.min(sh.length - 1, i + CH - 1)]);
+          const outline = sh.map((x, i) => i + ': ' + (x.p ? '[เห็นตัวเอก' + (x.f ? ' ไม่มองกล้อง' : ' มองกล้องพูด') + '] ' : '[แมว/วิว ไม่มีคน] ') + x.t + (x.m ? ' — ' + x.m : '') + ' | พูดเรื่อง: ' + x.beat).join('\n');
+          const parts = await Promise.all(groups.map(async ([a, z], gi) => {
+            const r = await llmJson(env, s, `เขียนบทพูดพากย์ของคลิปไลฟ์สไตล์ "${title}" ให้ตัวเอกหญิงชาวเกาหลีชื่อ ${pr.name || 'ตัวเอก'} พูดเป็นภาษาจีนกลาง (ตัวย่อ) น้ำเสียงเป็นกันเอง อบอุ่น เล่าไปพร้อมกับภาพ (คนดูอ่านซับไทย) บุคลิก: ${PRES_TONE[pr.tone] || PRES_TONE.bright}\nโครงทั้งซีน (ภาพ 0–${sh.length - 1}):\n${outline}\nให้เขียนเฉพาะภาพ ${a} ถึง ${z} ${gi === 0 ? '(เป็นช่วงเปิดคลิป ทักทายและดึงความสนใจใน 3 วินาทีแรก)' : ''}${z === sh.length - 1 ? ' (เป็นช่วงปิด สรุปอบอุ่นแล้วชวนกดติดตาม)' : ' (ยังไม่จบเรื่อง ห้ามสรุปหรือร่ำลา)'}\nกติกา:\n- ภาพละ 3–4 ประโยค ประโยคสั้น พูดจบใน 4–5 วินาที (ไม่เกิน 22 ตัวอักษรจีน) เรื่องที่พูดต้องเข้ากับภาพนั้นและต่อเนื่องจากภาพก่อนหน้า\n- zh = ประโยคภาษาจีนกลางตัวย่อ ห้ามมีวงเล็บหรือคำกำกับ · th = ซับไทยสั้น อ่านทันใน 3 วินาที ผู้พูดเป็นผู้หญิง ใช้ ฉัน/เรา ลงท้าย ค่ะ/นะคะ/นะ ห้ามใช้ ผม/ครับ\n- ข้อเท็จจริงต้องเป็นเรื่องที่รู้กันทั่วไป ห้ามแต่งตัวเลขหรือชื่อเอง\n- img = เลขภาพที่แสดงตอนพูด เรียงจากน้อยไปมาก ใช้ให้ครบทุกภาพ ${a}–${z}\nตอบ JSON array เท่านั้น: [{"zh":"...","th":"...","img":${a}}]`, 5000);
+            const arr = Array.isArray(r) ? r : (r && Array.isArray(r.lines) ? r.lines : []);
+            const raw = arr.map(x => ({ ko: String((x && x.zh) || '').trim().slice(0, 90), th: thFem(String((x && x.th) || '').trim().slice(0, 160)), img: Number.isFinite(+(x && x.img)) ? Math.max(a, Math.min(z, Math.round(+x.img))) : a })).filter(x => x.ko && x.th);
+            if (raw.length < (z - a + 1) * 2) throw new Error('AI เขียนบทภาพ ' + a + '–' + z + ' ไม่ครบ');
+            let cur = a; raw.forEach(x => { x.img = Math.max(cur, x.img); cur = x.img; });
+            return raw;
+          })).catch(e => { throw e; });
+          const lines = parts.flat();
+          const sc = { series: true, clip: true, lang: 'Chinese', epno: await serNextEp(env, pr.k), motion: [0, 2, 3].includes(+b.motion) ? +b.motion : 2, outfit: String(o.outfit || '').trim().slice(0, 120) || presOutfit(pr), hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)], pets, place, scenes: [{ title, settings: sh.map(x => ({ t: x.t, p: x.p, f: x.f, m: x.m })), lines }] };
+          await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'draft',?,?,?)").bind(pr.k, theme.slice(0, 200), title, JSON.stringify(sc), String(o.caption || '').slice(0, 2000), Date.now()).run();
         }
         if (act === 'pres_series') { // รายการ "<ชื่อ>สอนทำอาหารกับเล่าเรื่องปริศนา EPn": AI ออกแบบโครง 3 ซีน → presTick เขียนบททีละช่วงเอง → รออนุมัติ
           const px = L.find(x => x.k === String(b.k || '')); if (!px) return json({ error: 'เลือกพรีเซนเตอร์ก่อน' }, 400);
@@ -6267,7 +6327,7 @@ async function castApi(req, env, url, body) {
           if (act === 'pres_post') { try { const r = await ttPost(env, ep); await env.DB.prepare('UPDATE pres_eps SET posted=? WHERE id=?').bind(r, ep.id).run(); } catch (e) { return json({ error: 'ส่งเข้า TikTok ไม่สำเร็จ: ' + String(e.message || e).slice(0, 200) }, 500); } }
         }
         if (act === 'pres_tt') { for (const k of ['tt_key', 'tt_secret']) if (b[k]) await setSetting(env, k, String(b[k]).trim().slice(0, 200)); for (const k of ['tt_mode', 'tt_auto']) if (b[k] !== undefined) await setSetting(env, k, String(b[k])); if (b.tt_off) await setSetting(env, 'tt_tok', ''); }
-        if (act === 'pres_set') { if (pr) { if (b.name !== undefined) pr.name = String(b.name || '').slice(0, 40); if (['bright', 'warm', 'cool'].includes(b.tone)) pr.tone = b.tone; if (/^#[0-9a-fA-F]{6}$/.test(String(b.sc || ''))) pr.sc = String(b.sc).toUpperCase(); } else { if (b.main !== undefined) P.main = +b.main || 0; if (b.name !== undefined) P.name = String(b.name || '').slice(0, 40); } await save(); }
+        if (act === 'pres_set') { if (pr) { if (b.name !== undefined) pr.name = String(b.name || '').slice(0, 40); if (b.pets !== undefined) pr.pets = String(b.pets || '').slice(0, 300); if (['bright', 'warm', 'cool'].includes(b.tone)) pr.tone = b.tone; if (/^#[0-9a-fA-F]{6}$/.test(String(b.sc || ''))) pr.sc = String(b.sc).toUpperCase(); } else { if (b.main !== undefined) P.main = +b.main || 0; if (b.name !== undefined) P.name = String(b.name || '').slice(0, 40); } await save(); }
         if (act === 'pres_pick' && pr) { const id = +b.id, s1 = new Set(pr.picked || []); s1.has(id) ? s1.delete(id) : s1.add(id); pr.picked = [...s1]; await save(); }
         if (act === 'pres_ds' && pr) { if (b.redo) { pr.picked = []; await save(); } await presQueueDs(env, pr, !!b.redo); }
         if (act === 'pres_train' && pr) { // เทรน LoRA ภาพเหมือนจริง (ฐาน RealVisXL) — ใช้ภาพที่ติดดาว
@@ -6296,8 +6356,8 @@ async function castApi(req, env, url, body) {
           const cnt = (pj, st) => vq.filter(r => r.project === pj && (!st || r.status === st)).reduce((n, r) => n + r.n, 0);
           const vs = (await env.DB.prepare('SELECT id,shot FROM videos WHERE project=? ORDER BY id DESC LIMIT 6').bind(PJ(x, 'เสียง')).all()).results, vsq = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE project=? AND status IN ('queued','running')").bind(PJ(x, 'เสียง')).first()).n;
           if (x.hide) continue; // เก็บไว้ (ไม่ใช้ในช่องพรีเซนเตอร์แล้ว) — LoRA/ภาพ/เสียงยังอยู่ครบ
-          out.push({ k: x.k, name: x.name || '', tone: x.tone || 'bright', sc: x.sc || '#FFFFFF', full: x.full, face: x.face, picked: x.picked || [], voice: x.voice || 0, voices: vs, vq: vsq, ds: rows.filter(r => r.project === pjs[0]).map(r => ({ id: r.id, sc: r.scene })), test: rows.filter(r => r.project === pjs[1]).map(r => ({ id: r.id, sc: r.scene })), dsq: cnt(pjs[0]), dsrun: cnt(pjs[0], 'running'), tq: cnt(pjs[1]), lora: lo ? { id: lo.id, status: lo.status, error: lo.error || '', prog: lp } : null }); }
-        const eps = (await env.DB.prepare('SELECT id,pk,topic,title,status,script,caption,vid,err,posted,created FROM pres_eps ORDER BY id DESC LIMIT 20').all()).results.map(e => { let sc = {}; try { sc = JSON.parse(e.script || '{}'); } catch { sc = {}; } return { ...e, script: undefined, lines: sc.series ? (sc.scenes || []).flatMap(S => S.lines || []) : (sc.lines || []), outfit: sc.outfit || '', series: sc.series ? 1 : 0, prog: sc.series ? (sc.scenes || []).map(S => ({ t: S.title || '', n: (S.lines || []).length, done: S.done || 0, min: Math.round((S.lines || []).length * 4.3 / 6) / 10 })) : undefined, vids: sc.vids || [] }; });
+          out.push({ k: x.k, name: x.name || '', pets: x.pets || '', tone: x.tone || 'bright', sc: x.sc || '#FFFFFF', full: x.full, face: x.face, picked: x.picked || [], voice: x.voice || 0, voices: vs, vq: vsq, ds: rows.filter(r => r.project === pjs[0]).map(r => ({ id: r.id, sc: r.scene })), test: rows.filter(r => r.project === pjs[1]).map(r => ({ id: r.id, sc: r.scene })), dsq: cnt(pjs[0]), dsrun: cnt(pjs[0], 'running'), tq: cnt(pjs[1]), lora: lo ? { id: lo.id, status: lo.status, error: lo.error || '', prog: lp } : null }); }
+        const eps = (await env.DB.prepare('SELECT id,pk,topic,title,status,script,caption,vid,err,posted,created FROM pres_eps ORDER BY id DESC LIMIT 20').all()).results.map(e => { let sc = {}; try { sc = JSON.parse(e.script || '{}'); } catch { sc = {}; } return { ...e, script: undefined, lines: sc.series ? (sc.scenes || []).flatMap(S => S.lines || []) : (sc.lines || []), outfit: sc.outfit || '', series: sc.series ? 1 : 0, clip: sc.clip ? 1 : 0, shots: sc.clip ? (((sc.scenes || [])[0] || {}).settings || []) : undefined, prog: sc.series ? (sc.scenes || []).map(S => ({ t: S.title || '', n: (S.lines || []).length, done: S.done || 0, min: Math.round((S.lines || []).length * 4.3 / 6) / 10 })) : undefined, vids: sc.vids || [] }; });
         return json({ ok: true, pres: P, imgs: im, queued: q, list: out, eps, tt: { key: !!s.tt_key, linked: !!s.tt_tok, mode: s.tt_mode || 'inbox', auto: s.tt_auto === '1', redirect: (s.self_url || '') + '/tt/cb' } });
       }
       if (act === 'clog') { const k = 'clog', old = (await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(k).first().catch(() => null)); let L = []; try { L = JSON.parse((old && old.value) || '[]'); } catch { } L.push(new Date().toISOString().slice(11, 19) + ' ' + String(b.m || '').slice(0, 400) + ' | ' + String(b.ua || '').slice(0, 120)); await setSetting(env, k, JSON.stringify(L.slice(-15))); return json({ ok: true }); } // ข้อผิดพลาดจากหน้าเว็บของผู้ใช้ (ไว้ตรวจปัญหาที่จำลองไม่ได้)
@@ -6587,7 +6647,7 @@ async function castApi(req, env, url, body) {
           let cleared = 0;
           for (const e of scs) { if (!e.script_id) continue; const sid = e.script_id;
             const old = (await env.DB.prepare('SELECT id,kproj FROM shots WHERE script_id=?').bind(sid).all()).results, st = [];
-            for (const x of old) st.push(env.DB.prepare('DELETE FROM images WHERE project=?').bind(x.kproj), env.DB.prepare('DELETE FROM jobs WHERE project=?').bind(x.kproj), env.DB.prepare(\"DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'\").bind(x.kproj), env.DB.prepare('DELETE FROM videos WHERE ep=? AND shot=?').bind('a' + sid, String(x.id)));
+            for (const x of old) st.push(env.DB.prepare('DELETE FROM images WHERE project=?').bind(x.kproj), env.DB.prepare('DELETE FROM jobs WHERE project=?').bind(x.kproj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'").bind(x.kproj), env.DB.prepare('DELETE FROM videos WHERE ep=? AND shot=?').bind('a' + sid, String(x.id)));
             st.push(env.DB.prepare('DELETE FROM shots WHERE script_id=?').bind(sid), env.DB.prepare('DELETE FROM settings WHERE key IN (?,?,?,?,?,?)').bind('sbfix:' + sid, 'sbrev:' + sid, 'sbsay:' + sid, 'sbdone:' + sid, 'sbok:' + sid, 'sbfail:' + sid), env.DB.prepare('UPDATE scenes SET sb=0, fin=0, auto=1 WHERE script_id=?').bind(sid));
             for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20)); cleared += old.length; }
           return json({ ok: true, cleared });
