@@ -1613,6 +1613,8 @@ async function bridgeImg(env, s) {
         if (id) { c.ref = s.self_url + '/vi/' + id + '?s=' + await vvSig(env, 'i' + id); c.rw = fId ? 0.5 : gag ? 0.45 : 0.6; if (!fId && (c.face || (!ofId && !gag))) c.rc = 'face'; } }
       if (wait) { st.push(env.DB.prepare("UPDATE jobs SET status='queued' WHERE id=?").bind(j.id)); continue; }
       { const LR = {}; for (const r of (await env.DB.prepare("SELECT l.id, c.id cid, c.name FROM loras l JOIN chars c ON c.id=l.char_id WHERE c.series_id=0 AND l.status='ready' ORDER BY l.id").all()).results) LR[r.name] = r; // LoRA ตัวละครที่เทรนเสร็จ → ต่อเข้าการวาดฉาก + คำเรียก (chrNx) + ชุด (outfit_x)
+        const LW = {}; for (const r of (await env.DB.prepare("SELECT c.name FROM loras l JOIN chars c ON c.id=l.char_id WHERE c.series_id=0 AND l.status IN ('queued','running')").all()).results) LW[r.name] = 1;
+        if (hyO.chars.some(c => c.p && !LR[c.n] && LW[c.n])) { st.push(env.DB.prepare("UPDATE jobs SET status='queued' WHERE id=?").bind(j.id)); continue; } // ผู้ใช้สั่ง: ตัวละครในช่องนี้ LoRA ยังเทรนไม่เสร็จ → เว้นไว้ก่อน วาดเมื่อ LoRA เสร็จ (ไม่วาดแบบไม่มี LoRA แล้วต้องวาดใหม่)
         const pcs = hyO.chars.filter(c => c.p && LR[c.n]), lo = [], tg = [];
         for (const c of pcs) { const r = LR[c.n], k = shOf && shOf[c.n]; lo.push({ id: r.id, w: pcs.length > 1 ? 0.55 : 0.7 }); const t = 'chr' + r.cid + 'x' + (k ? ', outfit_' + k : ''); tg.push(t); c.tags = t + ', ' + c.tags; }
         if (lo.length) { hyO.loras = lo; hyO.all = (tg.join(', ') + ', ' + hyO.all).slice(0, 1100); } } // รอรูปชุดเสร็จก่อนค่อยวาดช่องนี้ (ชุดตรงตั้งแต่ช่องแรก)
