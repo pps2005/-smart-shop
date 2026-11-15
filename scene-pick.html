@@ -223,6 +223,8 @@ document.addEventListener('change',e=>{
   try{SCENES=await (await fetch('scenes.json')).json();}catch(e){}
   await loadLocks();renderView();
 })();
+/* กันหน้าเด้งขึ้นบนตอนวาดใหม่ */const _keepY=f=>function(){const y=window.scrollY;const r=f.apply(this,arguments);window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y));return r};
+renderView=_keepY(renderView);renderLock=_keepY(renderLock);
 </script>
 </body>
 </html>
