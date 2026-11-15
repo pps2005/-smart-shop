@@ -56,7 +56,7 @@ export default {
   },
   async scheduled(event, env0, ctx) {
     const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) }, jobs = [];
-    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
+    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presTick(env).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
     await handleCron(event, env, { waitUntil: p => jobs.push(p) });
     ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare('DELETE FROM rmeter WHERE day < ?').bind(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
   },
@@ -90,6 +90,7 @@ async function handleFetch(req, env, ctx) {
       if (p === '/api/ping') return json({ ok: true, bot: 'anime-image-bot', github: !!(env.GH_TOKEN && env.GH_REPO), ver: BOT_VER, kseen: +((await getSettings(env)).k_seen) || 0 });
       if (p === '/api/state') return json(await getState(env));
       if (p.startsWith('/img/')) return getImage(env, +p.split('/')[2]);
+      if (p === '/tt/login' || p === '/tt/cb') return ttRoute(req, env, url, p);
       if (p.startsWith('/vo/')) { const r = await env.DB.prepare('SELECT data,mime FROM voices WHERE id=?').bind(+p.split('/')[2]).first(); return r ? new Response(b64ToBytes(r.data), { headers: { 'content-type': r.mime || 'audio/mp4', 'cache-control': 'private, max-age=31536000, immutable', ...CORS } }) : new Response('not found', { status: 404 }); } // เสียงพากย์ทีละบรรทัด
       if (p === '/api/zip') return makeZip(env, url.searchParams.get('project') || '', url.searchParams.get('starred') === '1');
       if (req.method !== 'POST') return json({ error: 'not found' }, 404);
@@ -348,6 +349,71 @@ async function presSeed(env) {
     await presQueueDs(env, x, false);
     await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('พรีเซนเตอร์ ' + (x.name || x.k) + ': ตั้งภาพต้นแบบแล้ว → ส่งวาดชุดฝึก 28 ภาพ (ภาพเหมือนจริง)', Date.now()).run().catch(() => { }); }
   await setSetting(env, 'pres_seed', 'done');
+}
+// เสียงประจำตัวพรีเซนเตอร์ (Qwen3-TTS VoiceDesign) · ประโยคอ้างอิง = ใช้เป็นข้อความกำกับตอนโคลนเสียง
+let presEpReady = false;
+const PRES_VREF = '안녕하세요, 여러분! 오늘도 재미있고 신기한 이야기를 하나 가져왔어요. 끝까지 들어 보시면 깜짝 놀라실 거예요.';
+const PRES_VOICE = { a: 'Female, early 20s, Korean, sweet soft bright voice, gentle and friendly storyteller, clear natural pronunciation, a warm smile in the voice, medium-high pitch', b: 'Female, early 20s, Korean, calm elegant voice with a slight husky texture, composed and confident storyteller, clear natural pronunciation, medium-low pitch, soothing' };
+// ทุก 2 นาที: คลิปที่อนุมัติแล้ว → ภาพครบ → ส่งงานทำเสียง+ขยับปาก+ซับ (ptts) → คลิปเสร็จ → แจ้งเตือน / ส่งเข้า TikTok อัตโนมัติ (ถ้าเปิด)
+async function presTick(env) {
+  if (new Date().getUTCMinutes() % 2) return;
+  let eps; try { eps = (await env.DB.prepare("SELECT * FROM pres_eps WHERE status IN ('imgs','render')").all()).results; } catch (e) { return; }
+  if (!eps.length) return;
+  const s = await getSettings(env); let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; } const L = P.list || [];
+  for (const ep of eps) {
+    const pj = 'พรีเซนเตอร์·ตอน·' + ep.id, cj = 'พรีเซนเตอร์·คลิป·' + ep.id, px = L.find(x => x.k === ep.pk) || {};
+    const vq = (await env.DB.prepare("SELECT status,error FROM vjobs WHERE project IN (?,?)").bind(pj, cj).all()).results, busy = vq.filter(r => r.status === 'queued' || r.status === 'running').length, bad = vq.find(r => r.status === 'failed');
+    if (ep.status === 'imgs') {
+      if (busy) continue;
+      let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; }
+      const ims = (await env.DB.prepare('SELECT id,scene FROM images WHERE project=? ORDER BY id').bind(pj).all()).results, by = {}; for (const r of ims) by[+r.scene] = r.id;
+      const ids = (sc.settings || []).map((g, i) => by[i + 1] || 0);
+      if (!ids.length || ids.some(x => !x)) { await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind('วาดภาพประกอบไม่ครบ' + (bad ? ': ' + String(bad.error || '').slice(0, 160) : ''), ep.id).run(); continue; }
+      await env.DB.batch([env.DB.prepare("DELETE FROM vjobs WHERE project=? AND status IN ('failed','done')").bind(cj), env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj, String(ep.title || ''), Date.now(), JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: sc.lines || [], imgids: ids, lips: s.pres_lips !== '0', pri: 0 })), env.DB.prepare("UPDATE pres_eps SET status='render' WHERE id=?").bind(ep.id)]);
+    } else {
+      const v = await env.DB.prepare('SELECT id FROM videos WHERE project=? ORDER BY id DESC LIMIT 1').bind(cj).first();
+      if (v) {
+        await env.DB.prepare("UPDATE pres_eps SET status='done', vid=? WHERE id=?").bind(v.id, ep.id).run();
+        await notify(env, '🎙 คลิปเล่าเรื่อง "' + (ep.title || '') + '" ของ ' + (px.name || 'พรีเซนเตอร์') + ' เสร็จแล้ว');
+        if (s.tt_auto === '1' && s.tt_tok) { try { const r = await ttPost(env, { ...ep, vid: v.id }); await env.DB.prepare('UPDATE pres_eps SET posted=? WHERE id=?').bind(r, ep.id).run(); } catch (e) { await env.DB.prepare('UPDATE pres_eps SET err=? WHERE id=?').bind('ส่งเข้า TikTok ไม่สำเร็จ: ' + String(e.message || e).slice(0, 200), ep.id).run(); } }
+      } else if (!busy) await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind('ทำคลิปไม่สำเร็จ' + (bad ? ': ' + String(bad.error || '').slice(0, 200) : ''), ep.id).run();
+    }
+  }
+}
+// ===== TikTok (Content Posting API · ฟรี) — แอปยังไม่ผ่านการตรวจ: ส่งเข้ากล่องร่าง (inbox) ให้กดโพสต์ในแอปเอง · ผ่านแล้วตั้ง tt_mode=direct โพสต์สาธารณะเอง =====
+async function ttForm(url, form) { const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'cache-control': 'no-cache' }, body: new URLSearchParams(form).toString() }); const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(String(j.error_description || j.error || r.status)); return j; }
+async function ttSave(env, j) { await setSetting(env, 'tt_tok', JSON.stringify({ at: j.access_token, rt: j.refresh_token, exp: Date.now() + (+j.expires_in || 86400) * 1000, rexp: Date.now() + (+j.refresh_expires_in || 31536000) * 1000, oid: j.open_id || '' })); }
+async function ttToken(env) {
+  const s = await getSettings(env); let t = null; try { t = JSON.parse(s.tt_tok || 'null'); } catch { t = null; }
+  if (!t || !t.at) throw new Error('ยังไม่ได้เชื่อมบัญชี TikTok');
+  if (Date.now() > t.exp - 10 * 60000) { const j = await ttForm('https://open.tiktokapis.com/v2/oauth/token/', { client_key: s.tt_key, client_secret: s.tt_secret, grant_type: 'refresh_token', refresh_token: t.rt }); await ttSave(env, j); return j.access_token; }
+  return t.at;
+}
+async function ttApi(tok, path, body) { const r = await fetch('https://open.tiktokapis.com' + path, { method: 'POST', headers: { authorization: 'Bearer ' + tok, 'content-type': 'application/json; charset=UTF-8' }, body: JSON.stringify(body || {}) }); const j = await r.json().catch(() => ({})); if (!r.ok || (j.error && j.error.code && j.error.code !== 'ok')) throw new Error((j.error && (j.error.code + ' ' + (j.error.message || ''))) || String(r.status)); return j.data || {}; }
+async function ttPost(env, ep) {
+  if (!ep.vid) throw new Error('คลิปยังไม่เสร็จ');
+  const s = await getSettings(env), tok = await ttToken(env);
+  const rows = (await env.DB.prepare('SELECT data FROM vchunks WHERE vid=? ORDER BY idx').bind(ep.vid).all()).results, parts = rows.map(r => b64ToBytes(r.data)), n = parts.reduce((a, x) => a + x.length, 0), buf = new Uint8Array(n); let o = 0; for (const x of parts) { buf.set(x, o); o += x.length; }
+  if (n < 1000) throw new Error('ไม่พบไฟล์คลิป');
+  const src = { source: 'FILE_UPLOAD', video_size: n, chunk_size: n, total_chunk_count: 1 }; let d;
+  if (s.tt_mode === 'direct') {
+    const ci = await ttApi(tok, '/v2/post/publish/creator_info/query/', {}), opts = ci.privacy_level_options || [];
+    d = await ttApi(tok, '/v2/post/publish/video/init/', { post_info: { title: String(ep.caption || ep.title || '').slice(0, 2200), privacy_level: opts.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE' : (opts[0] || 'SELF_ONLY'), disable_duet: false, disable_comment: false, disable_stitch: false, video_cover_timestamp_ms: 1000 }, source_info: src });
+  } else d = await ttApi(tok, '/v2/post/publish/inbox/video/init/', { source_info: src });
+  const up = await fetch(d.upload_url, { method: 'PUT', headers: { 'content-type': 'video/mp4', 'content-length': String(n), 'content-range': 'bytes 0-' + (n - 1) + '/' + n }, body: buf });
+  if (!up.ok) throw new Error('อัปโหลดไฟล์ไม่สำเร็จ ' + up.status + ' ' + (await up.text()).slice(0, 150));
+  return (s.tt_mode === 'direct' ? 'โพสต์แล้ว ' : 'ส่งเข้ากล่องร่าง TikTok แล้ว ') + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+}
+async function ttRoute(req, env, url, p) { // /tt/login (ต้องมีรหัสเว็บ) → หน้าอนุญาตของ TikTok → /tt/cb เก็บโทเคน
+  const s = await getSettings(env), red = url.origin + '/tt/cb';
+  if (p === '/tt/login') { if (!authOK(req, url, env)) return new Response('forbidden', { status: 403 }); if (!s.tt_key) return new Response('ยังไม่ได้ใส่ Client key ของ TikTok', { status: 400 }); const st = crypto.randomUUID(); await setSetting(env, 'tt_state', st);
+    return Response.redirect('https://www.tiktok.com/v2/auth/authorize/?' + new URLSearchParams({ client_key: s.tt_key, scope: 'user.info.basic,video.upload,video.publish', response_type: 'code', redirect_uri: red, state: st }).toString(), 302); }
+  if (p === '/tt/cb') { const page = m => new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><body style="font:18px system-ui;padding:24px">' + m + '<p><a href="https://xiress-studio.pages.dev/">กลับไปสตูดิโอ</a></p>', { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    if (!url.searchParams.get('state') || url.searchParams.get('state') !== s.tt_state) return page('❌ ลิงก์หมดอายุ ลองกดเชื่อม TikTok ใหม่');
+    if (url.searchParams.get('error')) return page('❌ TikTok ไม่อนุญาต: ' + String(url.searchParams.get('error_description') || url.searchParams.get('error')).replace(/[<>]/g, ''));
+    try { await ttSave(env, await ttForm('https://open.tiktokapis.com/v2/oauth/token/', { client_key: s.tt_key, client_secret: s.tt_secret, code: url.searchParams.get('code') || '', grant_type: 'authorization_code', redirect_uri: red })); await setSetting(env, 'tt_state', ''); return page('✅ เชื่อมบัญชี TikTok สำเร็จ'); }
+    catch (e) { return page('❌ เชื่อมไม่สำเร็จ: ' + String(e.message || e).replace(/[<>]/g, '').slice(0, 200)); } }
+  return new Response('not found', { status: 404 });
 }
 // ---------- ตัวละคร LoRA: เลือกผู้สมัคร → สร้างชุดภาพ 12 ภาพ → ⭐ เลือกภาพ → ฝึก LoRA (ตัวละครที่ series_id=0 ใช้ได้ทุกเรื่อง จับคู่ด้วยชื่อ) ----------
 async function charList(env) {
@@ -1988,11 +2054,12 @@ async function vRoutes(req, env, url, ctx) {
       const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
-      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND (?12=0 OR json_extract(opt,'$.base') IS NOT 'real') AND NOT (kind='lora' AND ((SELECT COUNT(*) FROM vjobs r WHERE r.kind='lora' AND r.status='running') >= 2 OR EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running' AND COALESCE(r.helper,0)=COALESCE(?2,0)))) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'พรีเซนเตอร์·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 21 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0, kv0 < 22 ? 1 : 0).first(); // ภาพเหมือนจริง (opt.base='real' · RealVisXL) ต้องใช้สคริปต์รุ่น 22 // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
+      const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND (?12=0 OR json_extract(opt,'$.base') IS NOT 'real') AND (?13=0 OR kind<>'ptts') AND NOT (kind='lora' AND ((SELECT COUNT(*) FROM vjobs r WHERE r.kind='lora' AND r.status='running') >= 2 OR EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running' AND COALESCE(r.helper,0)=COALESCE(?2,0)))) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'พรีเซนเตอร์·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 21 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0, kv0 < 22 ? 1 : 0, kv0 < 23 ? 1 : 0).first(); // ภาพเหมือนจริง (opt.base='real' · RealVisXL) ต้องใช้สคริปต์รุ่น 22 // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
       if (hid) await env.DB.prepare('UPDATE helpers SET seen=?, cur=? WHERE id=?').bind(Date.now(), j ? String(j.project).slice(0, 120) : '', hid).run();
       if (!j) return json({});
       try { j.opt = JSON.parse(j.opt || '{}'); } catch { j.opt = {}; }
       if (+j.opt.refimg) j.opt.ref = (s.self_url || url.origin) + '/vi/' + (+j.opt.refimg) + '?s=' + await vvSig(env, 'i' + (+j.opt.refimg));
+      if (j.kind === 'ptts' && Array.isArray(j.opt.imgids)) { j.opt.imgs = []; for (const ii of j.opt.imgids) j.opt.imgs.push((s.self_url || url.origin) + '/vi/' + (+ii) + '?s=' + await vvSig(env, 'i' + (+ii))); } // ภาพประกอบคลิปพรีเซนเตอร์
       { const si = +j.opt.styleimg || (j.kind === 'img' && ((String(j.project).startsWith('อ้างอิง·') && !String(j.project).includes('·ตลก·')) || j.opt.engine === 's3d') ? +s.style_img || 0 : 0); /* หน้ามีมไม่ใช้ลายเส้นกลาง (ภาพสวยดึงหน้ามีมให้อ่อน) */ if (si && !j.opt.sw) j.opt.sw = +s.style_w || 0.6; // 0.8 ดึงโทนพาสเทลจนสีผมเพี้ยน → 0.6 // ลายเส้นกลางของเรื่อง (ผู้ใช้เลือกลายเส้นมิโอะ) ใช้กับทุกภาพตัวละคร/ฉาก
         if (si) j.opt.style_ref = (s.self_url || url.origin) + '/vi/' + si + '?s=' + await vvSig(env, 'i' + si); } // ภาพอ้างอิงที่ผู้ใช้เลือก → ลิงก์มีลายเซ็นให้เครื่องดึง (IP-Adapter)
       if (!hid) await setSetting(env, 'k_seen', String(Date.now()));
@@ -4971,7 +5038,291 @@ def song_job(j, port):
     return fin, int(time.time() - t0), 0, 0
 
 
+# ---------- พรีเซนเตอร์: เสียงพากย์เกาหลี (Qwen3-TTS · Apache-2.0) + ขยับปาก (MuseTalk · MIT) + ซับไทย → คลิปแนวตั้ง 1080x1920 ----------
+QTTS_RUN = r"""
+import sys, json, torch, soundfile as sf
+from qwen_tts import Qwen3TTSModel
+spec = json.load(open(sys.argv[1]))
+kw = dict(device_map="cuda:0", dtype=torch.float32)
+if spec["mode"] == "design":
+    m = Qwen3TTSModel.from_pretrained("Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", **kw)
+    wavs, sr = m.generate_voice_design(text=spec["text"], language="Korean", instruct=spec["instruct"])
+    sf.write(spec["out"], wavs[0], sr)
+else:
+    m = Qwen3TTSModel.from_pretrained("Qwen/Qwen3-TTS-12Hz-1.7B-Base", **kw)
+    pr = m.create_voice_clone_prompt(ref_audio=spec["ref"], ref_text=spec["ref_text"])
+    for i, t in enumerate(spec["lines"]):
+        wavs, sr = m.generate_voice_clone(text=t, language="Korean", voice_clone_prompt=pr)
+        sf.write(spec["outs"][i], wavs[0], sr)
+        print("line %d ok" % i, flush=True)
+"""
+
+
+def mk_venv(path):
+    if not os.path.exists(path + "/bin/pip"):
+        sh("python3 -m venv --system-site-packages " + path, check=False)
+    if not os.path.exists(path + "/bin/pip"):
+        sh("rm -rf " + path, check=False)
+        sh("python3 -m pip install -q virtualenv", check=False)
+        sh("python3 -m virtualenv --system-site-packages " + path, check=False)
+    if not os.path.exists(path + "/bin/pip"):
+        raise RuntimeError("สร้าง venv ไม่ได้")
+    return path + "/bin/python"
+
+
+def ensure_qtts():
+    with LOCK:
+        if M.get("qpy"):
+            return M["qpy"]
+        log("กำลังติดตั้งเสียงพากย์ Qwen3-TTS (ครั้งแรกประมาณ 3–6 นาที)")
+        py = mk_venv(os.path.join(ROOT, "qtts"))
+        sh("apt-get install -y -qq sox libsox-fmt-all >/dev/null 2>&1", check=False)
+        sh('"%s" -m pip install -q -U qwen-tts soundfile' % py, check=False)
+        r = subprocess.run('"%s" -c "import qwen_tts, soundfile"' % py, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        if r.returncode != 0:
+            raise RuntimeError("ติดตั้ง Qwen3-TTS ไม่ผ่าน: " + r.stdout[-300:])
+        open(os.path.join(ROOT, "qtts_run.py"), "w").write(QTTS_RUN)
+        M["qpy"] = py
+        log("เสียงพากย์ Qwen3-TTS พร้อม")
+        return py
+
+
+def run_qtts(py, spec, d, gpu):
+    f = os.path.join(d, "spec.json")
+    json.dump(spec, open(f, "w"), ensure_ascii=False)
+    cmd = 'CUDA_VISIBLE_DEVICES=%d HF_HOME="%s" "%s" "%s" "%s"' % (gpu, os.path.join(ROOT, "hf"), py, os.path.join(ROOT, "qtts_run.py"), f)
+    r = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=3600)
+    if r.returncode != 0:
+        raise RuntimeError("ทำเสียง Qwen3-TTS ไม่สำเร็จ: " + r.stdout[-400:])
+
+
+MT = None
+
+
+def ensure_muse():
+    # MuseTalk 1.5 (โค้ด MIT · โมเดลใช้เชิงพาณิชย์ได้) · ติดตั้งไม่ผ่าน = รอบนี้ใช้ภาพนิ่งขยับกล้องแทน (คลิปยังออกได้)
+    global MT
+    with LOCK:
+        if M.get("mpy"):
+            return M["mpy"]
+        if M.get("nomuse"):
+            return None
+        MT = os.path.join(ROOT, "musetalk")
+        try:
+            log("กำลังติดตั้งตัวขยับปาก MuseTalk (ครั้งแรกประมาณ 10–25 นาที)")
+            if not os.path.isdir(MT + "/scripts"):
+                sh("git clone --depth 1 https://github.com/TMElyralab/MuseTalk " + MT)
+            py = mk_venv(MT + "/venv")
+            keep = [x.strip() for x in open(MT + "/requirements.txt").read().splitlines() if x.strip() and not x.strip().startswith(("#", "torch", "-"))]
+            open("/tmp/mreq.txt", "w").write("\n".join(keep) + "\n")
+            sh('"%s" -m pip install -q -r /tmp/mreq.txt' % py, check=False)
+            sh('"%s" -m pip install -q -U openmim' % py, check=False)
+            mim = os.path.join(os.path.dirname(py), "mim")
+            for pk in ("mmengine", '"mmcv==2.0.1"', '"mmdet==3.1.0"', '"mmpose==1.1.0"'):
+                sh('timeout 1800 "%s" install %s' % (mim, pk), check=False)
+            from huggingface_hub import hf_hub_download
+            W = [("TMElyralab/MuseTalk", "musetalkV15/musetalk.json", "musetalkV15"), ("TMElyralab/MuseTalk", "musetalkV15/unet.pth", "musetalkV15"),
+                 ("stabilityai/sd-vae-ft-mse", "config.json", "sd-vae"), ("stabilityai/sd-vae-ft-mse", "diffusion_pytorch_model.bin", "sd-vae"),
+                 ("openai/whisper-tiny", "config.json", "whisper"), ("openai/whisper-tiny", "pytorch_model.bin", "whisper"), ("openai/whisper-tiny", "preprocessor_config.json", "whisper"),
+                 ("yzd-v/DWPose", "dw-ll_ucoco_384.pth", "dwpose")]
+            for repo, fn, sub in W:
+                dst = os.path.join(MT, "models", sub, os.path.basename(fn))
+                if not os.path.exists(dst):
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    shutil.copy(hf_hub_download(repo, fn, local_dir=os.path.join(ROOT, "hf")), dst)
+            fp = os.path.join(MT, "models", "face-parse-bisent")
+            os.makedirs(fp, exist_ok=True)
+            for fn, alt in (("79999_iter.pth", None), ("resnet18-5c106cde.pth", "https://download.pytorch.org/models/resnet18-5c106cde.pth")):
+                dst = os.path.join(fp, fn)
+                if os.path.exists(dst):
+                    continue
+                try:
+                    shutil.copy(hf_hub_download("ManyOtherFunctions/face-parse-bisent", fn, local_dir=os.path.join(ROOT, "hf")), dst)
+                except Exception:
+                    if alt:
+                        urllib.request.urlretrieve(alt, dst)
+                    else:
+                        sh('"%s" -m pip install -q gdown && "%s" -m gdown 154JgKpzCPW82qINcVieuPH3fZ2e0P812 -O "%s"' % (py, py, dst), check=False)
+            chk = subprocess.run('"%s" -c "import mmpose, mmcv, mmdet, diffusers, musetalk"' % py, shell=True, cwd=MT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            if chk.returncode != 0 or not os.path.exists(os.path.join(fp, "79999_iter.pth")):
+                raise RuntimeError(chk.stdout[-300:] or "ไม่มีไฟล์ face-parse")
+            M["mpy"] = py
+            log("ตัวขยับปาก MuseTalk พร้อม")
+            return py
+        except Exception as e:
+            M["nomuse"] = 1
+            log("ติดตั้ง MuseTalk ไม่ผ่าน รอบนี้ใช้ภาพนิ่งขยับกล้องแทน: " + str(e)[-250:])
+            return None
+
+
+def run_muse(py, img, wav, d, gpu, tag):
+    cfg = os.path.join(d, "mt%s.yaml" % tag)
+    out = os.path.join(d, "mt%s" % tag)
+    open(cfg, "w").write('task_0:\n  video_path: "%s"\n  audio_path: "%s"\n' % (img, wav))
+    cmd = ('CUDA_VISIBLE_DEVICES=%d HF_HOME="%s" "%s" -m scripts.inference --inference_config "%s" --result_dir "%s" --unet_model_path models/musetalkV15/unet.pth'
+           ' --unet_config models/musetalkV15/musetalk.json --version v15' % (gpu, os.path.join(ROOT, "hf"), py, cfg, out))
+    try:
+        r = subprocess.run(cmd, shell=True, cwd=MT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=1800)
+    except Exception as e:
+        log("ขยับปากช่วง %s ไม่สำเร็จ: %s" % (tag, str(e)[:150]))
+        return None
+    fs = sorted(glob.glob(os.path.join(out, "**", "*.mp4"), recursive=True), key=os.path.getmtime)
+    if not fs:
+        log("ขยับปากช่วง %s ไม่สำเร็จ ใช้ภาพนิ่งแทน: %s" % (tag, r.stdout[-200:]))
+        return None
+    return fs[-1]
+
+
+def wav_pcm(ff, src, dst):
+    sh('"%s" -y -loglevel error -i "%s" -ac 1 -ar 24000 -f s16le "%s"' % (ff, src, dst))
+    return open(dst, "rb").read()
+
+
+def pcm_wav(pcm, f):
+    import wave
+    w = wave.open(f, "wb")
+    w.setnchannels(1)
+    w.setsampwidth(2)
+    w.setframerate(24000)
+    w.writeframes(pcm)
+    w.close()
+
+
+def th_wrap(t, n=20):
+    # ซับไทยไม่มีช่องว่างให้ตัดบรรทัดเอง: ตัดที่ช่องว่างก่อน ไม่งั้นตัดตามความยาว (นับเฉพาะตัวที่กินที่)
+    marks = set("ัิีึืฺุู็่้๊๋์ํ")
+    words, lines, cur = str(t).split(" "), [], ""
+
+    def ln(x):
+        return sum(1 for c in x if c not in marks)
+    for w in words:
+        while ln(w) > n:
+            k, c = 0, 0
+            while k < len(w) and c < n:
+                if w[k] not in marks:
+                    c += 1
+                k += 1
+            while k < len(w) and w[k] in marks:
+                k += 1
+            if cur:
+                lines.append(cur)
+                cur = ""
+            lines.append(w[:k])
+            w = w[k:]
+        if cur and ln(cur) + 1 + ln(w) > n:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = (cur + " " + w).strip()
+    if cur:
+        lines.append(cur)
+    return "\\N".join(lines[:3])
+
+
+def pres_job(j, port):
+    o = j.get("opt") or {}
+    t0 = time.time()
+    gpu = max(0, (port or 8188) - 8188)
+    try:
+        comfy("/free", {"unload_models": True, "free_memory": True}, port=port)
+    except Exception:
+        pass
+    py = ensure_qtts()
+    d = os.path.join(ROOT, "pj%s" % j["id"])
+    shutil.rmtree(d, ignore_errors=True)
+    os.makedirs(d, exist_ok=True)
+    ff = ffmpeg_bin()
+    if o.get("mode") == "design":
+        run_qtts(py, {"mode": "design", "text": j.get("prompt") or "", "instruct": o.get("instruct") or "", "out": d + "/v.wav"}, d, gpu)
+        mf = os.path.join(ROOT, "pv%s.m4a" % j["id"])
+        sh('"%s" -y -loglevel error -i "%s/v.wav" -af "loudnorm=I=-16:TP=-1.5:LRA=11" -ac 1 -ar 44100 -c:a aac -b:a 128k "%s"' % (ff, d, mf))
+        shutil.rmtree(d, ignore_errors=True)
+        return mf, time.time() - t0, 0, 0
+    lines = o.get("lines") or []
+    imgs = o.get("imgs") or []
+    if not lines or not imgs or not o.get("voice"):
+        raise RuntimeError("งานคลิปพรีเซนเตอร์ข้อมูลไม่ครบ (บท/ภาพ/เสียง)")
+    with urllib.request.urlopen(urllib.request.Request(API + "/vid/%d" % int(o["voice"]), headers=UA), timeout=120) as r:
+        open(d + "/ref.m4a", "wb").write(r.read())
+    sh('"%s" -y -loglevel error -i "%s/ref.m4a" -ac 1 -ar 24000 "%s/ref.wav"' % (ff, d, d))
+    outs = [d + "/l%03d.wav" % i for i in range(len(lines))]
+    log("ทำเสียงพากย์เกาหลี %d ประโยค" % len(lines))
+    run_qtts(py, {"mode": "clone", "ref": d + "/ref.wav", "ref_text": o.get("voice_text") or "", "lines": [x.get("ko") or "" for x in lines], "outs": outs}, d, gpu)
+    # ต่อเสียงเป็นเส้นเดียว + จับเวลาซับทีละประโยค
+    SR, LEAD, GAP, TAIL = 24000, 0.35, 0.28, 0.8
+    sil = lambda s: b"\x00\x00" * int(SR * s)
+    pcm, t, tm = sil(LEAD), LEAD, []
+    for i, f in enumerate(outs):
+        a = wav_pcm(ff, f, d + "/p.raw")
+        du = len(a) / 2.0 / SR
+        tm.append((t, t + du))
+        pcm += a + sil(GAP)
+        t += du + GAP
+    pcm += sil(TAIL)
+    total = len(pcm) / 2.0 / SR
+    pcm_wav(pcm, d + "/all.wav")
+    # ช่วงภาพ: ประโยคติดกันที่ใช้ภาพเดียวกัน = 1 ช่วง
+    segs = []
+    for i, x in enumerate(lines):
+        g = max(0, min(len(imgs) - 1, int(x.get("img") or 0)))
+        if segs and segs[-1][0] == g:
+            segs[-1][2] = i
+        else:
+            segs.append([g, i, i])
+    bounds = []
+    for k, sg in enumerate(segs):
+        a = 0.0 if k == 0 else tm[sg[1]][0] - GAP / 2
+        b = total if k == len(segs) - 1 else tm[segs[k + 1][1]][0] - GAP / 2
+        bounds.append((a, b))
+    from PIL import Image
+    import io
+    ipaths = {}
+    for g in sorted(set(s[0] for s in segs)):
+        with urllib.request.urlopen(urllib.request.Request(imgs[g], headers=UA), timeout=120) as r:
+            im = Image.open(io.BytesIO(r.read())).convert("RGB")
+        p = d + "/img%d.png" % g
+        im.save(p)
+        ipaths[g] = p
+    mpy = ensure_muse() if o.get("lips", True) else None
+    VF = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=z='min(zoom+0.0004,1.06)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=25,format=yuv420p"
+    parts, nlip = [], 0
+    for k, sg in enumerate(segs):
+        a, b = bounds[k]
+        du = max(0.5, b - a)
+        sw = d + "/s%d.wav" % k
+        pcm_wav(pcm[int(a * SR) * 2:int(b * SR) * 2], sw)
+        lv = run_muse(mpy, ipaths[sg[0]], sw, d, gpu, str(k)) if mpy else None
+        pv = d + "/v%02d.mp4" % k
+        if lv:
+            nlip += 1
+            sh('"%s" -y -loglevel error -i "%s" -t %.3f -vf "%s,tpad=stop_mode=clone:stop_duration=2" -t %.3f -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, lv, du, VF, du, pv))
+        else:
+            sh('"%s" -y -loglevel error -loop 1 -framerate 25 -i "%s" -t %.3f -vf "%s" -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, ipaths[sg[0]], du, VF, pv))
+        parts.append(pv)
+    open(d + "/list.txt", "w").write("".join("file '%s'\n" % x for x in parts))
+    sh('"%s" -y -loglevel error -f concat -safe 0 -i "%s/list.txt" -c copy "%s/v.mp4"' % (ff, d, d))
+    fn = thai_font()
+    ass = ["[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "WrapStyle: 2", "",
+           "[V4+ Styles]", "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+           "Style: S,%s,66,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,5,2,2,70,70,330,1" % fn["name"], "",
+           "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
+    for i, x in enumerate(lines):
+        a, b = tm[i]
+        ass.append("Dialogue: 0,%s,%s,S,,0,0,0,,%s" % (ass_time(a - 0.05), ass_time(b + 0.15), th_wrap(ass_esc(x.get("th") or ""))))
+    open(d + "/s.ass", "w", encoding="utf-8").write("\n".join(ass) + "\n")
+    fsub = ff_sub() or ff
+    fdopt = (":fontsdir='%s'" % fn["dir"]) if fn["dir"] else ""
+    out = os.path.join(ROOT, "pc%s.mp4" % j["id"])
+    sh('"%s" -y -loglevel error -i "%s/v.mp4" -i "%s/all.wav" -vf "ass=\'s.ass\'%s" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -r 25 -c:a aac -b:a 160k -ar 44100 -shortest -movflags +faststart "%s"' % (fsub, d, d, fdopt, out), cwd=d)
+    log("คลิปพรีเซนเตอร์เสร็จ %.0f วินาที · ขยับปาก %d/%d ช่วง" % (total, nlip, len(segs)))
+    shutil.rmtree(d, ignore_errors=True)
+    return out, time.time() - t0, 1080, 1920
+
+
 def work(job, port):
+    if job.get("kind") == "ptts":
+        log("เริ่มงานพรีเซนเตอร์ %s (%s)" % (job.get("project"), (job.get("opt") or {}).get("mode")))
+        return pres_job(job, port)
     if job.get("kind") == "song":
         return song_job(job, port)
     if job.get("kind") == "lora":
@@ -5013,7 +5364,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=22" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=23" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
@@ -5468,10 +5819,44 @@ async function castApi(req, env, url, body) {
   if (p === '/api/vcastnow') return json(await castBatch(env, +body.n || 0, true, ['char', 'pet', 'place', 'prop'].includes(body.cat) ? body.cat : ''));
     if (p === '/api/vcastep') { // โครงเรื่อง (.docx ที่อ่านแล้ว) → ใส่บทอัตโนมัติ → ตรวจบทก่อนสร้างทีละตอน
       const b = body || {}, act = b.act || 'get', story = String(b.story || '').trim().slice(0, 60);
-      if (act === 'pres' || act === 'pres_set' || act === 'pres_more' || act === 'pres_ds' || act === 'pres_pick' || act === 'pres_train' || act === 'pres_test') { // แถบเล่าเรื่อง: พรีเซนเตอร์เสมือน (ช่องแยกจากอนิเมะ) · หลายคน (P.list) · ภาพเหมือนจริง RealVisXL + LoRA บน Kaggle
+      if (/^pres(_|$)/.test(act)) { // แถบเล่าเรื่อง: พรีเซนเตอร์เสมือน (ช่องแยกจากอนิเมะ) · หลายคน (P.list) · ภาพเหมือนจริง RealVisXL + LoRA บน Kaggle
         const s0p = await env.DB.prepare("SELECT value FROM settings WHERE key='pres'").first().catch(() => null); let P = {}; try { P = JSON.parse((s0p && s0p.value) || '{}'); } catch { P = {}; }
         const L = Array.isArray(P.list) ? P.list : (P.list = []), pi = L.findIndex(x => x.k === String(b.k || '')), pr = pi >= 0 ? L[pi] : null, save = () => setSetting(env, 'pres', JSON.stringify(P));
         const s = await getSettings(env), PJ = (x, t) => 'พรีเซนเตอร์·' + t + '·' + x.k, cidOf = i => -(100 + i), trigOf = x => 'prs' + x.k + 'x';
+        // ===== เสียงพากย์เกาหลี (Qwen3-TTS · Apache-2.0) · บท · คลิป · TikTok =====
+        if (!presEpReady) { await env.DB.prepare("CREATE TABLE IF NOT EXISTS pres_eps (id INTEGER PRIMARY KEY AUTOINCREMENT, pk TEXT, topic TEXT, title TEXT, status TEXT, script TEXT, caption TEXT, vid INTEGER DEFAULT 0, err TEXT, posted TEXT, created INTEGER)").run(); presEpReady = true; }
+        if (act === 'pres_voice' && pr) { // ออกแบบเสียง 3 แบบจากคำบรรยาย (ไม่ลอกเสียงคนจริง) → ผู้ใช้ฟังแล้วเลือก 1 = เสียงประจำตัว (โคลนจากเสียงนี้ทุกคลิป)
+          const base = PRES_VOICE[pr.k] || PRES_VOICE.a, V = ['', ', slightly breathy and intimate like a vlog', ', lively and expressive like a TV presenter']; let t = Date.now();
+          await env.DB.batch(V.map((x, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'ptts',?)").bind(PJ(pr, 'เสียง'), String(i + 1), PRES_VREF, t++, JSON.stringify({ mode: 'design', instruct: base + x, pri: 0 }))));
+        }
+        if (act === 'pres_vpick' && pr) { const v = await env.DB.prepare('SELECT id,prompt FROM videos WHERE id=? AND project=?').bind(+b.vid, PJ(pr, 'เสียง')).first(); if (v) { pr.voice = v.id; pr.vtext = v.prompt; await save(); } }
+        if (act === 'pres_script') { // AI เขียนบท 1 นาที (เกาหลี + ซับไทย) → รออนุมัติ
+          const px = L.find(x => x.k === String(b.k || '')); if (!px) return json({ error: 'เลือกพรีเซนเตอร์ก่อน' }, 400);
+          const topic = String(b.topic || '').trim().slice(0, 200) || 'เรื่องเล่าน่าทึ่งหรือความรู้รอบตัวที่คนไทยชอบ';
+          const r = await llmJson(env, s, `เขียนบทคลิป TikTok แนวตั้ง ยาวประมาณ 1 นาที ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} พูดกับกล้องเป็นภาษาเกาหลี (คนดูอ่านซับไทย)\nหัวข้อ: ${topic}\nกติกา:\n- 3 วินาทีแรกต้องดึงความสนใจ เล่าเป็นเรื่องมีจุดน่าทึ่งหรือหักมุม ปิดท้ายชวนกดติดตาม\n- 10–13 ประโยค ประโยคละสั้นๆ ภาษาพูดเป็นกันเองแบบสุภาพ (해요체)\n- th = คำแปลไทยที่เป็นธรรมชาติ สั้น อ่านทันใน 3 วินาที\n- ข้อเท็จจริงต้องเป็นเรื่องจริงที่รู้กันทั่วไป ห้ามแต่งตัวเลขหรือชื่อขึ้นเอง ถ้าไม่แน่ใจให้เล่าแบบกว้างๆ\n- แบ่งเป็นช่วงภาพ img = 0,1,2,3 (ช่วงละ ~3 ประโยค) และบอกฉากหลังของแต่ละช่วงเป็นภาษาอังกฤษสั้นๆ ที่เข้ากับเนื้อเรื่อง\nตอบ JSON เท่านั้น: {"title":"ชื่อคลิปภาษาไทย","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","settings":["setting of img 0","...1","...2","...3"],"lines":[{"ko":"...","th":"...","img":0}]}`);
+          const st = (Array.isArray(r.settings) ? r.settings : []).map(x => String(x).slice(0, 120)).filter(Boolean).slice(0, 5), lines = (Array.isArray(r.lines) ? r.lines : []).map(x => ({ ko: String(x.ko || '').trim().slice(0, 160), th: String(x.th || '').trim().slice(0, 160), img: Math.max(0, Math.min((st.length || 1) - 1, +x.img || 0)) })).filter(x => x.ko && x.th).slice(0, 16);
+          if (lines.length < 4 || !st.length) return json({ error: 'AI เขียนบทไม่ครบ ลองกดใหม่อีกครั้ง' }, 500);
+          const sc = { settings: st, lines, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
+          await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'draft',?,?,?)").bind(px.k, topic, String(r.title || topic).slice(0, 120), JSON.stringify(sc), String(r.caption || '').slice(0, 2000), Date.now()).run();
+        }
+        if (act === 'pres_go' || act === 'pres_del' || act === 'pres_post') {
+          const ep = await env.DB.prepare('SELECT * FROM pres_eps WHERE id=?').bind(+b.id).first(); if (!ep) return json({ error: 'ไม่พบคลิปนี้' }, 404);
+          const xi = L.findIndex(x => x.k === ep.pk), px = L[xi];
+          if (act === 'pres_del') { await env.DB.batch([env.DB.prepare('DELETE FROM pres_eps WHERE id=?').bind(ep.id), env.DB.prepare("DELETE FROM vjobs WHERE project IN (?,?) AND status<>'running'").bind('พรีเซนเตอร์·ตอน·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id), env.DB.prepare('DELETE FROM images WHERE project=?').bind('พรีเซนเตอร์·ตอน·' + ep.id)]); }
+          if (act === 'pres_go') { // อนุมัติบท → วาดภาพประกอบด้วย LoRA (ชุด/ทรงผมเดียวทั้งคลิป) → ระบบทำเสียง ขยับปาก ซับไทย รวมคลิปให้เอง (presTick)
+            if (!px) return json({ error: 'ไม่พบพรีเซนเตอร์ของคลิปนี้' }, 400);
+            const l = await env.DB.prepare("SELECT id FROM loras WHERE char_id=? AND status='ready' ORDER BY id DESC LIMIT 1").bind(cidOf(xi)).first();
+            if (!l) return json({ error: 'LoRA ของ ' + (px.name || 'พรีเซนเตอร์') + ' ยังไม่เสร็จ' }, 400);
+            if (!px.voice) return json({ error: 'ยังไม่ได้เลือกเสียงของ ' + (px.name || 'พรีเซนเตอร์') }, 400);
+            let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; }
+            const pj = 'พรีเซนเตอร์·ตอน·' + ep.id, SH = ['medium close-up portrait, head and shoulders, facing the camera, talking', 'medium shot from the waist up, facing the camera, gesturing with one hand while talking']; let t = Date.now();
+            await env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj).run();
+            await env.DB.batch((sc.settings || []).map((g, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${trigOf(px)} woman, ${presWho(px, sc.hair)}, ${SH[i % 2]}, friendly natural expression, wearing ${sc.outfit}, ${g}, vertical composition, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(832, 1216, i + 1, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman talking to the camera', 'a woman wearing ' + sc.outfit] })))));
+            await env.DB.prepare("UPDATE pres_eps SET status='imgs', err=NULL WHERE id=?").bind(ep.id).run();
+          }
+          if (act === 'pres_post') { try { const r = await ttPost(env, ep); await env.DB.prepare('UPDATE pres_eps SET posted=? WHERE id=?').bind(r, ep.id).run(); } catch (e) { return json({ error: 'ส่งเข้า TikTok ไม่สำเร็จ: ' + String(e.message || e).slice(0, 200) }, 500); } }
+        }
+        if (act === 'pres_tt') { for (const k of ['tt_key', 'tt_secret']) if (b[k]) await setSetting(env, k, String(b[k]).trim().slice(0, 200)); for (const k of ['tt_mode', 'tt_auto']) if (b[k] !== undefined) await setSetting(env, k, String(b[k])); if (b.tt_off) await setSetting(env, 'tt_tok', ''); }
         if (act === 'pres_set') { if (pr) { if (b.name !== undefined) pr.name = String(b.name || '').slice(0, 40); } else { if (b.main !== undefined) P.main = +b.main || 0; if (b.name !== undefined) P.name = String(b.name || '').slice(0, 40); } await save(); }
         if (act === 'pres_pick' && pr) { const id = +b.id, s1 = new Set(pr.picked || []); s1.has(id) ? s1.delete(id) : s1.add(id); pr.picked = [...s1]; await save(); }
         if (act === 'pres_ds' && pr) { if (b.redo) { pr.picked = []; await save(); } await presQueueDs(env, pr, !!b.redo); }
@@ -5499,8 +5884,10 @@ async function castApi(req, env, url, body) {
           const lo = await env.DB.prepare("SELECT id,vjob,status,error FROM loras WHERE char_id=? AND status<>'old' ORDER BY id DESC LIMIT 1").bind(cidOf(i)).first(); let lp = null;
           if (lo && lo.status === 'queued') { const vs = await env.DB.prepare('SELECT status FROM vjobs WHERE id=?').bind(lo.vjob).first(); if (vs && vs.status === 'running') { lo.status = 'training'; try { lp = JSON.parse(s['lprog:' + lo.vjob] || 'null'); } catch { lp = null; } } }
           const cnt = (pj, st) => vq.filter(r => r.project === pj && (!st || r.status === st)).reduce((n, r) => n + r.n, 0);
-          out.push({ k: x.k, name: x.name || '', full: x.full, face: x.face, picked: x.picked || [], ds: rows.filter(r => r.project === pjs[0]).map(r => ({ id: r.id, sc: r.scene })), test: rows.filter(r => r.project === pjs[1]).map(r => ({ id: r.id, sc: r.scene })), dsq: cnt(pjs[0]), dsrun: cnt(pjs[0], 'running'), tq: cnt(pjs[1]), lora: lo ? { id: lo.id, status: lo.status, error: lo.error || '', prog: lp } : null }); }
-        return json({ ok: true, pres: P, imgs: im, queued: q, list: out });
+          const vs = (await env.DB.prepare('SELECT id,shot FROM videos WHERE project=? ORDER BY id DESC LIMIT 6').bind(PJ(x, 'เสียง')).all()).results, vsq = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE project=? AND status IN ('queued','running')").bind(PJ(x, 'เสียง')).first()).n;
+          out.push({ k: x.k, name: x.name || '', full: x.full, face: x.face, picked: x.picked || [], voice: x.voice || 0, voices: vs, vq: vsq, ds: rows.filter(r => r.project === pjs[0]).map(r => ({ id: r.id, sc: r.scene })), test: rows.filter(r => r.project === pjs[1]).map(r => ({ id: r.id, sc: r.scene })), dsq: cnt(pjs[0]), dsrun: cnt(pjs[0], 'running'), tq: cnt(pjs[1]), lora: lo ? { id: lo.id, status: lo.status, error: lo.error || '', prog: lp } : null }); }
+        const eps = (await env.DB.prepare('SELECT id,pk,topic,title,status,script,caption,vid,err,posted,created FROM pres_eps ORDER BY id DESC LIMIT 20').all()).results.map(e => { let sc = {}; try { sc = JSON.parse(e.script || '{}'); } catch { sc = {}; } return { ...e, script: undefined, lines: sc.lines || [], outfit: sc.outfit || '' }; });
+        return json({ ok: true, pres: P, imgs: im, queued: q, list: out, eps, tt: { key: !!s.tt_key, linked: !!s.tt_tok, mode: s.tt_mode || 'inbox', auto: s.tt_auto === '1', redirect: (s.self_url || '') + '/tt/cb' } });
       }
       if (act === 'clog') { const k = 'clog', old = (await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(k).first().catch(() => null)); let L = []; try { L = JSON.parse((old && old.value) || '[]'); } catch { } L.push(new Date().toISOString().slice(11, 19) + ' ' + String(b.m || '').slice(0, 400) + ' | ' + String(b.ua || '').slice(0, 120)); await setSetting(env, k, JSON.stringify(L.slice(-15))); return json({ ok: true }); } // ข้อผิดพลาดจากหน้าเว็บของผู้ใช้ (ไว้ตรวจปัญหาที่จำลองไม่ได้)
       if (!story) return json({ error: 'ไม่มีชื่อเรื่อง' }, 400);
