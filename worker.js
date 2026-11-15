@@ -1267,6 +1267,9 @@ async function llmJson(env, s, user, mt) {
     const b = t.indexOf('['), k = t.lastIndexOf('},'); if (b >= 0 && k > b) { try { return JSON.parse(t.slice(b, k + 1) + ']'); } catch (e2) { } }
     throw new Error('AI ตอบ JSON ไม่ครบ: ' + String(e.message || e).slice(0, 80)); }
 }
+// ผู้ใช้สั่ง (15 พ.ย.): ฉากต้องสวย ตัวละครต้องน่าดู — ต่อท้ายทุกช่องสตอรีบอร์ด (ลายเส้นยังมาจาก [[STYLE]] เดิม)
+const SB_BEAUTY = 'beautiful anime key visual, richly detailed background art with depth and atmosphere, cinematic lighting with soft rim light and gentle bloom, harmonious color palette';
+const SB_BEAUTY_CH = 'attractive well-proportioned characters, beautiful detailed eyes with highlights, clean expressive faces, natural hands';
 let animeReady = false;
 async function animeSchema(env) {
   if (animeReady) return;
@@ -1752,7 +1755,7 @@ async function animeApi(env, b) {
       // จำนวนคน+เพศ ต้องอยู่ "ต้นคำสั่ง" (อยู่ท้ายแล้วโมเดลวาดเป็นกลุ่มผู้หญิง/ตารางหน้าคน — เจอจริงกับตอน 1)
       const cnt = !gs.length ? (crt ? 'no humans, creature' : /wide shot|insert shot/.test(sh.en) && !/\b(man|woman|men|women|customers?|guard|merchant|thugs?|figures?|demons?|hands?|finger|clerks?|people|person)\b/i.test(sh.en) ? 'no humans' : '') : [gs.length === 1 ? 'solo' : '', nm ? gt(nm) + (nm > 1 ? 'boys' : 'boy') : '', nf ? gt(nf) + (nf > 1 ? 'girls' : 'girl') : '', nm && !nf ? 'male focus' : '', old, crt ? 'one small creature' : '', gs.length === 1 ? 'single character' : gs.length === 2 ? 'only two people' : ''].filter(Boolean).join(', ');
       st.push(env.DB.prepare('UPDATE shots SET loras=? WHERE id=?').bind(JSON.stringify(m.map(c => ({ id: c.lid, w: c.w }))), sh.id));
-      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${cnt ? cnt + ', ' : ''}${m.map(c => c.tag || ('chr' + c.cid + 'x')).join(', ')}${m.length ? ', ' : ''}${sh.en}${extra.length ? ', ' + extra.join('; ') : ''}, single cinematic illustration, [[STYLE]]`.slice(0, 1800), Date.now(), nch ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
+      st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps,eng,seed) VALUES (?,1,?,'queued',?,?,?,?)").bind(sh.kproj, `${cnt ? cnt + ', ' : ''}${m.map(c => c.tag || ('chr' + c.cid + 'x')).join(', ')}${m.length ? ', ' : ''}${sh.en}${extra.length ? ', ' + extra.join('; ') : ''}, ${SB_BEAUTY}${names.length ? ', ' + SB_BEAUTY_CH : ''}, single cinematic illustration, [[STYLE]]`.slice(0, 1800), Date.now(), nch ? 8 : 4, names.length && !m.length ? 'sdxl' : null, seedOf[sh.id] || null)); // ร่างคร่าวๆ (ยังไม่มี LoRA) วาดเร็ว · ของจริงที่ใช้ LoRA วาดคุณภาพสูง
       n++;
     }
     if (st.length) await env.DB.batch(st);
@@ -1848,10 +1851,10 @@ async function kImgOn(env, s, now) {
   return true;
 }
 async function bridgeImg(env, s) {
-  const rows = (await env.DB.prepare("SELECT id,project,scene,prompt,steps,seed,eng FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux' ORDER BY CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) ELSE 999999 END, CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, id LIMIT 40").all()).results;
-  { const HOLD = new Set(String(s.img_hold || '').split(',').map(x => x.trim()).filter(Boolean)); // พักวาดซีนที่ระบุ (script_id) เช่น รอผู้ใช้เลือกภาพอ้างอิงตัวละครก่อน
-    const ONLY = new Set(String(s.img_only || '').split(',').map(x => x.trim()).filter(Boolean)); // ช่องที่ปล่อยให้วาดได้แม้ซีนถูกพัก (ไว้ทดสอบทีละไม่กี่ช่อง)
-    if (HOLD.size) for (let i = rows.length - 1; i >= 0; i--) { const m = /^ฉาก(\d+)·/.exec(String(rows[i].project)); if (m && HOLD.has(m[1]) && !ONLY.has(String(rows[i].project))) rows.splice(i, 1); } }
+  // พักวาดซีนที่ระบุ (settings img_hold = script_id) · img_only = ช่องที่ปล่อยให้วาดได้แม้ซีนถูกพัก — กรองใน SQL ก่อน LIMIT (เดิมกรองหลัง LIMIT 40 → ซีนที่พักกินโควตา 40 แถวแรกหมด งานอื่นค้างทั้งคิว)
+  const HOLD = String(s.img_hold || '').split(',').map(x => +x.trim()).filter(Boolean), ONLY = String(s.img_only || '').split(',').map(x => x.trim()).filter(Boolean);
+  const hq = HOLD.length ? ` AND NOT (substr(project,1,3)='ฉาก' AND instr(project,'·')>4 AND CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) IN (${HOLD.map(() => '?').join(',')})${ONLY.length ? ` AND project NOT IN (${ONLY.map(() => '?').join(',')})` : ''})` : '';
+  const rows = (await env.DB.prepare("SELECT id,project,scene,prompt,steps,seed,eng FROM jobs WHERE status='queued' AND COALESCE(eng,'')<>'flux'" + hq + " ORDER BY CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) ELSE 999999 END, CASE WHEN project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, id LIMIT 40").bind(...(HOLD.length ? [...HOLD, ...ONLY] : [])).all()).results;
   if (!rows.length) return 0;
   // จองงานแบบอะตอมก่อนส่ง (เคยมีรอบทำงานซ้อน 2 รอบ ส่งงานเดียวกันไป Kaggle ซ้ำ 2 เท่า)
   const got = new Set(((await env.DB.prepare(`UPDATE jobs SET status='kaggle' WHERE status='queued' AND id IN (${rows.map(() => '?').join(',')}) RETURNING id`).bind(...rows.map(r => r.id)).all()).results || []).map(r => r.id));
