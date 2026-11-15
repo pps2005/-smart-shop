@@ -56,7 +56,7 @@ export default {
   },
   async scheduled(event, env0, ctx) {
     const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) }, jobs = [];
-    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presMig1(env).catch(() => { }); await presAutoGo(env).catch(() => { }); await presTick(env, ctx).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
+    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presMig1(env).catch(() => { }); await presMig2(env).catch(() => { }); await presAutoGo(env).catch(() => { }); await presTick(env, ctx).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
     await handleCron(event, env, { waitUntil: p => jobs.push(p) });
     ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare('DELETE FROM rmeter WHERE day < ?').bind(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
   },
@@ -307,16 +307,17 @@ const PRS_BG = ['plain light grey studio backdrop', 'cozy cafe interior', 'city 
 const PRS_LT = ['soft window light', 'soft studio lighting', 'warm golden hour sunlight', 'overcast daylight'];
 // ทรงผมสลับทุกภาพ (ผู้ใช้สั่ง: ทรงผมเปลี่ยนลุคได้ สีคงเดิม) · ใส่ทรงผมในคำบรรยายตอนเทรน → LoRA จำแค่หน้า สั่งทรงผมได้ทุกฉาก
 const PRS_HS = ['long straight hair', 'long soft loose waves', 'high ponytail', 'low bun with face-framing strands', 'half-up half-down hairstyle', 'shoulder-length bob', 'single side braid over the shoulder', 'long hair with see-through curtain bangs', 'medium-length hair tucked behind the ears', 'low ponytail with a ribbon', 'messy top bun', 'long hair with soft curled ends', 'two low pigtails', 'sleek straight hair with a side part'];
-const presDsVar = (i, off = 0) => ({ v: PRS_VW[(i + Math.floor(i / 14)) % 7], e: PRS_EX[(i + Math.floor(i / 7)) % 7], o: PRS_OF[(i * 5 + off) % PRS_OF.length], g: PRS_BG[(i * 3 + 1) % 7], l: PRS_LT[i % 4], h: PRS_HS[(i * 5 + Math.floor(i / 14) * 3) % 14] });
+const presDsVar = (i, off = 0, pool = null) => ({ v: PRS_VW[(i + Math.floor(i / 14)) % 7], e: PRS_EX[(i + Math.floor(i / 7)) % 7], o: pool && pool.length ? pool[(i * 5) % pool.length] : PRS_OF[(i * 5 + off) % PRS_OF.length], g: PRS_BG[(i * 3 + 1) % 7], l: PRS_LT[i % 4], h: PRS_HS[(i * 5 + Math.floor(i / 14) * 3) % 14] });
+const presOutfit = x => { const P = x && Array.isArray(x.outfits) && x.outfits.length ? x.outfits : PRS_OF; return P[Math.floor(Math.random() * P.length)]; };
 const presOff = x => x.k === 'b' ? 17 : 0; // คนที่ 2 ได้ชุดอีกกลุ่ม → ทั้งสองคนรวมกันครอบคลุมชุดทั้งหมด
-const presWho = (x, hs) => `a beautiful young Korean woman in her early twenties, ${x.look || 'soft pretty face, natural makeup'}, ${x.hc || 'dark brown'} hair${hs ? ' styled as ' + hs : ''}, slender graceful figure`;
+const presWho = (x, hs) => `a beautiful young Korean woman in her early twenties, ${x.look || 'soft pretty face, natural makeup'}, ${x.hc || 'dark brown'} hair${hs ? ' styled as ' + hs : ''}, ${x.body || 'slender graceful figure'}`;
 const presOpt = (w, h, sc, extra) => ({ engine: 'sdxl', base: 'real', w, h, steps: 30, seed: 0, loras: [], scene: sc, takes: 2, np: 1, neg: '', neg: 'school uniform, sailor uniform, sailor collar, necktie, bow tie at the neck, uniform blazer, plaid school skirt, messy tangled hair, clumped hair, fused hair, hair merging into clothes, floating hair strands, wig, hair artifacts', qneg: ['two people', 'an anime cartoon drawing', 'a deformed distorted face', 'a blurry low quality photo', 'a woman with messy clumped unnatural hair', 'a girl in a school uniform'], ...extra });
 async function presQueueDs(env, pr, redo) { // วาดชุดฝึกบน Kaggle: RealVisXL + IP-Adapter Plus Face (ล็อกหน้าจากภาพต้นแบบที่ตัดเฉพาะหน้า)
   const pj = 'พรีเซนเตอร์·ชุดฝึก·' + pr.k;
   if (redo) await env.DB.batch([env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND status='queued'").bind(pj)]);
   const have = redo ? [] : (await env.DB.prepare('SELECT scene FROM images WHERE project=?').bind(pj).all()).results.map(r => +r.scene), q = (await env.DB.prepare("SELECT json_extract(opt,'$.scene') sc FROM vjobs WHERE project=? AND status IN ('queued','running')").bind(pj).all()).results.map(r => +r.sc);
   const st = []; let t = Date.now();
-  for (let i = 0; i < 28; i++) { if (have.includes(i + 1) || q.includes(i + 1)) continue; const d = presDsVar(i, presOff(pr));
+  for (let i = 0; i < 28; i++) { if (have.includes(i + 1) || q.includes(i + 1)) continue; const d = presDsVar(i, presOff(pr), pr.outfits);
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${presWho(pr, d.h)}, ${d.v[0]}, ${d.e}, wearing ${d.o}, ${d.g}, ${d.l}, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(d.v[1], d.v[2], i + 1, { refimg: pr.face, ipa: 'face', rw: 0.6, ipa_end: 1.0, qc: ['a realistic photo of one young Korean woman with ' + (pr.hc || 'dark') + ' hair styled as ' + d.h, 'a woman wearing ' + d.o] })))); }
   if (st.length) await env.DB.batch(st);
   return st.length;
@@ -335,6 +336,29 @@ async function presFix(env) { // ครั้งเดียว (pres_fix=v2): �
   for (const x of L) await presQueueDs(env, x, true);
   await setSetting(env, 'pres_fix', 'v6');
   await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('พรีเซนเตอร์: ล็อกเฉพาะหน้า + สลับทรงผม (สีเดิม) + ชุดสไตล์ใหม่ (ไม่มีเครื่องแบบ) → วาดชุดฝึกใหม่คนละ 28 ภาพ', Date.now()).run().catch(() => { });
+}
+// ผู้ใช้สั่ง (15 พ.ย. 18:15): ช่องพรีเซนเตอร์ใช้แค่ฮัน โซยุล · ชุดแนวเสื้อตัวสั้น/เสื้อยืดเข้ารูป + ยีนส์ขากว้าง + ผ้าใบขาว · หุ่นเต็ม เอวคอด
+const SOYUL_OUTFITS = ['a white puff-sleeve ruffled crop blouse with a front tie, light blue high-waisted wide-leg jeans and white sneakers', 'a black fitted short-sleeve t-shirt tucked into grey wide-leg jeans and white sneakers', 'a cream fitted knit crop top, mid-blue high-waisted wide-leg jeans and white sneakers', 'a white fitted crop t-shirt, light wash wide-leg jeans with a brown belt and white sneakers', 'a navy and white striped fitted t-shirt, light blue wide-leg jeans and white sneakers', 'a pastel pink square-neck puff-sleeve top, white wide-leg jeans and white sneakers', 'a soft grey fitted ribbed long-sleeve top, dark blue wide-leg jeans and white sneakers', 'a light blue fitted button-up shirt knotted at the waist, white wide-leg jeans and white sneakers', 'a black square-neck fitted top, faded grey wide-leg jeans, white sneakers and a small black shoulder bag', 'a white off-shoulder ruffle crop blouse, light blue wide-leg jeans and white sneakers', 'a lilac fitted knit cardigan buttoned up, light wash wide-leg jeans and white sneakers', 'a beige fitted t-shirt, cream wide-leg jeans and white sneakers'];
+const SOYUL_BODY = 'curvy figure with a full bust, a narrow waist and shapely hips, long legs, wearing fitted clothes';
+async function presMig2(env) { // ครั้งเดียว: ซ่อนซอ ฮาริน (เก็บไฟล์ไว้) · โซยุลได้ชุด/หุ่นใหม่ → ยกเลิก LoRA เก่า วาดชุดฝึกใหม่ · EP1 เปลี่ยนเป็นของโซยุล
+  const s = await getSettings(env); if (s.pres_mig2 === 'done' || (+s.pres_mig2n || 0) >= 5) return;
+  let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; } const L = P.list || [], A = L.find(x => x.k === 'a'), B = L.find(x => x.k === 'b'); if (!B) return;
+  if (!s.pres_mig2s) { // ขั้นแรก (ทำครั้งเดียว): ข้อมูลพรีเซนเตอร์ + ยกเลิกเทรนเก่า + วาดชุดฝึกใหม่
+    if (A) A.hide = 1;
+    B.outfits = SOYUL_OUTFITS; B.body = SOYUL_BODY; B.picked = [];
+    await setSetting(env, 'pres', JSON.stringify(P));
+    await env.DB.batch([env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND project=?").bind('พรีเซนเตอร์·LoRA·b'), env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=-101 AND status<>'ready'")]);
+    await presQueueDs(env, B, true);
+    await setSetting(env, 'pres_mig2s', '1');
+  }
+  const ep = await env.DB.prepare('SELECT * FROM pres_eps WHERE id=3').first().catch(() => null);
+  if (ep && ep.status !== 'done') {
+    try { const o = await serNew(env, s, B, 'ผัดไทย + เรื่องปริศนา', 1); let old = {}; try { old = JSON.parse(ep.script || '{}'); } catch { old = {}; } o.sc.motion = old.motion === undefined ? 2 : old.motion; o.sc.auto = 1;
+      await env.DB.batch([env.DB.prepare("DELETE FROM vjobs WHERE (project=? OR project=?) AND status<>'running'").bind('พรีเซนเตอร์·ตอน·3', 'พรีเซนเตอร์·คลิป·3'), env.DB.prepare('DELETE FROM images WHERE project=?').bind('พรีเซนเตอร์·ตอน·3'),
+        env.DB.prepare("UPDATE pres_eps SET pk='b', topic=?, title=?, script=?, caption=?, status='writing', err=NULL WHERE id=3").bind('ผัดไทย + เรื่องปริศนา', o.title, JSON.stringify(o.sc), o.caption.slice(0, 2000))]); }
+    catch (e) { await setSetting(env, 'pres_mig2n', String((+s.pres_mig2n || 0) + 1)); return; } }
+  await setSetting(env, 'pres_mig2', 'done');
+  await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('พรีเซนเตอร์: ใช้แค่ฮัน โซยุล (ชุดยีนส์ขากว้าง หุ่นเต็ม) → วาดชุดฝึกใหม่ 28 ภาพ · EP1 เขียนใหม่เป็นของโซยุล', Date.now()).run().catch(() => { });
 }
 async function presAutoGo(env) { // ตอนที่ผู้ใช้สั่งให้ทำต่อเอง (script.auto=1): บทครบ + LoRA เสร็จ + มีเสียง → อนุมัติเอง (เหมือนกด ✅)
   if (new Date().getUTCMinutes() % 2) return;
@@ -402,7 +426,7 @@ async function serNew(env, s, px, topic, epno) { // ออกแบบโคร�
   if (scenes.length < 3 || scenes.some(S => S.settings.length < 4 || S.beats.length < SER_CH)) throw new Error('AI ออกแบบตอนไม่ครบ 3 ซีน ลองกดใหม่อีกครั้ง');
   const menu = String((r && r.menu) || '').trim().slice(0, 60), mystery = String((r && r.mystery) || '').trim().slice(0, 80);
   const title = SHOW_NAME(px) + ' EP' + epno + (menu ? ' · ' + menu : '');
-  return { sc: { series: 1, kind: 'show', epno, menu, mystery, title, scenes, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] }, title, caption: title + '\n' + String((r && r.caption) || '').slice(0, 1800) };
+  return { sc: { series: 1, kind: 'show', epno, menu, mystery, title, scenes, outfit: presOutfit(px), hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] }, title, caption: title + '\n' + String((r && r.caption) || '').slice(0, 1800) };
 }
 async function serNextEp(env, pk) { const r = await env.DB.prepare("SELECT MAX(CAST(json_extract(script,'$.epno') AS INTEGER)) m FROM pres_eps WHERE pk=?").bind(pk).first().catch(() => null); return ((r && +r.m) || 0) + 1; }
 function serOutlinePrompt(px, kind, topic) {
@@ -6079,7 +6103,7 @@ async function castApi(req, env, url, body) {
 - ผู้พูดเป็นผู้หญิง ซับไทยต้องเป็นสำเนียงผู้หญิง ใช้ "ฉัน/เรา" ลงท้าย "ค่ะ/นะคะ/นะ" ห้ามใช้ "ผม/ครับ"\n- ข้อเท็จจริงต้องเป็นเรื่องจริงที่รู้กันทั่วไป ห้ามแต่งตัวเลขหรือชื่อขึ้นเอง ถ้าไม่แน่ใจให้เล่าแบบกว้างๆ\n- แบ่งเป็นช่วงภาพ img = 0,1,2,3 (ช่วงละ ~3 ประโยค) และบอกฉากหลังของแต่ละช่วงเป็นภาษาอังกฤษสั้นๆ ที่เข้ากับเนื้อเรื่อง\nตอบ JSON เท่านั้น: {"title":"ชื่อคลิปภาษาไทย","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","settings":["setting of img 0","...1","...2","...3"],"lines":[{"ko":"...","th":"...","img":0}]}`);
           const st = (Array.isArray(r.settings) ? r.settings : []).map(x => String(x).slice(0, 120)).filter(Boolean).slice(0, 5), lines = (Array.isArray(r.lines) ? r.lines : []).map(x => ({ ko: String(x.ko || '').trim().slice(0, 160), th: thFem(String(x.th || '').trim().slice(0, 160)), img: Math.max(0, Math.min((st.length || 1) - 1, +x.img || 0)) })).filter(x => x.ko && x.th).slice(0, 16);
           if (lines.length < 4 || !st.length) return json({ error: 'AI เขียนบทไม่ครบ ลองกดใหม่อีกครั้ง' }, 500);
-          const sc = { settings: st, lines, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
+          const sc = { settings: st, lines, outfit: presOutfit(px), hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
           await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'draft',?,?,?)").bind(px.k, topic, String(r.title || topic).slice(0, 120), JSON.stringify(sc), String(r.caption || '').slice(0, 2000), Date.now()).run();
         }
         if (act === 'pres_series') { // รายการ "<ชื่อ>สอนทำอาหารกับเล่าเรื่องปริศนา EPn": AI ออกแบบโครง 3 ซีน → presTick เขียนบททีละช่วงเอง → รออนุมัติ
@@ -6114,7 +6138,7 @@ async function castApi(req, env, url, body) {
         if (act === 'pres_train' && pr) { // เทรน LoRA ภาพเหมือนจริง (ฐาน RealVisXL) — ใช้ภาพที่ติดดาว
           const ims = (await env.DB.prepare('SELECT id,scene FROM images WHERE project=? ORDER BY scene').bind(PJ(pr, 'ชุดฝึก')).all()).results, pk = new Set(pr.picked || []); let use = ims.filter(x => pk.has(x.id));
           if (use.length < 12) { if (ims.length >= 12) use = ims; else return json({ error: 'ชุดฝึกวาดยังไม่ถึง 12 ภาพ (ตอนนี้ ' + ims.length + ')' }, 400); } // ติดดาวไม่ถึง 12 = ใช้ทุกภาพที่วาดแล้ว
-          const cid = cidOf(pi), trig = trigOf(pr), imgs = use.map(x => { const d = presDsVar((+x.scene || 1) - 1, presOff(pr)); return { id: x.id, cap: `${trig} woman, ${pr.hc || 'dark'} hair, ${d.h}, ${d.v[0]}, ${d.e}, wearing ${d.o}, ${d.g}, ${d.l}` }; }), pj = PJ(pr, 'LoRA');
+          const cid = cidOf(pi), trig = trigOf(pr), imgs = use.map(x => { const d = presDsVar((+x.scene || 1) - 1, presOff(pr), pr.outfits); return { id: x.id, cap: `${trig} woman, ${pr.hc || 'dark'} hair, ${d.h}, ${d.v[0]}, ${d.e}, wearing ${d.o}, ${d.g}, ${d.l}` }; }), pj = PJ(pr, 'LoRA');
           await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(cid), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
           const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: cid, trigger: trig, images: imgs, pri: 0, dim: 32, alpha: 16, lr: 1e-4, res: 896, base: 'real' })).run();
           await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(cid, r.meta.last_row_id, Date.now()).run();
@@ -6136,6 +6160,7 @@ async function castApi(req, env, url, body) {
           if (lo && lo.status === 'queued') { const vs = await env.DB.prepare('SELECT status FROM vjobs WHERE id=?').bind(lo.vjob).first(); if (vs && vs.status === 'running') { lo.status = 'training'; try { lp = JSON.parse(s['lprog:' + lo.vjob] || 'null'); } catch { lp = null; } } }
           const cnt = (pj, st) => vq.filter(r => r.project === pj && (!st || r.status === st)).reduce((n, r) => n + r.n, 0);
           const vs = (await env.DB.prepare('SELECT id,shot FROM videos WHERE project=? ORDER BY id DESC LIMIT 6').bind(PJ(x, 'เสียง')).all()).results, vsq = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE project=? AND status IN ('queued','running')").bind(PJ(x, 'เสียง')).first()).n;
+          if (x.hide) continue; // เก็บไว้ (ไม่ใช้ในช่องพรีเซนเตอร์แล้ว) — LoRA/ภาพ/เสียงยังอยู่ครบ
           out.push({ k: x.k, name: x.name || '', tone: x.tone || 'bright', sc: x.sc || '#FFFFFF', full: x.full, face: x.face, picked: x.picked || [], voice: x.voice || 0, voices: vs, vq: vsq, ds: rows.filter(r => r.project === pjs[0]).map(r => ({ id: r.id, sc: r.scene })), test: rows.filter(r => r.project === pjs[1]).map(r => ({ id: r.id, sc: r.scene })), dsq: cnt(pjs[0]), dsrun: cnt(pjs[0], 'running'), tq: cnt(pjs[1]), lora: lo ? { id: lo.id, status: lo.status, error: lo.error || '', prog: lp } : null }); }
         const eps = (await env.DB.prepare('SELECT id,pk,topic,title,status,script,caption,vid,err,posted,created FROM pres_eps ORDER BY id DESC LIMIT 20').all()).results.map(e => { let sc = {}; try { sc = JSON.parse(e.script || '{}'); } catch { sc = {}; } return { ...e, script: undefined, lines: sc.series ? (sc.scenes || []).flatMap(S => S.lines || []) : (sc.lines || []), outfit: sc.outfit || '', series: sc.series ? 1 : 0, prog: sc.series ? (sc.scenes || []).map(S => ({ t: S.title || '', n: (S.lines || []).length, done: S.done || 0, min: Math.round((S.lines || []).length * 4.3 / 6) / 10 })) : undefined, vids: sc.vids || [] }; });
         return json({ ok: true, pres: P, imgs: im, queued: q, list: out, eps, tt: { key: !!s.tt_key, linked: !!s.tt_tok, mode: s.tt_mode || 'inbox', auto: s.tt_auto === '1', redirect: (s.self_url || '') + '/tt/cb' } });
