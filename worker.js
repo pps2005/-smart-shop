@@ -284,7 +284,7 @@ function audIntro(name, tr) {
 // ออดิชันรายวัน: หลัง 07:00 น. เวลาไทย เรียกผู้สมัครใหม่รวม aud_daily คน (ค่าเริ่ม 6, 4–8) เฉพาะบทที่ยังไม่ได้เลือก
 async function audDaily(env) {
   const s = await getSettings(env), b = new Date(Date.now() + 7 * 3600000), day = b.toISOString().slice(0, 10);
-  if (s.aud_auto === '0' || b.getUTCHours() < 7 || s.aud_day === day) return;
+  if (s.aud_auto !== '1' || b.getUTCHours() < 7 || s.aud_day === day) return;
   await setSetting(env, 'aud_day', day);
   const first = await env.DB.prepare('SELECT COUNT(*) n FROM aud_cands').first();
   if (!first || !+first.n) return; // วันแรกเรียกครบทุกบทตอนเปิดห้องออดิชันอยู่แล้ว
@@ -5776,7 +5776,7 @@ def pres_job(j, port):
     t0 = time.time()
     LAND = str(o.get("aspect") or "") == "16:9"  # แนวนอน 16:9 = 1920x1080 · ไม่ระบุ = แนวตั้ง 1080x1920 เหมือนเดิม
     OW, OH = (1920, 1080) if LAND else (1080, 1920)
-    FPS = int(o.get("fps") or (60 if LAND else 25))
+    FPS = int(o.get("fps") or (60 if LAND else 30))
     o["_fps"], o["_mci"] = FPS, bool(o.get("interp"))
     gpu = max(0, (port or 8188) - 8188)
     try:
@@ -5888,7 +5888,7 @@ def pres_job(j, port):
     fn = thai_font()
     ass = ["[Script Info]", "ScriptType: v4.00+", "PlayResX: %d" % OW, "PlayResY: %d" % OH, "WrapStyle: 2", "",
            "[V4+ Styles]", "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-           "Style: S,%s,%d,%s,%s,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,5,2,2,%d,%d,%d,1" % (fn["name"], 52 if LAND else 66, ass_col(o.get("subc")), ass_col(o.get("subc")), 200 if LAND else 70, 200 if LAND else 70, 70 if LAND else 330), "",
+           "Style: S,%s,%d,%s,%s,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,5,2,2,%d,%d,%d,1" % (fn["name"], 52 if LAND else 66, ass_col(o.get("subc")), ass_col(o.get("subc")), 200 if LAND else 80, 200 if LAND else 150, 70 if LAND else 400), "",
            "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
     for i, x in enumerate(lines):
         a, b = tm[i]
@@ -5902,9 +5902,9 @@ def pres_job(j, port):
     open(d + "/s.ass", "w", encoding="utf-8").write("\n".join(ass) + "\n")
     fsub = ff_sub() or ff
     fdopt = (":fontsdir='%s'" % fn["dir"]) if fn["dir"] else ""
-    VB = int(max(700, min(9000, float(o.get("mb") or 40) * 8000.0 / max(total, 1.0) - 192)))  # เพดานขนาดไฟล์ ~40MB (บอทรับไฟล์ได้จำกัด) → บิตเรตลดตามความยาว
+    VB = int(max(700, min(12000, float(o.get("mb") or 40) * 8000.0 / max(total, 1.0) - 192)))  # เพดานขนาดไฟล์ ~40MB (บอทรับไฟล์ได้จำกัด) → บิตเรตลดตามความยาว
     out = os.path.join(ROOT, "pc%s.mp4" % j["id"])
-    sh('"%s" -y -loglevel error -i "%s/v.mp4" -i "%s/all.wav" -vf "ass=\'s.ass\'%s" -c:v libx264 -preset fast -crf 20 -maxrate %dk -bufsize %dk -pix_fmt yuv420p -r %d -c:a aac -b:a 160k -ar 44100 -shortest -movflags +faststart "%s"' % (fsub, d, d, fdopt, VB, VB * 2, FPS, out), cwd=d)
+    sh('"%s" -y -loglevel error -i "%s/v.mp4" -i "%s/all.wav" -vf "ass=\'s.ass\'%s" -c:v libx264 -preset medium -crf 18 -maxrate %dk -bufsize %dk -pix_fmt yuv420p -r %d -af loudnorm=I=-14:TP=-1.5:LRA=11 -c:a aac -b:a 192k -ar 44100 -shortest -movflags +faststart "%s"' % (fsub, d, d, fdopt, VB, VB * 2, FPS, out), cwd=d)
     log("คลิปพรีเซนเตอร์เสร็จ %.0f วินาที · ขยับปาก %d/%d ช่วง · ท่าทาง AI %d/%d ช่วง" % (total, nlip, len(segs), nmo, len(segs)))
     shutil.rmtree(d, ignore_errors=True)
     return out, time.time() - t0, OW, OH
@@ -6456,7 +6456,7 @@ async function castApi(req, env, url, body) {
         }
         if (act === 'pres_clip') { // ซีนยาว ~3 นาที: AI วางโครง 8–16 ภาพ (สาว + แมว + ฉากสวย ไม่ซ้ำกับครั้งก่อน) → เขียนบทพากย์จีน + ซับไทย → รออนุมัติ → ระบบทำต่อเอง
           if (!pr) return json({ error: 'เลือกตัวละครก่อน' }, 400);
-          const n = Math.max(8, Math.min(90, Math.round(+b.shots || 45))), idea = String(b.idea || '').trim().slice(0, 300);
+          const n = Math.max(8, Math.min(90, Math.round(+b.shots || 12))), idea = String(b.idea || '').trim().slice(0, 300);
           const pets = String(b.pets !== undefined ? b.pets : (pr.pets || '')).trim().slice(0, 300) || 'a cute fluffy cream and white cat with big round eyes';
           if (b.pets !== undefined && String(b.pets || '').trim() !== (pr.pets || '')) { pr.pets = String(b.pets || '').trim().slice(0, 300); await save(); }
           const prev = (await env.DB.prepare('SELECT title,script FROM pres_eps WHERE pk=? ORDER BY id DESC LIMIT 14').bind(pr.k).all()).results, usedPl = new Set(), usedTi = [];
@@ -6509,7 +6509,7 @@ async function castApi(req, env, url, body) {
           const spokenN = parts.reduce((t, x) => t + x.spoken, 0);
           if (spokenN < Math.ceil(sh.length * 0.5)) return json({ error: 'AI เขียนบทพากย์ได้ ' + spokenN + ' จาก ' + sh.length + ' ช็อต (โควตา AI ฟรีอาจใกล้หมด) ลองกดใหม่อีกครั้ง' }, 500);
           const lines = parts.flatMap(x => x.raw);
-          const sc = { series: true, clip: true, aspect: b.aspect === '9:16' ? '9:16' : '16:9', fps: +b.fps || (b.aspect === '9:16' ? 25 : 60), interp: +b.interp ? 1 : 0, lang: 'Chinese', epno: await serNextEp(env, pr.k), motion: [0, 2, 3].includes(+b.motion) ? +b.motion : 2, outfit: String(o.outfit || '').trim().slice(0, 120) || presOutfit(pr), hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)], pets, place, scenes: [{ title, settings: sh.map(x => ({ t: x.t, p: x.p, f: x.f, m: x.m })), lines }] };
+          const sc = { series: true, clip: true, aspect: b.aspect === '16:9' ? '16:9' : '9:16', fps: +b.fps || (b.aspect === '16:9' ? 60 : 30), interp: +b.interp ? 1 : 0, lang: 'Chinese', epno: await serNextEp(env, pr.k), motion: [0, 2, 3].includes(+b.motion) ? +b.motion : 2, outfit: String(o.outfit || '').trim().slice(0, 120) || presOutfit(pr), hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)], pets, place, scenes: [{ title, settings: sh.map(x => ({ t: x.t, p: x.p, f: x.f, m: x.m })), lines }] };
           await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'draft',?,?,?)").bind(pr.k, theme.slice(0, 200), title, JSON.stringify(sc), String(o.caption || '').slice(0, 2000), Date.now()).run();
         }
         if (act === 'pres_series') { // รายการ "<ชื่อ>สอนทำอาหารกับเล่าเรื่องปริศนา EPn": AI ออกแบบโครง 3 ซีน → presTick เขียนบททีละช่วงเอง → รออนุมัติ
