@@ -851,6 +851,8 @@ function bindTabs(A){A.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
   A.querySelectorAll('[data-wipe]').forEach(b=>b.onclick=wipeRebuild);
   A.querySelectorAll('[data-autoff]').forEach(b=>b.onclick=async()=>{if(!confirm('ปิดระบบอัตโนมัติเก่าทั้งหมด และล้างคิวงานเทรน LoRA/ภาพที่ค้างอยู่?'))return;b.disabled=true;try{const r=await api('autos_off');toast('ปิดแล้ว · ล้างงานเทรนค้าง '+(r.loras_cleared||0)+' รายการ');}catch(e){toast(botErr(e));}await load();});
   A.querySelectorAll('[data-test]').forEach(b=>b.onclick=async()=>{ST.testMsg='⏳ กำลังทดสอบ…';render();const c=botCfg(),r=await testBot(c.url,c.key);ST.testMsg=r.m;render();});}
+/* กันหน้าเด้งขึ้นบน: วาดใหม่แล้วอยู่ตำแหน่งเดิม (แตะภาพ/โหลดซ้ำทุก 30 วิ ไม่ดีดกลับ) · เปลี่ยนแท็บยังเลื่อนขึ้นบนตามเดิม */
+render=(function(r0){return function(){const y=window.scrollY;const v=r0.apply(this,arguments);window.scrollTo(0,y);return v;};})(render);
 async function wipeRebuild(){
   const t=prompt('จะลบคลังนักแสดงเก่าทั้งหมด (ผู้สมัคร ตัวละคร LoRA ภาพ) กู้คืนไม่ได้\nพิมพ์ ลบทั้งหมด เพื่อยืนยัน');if(t!=='ลบทั้งหมด'){if(t!==null)toast('ยกเลิก: พิมพ์ไม่ตรง');return;}
   ST.busy='กำลังลบคลังเก่า…';ST.msg='';ST.tab='story';render();
