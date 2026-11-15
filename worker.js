@@ -453,9 +453,28 @@ async function xlTick(env) {
   for (const c of cs) {
     const pj = charProj(c);
     if ((await env.DB.prepare("SELECT COUNT(*) n FROM jobs WHERE project=? AND status IN ('queued','running','kaggle')").bind(pj).first()).n) continue;
+    if ((await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE kind='img' AND project=? AND status IN ('queued','running','hold')").bind(pj).first()).n) continue; // ชุดฝึกยังวาดไม่ครบ
     if ((await env.DB.prepare('SELECT COUNT(*) n FROM images WHERE project=?').bind(pj).first()).n < 12) continue;
     await charTrain(env, { char_id: c.id });
   }
+}
+// LoRA สถานที่หลักของเรื่อง (ผู้ใช้สั่ง 15 พ.ย.: เทรนอัตโนมัติ) — ชื่อต้องตรงกับ shots.loc · วาดชุดฝึก 16 มุม ไม่มีคน ด้วย SDXL ลายเส้นเดียวกับตัวละคร
+const HY_PLACE = {
+  'ออฟฟิศคลังอาคม': 'indoors, office, archive room, long room, tall dark wood filing cabinets with many small drawers lining both walls up to the ceiling, tall arched window at the far end, brass hanging lamps, worn wooden floorboards, two wooden clerk desks side by side, stacks of paper, warm afternoon light',
+  'ตู้กดน้ำหลังโกดังคลังอาคม': 'outdoors, night, narrow gravel lot behind an old brick warehouse, single old vending machine glowing against the brick wall, worn wooden bench beside it, crooked street lamp, moths around the light, weeds along the wall, closed rolling shutter, dark blue night sky',
+  'ร้านขนมปังป้าฮานะ': 'indoors, bakery, small cozy shop, polished wooden counter, glass display case of round buns and pastries, wooden wall shelves stacked with baguettes and loaves, small bell above the door, large front window, morning sunlight',
+};
+async function placeSetup(env, story) {
+  await animeSchema(env); const made = [];
+  for (const [name, tags] of Object.entries(HY_PLACE)) {
+    let c = await env.DB.prepare('SELECT * FROM chars WHERE series_id=0 AND name=?').bind(name).first();
+    if (!c) { const r = await env.DB.prepare("INSERT INTO chars (series_id,name,desc,created,kind,story) VALUES (0,?,?,?,'place',?)").bind(name, tags, Date.now(), story).run(); c = { id: r.meta.last_row_id, name, desc: tags, kind: 'place', series_id: 0 }; }
+    const pj = charProj(c), have = (await env.DB.prepare("SELECT (SELECT COUNT(*) FROM images WHERE project=?1)+(SELECT COUNT(*) FROM vjobs WHERE kind='img' AND project=?1 AND status IN ('queued','running','hold')) n").bind(pj).first()).n || 0;
+    let t = Date.now();
+    for (let i = have; i < 16; i++) { const v = xlVar(c, i);
+      await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, 'no humans, scenery, ' + tags + ', ' + v + ', detailed background, anime screencap, anime coloring, flat color, clean lineart, simple cel shading, bright clean colors', t++, JSON.stringify({ engine: 'sdxl', w: 1344, h: 768, steps: 30, seed: 0, loras: [], scene: i + 1, neg: '1girl, 1boy, people, person, human, crowd, text, letters, signature, monochrome, greyscale, blurry', takes: 2, np: 0, qref: 1, qc: ['a detailed anime background painting of ' + tags.split(', ').slice(1, 6).join(', ') + ' with no people', 'anime scenery, ' + v], qneg: ['a person standing in the picture', 'words and letters written on signs', 'a blurry messy unfinished picture'] })).run(); }
+    made.push(name + ':' + Math.max(0, 16 - have)); }
+  return made;
 }
 async function xlNew(env, story, kind, name, desc) {
   await animeSchema(env);
@@ -1620,7 +1639,8 @@ async function bridgeImg(env, s) {
         for (const c of pcs) { const r = LR[c.n], k = shOf && shOf[c.n]; lo.push({ id: r.id, w: pcs.length > 1 ? 0.55 : 0.7 }); const t = 'chr' + r.cid + 'x' + (k ? ', outfit_' + k : ''); tg.push(t); c.tags = t + ', ' + c.tags; }
         if (lo.length) { hyO.loras = lo; hyO.all = (tg.join(', ') + ', ' + hyO.all).slice(0, 1100); } } // รอรูปชุดเสร็จก่อนค่อยวาดช่องนี้ (ชุดตรงตั้งแต่ช่องแรก)
     }
-    const opt = { ...(hyOn ? { hy: hyO } : {}), ...(hyO && hyO.loras ? { loras: hyO.loras } : {}), ...(s3 ? { s3 } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: s3 ? 's3d' : eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: (hyO && hyO.loras) || lo }; // LoRA ตัวละครของช่องแบบผสม (เดิมถูก loras: lo ทับเป็นค่าว่าง → ฉากไม่ได้ใช้ LoRA เลย)
+    let plo = null; if (hyOn && hyO && shLoc && s.place_lora !== '0') { plo = await env.DB.prepare("SELECT l.id, c.id cid FROM loras l JOIN chars c ON c.id=l.char_id WHERE c.series_id=0 AND c.kind='place' AND c.name=? AND l.status='ready' ORDER BY l.id DESC LIMIT 1").bind(shLoc).first().catch(() => null); if (plo && hyO.all) hyO.all = ('chr' + plo.cid + 'x, ' + hyO.all).slice(0, 1100); } // LoRA สถานที่: ห้องเดิมหน้าตาเดิมทุกช่อง (น้ำหนักเบา ไม่กลบตัวละคร)
+    const opt = { ...(hyOn ? { hy: hyO } : {}), ...(hyO && hyO.loras ? { loras: hyO.loras } : {}), ...(s3 ? { s3 } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: s3 ? 's3d' : eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: draft ? 1344 : (+s.img_w || 1024), h: draft ? 768 : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: [...((hyO && hyO.loras) || lo), ...(plo ? [{ id: plo.id, w: 0.4 }] : [])].slice(0, 3) }; // LoRA ตัวละครของช่องแบบผสม (เดิมถูก loras: lo ทับเป็นค่าว่าง → ฉากไม่ได้ใช้ LoRA เลย)
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: noChar ? '[[STYLE]]' : j.prompt }, s, noChar ? shEn : /chr\d+x/.test(String(j.prompt || '')) ? shEn : '', { nochar: noChar , color: hyOn }) : withStyle(j.prompt, s)).slice(0, 4000), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -1655,6 +1675,7 @@ async function tick(env, force) {
   }
   if (s.design_cast) { await env.DB.prepare("DELETE FROM settings WHERE key='design_cast'").run(); await designCast(env, s, String(s.design_cast)).catch(() => { }); }
   await restyleTick(tagged(env, 'bg:lora'), s).catch(() => { });
+  if (s.place_req) { const got = await env.DB.prepare("DELETE FROM settings WHERE key='place_req' RETURNING value").first(); if (got) await placeSetup(tagged(env, 'bg:lora'), String(got.value)).catch(() => { }); }
   await lsetReqTick(tagged(env, 'bg:lora'), s).catch(() => { });
   await lsetTick(tagged(env, 'bg:lora'), s).catch(() => { });
   await xlTick(tagged(env, 'bg:lora')).catch(() => { });
