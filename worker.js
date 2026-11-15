@@ -306,7 +306,7 @@ const PRS_BG = ['plain light grey studio backdrop', 'cozy cafe interior', 'city 
 const PRS_LT = ['soft window light', 'soft studio lighting', 'warm golden hour sunlight', 'overcast daylight'];
 // ทรงผมสลับทุกภาพ (ผู้ใช้สั่ง: ทรงผมเปลี่ยนลุคได้ สีคงเดิม) · ใส่ทรงผมในคำบรรยายตอนเทรน → LoRA จำแค่หน้า สั่งทรงผมได้ทุกฉาก
 const PRS_HS = ['long straight hair', 'long soft loose waves', 'high ponytail', 'low bun with face-framing strands', 'half-up half-down hairstyle', 'shoulder-length bob', 'single side braid over the shoulder', 'long hair with see-through curtain bangs', 'medium-length hair tucked behind the ears', 'low ponytail with a ribbon', 'messy top bun', 'long hair with soft curled ends', 'two low pigtails', 'sleek straight hair with a side part'];
-const presDsVar = (i, off = 0) => ({ v: PRS_VW[(i + Math.floor(i / 14)) % 7], e: PRS_EX[(i + Math.floor(i / 7)) % 7], o: PRS_OF[(i * 4 + off) % PRS_OF.length], g: PRS_BG[(i * 3 + 1) % 7], l: PRS_LT[i % 4], h: PRS_HS[(i * 5 + Math.floor(i / 14) * 3) % 14] });
+const presDsVar = (i, off = 0) => ({ v: PRS_VW[(i + Math.floor(i / 14)) % 7], e: PRS_EX[(i + Math.floor(i / 7)) % 7], o: PRS_OF[(i * 5 + off) % PRS_OF.length], g: PRS_BG[(i * 3 + 1) % 7], l: PRS_LT[i % 4], h: PRS_HS[(i * 5 + Math.floor(i / 14) * 3) % 14] });
 const presOff = x => x.k === 'b' ? 17 : 0; // คนที่ 2 ได้ชุดอีกกลุ่ม → ทั้งสองคนรวมกันครอบคลุมชุดทั้งหมด
 const presWho = (x, hs) => `a beautiful young Korean woman in her early twenties, ${x.look || 'soft pretty face, natural makeup'}, ${x.hc || 'dark brown'} hair${hs ? ' styled as ' + hs : ''}, slender graceful figure`;
 const presOpt = (w, h, sc, extra) => ({ engine: 'sdxl', base: 'real', w, h, steps: 30, seed: 0, loras: [], scene: sc, takes: 2, np: 1, neg: '', neg: 'school uniform, sailor uniform, sailor collar, necktie, bow tie at the neck, uniform blazer, plaid school skirt, messy tangled hair, clumped hair, fused hair, hair merging into clothes, floating hair strands, wig, hair artifacts', qneg: ['two people', 'an anime cartoon drawing', 'a deformed distorted face', 'a blurry low quality photo', 'a woman with messy clumped unnatural hair', 'a girl in a school uniform'], ...extra });
@@ -323,7 +323,7 @@ async function presQueueDs(env, pr, redo) { // วาดชุดฝึกบน
 // ตั้งพรีเซนเตอร์ 2 คนแรกจากภาพที่ผู้ใช้ส่งมา (ไฟล์ใน repo โฟลเดอร์ pres/) → เก็บเป็นภาพต้นแบบ แล้วเริ่มวาดชุดฝึกเอง · ทำครั้งเดียว (settings pres_seed)
 const PRES_SEED = [{ k: 'a', name: 'ซอ ฮาริน', hair: 'long straight chestnut brown hair with a center part and two small silver hair clips', look: 'soft sweet oval face, gentle almond eyes, light natural makeup, soft pink lips' }, { k: 'b', name: '', hair: 'long straight black hair with loose face-framing strands', look: 'elegant refined face, soft brown eyes, natural makeup, faint freckles, rosy lips' }];
 async function presFix(env) { // ครั้งเดียว (pres_fix=v2): เปลี่ยนภาพล็อกหน้าเป็นแบบตัดเฉพาะหน้า (ไม่ติดผม) + สีผมคงเดิม → ลบชุดฝึกเก่า วาดใหม่ทั้งชุดแบบสลับทรงผม
-  const s = await getSettings(env); if (s.pres_fix === 'v5' || s.pres_seed !== 'done' || (+String(s.pres_fixn || 0)) >= 20) return;
+  const s = await getSettings(env); if (s.pres_fix === 'v6' || s.pres_seed !== 'done' || (+String(s.pres_fixn || 0)) >= 20) return;
   let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; } const L = P.list || [], HC = { a: 'chestnut brown', b: 'black' };
   for (const x of L) { let d = null;
     for (const base of ['https://xiress-studio.pages.dev/pres/', 'https://raw.githubusercontent.com/pps2005/-smart-shop/main/pres/']) { try { const r = await fetch(base + x.k + '_face2.jpg'); if (r.ok && (r.headers.get('content-type') || '').includes('image')) { d = bytesToB64(new Uint8Array(await r.arrayBuffer())); break; } } catch (e) { } }
@@ -332,7 +332,7 @@ async function presFix(env) { // ครั้งเดียว (pres_fix=v2): �
   for (const x of L) { x.hc = x.hc || HC[x.k] || 'dark brown'; delete x.hair; x.picked = []; await env.DB.prepare('DELETE FROM vjobs WHERE project=?').bind('พรีเซนเตอร์·ชุดฝึก·' + x.k).run(); }
   await setSetting(env, 'pres', JSON.stringify(P));
   for (const x of L) await presQueueDs(env, x, true);
-  await setSetting(env, 'pres_fix', 'v5');
+  await setSetting(env, 'pres_fix', 'v6');
   await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('พรีเซนเตอร์: ล็อกเฉพาะหน้า + สลับทรงผม (สีเดิม) + ชุดสไตล์ใหม่ (ไม่มีเครื่องแบบ) → วาดชุดฝึกใหม่คนละ 28 ภาพ', Date.now()).run().catch(() => { });
 }
 async function presSeed(env) {
