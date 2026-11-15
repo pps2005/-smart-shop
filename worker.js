@@ -1006,6 +1006,7 @@ async function animeSchema(env) {
 // เทรน LoRA ตัวละครอัตโนมัติ: ภาพอ้างอิงครบและไม่มีงานค้าง → เข้าคิวเทรนบน Kaggle (ใช้ภาพที่ติดดาว ถ้าเลือกไว้ ≥8 ภาพ ไม่งั้นใช้ทุกภาพ) · ปิดได้ที่ settings.auto_lora = 0
 async function animeAuto(env, s) {
   if (s.auto_lora === '0') return;
+  if (new Date().getUTCMinutes() % 30) return; // ตัวเทรน LoRA อัตโนมัติรุ่นเก่า: ตรวจทุก 30 นาทีพอ (คำค้นตัวละครอ่าน ~1,600 แถว เดิมทุกนาที = ใช้โควตาวันละราว 1.2 ล้าน)
   await animeSchema(env);
   const cs = (await env.DB.prepare("SELECT c.* FROM chars c WHERE (c.series_id<>0 OR EXISTS (SELECT 1 FROM aud_cands a WHERE a.char_id=c.id AND a.cast_role IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM loras l WHERE l.char_id=c.id AND l.status IN ('queued','ready','failed'))").all()).results;
   for (const c of cs) {
@@ -1816,13 +1817,16 @@ function authOK(req, url, env) {
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,x-key', 'access-control-max-age': '86400' };
 function json(o, status = 200) { return new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json', ...CORS } }); }
 function b64ToBytes(b64) { const s = atob(b64); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+let SET_C = null, SET_T = 0; // ประหยัดโควตาอ่าน: งานหลายตัวในรอบเดียวกัน/คำขอจาก Kaggle ที่ถี่ ใช้ค่าตั้งค่าชุดเดียวกัน (อ่านทั้งตาราง ~130 แถวต่อครั้ง เดิมอ่านซ้ำ 5–8 ครั้งต่อนาที)
 async function getSettings(env) {
+  if (SET_C && Date.now() - SET_T < 3000) return { ...SET_C };
   const r = await env.DB.prepare('SELECT key,value FROM settings').all();
   const s = { interval_min: '2', style: '', character: '', steps: '4', paused_until: '0', last_run: '0', pace: '1', slots: '7,12,18,22' };
   for (const x of r.results) s[x.key] = x.value;
-  return s;
+  SET_C = s; SET_T = Date.now();
+  return { ...s };
 }
-async function setSetting(env, k, v) { await env.DB.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(k, v).run(); }
+async function setSetting(env, k, v) { await env.DB.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(k, v).run(); if (SET_C) SET_C[k] = String(v); }
 async function notify(env, msg) {
   await env.DB.prepare('INSERT INTO notices (msg,created) VALUES (?,?)').bind(msg, Date.now()).run();
   if (env.TG_TOKEN && env.TG_CHAT) {
