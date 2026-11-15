@@ -300,7 +300,7 @@ const PRS_OF = ['a white puff-sleeve blouse and light blue wide-leg jeans', 'a b
 const PRS_BG = ['plain light grey studio backdrop', 'cozy cafe interior', 'city street in Seoul in the daytime', 'modern office with glass walls', 'park with trees at golden hour', 'minimal bright living room', 'bookstore aisle'];
 const PRS_LT = ['soft window light', 'soft studio lighting', 'warm golden hour sunlight', 'overcast daylight'];
 const presDsVar = i => ({ v: PRS_VW[i % 7], e: PRS_EX[(i + Math.floor(i / 7)) % 7], o: PRS_OF[i % 10], g: PRS_BG[(i * 3 + 1) % 7], l: PRS_LT[i % 4] });
-const presWho = x => `a beautiful young Korean woman in her early twenties, ${x.hair || 'long straight dark hair'}, ${x.face || 'soft pretty face, natural makeup'}, slender graceful figure`;
+const presWho = x => `a beautiful young Korean woman in her early twenties, ${x.hair || 'long straight dark hair'}, ${x.look || 'soft pretty face, natural makeup'}, slender graceful figure`;
 const presOpt = (w, h, sc, extra) => ({ engine: 'sdxl', base: 'real', w, h, steps: 30, seed: 0, loras: [], scene: sc, takes: 2, np: 1, neg: '', qneg: ['two people', 'an anime cartoon drawing', 'a deformed distorted face', 'a blurry low quality photo'], ...extra });
 async function presQueueDs(env, pr, redo) { // วาดชุดฝึกบน Kaggle: RealVisXL + IP-Adapter Plus Face (ล็อกหน้าจากภาพต้นแบบที่ตัดเฉพาะหน้า)
   const pj = 'พรีเซนเตอร์·ชุดฝึก·' + pr.k;
@@ -313,7 +313,7 @@ async function presQueueDs(env, pr, redo) { // วาดชุดฝึกบน
   return st.length;
 }
 // ตั้งพรีเซนเตอร์ 2 คนแรกจากภาพที่ผู้ใช้ส่งมา (ไฟล์ใน repo โฟลเดอร์ pres/) → เก็บเป็นภาพต้นแบบ แล้วเริ่มวาดชุดฝึกเอง · ทำครั้งเดียว (settings pres_seed)
-const PRES_SEED = [{ k: 'a', name: 'ซอ ฮาริน', hair: 'long straight chestnut brown hair with a center part and two small silver hair clips', face: 'soft sweet oval face, gentle almond eyes, light natural makeup, soft pink lips' }, { k: 'b', name: '', hair: 'long straight black hair with loose face-framing strands', face: 'elegant refined face, soft brown eyes, natural makeup, faint freckles, rosy lips' }];
+const PRES_SEED = [{ k: 'a', name: 'ซอ ฮาริน', hair: 'long straight chestnut brown hair with a center part and two small silver hair clips', look: 'soft sweet oval face, gentle almond eyes, light natural makeup, soft pink lips' }, { k: 'b', name: '', hair: 'long straight black hair with loose face-framing strands', look: 'elegant refined face, soft brown eyes, natural makeup, faint freckles, rosy lips' }];
 async function presSeed(env) {
   const s = await getSettings(env); if (String(s.pres_seed || '').startsWith('done') || (+String(s.pres_seed || '').split(':')[1] || 0) >= 20) return;
   const get = async f => { for (const base of ['https://xiress-studio.pages.dev/pres/', 'https://raw.githubusercontent.com/pps2005/-smart-shop/main/pres/']) { try { const r = await fetch(base + f); if (r.ok && (r.headers.get('content-type') || '').includes('image')) return bytesToB64(new Uint8Array(await r.arrayBuffer())); } catch (e) { } } return null; };
