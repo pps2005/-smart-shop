@@ -712,17 +712,22 @@ async function loraPri(env, charId) { // 0 = ตัวหลัก (เทรน
     const pl = await readPlan(env, c.cast_story), r = pl && pl.roles.find(x => x.key === c.cast_role); return r && r.tier === 'main' ? 0 : 1;
   } catch (e) { return 1; }
 }
+// ตัวเทรน LoRA: อนิเมะ = dim 8 (ตัวละคร) / 4 (อื่นๆ) · คนจริง = dim 16/8 + ฐาน RealVisXL ความละเอียด 896 (ใช้ฐานเดียวกับตอนวาดช็อต) · ไฟล์ ~100 MB/ตัวละคร เก็บใน Supabase ฟรี 1 GB ได้ราว 9 ตัว
+async function lookRealOpt(env, ch) {
+  const real = await env.DB.prepare("SELECT value FROM settings WHERE key='img_look'").first().then(r => !!r && r.value === 'real').catch(() => false), isChar = xlKind(ch) === 'char';
+  return real ? { dim: isChar ? 16 : 8, alpha: isChar ? 8 : 4, lr: 1e-4, res: 896, base: 'real' } : { dim: isChar ? 8 : 4 };
+}
 async function charTrain(env, b) {
   await animeSchema(env);
   const ch = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+b.char_id).first(); if (!ch) return { error: 'ไม่พบตัวละคร' };
   if (await charBusy(env, ch.id)) return { error: 'กำลังรอ/เทรนอยู่ รอให้เสร็จก่อน' };
   const pj = charProj(ch);
   const all = (await env.DB.prepare('SELECT id,scene,starred FROM images WHERE project=? ORDER BY id').bind(pj).all()).results;
-  const st = all.filter(x => x.starred), use = (st.length ? st : all).slice(0, 24);
+  const st = all.filter(x => x.starred), use = (st.length ? st : all).slice(0, CAM_N);
   if (use.length < 8) return { error: st.length ? `ติด ⭐ แค่ ${st.length} ภาพ ต้องอย่างน้อย 8 (หรือไม่ติดเลย = ใช้ทุกภาพ)` : `มีภาพแค่ ${all.length} ภาพ ต้องอย่างน้อย 8 ภาพ` };
   const trig = 'chr' + ch.id + 'x', imgs = use.map(x => ({ id: x.id, cap: `${xlKind(ch) === 'char' ? loraTag({ cid: ch.id, desc: ch.desc }) : trig}, ${xlVar(ch, (+x.scene || 1) - 1)}` }));
   await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(ch.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
-  const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs, pri: await loraPri(env, ch.id), dim: xlKind(ch) === 'char' ? 8 : 4 })).run();
+  const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: ch.id, trigger: trig, images: imgs, pri: await loraPri(env, ch.id), ...(await lookRealOpt(env, ch)) })).run();
   await env.DB.prepare("INSERT INTO loras (char_id,vjob,status,created) VALUES (?,?,'queued',?)").bind(ch.id, r.meta.last_row_id, Date.now()).run();
   return { ok: true, images: imgs.length };
 }
@@ -843,6 +848,16 @@ async function xlTick(env) {
     if ((await env.DB.prepare('SELECT COUNT(*) n FROM images WHERE project=?').bind(pj).first()).n < 12) continue;
     await charTrain(env, { char_id: c.id });
   }
+  // ตัวละครที่สั่ง cam_full: ภาพครบชุด (ไม่มีคิวค้าง และ ≥ 80% ของ CAM_N) → เทรนเอง แล้วเอาออกจากรายการ
+  const cr = await env.DB.prepare("SELECT value FROM settings WHERE key='cam_train'").first().catch(() => null); let ids = []; try { ids = JSON.parse((cr && cr.value) || '[]'); } catch (e) { ids = []; }
+  if (ids.length) { const left = [];
+    for (const id of ids) { const c = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(+id).first(); if (!c) continue; const pj = charProj(c);
+      const pend = (await env.DB.prepare("SELECT (SELECT COUNT(*) FROM jobs WHERE project=?1 AND status IN ('queued','running','kaggle'))+(SELECT COUNT(*) FROM vjobs WHERE kind='img' AND project=?1 AND status IN ('queued','running','hold')) n").bind(pj).first()).n;
+      if (pend) { left.push(id); continue; }
+      const n = (await env.DB.prepare('SELECT COUNT(*) n FROM images WHERE project=?').bind(pj).first()).n;
+      if (n < Math.floor(CAM_N * 0.8)) { left.push(id); continue; }
+      const r = await charTrain(env, { char_id: c.id }); if (r && r.error && !/กำลังรอ/.test(r.error)) left.push(id); }
+    await setSetting(env, 'cam_train', JSON.stringify(left)); }
 }
 // LoRA สถานที่หลักของเรื่อง (ผู้ใช้สั่ง 15 พ.ย.: เทรนอัตโนมัติ) — ชื่อต้องตรงกับ shots.loc · วาดชุดฝึก 16 มุม ไม่มีคน ด้วย SDXL ลายเส้นเดียวกับตัวละคร
 const HY_PLACE = {
@@ -1067,7 +1082,11 @@ async function genImage(env, s, prompt, steps, seed) {
 }
 // ---- สไตล์ลายเส้นกลาง: พรอมต์เก็บ [[STYLE]] ไว้ แล้วแทนด้วยสไตล์ปัจจุบันตอนสร้าง/แสดง เปลี่ยนสไตล์ทีเดียวมีผลกับทุกอย่าง (รวมงานที่ยังรอคิว) ----
 const DEF_STYLE = 'soft anime style, beautiful detailed anime illustration, delicate fine line art, detailed hair strands and fabric folds, soft cinematic lighting, gentle shading';
-function curStyle(s) { return String((s && s.style) || '').trim() || DEF_STYLE; }
+// ลุคภาพ (ผู้ใช้สั่ง 16 พ.ย.: ซีรีส์เกาหลีคุณภาพเน็ตฟลิกซ์) — settings img_look='real' = ภาพคนจริงทั้งระบบ (ฐาน RealVisXL, ใช้หารายได้ได้) · ค่าอื่น = อนิเมะเดิม
+const KR_STYLE = 'Korean drama cinematography, cinematic film still, 35mm lens, shallow depth of field, soft natural window light, subtle film grain, muted teal and warm skin-tone colour grade, realistic skin texture, photorealistic, anamorphic 2.39:1 look';
+const KR_NEG = 'anime, cartoon, illustration, drawing, 3d render, cgi, doll, plastic skin, airbrushed, oversaturated, lowres, blurry, jpeg artifacts, bad anatomy, bad hands, extra fingers, deformed face, text, watermark, celebrity, real person lookalike, collage, split screen, multiple views';
+const isReal = s => !!s && s.img_look === 'real';
+function curStyle(s) { return isReal(s) ? KR_STYLE : (String((s && s.style) || '').trim() || DEF_STYLE); }
 function envStyle(s) { return curStyle(s).split(',').map(x => x.trim()).filter(x => x && !/hair|fabric|character|face|portrait|girl|person|people|skin|beautiful/i.test(x)).join(', ') || 'soft anime style, detailed anime background art'; }
 // สไตล์สำหรับ "ของ/ชุด/สัตว์/อาวุธ" (งานออกแบบวัตถุ): ตัดคำที่ดึงให้โมเดลวาดหน้าคน/ผม/สาวสวย ออก (Flux ไม่มี negative prompt คำว่า hair/beautiful จึงดึงหน้าเข้ามา)
 function objStyle(s) { return curStyle(s).split(',').map(x => x.trim()).filter(x => x && !/hair|fabric|character|face|portrait|girl|person|people|skin|beautiful/i.test(x)).join(', ') || 'soft anime style, clean detailed design illustration'; }
@@ -1438,6 +1457,15 @@ async function animeAuto(env, s) {
 }
 // ตัวละครต่อซีรีส์: สร้างชุดภาพอ้างอิงหลายมุม/อารมณ์ (เข้าคิวภาพเดิม → โหมดอัตโนมัติเลือก SDXL ให้) ภาพที่ติดดาว = ชุดเทรน LoRA
 const CHAR_VARS = ['front view, full body, standing, neutral expression', 'three-quarter view, upper body, smiling', 'side profile, upper body', 'back view, full body', 'close-up face, happy', 'close-up face, serious', 'close-up face, surprised', 'full body, walking', 'sitting on a chair, full body', 'running, dynamic pose, full body', 'looking up, upper body', 'waving at viewer, upper body', 'angry expression, upper body', 'sad expression, close-up face', 'laughing, upper body', 'arms crossed, full body, confident'];
+// ===== ชุดฝึก LoRA "ครบทุกมุมกล้อง" (ผู้ใช้สั่ง 16 พ.ย.): 7 ขนาดช็อต × 10 มุมกล้อง × สีหน้า → ต่อท้ายอีก 32 แบบ รวม 48 ภาพ/ตัว ทุกภาพมีคำบอกมุมในคำบรรยาย LoRA จึงสั่งมุมได้ =====
+const CAM_SIZE = ['extreme close-up of the eyes and face', 'close-up of the face', 'medium close-up, chest up', 'medium shot, waist up', 'cowboy shot, thighs up', 'full shot, whole body', 'wide shot, small figure in the environment'];
+const CAM_ANGLE = ['eye level, front view', 'three-quarter view from the left', 'three-quarter view from the right', 'side profile facing left', 'side profile facing right', 'over-the-shoulder, three-quarter back view', 'back view', 'low angle, looking up at the subject', 'high angle, looking down at the subject', 'top-down bird eye view', 'dutch angle, tilted camera'];
+const CAM_MOOD = ['neutral expression', 'slight smile', 'laughing', 'serious', 'surprised', 'sad, teary eyes', 'angry', 'worried', 'shy, looking away', 'looking straight at the camera'];
+const CAM_EXTRA = Array.from({ length: 32 }, (_, i) => { const a = i % 11; let z = i % 7; if (z < 2 && (a === 5 || a === 6)) z += 2; if (z < 2 && a === 9) z += 3; // 32 คู่ ขนาด×มุม ไม่ซ้ำกัน · มุมหลัง/โอเวอร์ชอลเดอร์/มองจากบน ไม่จับคู่กับโคลสอัพหน้า (ภาพจะเพี้ยน)
+  let m = CAM_MOOD[(i * 3) % 10]; if (a === 6) m = 'seen from behind, face not visible'; else if (a >= 3 && a <= 5 && /straight at the camera/.test(m)) m = 'neutral expression'; // มุมหลัง/ข้าง ไม่สั่งให้มองกล้อง
+  return `${CAM_SIZE[z]}, ${CAM_ANGLE[a]}, ${m}`; });
+CHAR_VARS.push(...CAM_EXTRA);
+const CAM_N = CHAR_VARS.length; // 48
 const charProj = c => `ซีรีส์${c.series_id}·${c.name}`;
 // LoRA ประเภทอื่นของเรื่อง: ศัตรู/ตัวประหลาด (enemy) · สถานที่ (place) · สไตล์ทั้งเรื่อง (style) — ใช้ตาราง chars เดิม แยกด้วยคอลัมน์ kind
 const XL_VARS = {
@@ -1452,16 +1480,29 @@ const xlRefPrompt = (c, i) => { const k = xlKind(c), v = xlVar(c, i);
   if (k === 'place') return `${c.desc}, ${v}, no people, same location design in every image, detailed anime background art, [[STYLE]]`;
   if (k === 'style') return `${v}${c.desc ? ', ' + c.desc : ''}, [[STYLE]]`;
   return `${c.desc}, ${v}, plain light background, same character design in every image, [[STYLE]]`; };
+const xlRefPromptReal = (c, i) => { const k = xlKind(c), v = xlVar(c, i), who = k === 'char' ? 'Korean ethnicity, ' : '';
+  if (k === 'place') return `${c.desc}, ${v}, no people, empty location, same set design and furniture in every image, ${KR_STYLE}`;
+  if (k === 'enemy') return `${c.desc}, ${v}, dark neutral backdrop, same design in every image, ${KR_STYLE}`;
+  if (k === 'style') return `${v}${c.desc ? ', ' + c.desc : ''}, ${KR_STYLE}`;
+  return `${who}${c.desc}, ${v}, plain neutral grey studio backdrop, soft even light, same person in every image, ${KR_STYLE}`; };
+const realRefOpt = (c, scene) => { const k = xlKind(c), wide = k === 'place' || /wide shot|full shot|top-down/.test(xlVar(c, scene - 1)); return { engine: 'sdxl', base: 'real', w: wide ? 1216 : 896, h: wide ? 832 : 1152, steps: 30, seed: 0, loras: [], scene, takes: 2, np: k === 'char' ? 1 : 0, neg: KR_NEG }; };
 async function charRefs(env, cid, n) {
   const c = await env.DB.prepare('SELECT * FROM chars WHERE id=?').bind(cid).first(); if (!c) throw new Error('ไม่พบตัวละคร');
   const pj = charProj(c);
+  const real = await env.DB.prepare("SELECT value FROM settings WHERE key='img_look'").first().then(r => !!r && r.value === 'real').catch(() => false);
+  if (real) { // คนจริง: ทุกภาพเข้าคิว Kaggle (SDXL RealVisXL) พร้อมเลขมุม (scene) ให้ตรงกับคำบรรยายตอนเทรน
+    const have = (await env.DB.prepare("SELECT (SELECT COUNT(*) FROM images WHERE project=?1)+(SELECT COUNT(*) FROM vjobs WHERE kind='img' AND project=?1 AND status IN ('queued','running','hold')) n").bind(pj).first()).n || 0;
+    const st = []; let t = Date.now();
+    for (let i = 0; i < n; i++) { const sc = have + i + 1; st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, xlRefPromptReal(c, sc - 1).slice(0, 1800), t++, JSON.stringify(realRefOpt(c, sc)))); }
+    if (st.length) await env.DB.batch(st);
+    return { queued: st.length, real: true };
+  }
   const have = (await env.DB.prepare('SELECT (SELECT COUNT(*) FROM images WHERE project=?1)+(SELECT COUNT(*) FROM jobs WHERE project=?1 AND status<>\'failed\') n').bind(pj).first()).n || 0;
   const now = Date.now(), st = [];
   for (let i = 0; i < n; i++) st.push(env.DB.prepare("INSERT INTO jobs (project,scene,prompt,status,created,steps) VALUES (?,?,?,'queued',?,4)").bind(pj, have + i + 1, xlRefPrompt(c, have + i).slice(0, 1800), now));
   await env.DB.batch(st);
   return { queued: n };
 }
-
 // ===== สร้างตอนอัตโนมัติจากโครงเรื่อง (.docx): บท→ช็อต→ภาพคีย์+LoRA→วิดีโอ ผ่านระบบ animeAdvance เดิม =====
 async function readPlan(env, story) { try { const r = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('plan:' + story).first(); return r ? JSON.parse(r.value) : null; } catch (e) { return null; } }
 async function castList(env, sr) { // บทในเรื่อง (ชื่อบท + ลักษณะ + LoRA ที่พร้อมของนักแสดงที่ใส่บทไว้) ให้ AI เขียนบท/ช็อต และให้ภาพคีย์ใช้ LoRA ถูกคน
@@ -1475,7 +1516,7 @@ async function castList(env, sr) { // บทในเรื่อง (ชื่�
 const WORK = {
   anime: { scenes: 3, shots: 90, beats: '10-12', note: 'งานนี้เป็นอนิเมะ: แอ็กชันและอารมณ์ชัดเจน มุมกล้องหลากหลาย มีช็อตเคลื่อนไหวเด่นๆ · 1 ซีนยาวราว 5 นาที แตกเป็นภาพ 80-100 ภาพ (ภาพละ ~3 วินาที) จึงต้องมีเหตุการณ์ย่อยละเอียดเรียงตามเวลา' },
   film: { scenes: 3, shots: 16, beats: '5-6', note: 'งานนี้เป็นหนังสั้นโทนภาพยนตร์: จังหวะนิ่ง ช็อตกว้างสลับโคลสอัพ แสงเงาแบบหนัง เล่าด้วยภาพมากกว่าคำพูด' },
-  series: { scenes: 3, shots: 14, beats: '5-6', note: 'งานนี้เป็นซีรีส์ดราม่า: เน้นบทสนทนาและสีหน้าตัวละคร จบซีนด้วยปมให้อยากดูต่อ' },
+  series: { scenes: 3, shots: 14, beats: '5-6', note: 'งานนี้เป็นซีรีส์ดราม่าเกาหลีระดับสตรีมมิง: เน้นบทสนทนาและสีหน้า ใช้ภาษาภาพแบบซีรีส์ (ช็อตกว้างบอกที่ → เมียร์/โอเวอร์ชอลเดอร์สลับคนพูด → โคลสอัพอารมณ์ → อินเสิร์ตของสำคัญ) ตัวละครทุกคนในฉากต้องอยู่ในช็อตกว้างตามที่บทระบุ ห้ามมุมเดิมซ้ำเกิน 2 ช็อตติดกัน จบซีนด้วยปมให้อยากดูต่อ' },
   ad: { scenes: 1, shots: 8, beats: '4', note: 'งานนี้เป็นโฆษณาสั้นราว 30 วินาที: เปิดด้วยภาพดึงสายตา → ปัญหาหรือความต้องการ → จุดขาย → ปิดด้วยคำชวน' }
 };
 async function workOf(env, title) { let k = ''; try { const r = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('wk:' + title).first(); k = r ? String(r.value) : ''; } catch (e) { } return { key: WORK[k] ? k : '', ...(WORK[k] || WORK.anime) }; }
@@ -1486,18 +1527,21 @@ async function shotLoraMap(env, seriesId) { // LoRA ที่พร้อมใ�
   for (const c of await castList(env, await env.DB.prepare('SELECT * FROM series WHERE id=?').bind(sc.series_id).first())) if (c.lid) lc.push({ cid: c.cid, name: c.name, lid: c.lid, desc: ((await env.DB.prepare('SELECT desc FROM chars WHERE id=?').bind(c.cid).first()) || {}).desc || '' }); // LoRA ของนักแสดงที่ใส่บทไว้ (ชื่อบท = ชื่อใน shots.chars)
   let wm = {}; try { const srt = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(sc.series_id).first(), wr = srt && await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind('lw:' + srt.title).first(); wm = wr ? JSON.parse(wr.value) : {}; } catch (e) { wm = {}; }
   let xl = []; try { const srt = await env.DB.prepare('SELECT title FROM series WHERE id=?').bind(seriesId).first(); if (srt) xl = (await env.DB.prepare("SELECT c.id cid,c.name,c.kind,l.id lid FROM chars c JOIN loras l ON l.char_id=c.id AND l.status='ready' AND l.use=1 WHERE c.story=? AND c.kind IN ('style','place') ORDER BY l.id DESC").bind(srt.title).all()).results; } catch (e) { xl = []; }
-  return { lc: lc.filter(c => !xl.some(x => x.cid === c.cid)), wm, xl };
+  let cap = 2; try { const r = await env.DB.prepare("SELECT value FROM settings WHERE key='lora_max_chars'").first(); cap = Math.max(2, Math.min(4, +(r && r.value) || 2)); } catch (e) { cap = 2; }
+  return { lc: lc.filter(c => !xl.some(x => x.cid === c.cid)), wm, xl, cap };
 }
 // คำเรียก LoRA ในคำสั่งวาด: คำกระตุ้น + เพศ + ลักษณะเด่นสั้นๆ ของตัวนั้น (คำกระตุ้นอย่างเดียวไม่พอ โมเดลจะวาดเป็นคนอื่น — เจอจริงกับ LoRA ชุดแรก)
 const loraTag = c => { const d = String(c.desc || ''), g = /\b(woman|girl|female)\b/i.test(d) ? '1girl' : /\b(man|boy|male)\b/i.test(d) ? '1boy' : ''; return ['chr' + c.cid + 'x', g, d.split(',').slice(0, 4).join(',').slice(0, 170)].filter(Boolean).join(', '); };
 // LoRA ที่ช็อตนี้ควรใช้: ตัวละคร/ศัตรูในช็อต (สูงสุด 2) + สไตล์ของเรื่อง + สถานที่ (ถ้ายังไม่เกิน 3 ตัว — ซ้อนมากกว่านี้ภาพเริ่มเละ)
 const styleW = wm => Math.min(0.9, Math.max(0.8, +(wm || {})['สไตล์'] || 0.85)); // LoRA สไตล์ลายเส้น: น้ำหนัก 0.8–0.9 (ตั้งค่าเฉพาะเรื่องได้ที่ lw:<เรื่อง> คีย์ 'สไตล์' แต่ถูกบีบให้อยู่ในช่วงนี้)
-function shotLoraPick(sh, L) {
+function shotLoraPick(sh, L) { // ตัวละครต่อช็อตได้ถึง L.cap (ค่าเริ่ม 2 ตามเดิม · ตั้ง 3–4 เพื่อใส่ทุกคนในฉาก) · เกิน 2 คน → ลดน้ำหนักแต่ละตัว ×0.75 กันหน้าปนกัน · รวมไม่เกิน 3 (cap 2) / 5 (cap 3–4)
   let names = []; try { names = JSON.parse(sh.chars || '[]'); } catch (e) { names = []; }
-  const seen = new Set(), m = [];
-  for (const c of L.lc) if (names.includes(c.name) && !seen.has(+c.lid) && m.length < 2) { seen.add(+c.lid); m.push({ cid: c.cid, lid: c.lid, w: +(L.wm || {})[c.name] || 0.9, k: 'char', tag: loraTag(c) }); }
+  const seen = new Set(), m = [], cap = Math.max(2, Math.min(4, +L.cap || 2)), picked = [];
+  for (const c of L.lc) if (names.includes(c.name) && !seen.has(+c.lid) && picked.length < cap) { seen.add(+c.lid); picked.push(c); }
+  const dil = picked.length > 2 ? 0.75 : 1;
+  for (const c of picked) m.push({ cid: c.cid, lid: c.lid, w: Math.min(1, (+(L.wm || {})[c.name] || 0.9) * dil), k: 'char', tag: loraTag(c) });
   const st = (L.xl || []).find(x => x.kind === 'style'); if (st) m.push({ cid: st.cid, lid: st.lid, w: styleW(L.wm), k: 'style' });
-  const pl = sh.loc && (L.xl || []).find(x => x.kind === 'place' && x.name === sh.loc); if (pl && m.length < 3) m.push({ cid: pl.cid, lid: pl.lid, w: 0.7, k: 'place' });
+  const pl = sh.loc && (L.xl || []).find(x => x.kind === 'place' && x.name === sh.loc); if (pl && m.length < (cap > 2 ? 5 : 3)) m.push({ cid: pl.cid, lid: pl.lid, w: 0.7, k: 'place' });
   return { names, m };
 }
 async function epCheck(env, story, plan, E) {
@@ -2072,7 +2116,7 @@ async function bridgeImg(env, s) {
         if (lo.length) { hyO.loras = lo; hyO.all = (tg.join(', ') + ', ' + hyO.all).slice(0, 1100); } } // รอรูปชุดเสร็จก่อนค่อยวาดช่องนี้ (ชุดตรงตั้งแต่ช่องแรก)
     }
     let plo = null; if (hyOn && hyO && shLoc && s.place_lora !== '0') { plo = await env.DB.prepare("SELECT l.id, c.id cid FROM loras l JOIN chars c ON c.id=l.char_id WHERE c.series_id=0 AND c.kind='place' AND c.name=? AND l.status='ready' ORDER BY l.id DESC LIMIT 1").bind(shLoc).first().catch(() => null); if (plo && hyO.all) hyO.all = ('chr' + plo.cid + 'x, ' + hyO.all).slice(0, 1100); } // LoRA สถานที่: ห้องเดิมหน้าตาเดิมทุกช่อง (น้ำหนักเบา ไม่กลบตัวละคร)
-    const opt = { ...(hyOn ? { hy: hyO } : {}), ...(hyO && hyO.loras ? { loras: hyO.loras } : {}), ...(s3 ? { s3 } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, engine: s3 ? 's3d' : eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: (draft || String(j.project).startsWith('ฉาก')) ? (+s.sb_w || 1344) : (+s.img_w || 1024), h: (draft || String(j.project).startsWith('ฉาก')) ? (+s.sb_h || 768) : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: [...((hyO && hyO.loras) || lo), ...(plo ? [{ id: plo.id, w: 0.4 }] : [])].slice(0, 3) }; // LoRA ตัวละครของช่องแบบผสม (เดิมถูก loras: lo ทับเป็นค่าว่าง → ฉากไม่ได้ใช้ LoRA เลย)
+    const opt = { ...(hyOn ? { hy: hyO } : {}), ...(hyO && hyO.loras ? { loras: hyO.loras } : {}), ...(s3 ? { s3 } : {}), ...(draft && npExp !== null ? { np: npExp } : {}), ...(draft ? { ...(hyOn ? {} : { gray: 1 }), takes: npExp >= 2 ? 3 : (+s.draft_takes || 2), ...(noChar || plushBad.length || hyOn ? { qneg: [...(noChar ? ['a person standing in the foreground'] : []), ...plushBad, ...(hyOn ? ['objects floating in the air', 'a crooked broken table with mismatched edges', 'words and letters written on signs', 'a person cut in half or merged into furniture'] : [])] } : {}), qc: [shEn.split(/,? setting:/i)[0].slice(0, 220), hyOn ? 'a detailed colour anime illustration with a fully drawn detailed background' : 'a detailed black and white manga panel with a fully drawn detailed background'] } : {}), ...(draft && locSeed ? { seedLoc: locSeed } : {}), jobId: j.id, scene: j.scene, ...(isReal(s) ? { base: 'real', neg: KR_NEG } : {}), engine: s3 ? 's3d' : eg, steps: eg === 'sdxl' ? (hi ? 34 : 26) : eg === 'schnell' ? 6 : (hi ? 28 : 24), seed: +j.seed || 0, w: (draft || String(j.project).startsWith('ฉาก')) ? (+s.sb_w || 1344) : (+s.img_w || 1024), h: (draft || String(j.project).startsWith('ฉาก')) ? (+s.sb_h || 768) : (+s.img_h || 1024), model: s.img_model || '', quant: s.img_quant || '', loras: [...((hyO && hyO.loras) || lo), ...(plo ? [{ id: plo.id, w: 0.4 }] : [])].slice(0, 3) }; // LoRA ตัวละครของช่องแบบผสม (เดิมถูก loras: lo ทับเป็นค่าว่าง → ฉากไม่ได้ใช้ LoRA เลย)
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,?,?,?,'','',0,'queued',0,?,'img',?)")
       .bind(j.project, '', String(j.scene), (draft ? fluxDraft({ project: j.project, prompt: noChar ? '[[STYLE]]' : j.prompt }, s, noChar ? shEn : /chr\d+x/.test(String(j.prompt || '')) ? shEn : '', { nochar: noChar , color: hyOn }) : withStyle(j.prompt, s)).slice(0, 4000), now, JSON.stringify(opt)));
     st.push(env.DB.prepare("UPDATE jobs SET status='kaggle' WHERE id=?").bind(j.id));
@@ -6259,6 +6303,29 @@ async function castApi(req, env, url, body) {
   if (p === '/api/vcastnow') return json(await castBatch(env, +body.n || 0, true, ['char', 'pet', 'place', 'prop'].includes(body.cat) ? body.cat : ''));
     if (p === '/api/vcastep') { // โครงเรื่อง (.docx ที่อ่านแล้ว) → ใส่บทอัตโนมัติ → ตรวจบทก่อนสร้างทีละตอน
       const b = body || {}, act = b.act || 'get', story = String(b.story || '').trim().slice(0, 60);
+      // ---- คำสั่งที่ไม่ต้องมีเรื่อง/โครงเรื่อง (ล้างคิว · ลุคภาพ · เพดานตัวละครต่อช็อต) ----
+      if (act === 'queue_peek') { // ดูคิวค้างทั้งหมดก่อนล้าง
+        await animeSchema(env);
+        const v = (await env.DB.prepare("SELECT kind, status, COUNT(*) n FROM vjobs WHERE status IN ('queued','failed','hold','running') GROUP BY kind, status").all()).results, j = (await env.DB.prepare("SELECT status, COUNT(*) n FROM jobs WHERE status IN ('queued','failed','kaggle','running') GROUP BY status").all()).results;
+        return json({ ok: true, vjobs: v, jobs: j });
+      }
+      if (act === 'queue_clear') { // ล้างคิวที่ค้างทั้งหมด: ภาพ/วิดีโอ/เสียง/รวมคลิป/เทรน LoRA (queued · failed · hold) — งานที่กำลังรันอยู่ไม่ถูกแตะ (stale=1 = ลบงาน running ที่ค้างเกิน 3 ชม. ด้วย) · ภาพ/วิดีโอ/LoRA ที่เสร็จแล้วอยู่ครบ
+        await animeSchema(env);
+        const kd = String(b.kind || '').replace(/[^a-z]/g, ''), kw = kd ? " AND kind='" + kd + "'" : '';
+        const r0 = b.stale ? await env.DB.prepare("DELETE FROM vjobs WHERE status='running' AND started IS NOT NULL AND started<?" + kw).bind(Date.now() - 3 * 3600 * 1000).run() : null;
+        const r1 = await env.DB.prepare("UPDATE loras SET status='old' WHERE status IN ('queued','failed') AND COALESCE(vjob,0) NOT IN (SELECT id FROM vjobs WHERE status='running')").run();
+        const r2 = await env.DB.prepare("DELETE FROM vjobs WHERE status IN ('queued','failed','hold')" + kw).run();
+        const r3 = kd ? null : await env.DB.prepare("DELETE FROM jobs WHERE status IN ('queued','failed','kaggle')").run();
+        if (!kd) await setSetting(env, 'cam_train', '[]');
+        const ch = r => (r && r.meta && r.meta.changes) || 0;
+        return json({ ok: true, vjobs: ch(r2), jobs: ch(r3), loras: ch(r1), stale: ch(r0) });
+      }
+      if (act === 'look_set') { // สลับลุคทั้งระบบ: real = ซีรีส์เกาหลีคนจริง (RealVisXL) · anime = เดิม · LoRA ที่เทรนต่างฐานใช้ปนกันไม่ได้ → เทรนตัวละครใหม่หลังสลับ
+        const v = b.look === 'real' ? 'real' : 'anime'; await setSetting(env, 'img_look', v);
+        if (v === 'real' && b.kind !== 'keep') await setSetting(env, 'lora_go', '1');
+        return json({ ok: true, look: v });
+      }
+      if (act === 'lora_cap') { await setSetting(env, 'lora_max_chars', String(Math.max(2, Math.min(4, +b.n || 2)))); return json({ ok: true, cap: Math.max(2, Math.min(4, +b.n || 2)) }); }
       if (/^pres(_|$)/.test(act)) { // แถบเล่าเรื่อง: พรีเซนเตอร์เสมือน (ช่องแยกจากอนิเมะ) · หลายคน (P.list) · ภาพเหมือนจริง RealVisXL + LoRA บน Kaggle
         const s0p = await env.DB.prepare("SELECT value FROM settings WHERE key='pres'").first().catch(() => null); let P = {}; try { P = JSON.parse((s0p && s0p.value) || '{}'); } catch { P = {}; }
         const L = Array.isArray(P.list) ? P.list : (P.list = []), pi = L.findIndex(x => x.k === String(b.k || '')), pr = pi >= 0 ? L[pi] : null, save = () => setSetting(env, 'pres', JSON.stringify(P));
@@ -6748,6 +6815,31 @@ async function castApi(req, env, url, body) {
         await setSetting(env, 'plan:' + story, JSON.stringify(plan)); return json({ ok: true });
       }
       if (act === 'design_cast') return json(await designCast(env, await getSettings(env), story));
+      if (act === 'cam_full') { // LoRA ตัวละคร "ครบทุกมุมกล้อง": วาดชุดฝึก 48 แบบ (7 ขนาดช็อต × 11 มุม × สีหน้า) ให้ทุกตัวละครที่ได้นักแสดงแล้ว (หรือ cid ที่ระบุ) แล้วเทรนเองเมื่อภาพครบ
+        await animeSchema(env);
+        const sr = await env.DB.prepare('SELECT * FROM series WHERE title=?').bind(story).first().catch(() => null);
+        let ids = b.cid ? [+b.cid] : (sr ? (await castList(env, sr)).filter(c => c.cid).map(c => +c.cid) : []);
+        ids = [...new Set(ids)].filter(Boolean); if (!ids.length) return json({ error: 'ยังไม่มีตัวละครที่เลือกนักแสดงแล้ว' }, 400);
+        const out = [];
+        for (const id of ids) { const c = await env.DB.prepare('SELECT * FROM chars WHERE id=? AND series_id=0').bind(id).first(); if (!c) continue; const pj = charProj(c);
+          const have = (await env.DB.prepare("SELECT (SELECT COUNT(*) FROM images WHERE project=?1)+(SELECT COUNT(*) FROM jobs WHERE project=?1 AND status IN ('queued','running','kaggle'))+(SELECT COUNT(*) FROM vjobs WHERE kind='img' AND project=?1 AND status IN ('queued','running','hold')) n").bind(pj).first()).n || 0;
+          const need = Math.max(0, CAM_N - have); if (need) await charRefs(env, id, need); out.push({ cid: id, name: c.name, add: need }); }
+        let cur = []; try { const r = await env.DB.prepare("SELECT value FROM settings WHERE key='cam_train'").first(); cur = JSON.parse((r && r.value) || '[]'); } catch (e) { cur = []; }
+        await setSetting(env, 'cam_train', JSON.stringify([...new Set([...cur, ...out.map(x => x.cid)])]));
+        if (!(await getSettings(env)).lora_go) await setSetting(env, 'lora_go', '1');
+        return json({ ok: true, chars: out, target: CAM_N });
+      }
+      if (act === 'place_auto') { // LoRA สถานที่ทุกแห่งในบท: บอทอ่าน plan.locs → แปลงเป็นคำสั่งวาด → สร้างชุดฝึก 16 มุม → เทรนเอง (xlTick) · ครั้งละไม่เกิน 12 แห่ง กดซ้ำได้
+        const S = await getSettings(env), nm = x => String(x || '').replace(/[·\n]/g, ' ').trim().slice(0, 40);
+        const have = new Set((await env.DB.prepare("SELECT name FROM chars WHERE series_id=0 AND kind='place' AND story=?").bind(story).all()).results.map(x => x.name));
+        const todo = (plan.locs || []).filter(L => L && L.name && !have.has(nm(L.name))).slice(0, Math.max(1, Math.min(12, +b.max || 12)));
+        if (!todo.length) return json({ ok: true, made: [], note: 'สถานที่ในบทมี LoRA ครบแล้ว' });
+        const real = isReal(S);
+        const o = await llmJson(env, S, `เรื่อง: ${plan.title || story}\nสถานที่ในเรื่อง:\n${todo.map((L, i) => `${i + 1}. ${L.name}${L.note ? ' — ' + L.note : ''}`).join('\n').slice(0, 2400)}\n\nแปลงแต่ละสถานที่เป็นคำสั่งวาดภาพภาษาอังกฤษสั้นกระชับ ${real ? 'แบบเซ็ตถ่ายทำซีรีส์เกาหลีของจริง (วัสดุจริง แสงธรรมชาติ ของตกแต่งสมจริง)' : 'แบบอนิเมะ'} ไม่มีคน บอกโครงสร้างห้อง วัสดุ สี ของตกแต่งหลัก แสง · ห้ามอ้างถึงสถานที่/ฉากจากเรื่องอื่น\nตอบเป็น JSON: {"items":[{"i":1,"en":"..."}]}`, 3000);
+        const made = [], fail = [];
+        for (const x of (Array.isArray(o.items) ? o.items : [])) { const L = todo[(+x.i || 0) - 1]; if (!L || !x.en) continue; const r = await xlNew(env, story, 'place', L.name, String(x.en).slice(0, 500)); (r.ok ? made : fail).push(L.name); }
+        return json({ ok: true, made, fail, left: Math.max(0, (plan.locs || []).filter(L => L && L.name && !have.has(nm(L.name))).length - made.length) });
+      }
       if (act === 'xl_list') { // LoRA ประเภทอื่นของเรื่องนี้ + สถานะ
         await animeSchema(env);
         const rows = (await env.DB.prepare("SELECT c.id,c.name,c.kind,c.desc,(SELECT COUNT(*) FROM images i WHERE i.project='ซีรีส์0·'||c.name) img,(SELECT MIN(i.id) FROM images i WHERE i.project='ซีรีส์0·'||c.name) face,(SELECT COUNT(*) FROM jobs j WHERE j.project='ซีรีส์0·'||c.name AND j.status IN ('queued','running','kaggle')) pend,(SELECT l.status FROM loras l WHERE l.char_id=c.id AND l.status<>'old' ORDER BY l.id DESC LIMIT 1) lora,(SELECT l.size FROM loras l WHERE l.char_id=c.id AND l.status='ready' ORDER BY l.id DESC LIMIT 1) size FROM chars c WHERE c.series_id=0 AND c.story=? AND c.kind IN ('enemy','place','style') ORDER BY c.kind,c.id").bind(story).all()).results;
