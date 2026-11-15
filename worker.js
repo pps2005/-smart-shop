@@ -1280,8 +1280,12 @@ function imgEngineFor(j, s) {
 // ===== เวอร์ชันเรียบ: ซีรีส์ → บท (AI เสนอ/สั่งแก้) → (ต่อไป: ตัวละคร LoRA → ซีน → ตอน) =====
 const SCRIPT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'; // เปลี่ยนได้ที่ settings.script_model (ชื่อโมเดล Workers AI)
 async function llmJson(env, s, user, mt) {
-  let out; try { out = await env.AI.run(s.script_model || SCRIPT_MODEL, { messages: [{ role: 'system', content: 'คุณเป็นนักเขียนบทอนิเมะ ตอบเป็นภาษาไทย และตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น' }, { role: 'user', content: user }], max_tokens: mt || 2400 }); }
-  catch (e) { if (isQuota(String(e.message || e))) await qset(env, 'nu_full', 1); throw e; }
+  const model = s.script_model || SCRIPT_MODEL, inp = { messages: [{ role: 'system', content: 'คุณเป็นนักเขียนบทอนิเมะ ตอบเป็นภาษาไทย และตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น' }, { role: 'user', content: user }], max_tokens: mt || 2400 };
+  let out; try { const nf = await env.DB.prepare("SELECT v FROM qmeter WHERE day=? AND k='nu_full'").bind(utcDay()).first().catch(() => null); if (nf && +nf.v) throw new Error('quota: daily neurons used up (nu_full)'); out = await env.AI.run(model, inp); }
+  catch (e) { const m = String(e.message || e); if (!isQuota(m)) throw e; await qset(env, 'nu_full', 1);
+    // โควตา AI ฟรีของบัญชีหลักหมด → ใช้โควตาฟรีของบัญชีผู้ช่วย (token Workers AI เดียวกับที่ใช้วาด Flux) ทีละบัญชี
+    out = null; for (const k of await activeKeys(env, Date.now()).catch(() => [])) { try { const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(k.acct)}/ai/run/${model}`, { method: 'POST', headers: { authorization: 'Bearer ' + k.token, 'content-type': 'application/json' }, body: JSON.stringify(inp) }); const j = await r.json().catch(() => ({})); if (r.ok && j.result && j.result.response) { out = j.result; break; } } catch (e2) { } }
+    if (!out) throw e; }
   { const u = out && out.usage, ti = (u && +u.prompt_tokens) || Math.ceil(String(user).length / 2), to = (u && +u.completion_tokens) || Math.ceil(String((out && out.response) || '').length / 2); await qadd(env, 'nu', ti * 0.026668 + to * 0.204805); await qadd(env, 'llm', 1); } // ราคาเป็น neurons ของ llama-3.3-70b fp8 (ประมาณ)
   let t = out && out.response; if (t && typeof t === 'object') t = JSON.stringify(t);
   t = String(t || '').replace(/```json|```/g, '');
@@ -2208,7 +2212,7 @@ async function vRoutes(req, env, url, ctx) {
       hid = h.id; hname = h.name;
     }
     const id = +p.split('/')[3];
-    if (hid && id && p !== '/k/claim' && p !== '/k/log') {
+    if (hid && id && p !== '/k/claim' && p !== '/k/log' && !p.startsWith('/k/lget/')) { // /k/lget/<เลข LoRA> ไม่ใช่เลขงาน: ผู้ช่วยต้องดึงไฟล์ LoRA ได้ (เดิมโดน 403 → ช่องสตอรีบอร์ดที่ผู้ช่วยรับพังหมด)
       const own = await env.DB.prepare('SELECT helper FROM vjobs WHERE id=?').bind(id).first();
       if (!own || own.helper !== hid) return json({ error: 'not your job' }, 403);
     }
