@@ -56,7 +56,7 @@ export default {
   },
   async scheduled(event, env0, ctx) {
     const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) }, jobs = [];
-    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presTick(env).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
+    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presTick(env, ctx).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
     await handleCron(event, env, { waitUntil: p => jobs.push(p) });
     ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare('DELETE FROM rmeter WHERE day < ?').bind(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
   },
@@ -354,23 +354,106 @@ async function presSeed(env) {
 let presEpReady = false;
 const PRES_VREF = '안녕하세요, 여러분! 오늘도 재미있고 신기한 이야기를 하나 가져왔어요. 끝까지 들어 보시면 깜짝 놀라실 거예요.';
 const PRES_VOICE = { a: 'Female, early 20s, Korean, sweet soft bright voice, gentle and friendly storyteller, clear natural pronunciation, a warm smile in the voice, medium-high pitch', b: 'Female, early 20s, Korean, calm elegant voice with a slight husky texture, composed and confident storyteller, clear natural pronunciation, medium-low pitch, soothing' };
+// ===== ซีรีส์อาหาร: 1 ตอน = 3 ซีน × ~5 นาที · คนจริงสอนทำอาหาร/เล่าเรื่องอาหาร คุยเรื่อยเปื่อย · เขียนบทอัตโนมัติทีละช่วงผ่าน presTick =====
+const thFem = t => String(t || '').replace(/นะครับ/g, 'นะคะ').replace(/ครับผม/g, 'ค่ะ').replace(/ครับ/g, 'ค่ะ').replace(/กระผม/g, 'ฉัน').replace(/(^|\s)ผม(?=ชื่อ|จะ|ก็|เอง|ว่า|คิด|ชอบ|อยาก|รู้|เคย|กิน|ทำ|เป็น|ไม่ได้|ขอ|ได้|ต้อง)/g, '$1ฉัน'); // ซับไทยเป็นเสียงผู้หญิงเสมอ (กันหลุดเป็น ผม/ครับ)
+const SER_CH = 3, SER_N = 20; // 1 ซีน = 3 ช่วง × ~20 ประโยค ≈ 5 นาที
+const serRange = (n, k) => { const a = Math.floor(k * n / SER_CH); return [a, Math.max(a, Math.floor((k + 1) * n / SER_CH) - 1)]; };
+const serSet = g => typeof g === 'string' ? { t: g.slice(0, 140), f: 0 } : { t: String((g && g.t) || '').slice(0, 140), f: (g && +g.f) ? 1 : 0 };
+function serOutlinePrompt(px, kind, topic) {
+  const cook = kind === 'cook';
+  return `ออกแบบซีรีส์คลิป TikTok แนวตั้ง 1 ตอน ยาว 3 ซีน ซีนละประมาณ 5 นาที (รวมประมาณ 15 นาที) ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} เป็นคนจริงๆ อยู่ในครัว${cook ? ' สอนทำอาหารแบบทำตามได้จริง' : ' เล่าเรื่องเกี่ยวกับอาหาร (ที่มา ความทรงจำ วัฒนธรรมการกิน) ระหว่างทำหรือกินอาหาร'} พร้อมพูดคุยเรื่อยเปื่อยเป็นกันเองเหมือนเพื่อนคุยไปทำไป
+เมนู/หัวข้อ: ${topic || 'ให้เลือกเมนูที่คนไทยหาวัตถุดิบง่ายและทำตามได้'}
+โครงสามซีน: ซีน 1 = เปิดตอน ทักทาย คุยเล่น ${cook ? 'แนะนำและเตรียมวัตถุดิบ' : 'เริ่มเล่าเรื่อง'} · ซีน 2 = ${cook ? 'ลงมือปรุงทีละขั้น พร้อมเคล็ดลับ' : 'เนื้อเรื่องหลักระหว่างทำอาหาร'} · ซีน 3 = ${cook ? 'ขั้นสุดท้าย จัดจาน ชิม สรุป' : 'ไคลแม็กซ์ ชิม สรุป'} ชวนกดติดตาม
+กติกา:
+- ${cook ? 'ขั้นตอนต้องเป็นวิธีทำอาหารที่ถูกต้องตามหลักทั่วไป มีปริมาณ ไฟ เวลาที่ทำได้จริง ห้ามแต่งข้อมูลโภชนาการหรือสถิติ' : 'ข้อเท็จจริงต้องเป็นเรื่องที่รู้กันทั่วไป ห้ามแต่งตัวเลข ชื่อ หรือปีเอง ถ้าไม่แน่ใจให้เล่าแบบกว้างๆ'}
+- แต่ละซีนมี settings 8 ภาพ เรียงตามเวลาในซีน: t = คำบรรยายภาพเป็นภาษาอังกฤษสั้นๆ ไม่เกิน 120 ตัวอักษร, f = 1 ถ้าเป็นภาพโคลสอัพอาหาร/วัตถุดิบ/กระทะ/จานโดยไม่มีคนในภาพ, f = 0 ถ้าเห็นพรีเซนเตอร์ (บอกว่ากำลังทำอะไรในครัวหรือที่โต๊ะ) ผสม f = 1 ประมาณ 3–4 ภาพต่อซีน
+- beats = 3 ข้อ บอกว่า 3 ช่วงของซีนนั้นพูดเรื่องอะไร (ไทย 1 ประโยค) ช่วงละประมาณ 1.5 นาที ต้องมีทั้งเนื้อหา${cook ? 'ขั้นตอน' : 'เรื่องเล่า'}และเรื่องคุยเล่นสลับกัน
+ตอบ JSON เท่านั้น: {"title":"ชื่อตอนภาษาไทย","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","scenes":[{"title":"ชื่อซีน","summary":"สรุปซีน 1 ประโยค","settings":[{"t":"...","f":0}],"beats":["...","...","..."]}]}`;
+}
+async function serWrite(env, s, px, sc, si) { // เขียนบทต่อ 1 ช่วง (~20 ประโยค) ของซีนที่ si
+  const S = sc.scenes[si], k = S.done || 0, cook = sc.kind === 'cook', [a, b] = serRange(S.settings.length, k);
+  const prev = (S.lines || []).slice(-3).map(l => l.ko + ' (' + l.th + ')').join(' / ');
+  const shots = S.settings.slice(a, b + 1).map((g, i) => (a + i) + ': ' + (g.f ? '[โคลสอัพอาหาร ไม่เห็นคน] ' : '[เห็นพรีเซนเตอร์] ') + g.t).join('\n');
+  const last = k === SER_CH - 1;
+  const r = await llmJson(env, s, `เขียนบทพูดของคลิปซีรีส์ "${sc.title}" (${cook ? 'สอนทำอาหาร' : 'เล่าเรื่องเกี่ยวกับอาหาร'}) ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} พูดกับกล้องเป็นภาษาเกาหลี (คนดูอ่านซับไทย)
+ซีนที่ ${si + 1}/${sc.scenes.length}: ${S.title} — ${S.summary}
+ช่วงที่ ${k + 1}/${SER_CH} ของซีนนี้: ${S.beats[k] || ''}
+${prev ? 'ประโยคท้ายของช่วงก่อนหน้า (เขียนต่อให้เนื่องกัน ห้ามซ้ำ): ' + prev : (si === 0 ? 'นี่คือช่วงเปิดตอน ทักทายและบอกว่าวันนี้จะทำ/เล่าอะไร' : 'นี่คือช่วงเปิดซีน ต่อจากซีนก่อนอย่างเป็นธรรมชาติ')}
+ภาพที่แสดงในช่วงนี้ (img = เลขภาพ):
+${shots}
+กติกา:
+- เขียน ${SER_N} ประโยค ประโยคสั้น ภาษาพูดสุภาพเป็นกันเอง (해요체)
+- พูดแบบคนจริงที่${cook ? 'ทำอาหารไปคุยไป' : 'เล่าไปทำ/กินไป'}: สลับระหว่าง${cook ? 'ขั้นตอนจริง (วัตถุดิบ ปริมาณ ไฟ เวลา เคล็ดลับ)' : 'เนื้อเรื่องเกี่ยวกับอาหาร'}กับเรื่องคุยเล่นเรื่อยเปื่อย (เรื่องเล่าเบาๆ ความทรงจำเกี่ยวกับอาหาร มุกเล็กๆ ความเห็นส่วนตัว) แล้ววนกลับมาที่งานตรงหน้า ไม่แห้งเป็นท่องสูตร
+- ${cook ? 'ขั้นตอนต้องถูกต้องตามหลักทำอาหารทั่วไป ห้ามแต่งตัวเลขโภชนาการหรือข้อมูลที่ไม่แน่ใจ' : 'ข้อเท็จจริงต้องรู้กันทั่วไป ห้ามแต่งตัวเลข ชื่อ หรือปีเอง'}
+- th = ซับไทยสั้น อ่านทันใน 3 วินาที ผู้พูดเป็นผู้หญิง ใช้ "ฉัน/เรา" ลงท้าย "ค่ะ/นะคะ/นะ" ห้ามใช้ "ผม/ครับ"
+- img = เลขภาพที่แสดงตอนพูดประโยคนั้น เลือกจากรายการด้านบน เรียงจากน้อยไปมาก และใช้ให้ครบทุกภาพ
+${last ? (si === sc.scenes.length - 1 ? '- ช่วงนี้เป็นช่วงจบตอน: สรุป ชิม ชวนกดติดตาม' : '- ช่วงนี้เป็นท้ายซีน: ปิดแบบเชื่อมไปซีนถัดไป') : ''}
+ตอบ JSON array เท่านั้น: [{"ko":"...","th":"...","img":${a}}]`, 4200);
+  const arr = Array.isArray(r) ? r : (r && Array.isArray(r.lines) ? r.lines : []);
+  const raw = arr.map(x => ({ ko: String((x && x.ko) || '').trim().slice(0, 160), th: thFem(String((x && x.th) || '').trim().slice(0, 160)), img: Number.isFinite(+(x && x.img)) ? Math.max(a, Math.min(b, Math.round(+x.img))) : a })).filter(x => x.ko && x.th).slice(0, SER_N + 6);
+  if (raw.length < 8) throw new Error('บทช่วงนี้สั้นเกินไป');
+  const spread = new Set(raw.map(x => x.img)).size >= Math.min(2, b - a + 1); let cur = a;
+  raw.forEach((x, i) => { x.img = spread ? Math.max(cur, x.img) : a + Math.floor(i * (b - a + 1) / raw.length); cur = x.img; });
+  S.lines = (S.lines || []).concat(raw); S.done = k + 1;
+}
+async function serStep(env, s, ep, px) { // ทุก 2 นาที: ซีนที่ยังเขียนไม่ครบ เขียนต่อซีนละ 1 ช่วง (3 ซีนพร้อมกัน)
+  let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; }
+  if (!sc.series || !Array.isArray(sc.scenes)) return;
+  if (sc.lock && Date.now() - sc.lock < 5 * 60000) return;
+  const todo = sc.scenes.map((S, i) => i).filter(i => (sc.scenes[i].done || 0) < SER_CH);
+  if (!todo.length) { await env.DB.prepare("UPDATE pres_eps SET status='draft', err=NULL WHERE id=?").bind(ep.id).run(); return; }
+  sc.lock = Date.now(); await env.DB.prepare('UPDATE pres_eps SET script=? WHERE id=?').bind(JSON.stringify(sc), ep.id).run();
+  const res = await Promise.allSettled(todo.map(i => serWrite(env, s, px, sc, i))), bad = res.find(r => r.status === 'rejected');
+  sc.lock = 0; if (bad) sc.fails = (sc.fails || 0) + 1;
+  const fin = sc.scenes.every(S => (S.done || 0) >= SER_CH);
+  if (!fin && (sc.fails || 0) >= 6) { await env.DB.prepare("UPDATE pres_eps SET status='failed', script=?, err=? WHERE id=?").bind(JSON.stringify(sc), 'AI เขียนบทไม่สำเร็จ: ' + String((bad && bad.reason && bad.reason.message) || '').slice(0, 160), ep.id).run(); return; }
+  await env.DB.prepare('UPDATE pres_eps SET status=?, script=? WHERE id=?').bind(fin ? 'draft' : 'writing', JSON.stringify(sc), ep.id).run();
+  if (fin) await notify(env, '📺 AI เขียนบทซีรีส์ "' + (ep.title || '') + '" ครบ 3 ซีนแล้ว รอคุณอนุมัติ');
+}
+function serImgJobs(env, px, sc, l, pj, t, trig) { // วาดภาพทั้งตอน: ภาพเห็นพรีเซนเตอร์ใช้ LoRA ล็อกหน้า · ภาพโคลสอัพอาหารไม่ใช้ LoRA ไม่มีคน
+  const SH = ['medium close-up portrait, head and shoulders, facing the camera, talking', 'medium shot from the waist up, facing the camera, gesturing with one hand while talking'], st = []; let n = 0;
+  for (const S of sc.scenes) for (const g of S.settings) { n++;
+    const prompt = g.f ? `photo of ${g.t}, food photography, close-up, natural window light, shallow depth of field, realistic, no people, no hands, vertical composition` : `photo of ${trig} woman, ${presWho(px, sc.hair)}, ${SH[n % 2]}, friendly natural expression, wearing ${sc.outfit}, ${g.t}, vertical composition, 85mm lens, shallow depth of field`;
+    const opt = g.f ? presOpt(832, 1216, n, { qc: ['a realistic photo of food or cooking ingredients with no people'] }) : presOpt(832, 1216, n, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman', 'a woman wearing ' + sc.outfit] });
+    st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(n), prompt, t++, JSON.stringify(opt))); }
+  return st;
+}
+
 // ทุก 2 นาที: คลิปที่อนุมัติแล้ว → ภาพครบ → ส่งงานทำเสียง+ขยับปาก+ซับ (ptts) → คลิปเสร็จ → แจ้งเตือน / ส่งเข้า TikTok อัตโนมัติ (ถ้าเปิด)
-async function presTick(env) {
+async function presTick(env, ctx) {
   if (new Date().getUTCMinutes() % 2) return;
-  let eps; try { eps = (await env.DB.prepare("SELECT * FROM pres_eps WHERE status IN ('imgs','render')").all()).results; } catch (e) { return; }
+  let eps; try { eps = (await env.DB.prepare("SELECT * FROM pres_eps WHERE status IN ('writing','imgs','render')").all()).results; } catch (e) { return; }
   if (!eps.length) return;
   const s = await getSettings(env); let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; } const L = P.list || [];
   for (const ep of eps) {
     const pj = 'พรีเซนเตอร์·ตอน·' + ep.id, cj = 'พรีเซนเตอร์·คลิป·' + ep.id, px = L.find(x => x.k === ep.pk) || {};
-    const vq = (await env.DB.prepare("SELECT status,error FROM vjobs WHERE project IN (?,?)").bind(pj, cj).all()).results, busy = vq.filter(r => r.status === 'queued' || r.status === 'running').length, bad = vq.find(r => r.status === 'failed');
+    const vq = (await env.DB.prepare("SELECT status,error FROM vjobs WHERE project IN (?,?) OR project LIKE ?").bind(pj, cj, cj + '·ซีน%').all()).results, busy = vq.filter(r => r.status === 'queued' || r.status === 'running').length, bad = vq.find(r => r.status === 'failed');
+    if (ep.status === 'writing') { const job = serStep(env, s, ep, px).catch(() => { }); if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job; continue; }
     if (ep.status === 'imgs') {
       if (busy) continue;
       let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; }
       const ims = (await env.DB.prepare('SELECT id,scene FROM images WHERE project=? ORDER BY id').bind(pj).all()).results, by = {}; for (const r of ims) by[+r.scene] = r.id;
+      if (sc.series) { // ซีรีส์: ภาพครบทุกซีน → ส่งงานทำเสียง+ซับ+ขยับปาก 3 งาน (ซีนละคลิป)
+        let gi = 0, miss = false; const ids = (sc.scenes || []).map(S => S.settings.map(() => { gi++; if (!by[gi]) miss = true; return by[gi] || 0; }));
+        if (!ids.length || miss) { await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind('วาดภาพประกอบไม่ครบ' + (bad ? ': ' + String(bad.error || '').slice(0, 160) : ''), ep.id).run(); continue; }
+        const st = [env.DB.prepare("DELETE FROM vjobs WHERE project LIKE ? AND status IN ('failed','done')").bind(cj + '·ซีน%')];
+        sc.scenes.forEach((S, i) => st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj + '·ซีน' + (i + 1), String(S.title || ep.title || ''), Date.now() + i, JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: (S.lines || []).map(x => ({ ko: x.ko, th: x.th, img: x.img })), imgids: ids[i], nolip: S.settings.map((g, j) => g.f ? j : -1).filter(j => j >= 0), lips: s.pres_lips !== '0', pri: 0 }))));
+        st.push(env.DB.prepare("UPDATE pres_eps SET status='render' WHERE id=?").bind(ep.id));
+        await env.DB.batch(st); continue;
+      }
+
       const ids = (sc.settings || []).map((g, i) => by[i + 1] || 0);
       if (!ids.length || ids.some(x => !x)) { await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind('วาดภาพประกอบไม่ครบ' + (bad ? ': ' + String(bad.error || '').slice(0, 160) : ''), ep.id).run(); continue; }
       await env.DB.batch([env.DB.prepare("DELETE FROM vjobs WHERE project=? AND status IN ('failed','done')").bind(cj), env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj, String(ep.title || ''), Date.now(), JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: sc.lines || [], imgids: ids, lips: s.pres_lips !== '0', pri: 0 })), env.DB.prepare("UPDATE pres_eps SET status='render' WHERE id=?").bind(ep.id)]);
     } else {
+            let sc0 = {}; try { sc0 = JSON.parse(ep.script || '{}'); } catch { sc0 = {}; }
+      if (sc0.series) { // ซีรีส์: รอครบทุกซีน
+        const vids = []; for (let i = 1; i <= (sc0.scenes || []).length; i++) { const vv = await env.DB.prepare('SELECT id FROM videos WHERE project=? ORDER BY id DESC LIMIT 1').bind(cj + '·ซีน' + i).first(); if (vv) vids.push(vv.id); }
+        if (vids.length && vids.length === (sc0.scenes || []).length) { sc0.vids = vids; await env.DB.prepare("UPDATE pres_eps SET status='done', vid=?, script=? WHERE id=?").bind(vids[0], JSON.stringify(sc0), ep.id).run(); await notify(env, '📺 ซีรีส์ "' + (ep.title || '') + '" ของ ' + (px.name || 'พรีเซนเตอร์') + ' เสร็จครบ ' + vids.length + ' ซีนแล้ว'); }
+        else if (!busy) await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind('ทำคลิปไม่ครบทุกซีน (' + vids.length + '/' + (sc0.scenes || []).length + ')' + (bad ? ': ' + String(bad.error || '').slice(0, 160) : ''), ep.id).run();
+        continue;
+      }
+
       const v = await env.DB.prepare('SELECT id FROM videos WHERE project=? ORDER BY id DESC LIMIT 1').bind(cj).first();
       if (v) {
         await env.DB.prepare("UPDATE pres_eps SET status='done', vid=? WHERE id=?").bind(v.id, ep.id).run();
@@ -1118,8 +1201,8 @@ function imgEngineFor(j, s) {
 }
 // ===== เวอร์ชันเรียบ: ซีรีส์ → บท (AI เสนอ/สั่งแก้) → (ต่อไป: ตัวละคร LoRA → ซีน → ตอน) =====
 const SCRIPT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'; // เปลี่ยนได้ที่ settings.script_model (ชื่อโมเดล Workers AI)
-async function llmJson(env, s, user) {
-  let out; try { out = await env.AI.run(s.script_model || SCRIPT_MODEL, { messages: [{ role: 'system', content: 'คุณเป็นนักเขียนบทอนิเมะ ตอบเป็นภาษาไทย และตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น' }, { role: 'user', content: user }], max_tokens: 2400 }); }
+async function llmJson(env, s, user, mt) {
+  let out; try { out = await env.AI.run(s.script_model || SCRIPT_MODEL, { messages: [{ role: 'system', content: 'คุณเป็นนักเขียนบทอนิเมะ ตอบเป็นภาษาไทย และตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น' }, { role: 'user', content: user }], max_tokens: mt || 2400 }); }
   catch (e) { if (isQuota(String(e.message || e))) await qset(env, 'nu_full', 1); throw e; }
   { const u = out && out.usage, ti = (u && +u.prompt_tokens) || Math.ceil(String(user).length / 2), to = (u && +u.completion_tokens) || Math.ceil(String((out && out.response) || '').length / 2); await qadd(env, 'nu', ti * 0.026668 + to * 0.204805); await qadd(env, 'llm', 1); } // ราคาเป็น neurons ของ llama-3.3-70b fp8 (ประมาณ)
   let t = out && out.response; if (t && typeof t === 'object') t = JSON.stringify(t);
@@ -5286,12 +5369,13 @@ def pres_job(j, port):
     mpy = ensure_muse() if o.get("lips", True) else None
     VF = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=z='min(zoom+0.0004,1.06)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=25,format=yuv420p"
     parts, nlip = [], 0
+    nolip = set(int(x) for x in (o.get("nolip") or []))  # ภาพโคลสอัพอาหาร (ไม่มีคน) ไม่ต้องขยับปาก
     for k, sg in enumerate(segs):
         a, b = bounds[k]
         du = max(0.5, b - a)
         sw = d + "/s%d.wav" % k
         pcm_wav(pcm[int(a * SR) * 2:int(b * SR) * 2], sw)
-        lv = run_muse(mpy, ipaths[sg[0]], sw, d, gpu, str(k)) if mpy else None
+        lv = run_muse(mpy, ipaths[sg[0]], sw, d, gpu, str(k)) if (mpy and sg[0] not in nolip) else None
         pv = d + "/v%02d.mp4" % k
         if lv:
             nlip += 1
@@ -5833,16 +5917,27 @@ async function castApi(req, env, url, body) {
         if (act === 'pres_script') { // AI เขียนบท 1 นาที (เกาหลี + ซับไทย) → รออนุมัติ
           const px = L.find(x => x.k === String(b.k || '')); if (!px) return json({ error: 'เลือกพรีเซนเตอร์ก่อน' }, 400);
           const topic = String(b.topic || '').trim().slice(0, 200) || 'เรื่องเล่าน่าทึ่งหรือความรู้รอบตัวที่คนไทยชอบ';
-          const r = await llmJson(env, s, `เขียนบทคลิป TikTok แนวตั้ง ยาวประมาณ 1 นาที ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} พูดกับกล้องเป็นภาษาเกาหลี (คนดูอ่านซับไทย)\nหัวข้อ: ${topic}\nกติกา:\n- 3 วินาทีแรกต้องดึงความสนใจ เล่าเป็นเรื่องมีจุดน่าทึ่งหรือหักมุม ปิดท้ายชวนกดติดตาม\n- 10–13 ประโยค ประโยคละสั้นๆ ภาษาพูดเป็นกันเองแบบสุภาพ (해요체)\n- th = คำแปลไทยที่เป็นธรรมชาติ สั้น อ่านทันใน 3 วินาที\n- ข้อเท็จจริงต้องเป็นเรื่องจริงที่รู้กันทั่วไป ห้ามแต่งตัวเลขหรือชื่อขึ้นเอง ถ้าไม่แน่ใจให้เล่าแบบกว้างๆ\n- แบ่งเป็นช่วงภาพ img = 0,1,2,3 (ช่วงละ ~3 ประโยค) และบอกฉากหลังของแต่ละช่วงเป็นภาษาอังกฤษสั้นๆ ที่เข้ากับเนื้อเรื่อง\nตอบ JSON เท่านั้น: {"title":"ชื่อคลิปภาษาไทย","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","settings":["setting of img 0","...1","...2","...3"],"lines":[{"ko":"...","th":"...","img":0}]}`);
-          const st = (Array.isArray(r.settings) ? r.settings : []).map(x => String(x).slice(0, 120)).filter(Boolean).slice(0, 5), lines = (Array.isArray(r.lines) ? r.lines : []).map(x => ({ ko: String(x.ko || '').trim().slice(0, 160), th: String(x.th || '').trim().slice(0, 160), img: Math.max(0, Math.min((st.length || 1) - 1, +x.img || 0)) })).filter(x => x.ko && x.th).slice(0, 16);
+          const r = await llmJson(env, s, `เขียนบทคลิป TikTok แนวตั้ง ยาวประมาณ 1 นาที ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} พูดกับกล้องเป็นภาษาเกาหลี (คนดูอ่านซับไทย)\nหัวข้อ: ${topic}\nกติกา:\n- 3 วินาทีแรกต้องดึงความสนใจ เล่าเป็นเรื่องมีจุดน่าทึ่งหรือหักมุม ปิดท้ายชวนกดติดตาม\n- 10–13 ประโยค ประโยคละสั้นๆ ภาษาพูดเป็นกันเองแบบสุภาพ (해요체)\n- th = คำแปลไทยที่เป็นธรรมชาติ สั้น อ่านทันใน 3 วินาที
+- ผู้พูดเป็นผู้หญิง ซับไทยต้องเป็นสำเนียงผู้หญิง ใช้ "ฉัน/เรา" ลงท้าย "ค่ะ/นะคะ/นะ" ห้ามใช้ "ผม/ครับ"\n- ข้อเท็จจริงต้องเป็นเรื่องจริงที่รู้กันทั่วไป ห้ามแต่งตัวเลขหรือชื่อขึ้นเอง ถ้าไม่แน่ใจให้เล่าแบบกว้างๆ\n- แบ่งเป็นช่วงภาพ img = 0,1,2,3 (ช่วงละ ~3 ประโยค) และบอกฉากหลังของแต่ละช่วงเป็นภาษาอังกฤษสั้นๆ ที่เข้ากับเนื้อเรื่อง\nตอบ JSON เท่านั้น: {"title":"ชื่อคลิปภาษาไทย","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","settings":["setting of img 0","...1","...2","...3"],"lines":[{"ko":"...","th":"...","img":0}]}`);
+          const st = (Array.isArray(r.settings) ? r.settings : []).map(x => String(x).slice(0, 120)).filter(Boolean).slice(0, 5), lines = (Array.isArray(r.lines) ? r.lines : []).map(x => ({ ko: String(x.ko || '').trim().slice(0, 160), th: thFem(String(x.th || '').trim().slice(0, 160)), img: Math.max(0, Math.min((st.length || 1) - 1, +x.img || 0)) })).filter(x => x.ko && x.th).slice(0, 16);
           if (lines.length < 4 || !st.length) return json({ error: 'AI เขียนบทไม่ครบ ลองกดใหม่อีกครั้ง' }, 500);
           const sc = { settings: st, lines, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
           await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'draft',?,?,?)").bind(px.k, topic, String(r.title || topic).slice(0, 120), JSON.stringify(sc), String(r.caption || '').slice(0, 2000), Date.now()).run();
         }
+        if (act === 'pres_series') { // ซีรีส์อาหาร: AI ออกแบบโครง 3 ซีน → presTick เขียนบททีละช่วงเอง → รออนุมัติ
+          const px = L.find(x => x.k === String(b.k || '')); if (!px) return json({ error: 'เลือกพรีเซนเตอร์ก่อน' }, 400);
+          const kind = b.kind === 'story' ? 'story' : 'cook', topic = String(b.topic || '').trim().slice(0, 200);
+          const r = await llmJson(env, s, serOutlinePrompt(px, kind, topic), 3800);
+          const scenes = (Array.isArray(r && r.scenes) ? r.scenes : []).slice(0, 3).map(S => ({ title: String((S && S.title) || '').slice(0, 80), summary: String((S && S.summary) || '').slice(0, 200), settings: (Array.isArray(S && S.settings) ? S.settings : []).map(serSet).filter(g => g.t).slice(0, 9), beats: (Array.isArray(S && S.beats) ? S.beats : []).map(x => String(x).slice(0, 200)).slice(0, SER_CH), lines: [], done: 0 }));
+          if (scenes.length < 3 || scenes.some(S => S.settings.length < 4 || S.beats.length < SER_CH)) return json({ error: 'AI ออกแบบซีรีส์ไม่ครบ 3 ซีน ลองกดใหม่อีกครั้ง' }, 500);
+          const sc = { series: 1, kind, title: String(r.title || topic || 'ซีรีส์อาหาร').slice(0, 120), scenes, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
+          await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'writing',?,?,?)").bind(px.k, topic || (kind === 'cook' ? 'สอนทำอาหาร' : 'เล่าเรื่องอาหาร'), sc.title, JSON.stringify(sc), String(r.caption || '').slice(0, 2000), Date.now()).run();
+        }
+
         if (act === 'pres_go' || act === 'pres_del' || act === 'pres_post') {
           const ep = await env.DB.prepare('SELECT * FROM pres_eps WHERE id=?').bind(+b.id).first(); if (!ep) return json({ error: 'ไม่พบคลิปนี้' }, 404);
           const xi = L.findIndex(x => x.k === ep.pk), px = L[xi];
-          if (act === 'pres_del') { await env.DB.batch([env.DB.prepare('DELETE FROM pres_eps WHERE id=?').bind(ep.id), env.DB.prepare("DELETE FROM vjobs WHERE project IN (?,?) AND status<>'running'").bind('พรีเซนเตอร์·ตอน·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id), env.DB.prepare('DELETE FROM images WHERE project=?').bind('พรีเซนเตอร์·ตอน·' + ep.id)]); }
+          if (act === 'pres_del') { await env.DB.batch([env.DB.prepare('DELETE FROM pres_eps WHERE id=?').bind(ep.id), env.DB.prepare("DELETE FROM vjobs WHERE (project IN (?,?) OR project LIKE ?) AND status<>'running'").bind('พรีเซนเตอร์·ตอน·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id, 'พรีเซนเตอร์·คลิป·' + ep.id + '·ซีน%'), env.DB.prepare('DELETE FROM images WHERE project=?').bind('พรีเซนเตอร์·ตอน·' + ep.id)]); }
           if (act === 'pres_go') { // อนุมัติบท → วาดภาพประกอบด้วย LoRA (ชุด/ทรงผมเดียวทั้งคลิป) → ระบบทำเสียง ขยับปาก ซับไทย รวมคลิปให้เอง (presTick)
             if (!px) return json({ error: 'ไม่พบพรีเซนเตอร์ของคลิปนี้' }, 400);
             const l = await env.DB.prepare("SELECT id FROM loras WHERE char_id=? AND status='ready' ORDER BY id DESC LIMIT 1").bind(cidOf(xi)).first();
@@ -5851,7 +5946,7 @@ async function castApi(req, env, url, body) {
             let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; }
             const pj = 'พรีเซนเตอร์·ตอน·' + ep.id, SH = ['medium close-up portrait, head and shoulders, facing the camera, talking', 'medium shot from the waist up, facing the camera, gesturing with one hand while talking']; let t = Date.now();
             await env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj).run();
-            await env.DB.batch((sc.settings || []).map((g, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${trigOf(px)} woman, ${presWho(px, sc.hair)}, ${SH[i % 2]}, friendly natural expression, wearing ${sc.outfit}, ${g}, vertical composition, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(832, 1216, i + 1, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman talking to the camera', 'a woman wearing ' + sc.outfit] })))));
+            await env.DB.batch(sc.series ? serImgJobs(env, px, sc, l, pj, t, trigOf(px)) : (sc.settings || []).map((g, i) => env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(i + 1), `photo of ${trigOf(px)} woman, ${presWho(px, sc.hair)}, ${SH[i % 2]}, friendly natural expression, wearing ${sc.outfit}, ${g}, vertical composition, 85mm lens, shallow depth of field`, t++, JSON.stringify(presOpt(832, 1216, i + 1, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman talking to the camera', 'a woman wearing ' + sc.outfit] })))));
             await env.DB.prepare("UPDATE pres_eps SET status='imgs', err=NULL WHERE id=?").bind(ep.id).run();
           }
           if (act === 'pres_post') { try { const r = await ttPost(env, ep); await env.DB.prepare('UPDATE pres_eps SET posted=? WHERE id=?').bind(r, ep.id).run(); } catch (e) { return json({ error: 'ส่งเข้า TikTok ไม่สำเร็จ: ' + String(e.message || e).slice(0, 200) }, 500); } }
@@ -5861,8 +5956,8 @@ async function castApi(req, env, url, body) {
         if (act === 'pres_pick' && pr) { const id = +b.id, s1 = new Set(pr.picked || []); s1.has(id) ? s1.delete(id) : s1.add(id); pr.picked = [...s1]; await save(); }
         if (act === 'pres_ds' && pr) { if (b.redo) { pr.picked = []; await save(); } await presQueueDs(env, pr, !!b.redo); }
         if (act === 'pres_train' && pr) { // เทรน LoRA ภาพเหมือนจริง (ฐาน RealVisXL) — ใช้ภาพที่ติดดาว
-          const ims = (await env.DB.prepare('SELECT id,scene FROM images WHERE project=? ORDER BY scene').bind(PJ(pr, 'ชุดฝึก')).all()).results, pk = new Set(pr.picked || []), use = ims.filter(x => pk.has(x.id));
-          if (use.length < 12) return json({ error: 'เลือกภาพที่หน้าเหมือนอย่างน้อย 12 ภาพก่อน (ตอนนี้ ' + use.length + ')' }, 400);
+          const ims = (await env.DB.prepare('SELECT id,scene FROM images WHERE project=? ORDER BY scene').bind(PJ(pr, 'ชุดฝึก')).all()).results, pk = new Set(pr.picked || []); let use = ims.filter(x => pk.has(x.id));
+          if (use.length < 12) { if (ims.length >= 12) use = ims; else return json({ error: 'ชุดฝึกวาดยังไม่ถึง 12 ภาพ (ตอนนี้ ' + ims.length + ')' }, 400); } // ติดดาวไม่ถึง 12 = ใช้ทุกภาพที่วาดแล้ว
           const cid = cidOf(pi), trig = trigOf(pr), imgs = use.map(x => { const d = presDsVar((+x.scene || 1) - 1, presOff(pr)); return { id: x.id, cap: `${trig} woman, ${pr.hc || 'dark'} hair, ${d.h}, ${d.v[0]}, ${d.e}, wearing ${d.o}, ${d.g}, ${d.l}` }; }), pj = PJ(pr, 'LoRA');
           await env.DB.batch([env.DB.prepare("UPDATE loras SET status='old' WHERE char_id=?").bind(cid), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status IN ('queued','failed') AND project=?").bind(pj)]);
           const r = await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','lora','','','',0,'queued',0,?,'lora',?)").bind(pj, Date.now(), JSON.stringify({ char_id: cid, trigger: trig, images: imgs, pri: 0, dim: 32, alpha: 16, lr: 1e-4, res: 896, base: 'real' })).run();
@@ -5886,7 +5981,7 @@ async function castApi(req, env, url, body) {
           const cnt = (pj, st) => vq.filter(r => r.project === pj && (!st || r.status === st)).reduce((n, r) => n + r.n, 0);
           const vs = (await env.DB.prepare('SELECT id,shot FROM videos WHERE project=? ORDER BY id DESC LIMIT 6').bind(PJ(x, 'เสียง')).all()).results, vsq = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE project=? AND status IN ('queued','running')").bind(PJ(x, 'เสียง')).first()).n;
           out.push({ k: x.k, name: x.name || '', full: x.full, face: x.face, picked: x.picked || [], voice: x.voice || 0, voices: vs, vq: vsq, ds: rows.filter(r => r.project === pjs[0]).map(r => ({ id: r.id, sc: r.scene })), test: rows.filter(r => r.project === pjs[1]).map(r => ({ id: r.id, sc: r.scene })), dsq: cnt(pjs[0]), dsrun: cnt(pjs[0], 'running'), tq: cnt(pjs[1]), lora: lo ? { id: lo.id, status: lo.status, error: lo.error || '', prog: lp } : null }); }
-        const eps = (await env.DB.prepare('SELECT id,pk,topic,title,status,script,caption,vid,err,posted,created FROM pres_eps ORDER BY id DESC LIMIT 20').all()).results.map(e => { let sc = {}; try { sc = JSON.parse(e.script || '{}'); } catch { sc = {}; } return { ...e, script: undefined, lines: sc.lines || [], outfit: sc.outfit || '' }; });
+        const eps = (await env.DB.prepare('SELECT id,pk,topic,title,status,script,caption,vid,err,posted,created FROM pres_eps ORDER BY id DESC LIMIT 20').all()).results.map(e => { let sc = {}; try { sc = JSON.parse(e.script || '{}'); } catch { sc = {}; } return { ...e, script: undefined, lines: sc.series ? (sc.scenes || []).flatMap(S => S.lines || []) : (sc.lines || []), outfit: sc.outfit || '', series: sc.series ? 1 : 0, prog: sc.series ? (sc.scenes || []).map(S => ({ t: S.title || '', n: (S.lines || []).length, done: S.done || 0, min: Math.round((S.lines || []).length * 4.3 / 6) / 10 })) : undefined, vids: sc.vids || [] }; });
         return json({ ok: true, pres: P, imgs: im, queued: q, list: out, eps, tt: { key: !!s.tt_key, linked: !!s.tt_tok, mode: s.tt_mode || 'inbox', auto: s.tt_auto === '1', redirect: (s.self_url || '') + '/tt/cb' } });
       }
       if (act === 'clog') { const k = 'clog', old = (await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(k).first().catch(() => null)); let L = []; try { L = JSON.parse((old && old.value) || '[]'); } catch { } L.push(new Date().toISOString().slice(11, 19) + ' ' + String(b.m || '').slice(0, 400) + ' | ' + String(b.ua || '').slice(0, 120)); await setSetting(env, k, JSON.stringify(L.slice(-15))); return json({ ok: true }); } // ข้อผิดพลาดจากหน้าเว็บของผู้ใช้ (ไว้ตรวจปัญหาที่จำลองไม่ได้)
