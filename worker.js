@@ -2020,11 +2020,11 @@ async function bridgeImg(env, s) {
     if (String(j.project).startsWith('ฉาก')) { const sh = await env.DB.prepare('SELECT loras FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); try { lo = JSON.parse((sh && sh.loras) || '[]'); } catch { lo = []; } }
     if (String(j.project).startsWith('ทดสอบLoRA·')) lo = [{ id: +String(j.project).split('·')[1] || 0, w: 0.8 }];
     // สตอรีบอร์ดช่วงร่าง (sb_draft ≠ 0): วาดเป็นมังงะขาวดำด้วย FLUX.1-dev บน Kaggle (ไม่ใช้ LoRA) ลายเส้นเดียวกับตัวสำรอง แต่ละเอียดกว่า · ปิดร่างด้วย sb_draft=0 เมื่อจะวาดจริงเป็นสี + LoRA
-    const draft = String(j.project).startsWith('ฉาก') && (s.sb_draft !== '0' || s.img_hybrid === '1'); // img_hybrid=1 ใช้ได้แม้ sb_draft=0 (เดิมปิดร่างแล้วหลุดไปวาดทางลัดที่ไม่มีชุด/มุมกล้อง)
+    const draft = String(j.project).startsWith('ฉาก') && (s.sb_draft !== '0' || s.img_hybrid !== '0'); // โหมดผสมเปิดเป็นค่าเริ่มต้น (ปิดด้วย img_hybrid=0) ใช้ได้แม้ sb_draft=0 (เดิมปิดร่างแล้วหลุดไปวาดทางลัดที่ไม่มีชุด/มุมกล้อง)
     let shEn = '', shLoc = '', noChar = false; if (draft) { const shr = await env.DB.prepare('SELECT en,loc,chars FROM shots WHERE kproj=?').bind(j.project).first().catch(() => null); shEn = shr ? String(shr.en || '') : ''; shLoc = shr ? String(shr.loc || '') : ''; noChar = !!shr && !/[^\[\]\s]/.test(String(shr.chars || '[]')); lo = []; }
     // ภาพร่าง: สถานที่เดียวกันใช้ seed ชุดเดียวกัน (ฉากหลัง/ลายเส้นใกล้กันขึ้น) + วาด 2 แบบแล้วให้ CLIP ตรวจเลือกภาพที่ตรงบทและฉากหลังครบที่สุด
     const locSeed = shLoc ? [...shLoc].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 2000000000 + 1 : 0;
-    const hyOn = draft && s.img_hybrid === '1'; // ภาพแบบผสม: FLUX วาดฉาก · SDXL อนิเมะวาดตัวละคร/ของสำคัญทั้งหมด (สี) — ผู้ใช้สั่ง: รายละเอียดสำคัญใช้ SDXL เท่านั้น
+    const hyOn = draft && s.img_hybrid !== '0'; // ภาพแบบผสม: FLUX วาดฉาก · SDXL อนิเมะวาดตัวละคร/ของสำคัญทั้งหมด (สี) — ผู้ใช้สั่ง: รายละเอียดสำคัญใช้ SDXL เท่านั้น
     const eg = hyOn ? (s.img_hy_mode === 'paste' ? 'hybrid' : 'cn') : draft ? fluxEng(s) : lo.length ? 'sdxl' : imgEngineFor(j, s), hi = (+j.steps || 4) >= 8;
     const npExp = !draft || /chibi/i.test(shEn) || /only (his|her|the two) hands?|hand(s)? (is|are) visible/i.test(shEn) ? null : /No people in the picture/.test(shEn) ? 0 : /Exactly one person/.test(shEn) ? 1 : /Exactly two people/.test(shEn) ? 2 : null; // จำนวนคนที่บทกำหนด ให้เครื่องตรวจภาพนับเทียบ
     const plushBad = draft && /talisman archive office/.test(shEn) && !/plush toys/.test(shEn) ? ['a person holding a teddy bear or stuffed toy', 'stuffed toys lying on the floor'] : [];
@@ -6341,7 +6341,7 @@ async function castApi(req, env, url, body) {
           meter.queue = { items: Q, perImg, perLine, measured: iT >= 5 };
         } catch (e) { }
         const voq = {}; for (const r of (await env.DB.prepare("SELECT project, SUM(json_array_length(json_extract(opt,'$.lines'))) n FROM vjobs WHERE kind='tts' AND status IN ('queued','running') AND project LIKE ? GROUP BY project").bind('เสียงพากย์·' + story + '·ตอน%').all()).results) voq[String(r.project).split('·ตอน').pop()] = +r.n || 0; // บรรทัดเสียงที่ยังรอทำ ต่อตอน
-        return json({ ok: true, voq, meter, draft: (await getSettings(env)).sb_draft !== '0' && (await getSettings(env)).img_hybrid !== '1' /* ภาพแบบผสมเป็นภาพสี: ไม่ใส่ฟิลเตอร์ขาวดำของภาพร่าง */, boost: +((await getSettings(env)).boost_until) || 0, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
+        return json({ ok: true, voq, meter, draft: (await getSettings(env)).sb_draft !== '0' && (await getSettings(env)).img_hybrid === '0' /* ภาพแบบผสมเป็นภาพสี: ไม่ใส่ฟิลเตอร์ขาวดำของภาพร่าง */, boost: +((await getSettings(env)).boost_until) || 0, reads: Math.round((+((await getSettings(env))[readDay()]) || 0) / READ_CAP * 100), plan: await rd('plan:' + story), epst, cands: cs, best: +((await getSettings(env))['best:' + story]) || 0, kind: (await workOf(env, story)).key });
       }
       if (act === 'save') {
         const pl = b.plan || {}; if (!Array.isArray(pl.roles) || !Array.isArray(pl.eps) || !pl.roles.length || !pl.eps.length) return json({ error: 'โครงเรื่องไม่ครบ (ต้องมีบทและตอน)' }, 400);
@@ -6571,7 +6571,7 @@ async function castApi(req, env, url, body) {
         if (!WORK[b.kind]) return json({ error: 'ไม่รู้จักประเภทงานนี้' }, 400);
         await setSetting(env, 'wk:' + story, String(b.kind)); return json({ ok: true, kind: b.kind, scenes: WORK[b.kind].scenes, shots: WORK[b.kind].shots });
       }
-      if (act === 'sb' || act === 'sb_redo' || act === 'sb_ok' || act === 'sb_lora' || act === 'sb_del' || act === 'sb_reopen') { // สตอรีบอร์ดของตอน: ดูทุกช็อต · วาดใหม่รายช็อต · อนุมัติแล้วค่อยทำคลิปทั้งตอน
+      if (act === 'sb' || act === 'sb_redo' || act === 'sb_ok' || act === 'sb_lora' || act === 'sb_del' || act === 'sb_reopen' || act === 'sb_reset') { // สตอรีบอร์ดของตอน: ดูทุกช็อต · วาดใหม่รายช็อต · อนุมัติแล้วค่อยทำคลิปทั้งตอน
         await animeSchema(env);
         const st = (await rd('epst:' + story)) || {}, cur = st[+b.ep], sr = await env.DB.prepare('SELECT id FROM series WHERE title=?').bind(story).first();
         const scs = sr ? (await env.DB.prepare('SELECT id,sc,title,script_id,sb,fin FROM scenes WHERE series_id=? AND ep=? ORDER BY sc').bind(sr.id, +b.ep).all()).results : [];
@@ -6581,6 +6581,16 @@ async function castApi(req, env, url, body) {
           if (cur && cur.gate === 'ok') return json({ error: 'อนุมัติไปแล้ว ลบช็อตไม่ได้' }, 400);
           await env.DB.batch([env.DB.prepare('DELETE FROM shots WHERE id=?').bind(sh.id), env.DB.prepare('DELETE FROM images WHERE project=?').bind(sh.kproj), env.DB.prepare("DELETE FROM jobs WHERE project=? AND status IN ('queued','kaggle')").bind(sh.kproj), env.DB.prepare("DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'").bind(sh.kproj), env.DB.prepare('DELETE FROM videos WHERE ep=? AND shot=?').bind('a' + sh.script_id, String(sh.id))]);
           return json({ ok: true });
+        }
+        if (act === 'sb_reset') { // ทำตอนนี้ใหม่ทั้งตอน: ลบช็อต/ภาพ/คลิปทุกซีนของตอน แล้วให้ระบบเขียนช่อง+วาดใหม่ตามเป้าจำนวนช็อต (ยังไม่อนุมัติเท่านั้น)
+          if (cur && cur.gate === 'ok') return json({ error: 'อนุมัติไปแล้ว ทำใหม่ไม่ได้ (กดกลับไปสตอรีบอร์ดก่อน)' }, 400);
+          let cleared = 0;
+          for (const e of scs) { if (!e.script_id) continue; const sid = e.script_id;
+            const old = (await env.DB.prepare('SELECT id,kproj FROM shots WHERE script_id=?').bind(sid).all()).results, st = [];
+            for (const x of old) st.push(env.DB.prepare('DELETE FROM images WHERE project=?').bind(x.kproj), env.DB.prepare('DELETE FROM jobs WHERE project=?').bind(x.kproj), env.DB.prepare(\"DELETE FROM vjobs WHERE project=? AND kind='img' AND status='queued'\").bind(x.kproj), env.DB.prepare('DELETE FROM videos WHERE ep=? AND shot=?').bind('a' + sid, String(x.id)));
+            st.push(env.DB.prepare('DELETE FROM shots WHERE script_id=?').bind(sid), env.DB.prepare('DELETE FROM settings WHERE key IN (?,?,?,?,?,?)').bind('sbfix:' + sid, 'sbrev:' + sid, 'sbsay:' + sid, 'sbdone:' + sid, 'sbok:' + sid, 'sbfail:' + sid), env.DB.prepare('UPDATE scenes SET sb=0, fin=0, auto=1 WHERE script_id=?').bind(sid));
+            for (let i = 0; i < st.length; i += 20) await env.DB.batch(st.slice(i, i + 20)); cleared += old.length; }
+          return json({ ok: true, cleared });
         }
         if (act === 'sb_redo') {
           const sh = await env.DB.prepare('SELECT id,script_id,kproj FROM shots WHERE id=?').bind(+b.shot).first();
