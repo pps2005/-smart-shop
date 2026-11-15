@@ -341,7 +341,7 @@ async function presFix(env) { // ครั้งเดียว (pres_fix=v2): �
 const SOYUL_OUTFITS = ['a white puff-sleeve ruffled crop blouse with a front tie, light blue high-waisted wide-leg jeans and white sneakers', 'a black fitted short-sleeve t-shirt tucked into grey wide-leg jeans and white sneakers', 'a cream fitted knit crop top, mid-blue high-waisted wide-leg jeans and white sneakers', 'a white fitted crop t-shirt, light wash wide-leg jeans with a brown belt and white sneakers', 'a navy and white striped fitted t-shirt, light blue wide-leg jeans and white sneakers', 'a pastel pink square-neck puff-sleeve top, white wide-leg jeans and white sneakers', 'a soft grey fitted ribbed long-sleeve top, dark blue wide-leg jeans and white sneakers', 'a light blue fitted button-up shirt knotted at the waist, white wide-leg jeans and white sneakers', 'a black square-neck fitted top, faded grey wide-leg jeans, white sneakers and a small black shoulder bag', 'a white off-shoulder ruffle crop blouse, light blue wide-leg jeans and white sneakers', 'a lilac fitted knit cardigan buttoned up, light wash wide-leg jeans and white sneakers', 'a beige fitted t-shirt, cream wide-leg jeans and white sneakers'];
 const SOYUL_BODY = 'curvy figure with a full bust, a narrow waist and shapely hips, long legs, wearing fitted clothes';
 async function presMig2(env) { // ครั้งเดียว: ซ่อนซอ ฮาริน (เก็บไฟล์ไว้) · โซยุลได้ชุด/หุ่นใหม่ → ยกเลิก LoRA เก่า วาดชุดฝึกใหม่ · EP1 เปลี่ยนเป็นของโซยุล
-  const s = await getSettings(env); if (s.pres_mig2 === 'done' || (+s.pres_mig2n || 0) >= 5) return;
+  const s = await getSettings(env); if (s.pres_mig2 === 'done' || s.pres_mig2wait === utcDay() || (+s.pres_mig2n || 0) >= 5) return; // โควตา AI ฟรีรายวันหมด → รอรอบวันใหม่ (07:00 น.)
   let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; } const L = P.list || [], A = L.find(x => x.k === 'a'), B = L.find(x => x.k === 'b'); if (!B) return;
   if (!s.pres_mig2s) { // ขั้นแรก (ทำครั้งเดียว): ข้อมูลพรีเซนเตอร์ + ยกเลิกเทรนเก่า + วาดชุดฝึกใหม่
     if (A) A.hide = 1;
@@ -356,7 +356,7 @@ async function presMig2(env) { // ครั้งเดียว: ซ่อน�
     try { const o = await serNew(env, s, B, 'ผัดไทย + เรื่องปริศนา', 1); let old = {}; try { old = JSON.parse(ep.script || '{}'); } catch { old = {}; } o.sc.motion = old.motion === undefined ? 2 : old.motion; o.sc.auto = 1;
       await env.DB.batch([env.DB.prepare("DELETE FROM vjobs WHERE (project=? OR project=?) AND status<>'running'").bind('พรีเซนเตอร์·ตอน·3', 'พรีเซนเตอร์·คลิป·3'), env.DB.prepare('DELETE FROM images WHERE project=?').bind('พรีเซนเตอร์·ตอน·3'),
         env.DB.prepare("UPDATE pres_eps SET pk='b', topic=?, title=?, script=?, caption=?, status='writing', err=NULL WHERE id=3").bind('ผัดไทย + เรื่องปริศนา', o.title, JSON.stringify(o.sc), o.caption.slice(0, 2000))]); }
-    catch (e) { await setSetting(env, 'pres_mig2n', String((+s.pres_mig2n || 0) + 1)); return; } }
+    catch (e) { const q = await env.DB.prepare("SELECT v FROM qmeter WHERE day=? AND k='nu_full'").bind(utcDay()).first().catch(() => null); if (q && +q.v) await setSetting(env, 'pres_mig2wait', utcDay()); else await setSetting(env, 'pres_mig2n', String((+s.pres_mig2n || 0) + 1)); return; } }
   await setSetting(env, 'pres_mig2', 'done');
   await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('พรีเซนเตอร์: ใช้แค่ฮัน โซยุล (ชุดยีนส์ขากว้าง หุ่นเต็ม) → วาดชุดฝึกใหม่ 28 ภาพ · EP1 เขียนใหม่เป็นของโซยุล', Date.now()).run().catch(() => { });
 }
