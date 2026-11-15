@@ -358,26 +358,28 @@ const PRES_VOICE = { a: 'Female, early 20s, Korean, sweet soft bright voice, gen
 const thFem = t => String(t || '').replace(/นะครับ/g, 'นะคะ').replace(/ครับผม/g, 'ค่ะ').replace(/ครับ/g, 'ค่ะ').replace(/กระผม/g, 'ฉัน').replace(/(^|\s)ผม(?=ชื่อ|จะ|ก็|เอง|ว่า|คิด|ชอบ|อยาก|รู้|เคย|กิน|ทำ|เป็น|ไม่ได้|ขอ|ได้|ต้อง)/g, '$1ฉัน'); // ซับไทยเป็นเสียงผู้หญิงเสมอ (กันหลุดเป็น ผม/ครับ)
 const SER_CH = 3, SER_N = 20; // 1 ซีน = 3 ช่วง × ~20 ประโยค ≈ 5 นาที
 const serRange = (n, k) => { const a = Math.floor(k * n / SER_CH); return [a, Math.max(a, Math.floor((k + 1) * n / SER_CH) - 1)]; };
-const serSet = g => typeof g === 'string' ? { t: g.slice(0, 140), f: 0 } : { t: String((g && g.t) || '').slice(0, 140), f: (g && +g.f) ? 1 : 0 };
+const serSet = g => typeof g === 'string' ? { t: g.slice(0, 140), f: 0, m: '' } : { t: String((g && g.t) || '').slice(0, 140), f: (g && +g.f) ? 1 : 0, m: String((g && g.m) || '').slice(0, 170) }; // m = ท่าทาง/การเคลื่อนไหวต่อเนื่องในภาพนั้น (อังกฤษ) ใช้สั่งตัวทำคลิปให้ตัวละครขยับตามที่เล่า
+const PRES_TONE = { bright: 'สดใส ขี้เล่น พูดไวนิดๆ มีมุกเล็กๆ หัวเราะง่าย', warm: 'อบอุ่น นุ่มนวล ใจเย็น เหมือนพี่สาวใจดีที่พาทำอาหาร', cool: 'เท่ ขรึมนิดๆ ตลกแห้งๆ พูดน้อยแต่มีเสน่ห์' };
 function serOutlinePrompt(px, kind, topic) {
   const cook = kind === 'cook';
-  return `ออกแบบซีรีส์คลิป TikTok แนวตั้ง 1 ตอน ยาว 3 ซีน ซีนละประมาณ 5 นาที (รวมประมาณ 15 นาที) ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} เป็นคนจริงๆ อยู่ในครัว${cook ? ' สอนทำอาหารแบบทำตามได้จริง' : ' เล่าเรื่องเกี่ยวกับอาหาร (ที่มา ความทรงจำ วัฒนธรรมการกิน) ระหว่างทำหรือกินอาหาร'} พร้อมพูดคุยเรื่อยเปื่อยเป็นกันเองเหมือนเพื่อนคุยไปทำไป
+  return `ออกแบบซีรีส์คลิป TikTok แนวตั้ง 1 ตอน ยาว 3 ซีน ซีนละประมาณ 5 นาที (รวมประมาณ 15 นาที) ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} เป็นคนจริงๆ อยู่ในครัว (บุคลิก: ${PRES_TONE[px.tone] || PRES_TONE.bright})${cook ? ' สอนทำอาหารแบบทำตามได้จริง' : ' เล่าเรื่องเกี่ยวกับอาหาร (ที่มา ความทรงจำ วัฒนธรรมการกิน) ระหว่างทำหรือกินอาหาร'} พร้อมพูดคุยเรื่อยเปื่อยเป็นกันเองเหมือนเพื่อนคุยไปทำไป
 เมนู/หัวข้อ: ${topic || 'ให้เลือกเมนูที่คนไทยหาวัตถุดิบง่ายและทำตามได้'}
 โครงสามซีน: ซีน 1 = เปิดตอน ทักทาย คุยเล่น ${cook ? 'แนะนำและเตรียมวัตถุดิบ' : 'เริ่มเล่าเรื่อง'} · ซีน 2 = ${cook ? 'ลงมือปรุงทีละขั้น พร้อมเคล็ดลับ' : 'เนื้อเรื่องหลักระหว่างทำอาหาร'} · ซีน 3 = ${cook ? 'ขั้นสุดท้าย จัดจาน ชิม สรุป' : 'ไคลแม็กซ์ ชิม สรุป'} ชวนกดติดตาม
 กติกา:
 - ${cook ? 'ขั้นตอนต้องเป็นวิธีทำอาหารที่ถูกต้องตามหลักทั่วไป มีปริมาณ ไฟ เวลาที่ทำได้จริง ห้ามแต่งข้อมูลโภชนาการหรือสถิติ' : 'ข้อเท็จจริงต้องเป็นเรื่องที่รู้กันทั่วไป ห้ามแต่งตัวเลข ชื่อ หรือปีเอง ถ้าไม่แน่ใจให้เล่าแบบกว้างๆ'}
-- แต่ละซีนมี settings 8 ภาพ เรียงตามเวลาในซีน: t = คำบรรยายภาพเป็นภาษาอังกฤษสั้นๆ ไม่เกิน 120 ตัวอักษร, f = 1 ถ้าเป็นภาพโคลสอัพอาหาร/วัตถุดิบ/กระทะ/จานโดยไม่มีคนในภาพ, f = 0 ถ้าเห็นพรีเซนเตอร์ (บอกว่ากำลังทำอะไรในครัวหรือที่โต๊ะ) ผสม f = 1 ประมาณ 3–4 ภาพต่อซีน
+- แต่ละซีนมี settings 12 ภาพ (ภาพละประมาณ 25 วินาที) เรียงตามเวลาในซีน: t = คำบรรยายภาพเป็นภาษาอังกฤษสั้นๆ ไม่เกิน 120 ตัวอักษร, f = 1 ถ้าเป็นภาพโคลสอัพอาหาร/วัตถุดิบ/กระทะ/จานโดยไม่มีคนในภาพ, f = 0 ถ้าเห็นพรีเซนเตอร์ (บอกว่ากำลังทำอะไรในครัวหรือที่โต๊ะ) ผสม f = 1 ประมาณ 4–5 ภาพต่อซีน · m = ท่าทางและการเคลื่อนไหวที่ "ต่อเนื่องอยู่ในภาพนั้น" เป็นภาษาอังกฤษสั้นๆ ไม่เกิน 100 ตัวอักษร ต้องตรงกับขั้นตอนจริงของเมนู (เช่น stirs the pan with a wooden spatula and glances at the camera, cracks an egg into a bowl and laughs) ส่วน f = 1 บอกสิ่งที่เคลื่อนไหวในภาพอาหาร (เช่น oil sizzling and steam rising) ห้าม m ซ้ำกันติดๆ
 - beats = 3 ข้อ บอกว่า 3 ช่วงของซีนนั้นพูดเรื่องอะไร (ไทย 1 ประโยค) ช่วงละประมาณ 1.5 นาที ต้องมีทั้งเนื้อหา${cook ? 'ขั้นตอน' : 'เรื่องเล่า'}และเรื่องคุยเล่นสลับกัน
-ตอบ JSON เท่านั้น: {"title":"ชื่อตอนภาษาไทย","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","scenes":[{"title":"ชื่อซีน","summary":"สรุปซีน 1 ประโยค","settings":[{"t":"...","f":0}],"beats":["...","...","..."]}]}`;
+ตอบ JSON เท่านั้น: {"title":"ชื่อตอนภาษาไทย","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","scenes":[{"title":"ชื่อซีน","summary":"สรุปซีน 1 ประโยค","settings":[{"t":"...","f":0,"m":"..."}],"beats":["...","...","..."]}]}`;
 }
 async function serWrite(env, s, px, sc, si) { // เขียนบทต่อ 1 ช่วง (~20 ประโยค) ของซีนที่ si
   const S = sc.scenes[si], k = S.done || 0, cook = sc.kind === 'cook', [a, b] = serRange(S.settings.length, k);
   const prev = (S.lines || []).slice(-3).map(l => l.ko + ' (' + l.th + ')').join(' / ');
-  const shots = S.settings.slice(a, b + 1).map((g, i) => (a + i) + ': ' + (g.f ? '[โคลสอัพอาหาร ไม่เห็นคน] ' : '[เห็นพรีเซนเตอร์] ') + g.t).join('\n');
+  const shots = S.settings.slice(a, b + 1).map((g, i) => (a + i) + ': ' + (g.f ? '[โคลสอัพอาหาร ไม่เห็นคน] ' : '[เห็นพรีเซนเตอร์] ') + g.t + (g.m ? ' — กำลัง: ' + g.m : '')).join('\n');
   const last = k === SER_CH - 1;
   const r = await llmJson(env, s, `เขียนบทพูดของคลิปซีรีส์ "${sc.title}" (${cook ? 'สอนทำอาหาร' : 'เล่าเรื่องเกี่ยวกับอาหาร'}) ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} พูดกับกล้องเป็นภาษาเกาหลี (คนดูอ่านซับไทย)
 ซีนที่ ${si + 1}/${sc.scenes.length}: ${S.title} — ${S.summary}
 ช่วงที่ ${k + 1}/${SER_CH} ของซีนนี้: ${S.beats[k] || ''}
+บุคลิกพรีเซนเตอร์ (ใช้ทั้งบทเกาหลีและซับไทย ให้ซับไทยพูดตามบุคลิกนี้): ${PRES_TONE[px.tone] || PRES_TONE.bright}
 ${prev ? 'ประโยคท้ายของช่วงก่อนหน้า (เขียนต่อให้เนื่องกัน ห้ามซ้ำ): ' + prev : (si === 0 ? 'นี่คือช่วงเปิดตอน ทักทายและบอกว่าวันนี้จะทำ/เล่าอะไร' : 'นี่คือช่วงเปิดซีน ต่อจากซีนก่อนอย่างเป็นธรรมชาติ')}
 ภาพที่แสดงในช่วงนี้ (img = เลขภาพ):
 ${shots}
@@ -437,7 +439,7 @@ async function presTick(env, ctx) {
         let gi = 0, miss = false; const ids = (sc.scenes || []).map(S => S.settings.map(() => { gi++; if (!by[gi]) miss = true; return by[gi] || 0; }));
         if (!ids.length || miss) { await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind('วาดภาพประกอบไม่ครบ' + (bad ? ': ' + String(bad.error || '').slice(0, 160) : ''), ep.id).run(); continue; }
         const st = [env.DB.prepare("DELETE FROM vjobs WHERE project LIKE ? AND status IN ('failed','done')").bind(cj + '·ซีน%')];
-        sc.scenes.forEach((S, i) => st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj + '·ซีน' + (i + 1), String(S.title || ep.title || ''), Date.now() + i, JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: (S.lines || []).map(x => ({ ko: x.ko, th: x.th, img: x.img })), imgids: ids[i], nolip: S.settings.map((g, j) => g.f ? j : -1).filter(j => j >= 0), lips: s.pres_lips !== '0', pri: 0 }))));
+        sc.scenes.forEach((S, i) => st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj + '·ซีน' + (i + 1), String(S.title || ep.title || ''), Date.now() + i, JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: (S.lines || []).map(x => ({ ko: x.ko, th: x.th, img: x.img })), imgids: ids[i], nolip: S.settings.map((g, j) => g.f ? j : -1).filter(j => j >= 0), lips: s.pres_lips !== '0', motion: sc.motion === undefined ? 2 : sc.motion, mprompts: S.settings.map(g => g.m || g.t), subc: px.sc || '#FFFFFF', pri: 0 }))));
         st.push(env.DB.prepare("UPDATE pres_eps SET status='render' WHERE id=?").bind(ep.id));
         await env.DB.batch(st); continue;
       }
@@ -5302,6 +5304,92 @@ def th_wrap(t, n=20):
     return "\\N".join(lines[:3])
 
 
+def cam_vf(k, du, live=True):
+    # กล้องมีชีวิต: หายใจ/โยกตัวเบาๆ ซ้อนหลายความถี่ + ซูมเข้า/ออก/เอียงสลับตามช่วง (ไม่ให้ทุกช็อตเหมือนกัน)
+    n = max(25, int(du * 25))
+    st = int(k) % 4
+    z = ["1.06+0.05*on/%d" % n, "1.11-0.05*on/%d" % n, "1.07+0.012*sin(on/25*2*PI*0.2)", "1.06+0.03*on/%d" % n][st]
+    amp = 0.011 if live else 0.006
+    dx = ["0", "0", "-0.012*on/%d" % n, "0.012*on/%d" % n][st]
+    x = "iw/2-(iw/zoom/2)+iw*(%s+%.4f*sin(on/25*2*PI*0.17)+%.4f*sin(on/25*2*PI*0.41+1.3))" % (dx, amp, amp * 0.4)
+    y = "ih/2-(ih/zoom/2)+ih*(%.4f*sin(on/25*2*PI*0.23+0.7)+%.4f*sin(on/25*2*PI*0.53))" % (amp * 0.7, amp * 0.3)
+    return ("scale=1620:2880:force_original_aspect_ratio=increase,crop=1620:2880,"
+            "zoompan=z='%s':d=1:x='%s':y='%s':s=1080x1920:fps=25,setsar=1,format=yuv420p" % (z, x, y))
+
+
+def ass_col(h):
+    # #RRGGBB -> &H00BBGGRR (สีซับไทยประจำตัวละคร)
+    h = str(h or "#FFFFFF").lstrip("#")
+    try:
+        int(h, 16)
+        if len(h) != 6:
+            raise ValueError("len")
+    except Exception:
+        h = "FFFFFF"
+    return "&H00%s%s%s" % (h[4:6].upper(), h[2:4].upper(), h[0:2].upper())
+
+
+def motion_prompt(o, g, nolip, c):
+    ms = o.get("mprompts") or []
+    m = str(ms[g]).strip() if 0 <= g < len(ms) and ms[g] else ""
+    if g in nolip:
+        return "%s. close-up food video, steam rising softly, ingredients moving and sizzling naturally, slow gentle camera push-in, realistic smooth motion" % (m or "cooking food")
+    more = ["", "she glances down at the food, then looks back at the camera and smiles, "][c % 2]
+    return "%s%s. a young woman talking to the camera in a kitchen, natural blinking, subtle head movements and small nods, expressive hand gestures while she talks, relaxed breathing, hair and clothes moving slightly, smooth realistic motion, stable camera" % (more, m)
+
+
+def pingpong(ff, tmp, fps_in, out):
+    # เฟรมจากตัวทำคลิป (16fps) -> 25fps แบบผสมเฟรม -> เล่นไปแล้วย้อนกลับ (ต่อเป็นวงได้ไม่กระตุก)
+    sh('"%s" -y -loglevel error -framerate %d -i "%s/%%05d.png" -filter_complex '
+       '"[0:v]minterpolate=fps=25:mi_mode=blend,scale=trunc(iw/2)*2:trunc(ih/2)*2,split[a][b];[b]reverse[r];[a][r]concat=n=2:v=1:a=0[o]" '
+       '-map "[o]" -c:v libx264 -preset veryfast -crf 17 -pix_fmt yuv420p -an "%s"' % (ff, fps_in, tmp, out))
+
+
+def make_motion(o, d, segs, bounds, ipaths, port, mode, nolip, t0, ff):
+    # ให้ตัวละคร/อาหารขยับธรรมชาติ: ภาพต่อช็อต -> คลิป Wan2.2 (กะพริบตา พยักหน้า ใช้มือ ทำอาหาร) 1 คลิป (โหมดเนียน: ช็อตยาวต่อเฟรมสุดท้ายอีก 1 คลิป)
+    # คืน {เลขภาพ: ไฟล์วนลูปได้} · ช็อตไหนพัง/เกินเวลา = ไม่มีในผลลัพธ์ (ช็อตนั้นใช้ภาพนิ่งขยับกล้องแทน)
+    from PIL import Image
+    try:
+        ensure_video()
+    except Exception as e:
+        log("โหลดโมเดลท่าทางไม่ได้ ซีนนี้ใช้ขยับกล้องแทน: " + str(e)[-200:])
+        return {}
+    base, fails, need = {}, 0, {}
+    budget = float(o.get("mbudget") or 5400)  # ระบบดึงงานที่รันเกิน 150 นาทีกลับเข้าคิว จึงกันเวลาไว้ให้ขั้นขยับปากกับรวมคลิป
+    for k, sg in enumerate(segs):
+        need[sg[0]] = max(need.get(sg[0], 0), bounds[k][1] - bounds[k][0])
+    for n, g in enumerate(sorted(need)):
+        if time.time() - t0 > budget:
+            log("ทำท่าทางเกินเวลาที่กำหนด ช็อตที่เหลือใช้ขยับกล้องแทน")
+            break
+        if fails >= 2 and not base:
+            log("ตัวทำท่าทางใช้ไม่ได้ ทั้งซีนใช้ขยับกล้องแทน")
+            break
+        tmp = d + "/mo%d" % g
+        shutil.rmtree(tmp, ignore_errors=True)
+        os.makedirs(tmp, exist_ok=True)
+        try:
+            im = Image.open(ipaths[g]).convert("RGB")
+            seq = []
+            for c in range(2 if (mode >= 3 and need[g] > 15 and g not in nolip) else 1):
+                jj = {"id": "pm%s_%d_%d" % (o.get("_jid", "0"), g, c), "prompt": motion_prompt(o, g, nolip, c), "neg": ""}
+                fr, fps_t, W, H = gen_pass(jj, im, 0, port, 81, {"fps": 12, "takes": 1})
+                seq += fr if c == 0 else fr[1:]
+                im = Image.open(fr[-1]).convert("RGB")
+            for i, f in enumerate(seq):
+                shutil.move(f, os.path.join(tmp, "%05d.png" % i))
+            out = d + "/base%d.mp4" % g
+            pingpong(ff, tmp, 16, out)
+            base[g] = out
+            log("ท่าทางช็อตที่ %d/%d เสร็จ (%d เฟรม)" % (n + 1, len(need), len(seq)))
+        except Exception as e:
+            fails += 1
+            log("ท่าทางช็อต %d ไม่สำเร็จ ใช้ขยับกล้องแทน: %s" % (g, str(e)[-200:]))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return base
+
+
 def pres_job(j, port):
     o = j.get("opt") or {}
     t0 = time.time()
@@ -5367,28 +5455,43 @@ def pres_job(j, port):
         im.save(p)
         ipaths[g] = p
     mpy = ensure_muse() if o.get("lips", True) else None
-    VF = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=z='min(zoom+0.0004,1.06)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=25,format=yuv420p"
-    parts, nlip = [], 0
     nolip = set(int(x) for x in (o.get("nolip") or []))  # ภาพโคลสอัพอาหาร (ไม่มีคน) ไม่ต้องขยับปาก
+    mode = int(o.get("motion") or 0)  # 0 = ขยับกล้องเบาๆ · 2 = AI ทำท่าทางธรรมชาติ · 3 = เนียน (ช็อตยาวต่อ 2 คลิป)
+    o["_jid"] = j.get("id", "0")
+    base = {}
+    if mode >= 2:
+        base = make_motion(o, d, segs, bounds, ipaths, port, mode, nolip, t0, ff)
+        try:
+            comfy("/free", {"unload_models": True, "free_memory": True}, port=port)  # คืนหน่วยความจำการ์ดให้ MuseTalk
+        except Exception:
+            pass
+    parts, nlip, nmo = [], 0, 0
     for k, sg in enumerate(segs):
         a, b = bounds[k]
         du = max(0.5, b - a)
+        g = sg[0]
         sw = d + "/s%d.wav" % k
         pcm_wav(pcm[int(a * SR) * 2:int(b * SR) * 2], sw)
-        lv = run_muse(mpy, ipaths[sg[0]], sw, d, gpu, str(k)) if (mpy and sg[0] not in nolip) else None
+        bv = base.get(g)
+        lv = run_muse(mpy, bv or ipaths[g], sw, d, gpu, str(k)) if (mpy and g not in nolip) else None
         pv = d + "/v%02d.mp4" % k
+        vf = cam_vf(k, du, live=not bv)
         if lv:
             nlip += 1
-            sh('"%s" -y -loglevel error -i "%s" -t %.3f -vf "%s,tpad=stop_mode=clone:stop_duration=2" -t %.3f -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, lv, du, VF, du, pv))
+            sh('"%s" -y -loglevel error -i "%s" -t %.3f -vf "%s,tpad=stop_mode=clone:stop_duration=2" -t %.3f -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, lv, du, vf, du, pv))
+        elif bv:
+            sh('"%s" -y -loglevel error -stream_loop -1 -i "%s" -t %.3f -vf "%s" -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, bv, du, vf, pv))
         else:
-            sh('"%s" -y -loglevel error -loop 1 -framerate 25 -i "%s" -t %.3f -vf "%s" -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, ipaths[sg[0]], du, VF, pv))
+            sh('"%s" -y -loglevel error -loop 1 -framerate 25 -i "%s" -t %.3f -vf "%s" -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, ipaths[g], du, vf, pv))
+        if bv:
+            nmo += 1
         parts.append(pv)
     open(d + "/list.txt", "w").write("".join("file '%s'\n" % x for x in parts))
     sh('"%s" -y -loglevel error -f concat -safe 0 -i "%s/list.txt" -c copy "%s/v.mp4"' % (ff, d, d))
     fn = thai_font()
     ass = ["[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "WrapStyle: 2", "",
            "[V4+ Styles]", "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-           "Style: S,%s,66,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,5,2,2,70,70,330,1" % fn["name"], "",
+           "Style: S,%s,66,%s,%s,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,5,2,2,70,70,330,1" % (fn["name"], ass_col(o.get("subc")), ass_col(o.get("subc"))), "",
            "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
     for i, x in enumerate(lines):
         a, b = tm[i]
@@ -5398,7 +5501,7 @@ def pres_job(j, port):
     fdopt = (":fontsdir='%s'" % fn["dir"]) if fn["dir"] else ""
     out = os.path.join(ROOT, "pc%s.mp4" % j["id"])
     sh('"%s" -y -loglevel error -i "%s/v.mp4" -i "%s/all.wav" -vf "ass=\'s.ass\'%s" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -r 25 -c:a aac -b:a 160k -ar 44100 -shortest -movflags +faststart "%s"' % (fsub, d, d, fdopt, out), cwd=d)
-    log("คลิปพรีเซนเตอร์เสร็จ %.0f วินาที · ขยับปาก %d/%d ช่วง" % (total, nlip, len(segs)))
+    log("คลิปพรีเซนเตอร์เสร็จ %.0f วินาที · ขยับปาก %d/%d ช่วง · ท่าทาง AI %d/%d ช่วง" % (total, nlip, len(segs), nmo, len(segs)))
     shutil.rmtree(d, ignore_errors=True)
     return out, time.time() - t0, 1080, 1920
 
@@ -5927,10 +6030,10 @@ async function castApi(req, env, url, body) {
         if (act === 'pres_series') { // ซีรีส์อาหาร: AI ออกแบบโครง 3 ซีน → presTick เขียนบททีละช่วงเอง → รออนุมัติ
           const px = L.find(x => x.k === String(b.k || '')); if (!px) return json({ error: 'เลือกพรีเซนเตอร์ก่อน' }, 400);
           const kind = b.kind === 'story' ? 'story' : 'cook', topic = String(b.topic || '').trim().slice(0, 200);
-          const r = await llmJson(env, s, serOutlinePrompt(px, kind, topic), 3800);
-          const scenes = (Array.isArray(r && r.scenes) ? r.scenes : []).slice(0, 3).map(S => ({ title: String((S && S.title) || '').slice(0, 80), summary: String((S && S.summary) || '').slice(0, 200), settings: (Array.isArray(S && S.settings) ? S.settings : []).map(serSet).filter(g => g.t).slice(0, 9), beats: (Array.isArray(S && S.beats) ? S.beats : []).map(x => String(x).slice(0, 200)).slice(0, SER_CH), lines: [], done: 0 }));
+          const r = await llmJson(env, s, serOutlinePrompt(px, kind, topic), 6200);
+          const scenes = (Array.isArray(r && r.scenes) ? r.scenes : []).slice(0, 3).map(S => ({ title: String((S && S.title) || '').slice(0, 80), summary: String((S && S.summary) || '').slice(0, 200), settings: (Array.isArray(S && S.settings) ? S.settings : []).map(serSet).filter(g => g.t).slice(0, 14), beats: (Array.isArray(S && S.beats) ? S.beats : []).map(x => String(x).slice(0, 200)).slice(0, SER_CH), lines: [], done: 0 }));
           if (scenes.length < 3 || scenes.some(S => S.settings.length < 4 || S.beats.length < SER_CH)) return json({ error: 'AI ออกแบบซีรีส์ไม่ครบ 3 ซีน ลองกดใหม่อีกครั้ง' }, 500);
-          const sc = { series: 1, kind, title: String(r.title || topic || 'ซีรีส์อาหาร').slice(0, 120), scenes, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
+          const sc = { series: 1, kind, motion: [0, 2, 3].includes(+b.motion) ? +b.motion : 2, title: String(r.title || topic || 'ซีรีส์อาหาร').slice(0, 120), scenes, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
           await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'writing',?,?,?)").bind(px.k, topic || (kind === 'cook' ? 'สอนทำอาหาร' : 'เล่าเรื่องอาหาร'), sc.title, JSON.stringify(sc), String(r.caption || '').slice(0, 2000), Date.now()).run();
         }
 
@@ -5952,7 +6055,7 @@ async function castApi(req, env, url, body) {
           if (act === 'pres_post') { try { const r = await ttPost(env, ep); await env.DB.prepare('UPDATE pres_eps SET posted=? WHERE id=?').bind(r, ep.id).run(); } catch (e) { return json({ error: 'ส่งเข้า TikTok ไม่สำเร็จ: ' + String(e.message || e).slice(0, 200) }, 500); } }
         }
         if (act === 'pres_tt') { for (const k of ['tt_key', 'tt_secret']) if (b[k]) await setSetting(env, k, String(b[k]).trim().slice(0, 200)); for (const k of ['tt_mode', 'tt_auto']) if (b[k] !== undefined) await setSetting(env, k, String(b[k])); if (b.tt_off) await setSetting(env, 'tt_tok', ''); }
-        if (act === 'pres_set') { if (pr) { if (b.name !== undefined) pr.name = String(b.name || '').slice(0, 40); } else { if (b.main !== undefined) P.main = +b.main || 0; if (b.name !== undefined) P.name = String(b.name || '').slice(0, 40); } await save(); }
+        if (act === 'pres_set') { if (pr) { if (b.name !== undefined) pr.name = String(b.name || '').slice(0, 40); if (['bright', 'warm', 'cool'].includes(b.tone)) pr.tone = b.tone; if (/^#[0-9a-fA-F]{6}$/.test(String(b.sc || ''))) pr.sc = String(b.sc).toUpperCase(); } else { if (b.main !== undefined) P.main = +b.main || 0; if (b.name !== undefined) P.name = String(b.name || '').slice(0, 40); } await save(); }
         if (act === 'pres_pick' && pr) { const id = +b.id, s1 = new Set(pr.picked || []); s1.has(id) ? s1.delete(id) : s1.add(id); pr.picked = [...s1]; await save(); }
         if (act === 'pres_ds' && pr) { if (b.redo) { pr.picked = []; await save(); } await presQueueDs(env, pr, !!b.redo); }
         if (act === 'pres_train' && pr) { // เทรน LoRA ภาพเหมือนจริง (ฐาน RealVisXL) — ใช้ภาพที่ติดดาว
@@ -5980,7 +6083,7 @@ async function castApi(req, env, url, body) {
           if (lo && lo.status === 'queued') { const vs = await env.DB.prepare('SELECT status FROM vjobs WHERE id=?').bind(lo.vjob).first(); if (vs && vs.status === 'running') { lo.status = 'training'; try { lp = JSON.parse(s['lprog:' + lo.vjob] || 'null'); } catch { lp = null; } } }
           const cnt = (pj, st) => vq.filter(r => r.project === pj && (!st || r.status === st)).reduce((n, r) => n + r.n, 0);
           const vs = (await env.DB.prepare('SELECT id,shot FROM videos WHERE project=? ORDER BY id DESC LIMIT 6').bind(PJ(x, 'เสียง')).all()).results, vsq = (await env.DB.prepare("SELECT COUNT(*) n FROM vjobs WHERE project=? AND status IN ('queued','running')").bind(PJ(x, 'เสียง')).first()).n;
-          out.push({ k: x.k, name: x.name || '', full: x.full, face: x.face, picked: x.picked || [], voice: x.voice || 0, voices: vs, vq: vsq, ds: rows.filter(r => r.project === pjs[0]).map(r => ({ id: r.id, sc: r.scene })), test: rows.filter(r => r.project === pjs[1]).map(r => ({ id: r.id, sc: r.scene })), dsq: cnt(pjs[0]), dsrun: cnt(pjs[0], 'running'), tq: cnt(pjs[1]), lora: lo ? { id: lo.id, status: lo.status, error: lo.error || '', prog: lp } : null }); }
+          out.push({ k: x.k, name: x.name || '', tone: x.tone || 'bright', sc: x.sc || '#FFFFFF', full: x.full, face: x.face, picked: x.picked || [], voice: x.voice || 0, voices: vs, vq: vsq, ds: rows.filter(r => r.project === pjs[0]).map(r => ({ id: r.id, sc: r.scene })), test: rows.filter(r => r.project === pjs[1]).map(r => ({ id: r.id, sc: r.scene })), dsq: cnt(pjs[0]), dsrun: cnt(pjs[0], 'running'), tq: cnt(pjs[1]), lora: lo ? { id: lo.id, status: lo.status, error: lo.error || '', prog: lp } : null }); }
         const eps = (await env.DB.prepare('SELECT id,pk,topic,title,status,script,caption,vid,err,posted,created FROM pres_eps ORDER BY id DESC LIMIT 20').all()).results.map(e => { let sc = {}; try { sc = JSON.parse(e.script || '{}'); } catch { sc = {}; } return { ...e, script: undefined, lines: sc.series ? (sc.scenes || []).flatMap(S => S.lines || []) : (sc.lines || []), outfit: sc.outfit || '', series: sc.series ? 1 : 0, prog: sc.series ? (sc.scenes || []).map(S => ({ t: S.title || '', n: (S.lines || []).length, done: S.done || 0, min: Math.round((S.lines || []).length * 4.3 / 6) / 10 })) : undefined, vids: sc.vids || [] }; });
         return json({ ok: true, pres: P, imgs: im, queued: q, list: out, eps, tt: { key: !!s.tt_key, linked: !!s.tt_tok, mode: s.tt_mode || 'inbox', auto: s.tt_auto === '1', redirect: (s.self_url || '') + '/tt/cb' } });
       }
