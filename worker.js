@@ -56,7 +56,7 @@ export default {
   },
   async scheduled(event, env0, ctx) {
     const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) }, jobs = [];
-    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presTick(env, ctx).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
+    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presMig1(env).catch(() => { }); await presTick(env, ctx).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
     await handleCron(event, env, { waitUntil: p => jobs.push(p) });
     ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare('DELETE FROM rmeter WHERE day < ?').bind(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
   },
@@ -336,6 +336,16 @@ async function presFix(env) { // ครั้งเดียว (pres_fix=v2): �
   await setSetting(env, 'pres_fix', 'v6');
   await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('พรีเซนเตอร์: ล็อกเฉพาะหน้า + สลับทรงผม (สีเดิม) + ชุดสไตล์ใหม่ (ไม่มีเครื่องแบบ) → วาดชุดฝึกใหม่คนละ 28 ภาพ', Date.now()).run().catch(() => { });
 }
+async function presMig1(env) { // ครั้งเดียว: ตอนที่เขียนไว้แล้ว (สูตรเดิม สอนทำอาหารอย่างเดียว) → เขียนใหม่เป็นรายการทำอาหาร+เล่าเรื่องปริศนา ตั้งชื่อ EP1
+  const s = await getSettings(env); if (s.pres_mig1 === 'done' || (+s.pres_mig1n || 0) >= 5) return;
+  let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; } const L = P.list || [];
+  const eps = (await env.DB.prepare("SELECT * FROM pres_eps WHERE status IN ('draft','writing','failed') AND COALESCE(json_extract(script,'$.kind'),'') IN ('cook','story') ORDER BY id").all().catch(() => ({ results: [] }))).results;
+  for (const ep of eps) { const px = L.find(x => x.k === ep.pk); if (!px) continue;
+    try { const o = await serNew(env, s, px, ep.topic || '', await serNextEp(env, ep.pk)); let old = {}; try { old = JSON.parse(ep.script || '{}'); } catch { old = {}; } o.sc.motion = old.motion === undefined ? 2 : old.motion;
+      await env.DB.prepare("UPDATE pres_eps SET title=?, script=?, caption=?, status='writing', err=NULL WHERE id=?").bind(o.title, JSON.stringify(o.sc), o.caption.slice(0, 2000), ep.id).run(); }
+    catch (e) { await setSetting(env, 'pres_mig1n', String((+s.pres_mig1n || 0) + 1)); return; } }
+  await setSetting(env, 'pres_mig1', 'done');
+}
 async function presSeed(env) {
   const s = await getSettings(env); if (String(s.pres_seed || '').startsWith('done') || (+String(s.pres_seed || '').split(':')[1] || 0) >= 20) return;
   const get = async f => { for (const base of ['https://xiress-studio.pages.dev/pres/', 'https://raw.githubusercontent.com/pps2005/-smart-shop/main/pres/']) { try { const r = await fetch(base + f); if (r.ok && (r.headers.get('content-type') || '').includes('image')) return bytesToB64(new Uint8Array(await r.arrayBuffer())); } catch (e) { } } return null; };
@@ -360,6 +370,29 @@ const SER_CH = 3, SER_N = 20; // 1 ซีน = 3 ช่วง × ~20 ประ�
 const serRange = (n, k) => { const a = Math.floor(k * n / SER_CH); return [a, Math.max(a, Math.floor((k + 1) * n / SER_CH) - 1)]; };
 const serSet = g => typeof g === 'string' ? { t: g.slice(0, 140), f: 0, m: '' } : { t: String((g && g.t) || '').slice(0, 140), f: (g && +g.f) ? 1 : 0, m: String((g && g.m) || '').slice(0, 170) }; // m = ท่าทาง/การเคลื่อนไหวต่อเนื่องในภาพนั้น (อังกฤษ) ใช้สั่งตัวทำคลิปให้ตัวละครขยับตามที่เล่า
 const PRES_TONE = { bright: 'สดใส ขี้เล่น พูดไวนิดๆ มีมุกเล็กๆ หัวเราะง่าย', warm: 'อบอุ่น นุ่มนวล ใจเย็น เหมือนพี่สาวใจดีที่พาทำอาหาร', cool: 'เท่ ขรึมนิดๆ ตลกแห้งๆ พูดน้อยแต่มีเสน่ห์' };
+const presShort = px => String(px.name || 'พรีเซนเตอร์').trim().split(/\s+/).pop(); // ชื่อตัว (ซอ ฮาริน → ฮาริน)
+const SHOW_NAME = px => presShort(px) + 'สอนทำอาหารกับเล่าเรื่องปริศนา'; // ชื่อรายการ (ผู้ใช้กำหนด)
+function showOutlinePrompt(px, topic) { // รายการทำอาหารแบบที่คนทำจริง: สอน + เล่าเรื่องปริศนาต่อเนื่องทั้งตอน + ชิม + คุยเล่น
+  return `ออกแบบรายการ TikTok แนวตั้งชื่อ "${SHOW_NAME(px)}" 1 ตอน ยาว 3 ซีน ซีนละประมาณ 5 นาที (รวมประมาณ 15 นาที) พิธีกรคือพรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} อยู่ในครัวเหมือนรายการทำอาหารที่คนทำจริง (บุคลิก: ${PRES_TONE[px.tone] || PRES_TONE.bright})
+รูปแบบรายการ: ทำอาหารไปเล่าเรื่องปริศนาไป สลับช่วงกันอย่างเป็นธรรมชาติ — ช่วงสอน (ขั้นตอนจริง วัตถุดิบ ปริมาณ ไฟ เวลา เคล็ดลับ) · ช่วงเล่า (เรื่องปริศนา/ลึกลับ/ตำนาน เรื่องเดียวต่อเนื่องทั้งตอน เล่าแบบชวนลุ้น ค้างไว้ตอนท้ายซีน 1 และ 2) · ช่วงชิม (ชิมระหว่างทำและชิมจริงจังตอนจบ บอกรสชาติ) · คุยเล่นกับคนดูเหมือนเพื่อน
+หัวข้อที่ผู้ใช้ให้มา: ${topic || 'ให้เลือกเอง: เมนูที่คนไทยหาวัตถุดิบง่ายทำตามได้ + เรื่องปริศนาหรือตำนานที่คนรู้จัก (ไทย เกาหลี หรือทั่วโลก)'}
+โครงสามซีน: ซีน 1 = เปิดรายการ ทักทาย แนะนำเมนู เตรียมวัตถุดิบ + เริ่มปูเรื่องปริศนา · ซีน 2 = ลงมือปรุงทีละขั้นพร้อมเคล็ดลับ + เรื่องเข้มข้นขึ้น + ชิมระหว่างทำ · ซีน 3 = ขั้นสุดท้าย จัดจาน ชิมจริงจัง + ไคลแม็กซ์/บทสรุปของเรื่อง ชวนกดติดตามตอนหน้า
+กติกา:
+- ขั้นตอนต้องเป็นวิธีทำอาหารที่ถูกต้องตามหลักทั่วไป ทำตามได้จริง ห้ามแต่งข้อมูลโภชนาการหรือสถิติ
+- เรื่องปริศนาต้องเป็นเรื่องที่มีอยู่จริงหรือตำนาน/เรื่องเล่าที่รู้กันทั่วไป ห้ามแต่งตัวเลข ชื่อ หรือปีเอง ถ้าเป็นตำนานหรือยังไม่มีข้อพิสูจน์ให้พูดว่าเป็นเรื่องเล่า ไม่เล่าโหดหรือน่ากลัวเกินเหตุ
+- แต่ละซีนมี settings 12 ภาพ (ภาพละประมาณ 25 วินาที) เรียงตามเวลาในซีน: t = คำบรรยายภาพเป็นภาษาอังกฤษสั้นๆ ไม่เกิน 120 ตัวอักษร, f = 1 ถ้าเป็นภาพโคลสอัพอาหาร/วัตถุดิบ/กระทะ/จานโดยไม่มีคนในภาพ, f = 0 ถ้าเห็นพรีเซนเตอร์ (บอกว่ากำลังทำอะไรในครัวหรือที่โต๊ะ) ผสม f = 1 ประมาณ 4–5 ภาพต่อซีน · m = ท่าทางและการเคลื่อนไหวที่ "ต่อเนื่องอยู่ในภาพนั้น" เป็นภาษาอังกฤษสั้นๆ ไม่เกิน 100 ตัวอักษร ต้องตรงกับขั้นตอนจริงหรือช่วงเล่าเรื่อง (เช่น stirs the pan with a wooden spatula and glances at the camera, leans toward the camera and lowers her voice mysteriously, tastes from a spoon and nods happily) ส่วน f = 1 บอกสิ่งที่เคลื่อนไหวในภาพอาหาร (เช่น oil sizzling and steam rising) ห้าม m ซ้ำกันติดๆ
+- beats = 3 ข้อ บอกว่า 3 ช่วงของซีนนั้นพูดอะไร (ไทย 1 ประโยค ระบุว่าเป็นช่วงสอน/เล่า/ชิม/คุยเล่นแบบไหนผสมกัน) ช่วงละประมาณ 1.5 นาที ทุกซีนต้องมีทั้งสอนและเล่า
+ตอบ JSON เท่านั้น: {"menu":"ชื่อเมนูภาษาไทยสั้นๆ","mystery":"ชื่อเรื่องปริศนาสั้นๆ","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","scenes":[{"title":"ชื่อซีน","summary":"สรุปซีน 1 ประโยค","settings":[{"t":"...","f":0,"m":"..."}],"beats":["...","...","..."]}]}`;
+}
+async function serNew(env, s, px, topic, epno) { // ออกแบบโครงตอนใหม่ (รายการทำอาหาร+เล่าเรื่องปริศนา) → script + ชื่อตอน EP
+  const r = await llmJson(env, s, showOutlinePrompt(px, topic), 6200);
+  const scenes = (Array.isArray(r && r.scenes) ? r.scenes : []).slice(0, 3).map(S => ({ title: String((S && S.title) || '').slice(0, 80), summary: String((S && S.summary) || '').slice(0, 200), settings: (Array.isArray(S && S.settings) ? S.settings : []).map(serSet).filter(g => g.t).slice(0, 14), beats: (Array.isArray(S && S.beats) ? S.beats : []).map(x => String(x).slice(0, 200)).slice(0, SER_CH), lines: [], done: 0 }));
+  if (scenes.length < 3 || scenes.some(S => S.settings.length < 4 || S.beats.length < SER_CH)) throw new Error('AI ออกแบบตอนไม่ครบ 3 ซีน ลองกดใหม่อีกครั้ง');
+  const menu = String((r && r.menu) || '').trim().slice(0, 60), mystery = String((r && r.mystery) || '').trim().slice(0, 80);
+  const title = SHOW_NAME(px) + ' EP' + epno + (menu ? ' · ' + menu : '');
+  return { sc: { series: 1, kind: 'show', epno, menu, mystery, title, scenes, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] }, title, caption: title + '\n' + String((r && r.caption) || '').slice(0, 1800) };
+}
+async function serNextEp(env, pk) { const r = await env.DB.prepare("SELECT MAX(CAST(json_extract(script,'$.epno') AS INTEGER)) m FROM pres_eps WHERE pk=?").bind(pk).first().catch(() => null); return ((r && +r.m) || 0) + 1; }
 function serOutlinePrompt(px, kind, topic) {
   const cook = kind === 'cook';
   return `ออกแบบซีรีส์คลิป TikTok แนวตั้ง 1 ตอน ยาว 3 ซีน ซีนละประมาณ 5 นาที (รวมประมาณ 15 นาที) ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} เป็นคนจริงๆ อยู่ในครัว (บุคลิก: ${PRES_TONE[px.tone] || PRES_TONE.bright})${cook ? ' สอนทำอาหารแบบทำตามได้จริง' : ' เล่าเรื่องเกี่ยวกับอาหาร (ที่มา ความทรงจำ วัฒนธรรมการกิน) ระหว่างทำหรือกินอาหาร'} พร้อมพูดคุยเรื่อยเปื่อยเป็นกันเองเหมือนเพื่อนคุยไปทำไป
@@ -372,11 +405,11 @@ function serOutlinePrompt(px, kind, topic) {
 ตอบ JSON เท่านั้น: {"title":"ชื่อตอนภาษาไทย","caption":"แคปชันไทยสั้นๆ + แฮชแท็ก 4-6 อัน","scenes":[{"title":"ชื่อซีน","summary":"สรุปซีน 1 ประโยค","settings":[{"t":"...","f":0,"m":"..."}],"beats":["...","...","..."]}]}`;
 }
 async function serWrite(env, s, px, sc, si) { // เขียนบทต่อ 1 ช่วง (~20 ประโยค) ของซีนที่ si
-  const S = sc.scenes[si], k = S.done || 0, cook = sc.kind === 'cook', [a, b] = serRange(S.settings.length, k);
+  const S = sc.scenes[si], k = S.done || 0, show = sc.kind === 'show', cook = sc.kind === 'cook' || show, [a, b] = serRange(S.settings.length, k);
   const prev = (S.lines || []).slice(-3).map(l => l.ko + ' (' + l.th + ')').join(' / ');
   const shots = S.settings.slice(a, b + 1).map((g, i) => (a + i) + ': ' + (g.f ? '[โคลสอัพอาหาร ไม่เห็นคน] ' : '[เห็นพรีเซนเตอร์] ') + g.t + (g.m ? ' — กำลัง: ' + g.m : '')).join('\n');
   const last = k === SER_CH - 1;
-  const r = await llmJson(env, s, `เขียนบทพูดของคลิปซีรีส์ "${sc.title}" (${cook ? 'สอนทำอาหาร' : 'เล่าเรื่องเกี่ยวกับอาหาร'}) ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} พูดกับกล้องเป็นภาษาเกาหลี (คนดูอ่านซับไทย)
+  const r = await llmJson(env, s, `เขียนบทพูดของคลิปซีรีส์ "${sc.title}" (${show ? 'รายการทำอาหารไปเล่าเรื่องปริศนาไป มีช่วงสอน ช่วงเล่า ช่วงชิม เหมือนรายการทำอาหารที่คนทำจริง · เมนู: ' + (sc.menu || '-') + ' · เรื่องปริศนา: ' + (sc.mystery || '-') : cook ? 'สอนทำอาหาร' : 'เล่าเรื่องเกี่ยวกับอาหาร'}) ให้พรีเซนเตอร์หญิงชาวเกาหลีชื่อ ${px.name || 'พรีเซนเตอร์'} พูดกับกล้องเป็นภาษาเกาหลี (คนดูอ่านซับไทย)
 ซีนที่ ${si + 1}/${sc.scenes.length}: ${S.title} — ${S.summary}
 ช่วงที่ ${k + 1}/${SER_CH} ของซีนนี้: ${S.beats[k] || ''}
 บุคลิกพรีเซนเตอร์ (ใช้ทั้งบทเกาหลีและซับไทย ให้ซับไทยพูดตามบุคลิกนี้): ${PRES_TONE[px.tone] || PRES_TONE.bright}
@@ -385,11 +418,11 @@ ${prev ? 'ประโยคท้ายของช่วงก่อนหน�
 ${shots}
 กติกา:
 - เขียน ${SER_N} ประโยค ประโยคสั้น ภาษาพูดสุภาพเป็นกันเอง (해요체)
-- พูดแบบคนจริงที่${cook ? 'ทำอาหารไปคุยไป' : 'เล่าไปทำ/กินไป'}: สลับระหว่าง${cook ? 'ขั้นตอนจริง (วัตถุดิบ ปริมาณ ไฟ เวลา เคล็ดลับ)' : 'เนื้อเรื่องเกี่ยวกับอาหาร'}กับเรื่องคุยเล่นเรื่อยเปื่อย (เรื่องเล่าเบาๆ ความทรงจำเกี่ยวกับอาหาร มุกเล็กๆ ความเห็นส่วนตัว) แล้ววนกลับมาที่งานตรงหน้า ไม่แห้งเป็นท่องสูตร
-- ${cook ? 'ขั้นตอนต้องถูกต้องตามหลักทำอาหารทั่วไป ห้ามแต่งตัวเลขโภชนาการหรือข้อมูลที่ไม่แน่ใจ' : 'ข้อเท็จจริงต้องรู้กันทั่วไป ห้ามแต่งตัวเลข ชื่อ หรือปีเอง'}
+- พูดแบบคนจริงที่${show ? 'ทำอาหารไปเล่าเรื่องปริศนาไป' : cook ? 'ทำอาหารไปคุยไป' : 'เล่าไปทำ/กินไป'}: สลับระหว่าง${show ? 'ขั้นตอนจริง (วัตถุดิบ ปริมาณ ไฟ เวลา เคล็ดลับ) กับเรื่องปริศนาที่เล่าต่อจากช่วงก่อน (เล่าแบบชวนลุ้น ใส่จังหวะเงียบ/กระซิบ) และช่วงชิมเมื่อถึงจังหวะ' : cook ? 'ขั้นตอนจริง (วัตถุดิบ ปริมาณ ไฟ เวลา เคล็ดลับ)' : 'เนื้อเรื่องเกี่ยวกับอาหาร'}กับเรื่องคุยเล่นเรื่อยเปื่อย (เรื่องเล่าเบาๆ ความทรงจำเกี่ยวกับอาหาร มุกเล็กๆ ความเห็นส่วนตัว) แล้ววนกลับมาที่งานตรงหน้า ไม่แห้งเป็นท่องสูตร
+- ${show ? 'ขั้นตอนต้องถูกต้องตามหลักทำอาหารทั่วไป · เรื่องปริศนาห้ามแต่งตัวเลข ชื่อ หรือปีเอง ถ้าเป็นตำนานให้พูดว่าเป็นเรื่องเล่า' : cook ? 'ขั้นตอนต้องถูกต้องตามหลักทำอาหารทั่วไป ห้ามแต่งตัวเลขโภชนาการหรือข้อมูลที่ไม่แน่ใจ' : 'ข้อเท็จจริงต้องรู้กันทั่วไป ห้ามแต่งตัวเลข ชื่อ หรือปีเอง'}
 - th = ซับไทยสั้น อ่านทันใน 3 วินาที ผู้พูดเป็นผู้หญิง ใช้ "ฉัน/เรา" ลงท้าย "ค่ะ/นะคะ/นะ" ห้ามใช้ "ผม/ครับ"
 - img = เลขภาพที่แสดงตอนพูดประโยคนั้น เลือกจากรายการด้านบน เรียงจากน้อยไปมาก และใช้ให้ครบทุกภาพ
-${last ? (si === sc.scenes.length - 1 ? '- ช่วงนี้เป็นช่วงจบตอน: สรุป ชิม ชวนกดติดตาม' : '- ช่วงนี้เป็นท้ายซีน: ปิดแบบเชื่อมไปซีนถัดไป') : ''}
+${last ? (si === sc.scenes.length - 1 ? (show ? '- ช่วงนี้เป็นช่วงจบตอน: ชิมจริงจัง บอกรสชาติ ปิดเรื่องปริศนา สรุป ชวนกดติดตามตอนหน้า' : '- ช่วงนี้เป็นช่วงจบตอน: สรุป ชิม ชวนกดติดตาม') : (show ? '- ช่วงนี้เป็นท้ายซีน: ค้างเรื่องปริศนาไว้ให้ลุ้น แล้วบอกว่าเดี๋ยวมาต่อ' : '- ช่วงนี้เป็นท้ายซีน: ปิดแบบเชื่อมไปซีนถัดไป')) : ''}
 ตอบ JSON array เท่านั้น: [{"ko":"...","th":"...","img":${a}}]`, 4200);
   const arr = Array.isArray(r) ? r : (r && Array.isArray(r.lines) ? r.lines : []);
   const raw = arr.map(x => ({ ko: String((x && x.ko) || '').trim().slice(0, 160), th: thFem(String((x && x.th) || '').trim().slice(0, 160)), img: Number.isFinite(+(x && x.img)) ? Math.max(a, Math.min(b, Math.round(+x.img))) : a })).filter(x => x.ko && x.th).slice(0, SER_N + 6);
@@ -475,7 +508,14 @@ async function ttToken(env) {
   return t.at;
 }
 async function ttApi(tok, path, body) { const r = await fetch('https://open.tiktokapis.com' + path, { method: 'POST', headers: { authorization: 'Bearer ' + tok, 'content-type': 'application/json; charset=UTF-8' }, body: JSON.stringify(body || {}) }); const j = await r.json().catch(() => ({})); if (!r.ok || (j.error && j.error.code && j.error.code !== 'ok')) throw new Error((j.error && (j.error.code + ' ' + (j.error.message || ''))) || String(r.status)); return j.data || {}; }
-async function ttPost(env, ep) {
+async function ttPost(env, ep) { // ซีรีส์ = ส่งครบทุกซีน ต่อท้ายชื่อด้วย Part 1/3, 2/3, 3/3
+  let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; }
+  const vids = Array.isArray(sc.vids) && sc.vids.length ? sc.vids : [ep.vid], out = [];
+  for (let i = 0; i < vids.length; i++) { const cap = String(ep.caption || ep.title || ''), nl = cap.indexOf('\n'), head = nl >= 0 ? cap.slice(0, nl) : cap, rest = nl >= 0 ? cap.slice(nl) : '';
+    out.push(await ttPost1(env, { ...ep, vid: vids[i], caption: vids.length > 1 ? head + ' Part ' + (i + 1) + '/' + vids.length + rest : cap })); }
+  return out[out.length - 1] + (vids.length > 1 ? ' (' + vids.length + ' คลิป)' : '');
+}
+async function ttPost1(env, ep) {
   if (!ep.vid) throw new Error('คลิปยังไม่เสร็จ');
   const s = await getSettings(env), tok = await ttToken(env);
   const rows = (await env.DB.prepare('SELECT data FROM vchunks WHERE vid=? ORDER BY idx').bind(ep.vid).all()).results, parts = rows.map(r => b64ToBytes(r.data)), n = parts.reduce((a, x) => a + x.length, 0), buf = new Uint8Array(n); let o = 0; for (const x of parts) { buf.set(x, o); o += x.length; }
@@ -6027,14 +6067,12 @@ async function castApi(req, env, url, body) {
           const sc = { settings: st, lines, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
           await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'draft',?,?,?)").bind(px.k, topic, String(r.title || topic).slice(0, 120), JSON.stringify(sc), String(r.caption || '').slice(0, 2000), Date.now()).run();
         }
-        if (act === 'pres_series') { // ซีรีส์อาหาร: AI ออกแบบโครง 3 ซีน → presTick เขียนบททีละช่วงเอง → รออนุมัติ
+        if (act === 'pres_series') { // รายการ "<ชื่อ>สอนทำอาหารกับเล่าเรื่องปริศนา EPn": AI ออกแบบโครง 3 ซีน → presTick เขียนบททีละช่วงเอง → รออนุมัติ
           const px = L.find(x => x.k === String(b.k || '')); if (!px) return json({ error: 'เลือกพรีเซนเตอร์ก่อน' }, 400);
-          const kind = b.kind === 'story' ? 'story' : 'cook', topic = String(b.topic || '').trim().slice(0, 200);
-          const r = await llmJson(env, s, serOutlinePrompt(px, kind, topic), 6200);
-          const scenes = (Array.isArray(r && r.scenes) ? r.scenes : []).slice(0, 3).map(S => ({ title: String((S && S.title) || '').slice(0, 80), summary: String((S && S.summary) || '').slice(0, 200), settings: (Array.isArray(S && S.settings) ? S.settings : []).map(serSet).filter(g => g.t).slice(0, 14), beats: (Array.isArray(S && S.beats) ? S.beats : []).map(x => String(x).slice(0, 200)).slice(0, SER_CH), lines: [], done: 0 }));
-          if (scenes.length < 3 || scenes.some(S => S.settings.length < 4 || S.beats.length < SER_CH)) return json({ error: 'AI ออกแบบซีรีส์ไม่ครบ 3 ซีน ลองกดใหม่อีกครั้ง' }, 500);
-          const sc = { series: 1, kind, motion: [0, 2, 3].includes(+b.motion) ? +b.motion : 2, title: String(r.title || topic || 'ซีรีส์อาหาร').slice(0, 120), scenes, outfit: PRS_OF[Math.floor(Math.random() * PRS_OF.length)], hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)] };
-          await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'writing',?,?,?)").bind(px.k, topic || (kind === 'cook' ? 'สอนทำอาหาร' : 'เล่าเรื่องอาหาร'), sc.title, JSON.stringify(sc), String(r.caption || '').slice(0, 2000), Date.now()).run();
+          const topic = String(b.topic || '').trim().slice(0, 200), epno = await serNextEp(env, px.k); let o;
+          try { o = await serNew(env, s, px, topic, epno); } catch (e) { return json({ error: String(e.message || e).slice(0, 200) }, 500); }
+          o.sc.motion = [0, 2, 3].includes(+b.motion) ? +b.motion : 2;
+          await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'writing',?,?,?)").bind(px.k, topic || 'สอนทำอาหาร + เล่าเรื่องปริศนา', o.title, JSON.stringify(o.sc), o.caption.slice(0, 2000), Date.now()).run();
         }
 
         if (act === 'pres_go' || act === 'pres_del' || act === 'pres_post') {
