@@ -56,7 +56,7 @@ export default {
   },
   async scheduled(event, env0, ctx) {
     const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) }, jobs = [];
-    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presMig1(env).catch(() => { }); await presTick(env, ctx).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
+    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presMig1(env).catch(() => { }); await presAutoGo(env).catch(() => { }); await presTick(env, ctx).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
     await handleCron(event, env, { waitUntil: p => jobs.push(p) });
     ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare('DELETE FROM rmeter WHERE day < ?').bind(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
   },
@@ -335,6 +335,18 @@ async function presFix(env) { // ครั้งเดียว (pres_fix=v2): �
   for (const x of L) await presQueueDs(env, x, true);
   await setSetting(env, 'pres_fix', 'v6');
   await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind('พรีเซนเตอร์: ล็อกเฉพาะหน้า + สลับทรงผม (สีเดิม) + ชุดสไตล์ใหม่ (ไม่มีเครื่องแบบ) → วาดชุดฝึกใหม่คนละ 28 ภาพ', Date.now()).run().catch(() => { });
+}
+async function presAutoGo(env) { // ตอนที่ผู้ใช้สั่งให้ทำต่อเอง (script.auto=1): บทครบ + LoRA เสร็จ + มีเสียง → อนุมัติเอง (เหมือนกด ✅)
+  if (new Date().getUTCMinutes() % 2) return;
+  const eps = (await env.DB.prepare("SELECT * FROM pres_eps WHERE status='draft' AND json_extract(script,'$.auto')=1").all().catch(() => ({ results: [] }))).results; if (!eps.length) return;
+  const s = await getSettings(env); let P = {}; try { P = JSON.parse(s.pres || '{}'); } catch { P = {}; } const L = P.list || [];
+  for (const ep of eps) { const xi = L.findIndex(x => x.k === ep.pk), px = L[xi]; if (!px || !px.voice) continue;
+    const l = await env.DB.prepare("SELECT id FROM loras WHERE char_id=? AND status='ready' ORDER BY id DESC LIMIT 1").bind(-(100 + xi)).first(); if (!l) continue;
+    let sc = {}; try { sc = JSON.parse(ep.script || '{}'); } catch { sc = {}; } if (!sc.series) continue;
+    const pj = 'พรีเซนเตอร์·ตอน·' + ep.id; await env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj).run();
+    await env.DB.batch(serImgJobs(env, px, sc, l, pj, Date.now(), 'prs' + px.k + 'x'));
+    await env.DB.prepare("UPDATE pres_eps SET status='imgs', err=NULL WHERE id=?").bind(ep.id).run();
+    await notify(env, '🎬 เริ่มทำ "' + (ep.title || '') + '" ให้อัตโนมัติแล้ว (LoRA เสร็จ)'); }
 }
 async function presMig1(env) { // ครั้งเดียว: ตอนที่เขียนไว้แล้ว (สูตรเดิม สอนทำอาหารอย่างเดียว) → เขียนใหม่เป็นรายการทำอาหาร+เล่าเรื่องปริศนา ตั้งชื่อ EP1
   const s = await getSettings(env); if (s.pres_mig1 === 'done' || (+s.pres_mig1n || 0) >= 5) return;
