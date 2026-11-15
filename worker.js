@@ -772,6 +772,9 @@ async function xlNew(env, story, kind, name, desc) {
 }
 // วาดช่องที่มีตัวละครของตอนนั้นใหม่ทั้งหมด (settings sb_redraw = "เรื่อง|ตอน") — ใช้หลังแก้ตัวสั่งวาดหรือ LoRA เพิ่งเสร็จ · ช่องฉากหลังล้วนไม่แตะ
 async function sbRedrawTick(env, s) {
+  if (!s.sb_redraw && s.sb_redraw_q) { // คิววาดใหม่หลายซีน (คั่นด้วย ;) — ดึงทีละรายการต่อรอบ
+    const q = String(s.sb_redraw_q).split(';').map(x => x.trim()).filter(Boolean), cur = q.shift();
+    await setSetting(env, 'sb_redraw_q', q.join(';')); if (cur) { await setSetting(env, 'sb_redraw', cur); s.sb_redraw = cur; } }
   if (!s.sb_redraw) return;
   const [story, epS, mode, scOnly, idxS] = String(s.sb_redraw).split('|'); // ตัวที่สาม 'all' = วาดใหม่ทุกช่องรวมฉากหลัง · ตัวที่สี่ = เฉพาะซีนนั้น · ตัวที่ห้า = เฉพาะช่องลำดับที่ (เช่น 5,8,10) ไว้ทดสอบ
   const ONLY = new Set(String(idxS || '').split(',').map(Number).filter(Boolean));
