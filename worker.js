@@ -583,10 +583,10 @@ function serImgJobs(env, px, sc, l, pj, t, trig) { // วาดภาพทั�
 }
 
 function clipImgJobs(env, px, sc, l, pj, t, trig) { // ซีนยาว ~3 นาที: รูปที่เห็นตัวละคร (p=1) = LoRA ล็อกหน้า · รูปแมว/ฉาก (p=0) = ไม่ใช้ LoRA ไม่มีคน
-  const st = []; let n = 0;
+  const st = []; let n = 0; const land = sc.aspect === '16:9', IW = land ? 1344 : 832, IH = land ? 768 : 1216, comp = land ? 'horizontal 16:9 composition, wide frame' : 'vertical composition';
   for (const S of sc.scenes) for (const g of S.settings) { n++;
-    const prompt = g.p ? `photo of ${trig} woman, ${presWho(px, sc.hair)}, wearing ${sc.outfit}, ${g.t}, beautiful natural light, candid lifestyle photo, shallow depth of field, realistic, no text, vertical composition` : `photo of ${g.t}, beautiful natural light, shallow depth of field, realistic photo, no people, no text, vertical composition`;
-    const opt = g.p ? presOpt(832, 1216, n, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman', 'a woman wearing ' + sc.outfit] }) : presOpt(832, 1216, n, { qc: ['a realistic photo of a cat or a pretty scenery with no people'] });
+    const prompt = g.p ? `photo of ${trig} woman, ${presWho(px, sc.hair)}, wearing ${sc.outfit}, ${g.t}, beautiful natural light, candid lifestyle photo, shallow depth of field, realistic, no text, ${comp}` : `photo of ${g.t}, beautiful natural light, shallow depth of field, realistic photo, no people, no text, ${comp}`;
+    const opt = g.p ? presOpt(IW, IH, n, { loras: [{ id: l.id, w: 0.9 }], refimg: px.face, ipa: 'face', rw: 0.3, ipa_end: 0.8, qc: ['a realistic photo of one young Korean woman', 'a woman wearing ' + sc.outfit] }) : presOpt(IW, IH, n, { qc: ['a realistic photo of a cat or a pretty scenery with no people'] });
     st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'',?,?,'','',0,'queued',0,?,'img',?)").bind(pj, String(n), prompt, t++, JSON.stringify(opt))); }
   return st;
 }
@@ -609,7 +609,7 @@ async function presTick(env, ctx) {
         let gi = 0, miss = false; const ids = (sc.scenes || []).map(S => S.settings.map(() => { gi++; if (!by[gi]) miss = true; return by[gi] || 0; }));
         if (!ids.length || miss) { await env.DB.prepare("UPDATE pres_eps SET status='failed', err=? WHERE id=?").bind('วาดภาพประกอบไม่ครบ' + (bad ? ': ' + String(bad.error || '').slice(0, 160) : ''), ep.id).run(); continue; }
         const st = [env.DB.prepare("DELETE FROM vjobs WHERE project >= ? AND project < ? AND status IN ('failed','done')").bind(cj + '·ซีน', cj + '·ซีน\uffff')];
-        sc.scenes.forEach((S, i) => st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj + '·ซีน' + (i + 1), String(S.title || ep.title || ''), Date.now() + i, JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: (S.lines || []).map(x => ({ ko: x.ko, th: x.th, en: x.en || '', dur: x.dur || 0, img: x.img })), imgids: ids[i], nolip: S.settings.map((g, j) => g.f ? j : -1).filter(j => j >= 0), lips: s.pres_lips !== '0', motion: sc.motion === undefined ? 2 : sc.motion, mprompts: S.settings.map(g => g.m || g.t), subc: px.sc || '#FFFFFF', vlog: sc.clip ? 1 : 0, lang: sc.lang || undefined, pri: 0 }))));
+        sc.scenes.forEach((S, i) => st.push(env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','clip',?,'','',0,'queued',0,?,'ptts',?)").bind(cj + '·ซีน' + (i + 1), String(S.title || ep.title || ''), Date.now() + i, JSON.stringify({ mode: 'scene', voice: +px.voice || 0, voice_text: px.vtext || PRES_VREF, lines: (S.lines || []).map(x => ({ ko: x.ko, th: x.th, en: x.en || '', dur: x.dur || 0, img: x.img })), imgids: ids[i], nolip: S.settings.map((g, j) => g.f ? j : -1).filter(j => j >= 0), lips: s.pres_lips !== '0', motion: sc.motion === undefined ? 2 : sc.motion, mprompts: S.settings.map(g => g.m || g.t), subc: px.sc || '#FFFFFF', vlog: sc.clip ? 1 : 0, aspect: sc.aspect || undefined, fps: sc.fps || undefined, interp: sc.interp || 0, lang: sc.lang || undefined, pri: 0 }))));
         st.push(env.DB.prepare("UPDATE pres_eps SET status='render' WHERE id=?").bind(ep.id));
         await env.DB.batch(st); continue;
       }
@@ -2359,7 +2359,7 @@ async function vRoutes(req, env, url, ctx) {
     if (p === '/k/claim') {
       if ((+s[readDay()] || 0) > READ_KSTOP) return json({ job: null, paused: 'reads' }); // ถึง 95%: ไม่จ่ายงานใหม่ เครื่องทำงานที่ถืออยู่ให้จบแล้วปิดเอง ทำต่อพรุ่งนี้
       // เครื่องที่ถือสคริปต์รุ่นเก่า (ไม่ส่ง v หรือ v<2) หรือเครื่องที่ติดตั้งตัวเทรนไม่ผ่านในรอบนี้ → ไม่จ่ายงานเทรน LoRA ให้ (รอเครื่องรอบใหม่)
-      const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 7 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
+      const cpuK = url.searchParams.get('cpu') === '1' ? 1 : 0, kv0 = +url.searchParams.get('v') || 0, gpuNoCat = !cpuK && kv0 >= 6 && s.v_cpu !== '0' ? 1 : 0, noTts = kv0 < 25 ? 1 : 0; // เครื่อง CPU (ไม่จำกัดชั่วโมง) รับเฉพาะงานรวมตอน/รวมคลิป · เครื่อง GPU ไม่รับงานพวกนี้
       const kv = +url.searchParams.get('v') || 0, noLora = kv < 4 || s.lora_go !== '1' || url.searchParams.get('nolora') === '1' ? 1 : 0 /* lora_go: เปิดให้เทรนเมื่อชุดฝึกสไตล์ใหม่พร้อม */, noCat = kv < 5 ? 1 : 0; // งานรวมตอน (epcat) ต้องใช้สคริปต์รุ่น 3 ขึ้นไป
       await env.DB.prepare("UPDATE vjobs SET status='queued' WHERE status='running' AND started < ?").bind(Date.now() - 150 * 60000).run();
       const j = await env.DB.prepare("UPDATE vjobs SET status='running', started=?, tries=tries+1, helper=? WHERE id=(SELECT id FROM vjobs WHERE status='queued' AND (?3=0 OR kind<>'lora') AND (?4=0 OR kind<>'epcat') AND (?5=0 OR kind IN ('epcat','concat','tts')) AND (?6=0 OR kind NOT IN ('epcat','concat','tts')) AND (?7=0 OR kind<>'tts') AND (?8=0 OR json_extract(opt,'$.engine') IS NOT 'schnell') AND (?9=0 OR COALESCE(json_extract(opt,'$.engine'),'') NOT IN ('hybrid','cn','s3d')) AND (?10=0 OR kind<>'song') AND (?11=0 OR (json_extract(opt,'$.refimg') IS NULL AND substr(project,1,8)<>'อ้างอิง·')) AND (?12=0 OR json_extract(opt,'$.base') IS NOT 'real') AND (?13=0 OR kind<>'ptts') AND (?14=0 OR (json_extract(opt,'$.vlog') IS NOT 1 AND json_extract(opt,'$.lang') IS NULL)) AND NOT (kind='lora' AND ((SELECT COUNT(*) FROM vjobs r WHERE r.kind='lora' AND r.status='running') >= 2 OR EXISTS (SELECT 1 FROM vjobs r WHERE r.kind='lora' AND r.status='running' AND COALESCE(r.helper,0)=COALESCE(?2,0)))) ORDER BY (kind='img'), CASE WHEN kind='lora' THEN COALESCE(json_extract(opt,'$.pri'),1) END, CASE WHEN kind='img' AND project LIKE 'อ้างอิง·%' THEN 0 WHEN kind='img' AND project LIKE 'พรีเซนเตอร์·%' THEN 0 WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,4,instr(project,'·')-4) AS INTEGER) WHEN kind='img' THEN 999999 END, CASE WHEN kind='img' AND project LIKE 'ฉาก%·%' THEN CAST(substr(project,instr(project,'·')+1) AS INTEGER) END, CASE WHEN kind='img' THEN COALESCE(json_extract(opt,'$.engine'),'') END, id LIMIT 1) AND status='queued' RETURNING id,project,ep,shot,prompt,neg,frames,kind,opt").bind(Date.now(), hid, noLora, noCat, cpuK, gpuNoCat, noTts, kv0 < 8 ? 1 : 0, kv0 < 21 ? 1 : 0, kv0 < 15 ? 1 : 0, kv0 < 20 ? 1 : 0, kv0 < 22 ? 1 : 0, kv0 < 23 ? 1 : 0, kv0 < 24 ? 1 : 0).first(); // ภาพเหมือนจริง (opt.base='real' · RealVisXL) ต้องใช้สคริปต์รุ่น 22 // แบบผสมรุ่นแก้ (สีเต็ม ตุ๊กตาตามบท) ต้องใช้สคริปต์รุ่น 10 // เครื่องรุ่นเก่า (<v8) ไม่รู้จัก FLUX.1-schnell → ไม่ให้รับงานนั้น
@@ -5527,17 +5527,20 @@ def th_wrap(t, n=20):
     return "\\N".join(lines[:3])
 
 
-def cam_vf(k, du, live=True):
+def cam_vf(k, du, live=True, W=1080, H=1920, FPS=25):
     # กล้องมีชีวิต: หายใจ/โยกตัวเบาๆ ซ้อนหลายความถี่ + ซูมเข้า/ออก/เอียงสลับตามช่วง (ไม่ให้ทุกช็อตเหมือนกัน)
-    n = max(25, int(du * 25))
+    # W×H = ขนาดผลลัพธ์ (1080×1920 แนวตั้ง · 1920×1080 แนวนอน) · FPS = เฟรมเรต (กล้องคำนวณทุกเฟรมจึงเนียนที่ 60fps)
+    f = float(FPS)
+    n = max(FPS, int(du * FPS))
     st = int(k) % 4
-    z = ["1.06+0.05*on/%d" % n, "1.11-0.05*on/%d" % n, "1.07+0.012*sin(on/25*2*PI*0.2)", "1.06+0.03*on/%d" % n][st]
+    z = ["1.06+0.05*on/%d" % n, "1.11-0.05*on/%d" % n, "1.07+0.012*sin(on/%g*2*PI*0.2)" % f, "1.06+0.03*on/%d" % n][st]
     amp = 0.011 if live else 0.006
     dx = ["0", "0", "-0.012*on/%d" % n, "0.012*on/%d" % n][st]
-    x = "iw/2-(iw/zoom/2)+iw*(%s+%.4f*sin(on/25*2*PI*0.17)+%.4f*sin(on/25*2*PI*0.41+1.3))" % (dx, amp, amp * 0.4)
-    y = "ih/2-(ih/zoom/2)+ih*(%.4f*sin(on/25*2*PI*0.23+0.7)+%.4f*sin(on/25*2*PI*0.53))" % (amp * 0.7, amp * 0.3)
-    return ("scale=1620:2880:force_original_aspect_ratio=increase,crop=1620:2880,"
-            "zoompan=z='%s':d=1:x='%s':y='%s':s=1080x1920:fps=25,setsar=1,format=yuv420p" % (z, x, y))
+    x = "iw/2-(iw/zoom/2)+iw*(%s+%.4f*sin(on/%g*2*PI*0.17)+%.4f*sin(on/%g*2*PI*0.41+1.3))" % (dx, amp, f, amp * 0.4, f)
+    y = "ih/2-(ih/zoom/2)+ih*(%.4f*sin(on/%g*2*PI*0.23+0.7)+%.4f*sin(on/%g*2*PI*0.53))" % (amp * 0.7, f, amp * 0.3, f)
+    bw, bh = int(W * 1.5), int(H * 1.5)
+    return ("fps=%d,scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,"
+            "zoompan=z='%s':d=1:x='%s':y='%s':s=%dx%d:fps=%d,setsar=1,format=yuv420p" % (FPS, bw, bh, bw, bh, z, x, y, W, H, FPS))
 
 
 def ass_col(h):
@@ -5564,11 +5567,12 @@ def motion_prompt(o, g, nolip, c):
     return "%s%s. a young woman talking to the camera in a kitchen, natural blinking, subtle head movements and small nods, expressive hand gestures while she talks, relaxed breathing, hair and clothes moving slightly, smooth realistic motion, stable camera" % (more, m)
 
 
-def pingpong(ff, tmp, fps_in, out):
-    # เฟรมจากตัวทำคลิป (16fps) -> 25fps แบบผสมเฟรม -> เล่นไปแล้วย้อนกลับ (ต่อเป็นวงได้ไม่กระตุก)
+def pingpong(ff, tmp, fps_in, out, fps_out=25, mci=False):
+    # เฟรมจากตัวทำคลิป (16fps) -> fps_out แบบผสมเฟรม (หรือ mci = เติมเฟรมตามการเคลื่อนไหวจริง ช้ากว่าแต่เนียนกว่า) -> เล่นไปแล้วย้อนกลับ (ต่อเป็นวงได้ไม่กระตุก)
+    mi = "mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1" if mci else "mi_mode=blend"
     sh('"%s" -y -loglevel error -framerate %d -i "%s/%%05d.png" -filter_complex '
-       '"[0:v]minterpolate=fps=25:mi_mode=blend,scale=trunc(iw/2)*2:trunc(ih/2)*2,split[a][b];[b]reverse[r];[a][r]concat=n=2:v=1:a=0[o]" '
-       '-map "[o]" -c:v libx264 -preset veryfast -crf 17 -pix_fmt yuv420p -an "%s"' % (ff, fps_in, tmp, out))
+       '"[0:v]minterpolate=fps=%d:%s,scale=trunc(iw/2)*2:trunc(ih/2)*2,split[a][b];[b]reverse[r];[a][r]concat=n=2:v=1:a=0[o]" '
+       '-map "[o]" -c:v libx264 -preset veryfast -crf 17 -pix_fmt yuv420p -an "%s"' % (ff, fps_in, tmp, fps_out, mi, out))
 
 
 def make_motion(o, d, segs, bounds, ipaths, port, mode, nolip, t0, ff):
@@ -5605,7 +5609,7 @@ def make_motion(o, d, segs, bounds, ipaths, port, mode, nolip, t0, ff):
             for i, f in enumerate(seq):
                 shutil.move(f, os.path.join(tmp, "%05d.png" % i))
             out = d + "/base%d.mp4" % g
-            pingpong(ff, tmp, 16, out)
+            pingpong(ff, tmp, 16, out, int(o.get("_fps") or 25) if o.get("_mci") else 25, bool(o.get("_mci")))
             base[g] = out
             log("ท่าทางช็อตที่ %d/%d เสร็จ (%d เฟรม)" % (n + 1, len(need), len(seq)))
         except Exception as e:
@@ -5619,6 +5623,10 @@ def make_motion(o, d, segs, bounds, ipaths, port, mode, nolip, t0, ff):
 def pres_job(j, port):
     o = j.get("opt") or {}
     t0 = time.time()
+    LAND = str(o.get("aspect") or "") == "16:9"  # แนวนอน 16:9 = 1920x1080 · ไม่ระบุ = แนวตั้ง 1080x1920 เหมือนเดิม
+    OW, OH = (1920, 1080) if LAND else (1080, 1920)
+    FPS = int(o.get("fps") or (60 if LAND else 25))
+    o["_fps"], o["_mci"] = FPS, bool(o.get("interp"))
     gpu = max(0, (port or 8188) - 8188)
     try:
         comfy("/free", {"unload_models": True, "free_memory": True}, port=port)
@@ -5713,41 +5721,42 @@ def pres_job(j, port):
         bv = base.get(g)
         lv = run_muse(mpy, bv or ipaths[g], sw, d, gpu, str(k)) if (mpy and g not in nolip and any(q in sp_set for q in range(sg[1], sg[2] + 1))) else None
         pv = d + "/v%02d.mp4" % k
-        vf = cam_vf(k, du, live=not bv)
+        vf = cam_vf(k, du, not bv, OW, OH, FPS)
         if lv:
             nlip += 1
             sh('"%s" -y -loglevel error -i "%s" -t %.3f -vf "%s,tpad=stop_mode=clone:stop_duration=2" -t %.3f -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, lv, du, vf, du, pv))
         elif bv:
             sh('"%s" -y -loglevel error -stream_loop -1 -i "%s" -t %.3f -vf "%s" -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, bv, du, vf, pv))
         else:
-            sh('"%s" -y -loglevel error -loop 1 -framerate 25 -i "%s" -t %.3f -vf "%s" -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, ipaths[g], du, vf, pv))
+            sh('"%s" -y -loglevel error -loop 1 -framerate %d -i "%s" -t %.3f -vf "%s" -an -c:v libx264 -preset veryfast -crf 19 "%s"' % (ff, FPS, ipaths[g], du, vf, pv))
         if bv:
             nmo += 1
         parts.append(pv)
     open(d + "/list.txt", "w").write("".join("file '%s'\n" % x for x in parts))
     sh('"%s" -y -loglevel error -f concat -safe 0 -i "%s/list.txt" -c copy "%s/v.mp4"' % (ff, d, d))
     fn = thai_font()
-    ass = ["[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "WrapStyle: 2", "",
+    ass = ["[Script Info]", "ScriptType: v4.00+", "PlayResX: %d" % OW, "PlayResY: %d" % OH, "WrapStyle: 2", "",
            "[V4+ Styles]", "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-           "Style: S,%s,66,%s,%s,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,5,2,2,70,70,330,1" % (fn["name"], ass_col(o.get("subc")), ass_col(o.get("subc"))), "",
+           "Style: S,%s,%d,%s,%s,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,5,2,2,%d,%d,%d,1" % (fn["name"], 52 if LAND else 66, ass_col(o.get("subc")), ass_col(o.get("subc")), 200 if LAND else 70, 200 if LAND else 70, 70 if LAND else 330), "",
            "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
     for i, x in enumerate(lines):
         a, b = tm[i]
-        txt = th_wrap(ass_esc(x.get("th") or "")) if x.get("th") else ""
+        txt = th_wrap(ass_esc(x.get("th") or ""), 38 if LAND else 20) if x.get("th") else ""
         if o.get("vlog") and x.get("en"):
             import textwrap
-            txt = "\\N".join(textwrap.wrap(ass_esc(x.get("en")), 24)) + ("\\N" + txt if txt else "")
+            txt = "\\N".join(textwrap.wrap(ass_esc(x.get("en")), 46 if LAND else 24)) + ("\\N" + txt if txt else "")
         if not txt:
             continue
         ass.append("Dialogue: 0,%s,%s,S,,0,0,0,,%s" % (ass_time(a - 0.05), ass_time(b + 0.15), txt))
     open(d + "/s.ass", "w", encoding="utf-8").write("\n".join(ass) + "\n")
     fsub = ff_sub() or ff
     fdopt = (":fontsdir='%s'" % fn["dir"]) if fn["dir"] else ""
+    VB = int(max(700, min(9000, float(o.get("mb") or 40) * 8000.0 / max(total, 1.0) - 192)))  # เพดานขนาดไฟล์ ~40MB (บอทรับไฟล์ได้จำกัด) → บิตเรตลดตามความยาว
     out = os.path.join(ROOT, "pc%s.mp4" % j["id"])
-    sh('"%s" -y -loglevel error -i "%s/v.mp4" -i "%s/all.wav" -vf "ass=\'s.ass\'%s" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -r 25 -c:a aac -b:a 160k -ar 44100 -shortest -movflags +faststart "%s"' % (fsub, d, d, fdopt, out), cwd=d)
+    sh('"%s" -y -loglevel error -i "%s/v.mp4" -i "%s/all.wav" -vf "ass=\'s.ass\'%s" -c:v libx264 -preset fast -crf 20 -maxrate %dk -bufsize %dk -pix_fmt yuv420p -r %d -c:a aac -b:a 160k -ar 44100 -shortest -movflags +faststart "%s"' % (fsub, d, d, fdopt, VB, VB * 2, FPS, out), cwd=d)
     log("คลิปพรีเซนเตอร์เสร็จ %.0f วินาที · ขยับปาก %d/%d ช่วง · ท่าทาง AI %d/%d ช่วง" % (total, nlip, len(segs), nmo, len(segs)))
     shutil.rmtree(d, ignore_errors=True)
-    return out, time.time() - t0, 1080, 1920
+    return out, time.time() - t0, OW, OH
 
 
 def work(job, port):
@@ -5795,7 +5804,7 @@ def heal(port, err):
 
 
 def claim_path():
-    return "/k/claim?v=24" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
+    return "/k/claim?v=25" + ("&nolora=1" if M.get("nolora") else "") + ("&cpu=1" if CPU else "")
 
 
 def claim_wait(stat):
@@ -6273,29 +6282,60 @@ async function castApi(req, env, url, body) {
         }
         if (act === 'pres_clip') { // ซีนยาว ~3 นาที: AI วางโครง 8–16 ภาพ (สาว + แมว + ฉากสวย ไม่ซ้ำกับครั้งก่อน) → เขียนบทพากย์จีน + ซับไทย → รออนุมัติ → ระบบทำต่อเอง
           if (!pr) return json({ error: 'เลือกตัวละครก่อน' }, 400);
-          const n = Math.max(8, Math.min(16, Math.round(+b.shots || 12))), idea = String(b.idea || '').trim().slice(0, 300);
+          const n = Math.max(8, Math.min(90, Math.round(+b.shots || 45))), idea = String(b.idea || '').trim().slice(0, 300);
           const pets = String(b.pets !== undefined ? b.pets : (pr.pets || '')).trim().slice(0, 300) || 'a cute fluffy cream and white cat with big round eyes';
           if (b.pets !== undefined && String(b.pets || '').trim() !== (pr.pets || '')) { pr.pets = String(b.pets || '').trim().slice(0, 300); await save(); }
           const prev = (await env.DB.prepare('SELECT title,script FROM pres_eps WHERE pk=? ORDER BY id DESC LIMIT 14').bind(pr.k).all()).results, usedPl = new Set(), usedTi = [];
           for (const e of prev) { usedTi.push(String(e.title || '')); try { const q = JSON.parse(e.script || '{}'); if (q.place) usedPl.add(q.place); } catch { } }
           const free = CLIP_PLACES.filter(x => !usedPl.has(x)), pool = free.length ? free : CLIP_PLACES, place = pool[Math.floor(Math.random() * pool.length)];
           const theme = idea || CLIP_THEMES[Math.floor(Math.random() * CLIP_THEMES.length)];
-          const o = await llmJson(env, s, `วางโครงซีนคลิป TikTok แนวตั้ง ยาวประมาณ 3 นาที สไตล์ไลฟ์สไตล์สวยๆ ภาพเหมือนจริง ตัวเอกเป็นสาวเกาหลีชื่อ ${pr.name || 'ตัวเอก'} อยู่กับแมว: ${pets}\nสถานที่หลักของซีน: ${place}\nเรื่อง: ${theme}\n${usedTi.length ? 'ห้ามซ้ำกับชื่อคลิปที่เคยทำแล้ว: ' + usedTi.join(' / ') + '\n' : ''}กติกา:\n- ${n} ภาพ (ภาพละประมาณ 15 วินาที) เล่าเรื่องต่อเนื่อง มีต้น กลาง จบ ภาพแรกต้องดึงความสนใจ เปลี่ยนมุมกล้องและจุดในสถานที่ไปเรื่อยๆ ไม่ซ้ำกันติดๆ (wide, medium, close-up ใบหน้า, โคลสอัพแมว, สิ่งของ/วิวสวยๆ, มุมหลังไหล่)\n- p = 1 ถ้าเห็นตัวเอกในภาพ, p = 0 ถ้าเป็นภาพแมวหรือวิวสวยๆ ล้วนไม่มีคน (ใช้ p = 0 ประมาณ 3–4 ภาพ)\n- f = 1 ถ้าภาพนั้นไม่ควรขยับปาก (เช่น แมว วิว หรือตัวเอกหันหลัง/ไม่ได้มองกล้อง), f = 0 ถ้าตัวเอกมองกล้องพูดอยู่\n- t = คำสั่งวาดภาพเป็นภาษาอังกฤษ ไม่เกิน 190 ตัวอักษร ระบุมุมกล้อง จุดในสถานที่ การกระทำ แสง ถ้ามีแมวให้เขียนลักษณะแมวซ้ำให้เหมือนเดิมทุกภาพ ห้ามมีตัวหนังสือ โลโก้ หรือคนอื่น\n- m = การเคลื่อนไหวในภาพเป็นภาษาอังกฤษสั้นๆ ไม่เกิน 100 ตัวอักษร เช่น she gently strokes the cat and smiles, the cat blinks slowly and the tail sways\n- beat = เรื่องที่พูดในภาพนั้น (ไทย 1 ประโยค)\n- title = ชื่อคลิปภาษาไทย · caption = แคปชันไทยชวนอ่านต่อ 1 บรรทัด แล้วขึ้นบรรทัดใหม่ตามด้วยแฮชแท็ก 4-6 อัน · outfit = ชุดของตัวเอกเป็นภาษาอังกฤษสั้นๆ แนวแฟชั่นเกาหลีสะอาดตา (เช่น เสื้อเข้ารูปกับยีนส์ขากว้าง หรือเสื้อแขนพองสีขาว) ชุดเดียวทั้งซีน\nตอบ JSON เท่านั้น: {"title":"...","caption":"...","outfit":"...","shots":[{"t":"...","p":1,"f":0,"m":"...","beat":"..."}]}`, 4000);
-          const sh = (Array.isArray(o.shots) ? o.shots : []).slice(0, n).map(x => ({ t: String(x.t || '').trim().slice(0, 220), p: +x.p ? 1 : 0, f: +x.f ? 1 : 0, m: String(x.m || '').trim().slice(0, 130), beat: String(x.beat || '').trim().slice(0, 200) })).filter(x => x.t);
-          if (sh.length < 6) return json({ error: 'AI วางโครงคลิปไม่ครบ ลองกดใหม่อีกครั้ง' }, 500);
+          const retry = async (fn, k) => { let e0; for (let i = 0; i < (k || 2); i++) { try { return await fn(); } catch (e) { e0 = e; } } throw e0; };
+          const SC = 10, nCh = Math.ceil(n / SC), mins = Math.round(n * 4 / 60 * 10) / 10, who = pr.name || 'ตัวเอก';
+          // 1) โครงเรื่องรวม (เรียกครั้งเดียว): ชื่อ แคปชัน ชุด และเนื้อเรื่องรายช่วง (ช่วงละ ~10 ช็อต)
+          const o = await retry(() => llmJson(env, s, `วางโครงเรื่องคลิปไลฟ์สไตล์ ยาวประมาณ ${mins} นาที สไตล์คนถ่ายคอนเทนต์ลงอินสตาแกรม ภาพเหมือนจริง ตัวเอกเป็นสาวเกาหลีชื่อ ${who} อยู่กับสัตว์เลี้ยง: ${pets}\nสถานที่หลักของซีน: ${place}\nเรื่อง: ${theme}\n${usedTi.length ? 'ห้ามซ้ำกับชื่อคลิปที่เคยทำแล้ว: ' + usedTi.join(' / ') + '\n' : ''}กติกา:\n- acts = ${nCh} ช่วง เรียงตามเวลา ช่วงละ 1 ประโยคไทยบอกว่าเกิดอะไรขึ้นในช่วงนั้น มีต้น กลาง จบ ช่วงแรกต้องดึงความสนใจ\n- title = ชื่อคลิปภาษาไทย · caption = แคปชันไทยชวนอ่านต่อ 1 บรรทัด แล้วขึ้นบรรทัดใหม่ตามด้วยแฮชแท็ก 4-6 อัน · outfit = ชุดของตัวเอกเป็นภาษาอังกฤษสั้นๆ แนวแฟชั่นเกาหลีสะอาดตา ชุดเดียวทั้งซีน\nตอบ JSON เท่านั้น: {"title":"...","caption":"...","outfit":"...","acts":["..."]}`, 1800), 2);
+          const acts = (Array.isArray(o.acts) ? o.acts : []).map(x => String(x || '').trim().slice(0, 160)).filter(Boolean); while (acts.length < nCh) acts.push(theme);
+          const outfit0 = String(o.outfit || '').trim().slice(0, 120) || presOutfit(pr), title = String(o.title || theme).slice(0, 120);
+          // 2) แตกเป็นช็อตทีละช่วง ทำขนานกัน (ช่วงไหนพังลองซ้ำ 1 ครั้ง ถ้ายังพังเติมช็อตสำรองแทน ไม่ล้มทั้งคลิป)
+          const cleanSh = x => ({ t: String((x && x.t) || '').trim().slice(0, 220), p: x && +x.p ? 1 : 0, f: x && +x.f ? 1 : 0, m: String((x && x.m) || '').trim().slice(0, 130), beat: String((x && x.beat) || '').trim().slice(0, 200) });
+          const chunks = await Promise.all(Array.from({ length: nCh }, (_, ci) => {
+            const a = ci * SC, z = Math.min(n, (ci + 1) * SC) - 1, cnt = z - a + 1;
+            return retry(async () => {
+              const r = await llmJson(env, s, `เขียนรายการช็อตของคลิปไลฟ์สไตล์ "${title}" ตัวเอกสาวเกาหลีชื่อ ${who} อยู่กับสัตว์เลี้ยง: ${pets}\nสถานที่หลัก: ${place} · ชุดตัวเอก: ${outfit0}\nเรื่องทั้งคลิปแบ่ง ${nCh} ช่วง ตอนนี้เป็นช่วงที่ ${ci + 1}\n${ci > 0 ? 'ช่วงก่อนหน้า: ' + acts[ci - 1] + '\n' : ''}ช่วงนี้: ${acts[ci]}\n${ci < nCh - 1 ? 'ช่วงถัดไป: ' + acts[ci + 1] + '\n' : ''}ให้เขียนช็อตของช่วงนี้ ${cnt} ช็อต (ช็อตที่ ${a + 1}–${z + 1} จาก ${n})\nกติกา:\n- 1 ช็อตยาวราว 3–4 วินาที ตัดภาพถี่แบบรีลอินสตาแกรม เปลี่ยนมุมกล้อง ระยะ และจุดในสถานที่ทุกช็อต ไม่ซ้ำกันติดๆ (wide, medium, close-up ใบหน้า, โคลสอัพสัตว์เลี้ยง, สิ่งของ/วิวสวยๆ, มุมหลังไหล่, มุมต่ำ, มุมข้าง)\n- p = 1 ถ้าเห็นตัวเอกในภาพ, p = 0 ถ้าเป็นภาพสัตว์เลี้ยงหรือวิวสวยๆ ล้วนไม่มีคน (ใช้ p = 0 ประมาณ 3 ใน 10 ช็อต)\n- f = 1 ถ้าภาพนั้นไม่ควรขยับปาก (สัตว์เลี้ยง วิว หรือตัวเอกหันหลัง/ไม่ได้มองกล้อง), f = 0 ถ้าตัวเอกมองกล้องพูดอยู่\n- t = คำสั่งวาดภาพเป็นภาษาอังกฤษ ไม่เกิน 190 ตัวอักษร ระบุมุมกล้อง จุดในสถานที่ การกระทำ แสง ถ้ามีสัตว์เลี้ยงให้เขียนลักษณะซ้ำให้เหมือนเดิมทุกภาพ ห้ามมีตัวหนังสือ โลโก้ หรือคนอื่น\n- m = การเคลื่อนไหวในภาพเป็นภาษาอังกฤษสั้นๆ ไม่เกิน 100 ตัวอักษร · beat = เรื่องที่พูดในภาพนั้น (ไทย 1 ประโยค)\nตอบ JSON array เท่านั้น: [{"t":"...","p":1,"f":0,"m":"...","beat":"..."}]`, 3200);
+              const arr = (Array.isArray(r) ? r : (r && Array.isArray(r.shots) ? r.shots : [])).map(cleanSh).filter(x => x.t);
+              if (arr.length < Math.ceil(cnt * 0.6)) throw new Error('ช่วง ' + (ci + 1) + ' ได้ภาพน้อยเกินไป');
+              return arr.slice(0, cnt);
+            }, 2).catch(() => []);
+          }));
+          const FILL = ['a close-up of ' + pets + ' resting in ' + place + ', soft natural light', 'a pretty detail of ' + place + ', soft natural light, no people'], sh = []; let realN = 0;
+          chunks.forEach((arr, ci) => { const cnt = Math.min(n, (ci + 1) * SC) - ci * SC; realN += arr.length; for (let k = 0; k < cnt; k++) sh.push(arr[k] || { t: FILL[k % 2].slice(0, 220), p: 0, f: 1, m: 'gentle breeze, soft natural movement', beat: acts[ci] }); });
+          if (realN < Math.ceil(n * 0.5)) return json({ error: 'AI วางโครงได้ ' + realN + ' จาก ' + n + ' ช็อต (โควตา AI ฟรีวันนี้อาจใกล้หมด) ลองลดจำนวนช็อต หรือรอสักพักแล้วกดใหม่' }, 500);
           sh.forEach(x => { if (!x.p) x.f = 1; });
-          const title = String(o.title || theme).slice(0, 120), CH = 4, groups = []; for (let i = 0; i < sh.length; i += CH) groups.push([i, Math.min(sh.length - 1, i + CH - 1)]);
-          const outline = sh.map((x, i) => i + ': ' + (x.p ? '[เห็นตัวเอก' + (x.f ? ' ไม่มองกล้อง' : ' มองกล้องพูด') + '] ' : '[แมว/วิว ไม่มีคน] ') + x.t + (x.m ? ' — ' + x.m : '') + ' | พูดเรื่อง: ' + x.beat).join('\n');
+          o.outfit = outfit0;
+          // 3) บทพากย์: ทีละ 10 ช็อต ขนานกัน · ภาพไหนไม่มีบทพูดให้เป็นช็อตเงียบ (จังหวะพัก) ใส่ให้ครบทุกภาพ
+          const CH = 10, groups = []; for (let i = 0; i < sh.length; i += CH) groups.push([i, Math.min(sh.length - 1, i + CH - 1)]);
+          const lineOf = (x, i) => (x.p ? '[เห็นตัวเอก' + (x.f ? ' ไม่มองกล้อง' : ' มองกล้องพูด') + '] ' : '[สัตว์เลี้ยง/วิว ไม่มีคน] ') + x.t + (x.m ? ' — ' + x.m : '') + ' | พูดเรื่อง: ' + x.beat;
           const parts = await Promise.all(groups.map(async ([a, z], gi) => {
-            const r = await llmJson(env, s, `เขียนบทพูดพากย์ของคลิปไลฟ์สไตล์ "${title}" ให้ตัวเอกหญิงชาวเกาหลีชื่อ ${pr.name || 'ตัวเอก'} พูดเป็นภาษาจีนกลาง (ตัวย่อ) น้ำเสียงเป็นกันเอง อบอุ่น เล่าไปพร้อมกับภาพ (คนดูอ่านซับไทย) บุคลิก: ${PRES_TONE[pr.tone] || PRES_TONE.bright}\nโครงทั้งซีน (ภาพ 0–${sh.length - 1}):\n${outline}\nให้เขียนเฉพาะภาพ ${a} ถึง ${z} ${gi === 0 ? '(เป็นช่วงเปิดคลิป ทักทายและดึงความสนใจใน 3 วินาทีแรก)' : ''}${z === sh.length - 1 ? ' (เป็นช่วงปิด สรุปอบอุ่นแล้วชวนกดติดตาม)' : ' (ยังไม่จบเรื่อง ห้ามสรุปหรือร่ำลา)'}\nกติกา:\n- ภาพละ 3–4 ประโยค ประโยคสั้น พูดจบใน 4–5 วินาที (ไม่เกิน 22 ตัวอักษรจีน) เรื่องที่พูดต้องเข้ากับภาพนั้นและต่อเนื่องจากภาพก่อนหน้า\n- zh = ประโยคภาษาจีนกลางตัวย่อ ห้ามมีวงเล็บหรือคำกำกับ · th = ซับไทยสั้น อ่านทันใน 3 วินาที ผู้พูดเป็นผู้หญิง ใช้ ฉัน/เรา ลงท้าย ค่ะ/นะคะ/นะ ห้ามใช้ ผม/ครับ\n- ข้อเท็จจริงต้องเป็นเรื่องที่รู้กันทั่วไป ห้ามแต่งตัวเลขหรือชื่อเอง\n- img = เลขภาพที่แสดงตอนพูด เรียงจากน้อยไปมาก ใช้ให้ครบทุกภาพ ${a}–${z}\nตอบ JSON array เท่านั้น: [{"zh":"...","th":"...","img":${a}}]`, 5000);
-            const arr = Array.isArray(r) ? r : (r && Array.isArray(r.lines) ? r.lines : []);
-            const raw = arr.map(x => ({ ko: String((x && x.zh) || '').trim().slice(0, 90), th: thFem(String((x && x.th) || '').trim().slice(0, 160)), img: Number.isFinite(+(x && x.img)) ? Math.max(a, Math.min(z, Math.round(+x.img))) : a })).filter(x => x.ko && x.th);
-            if (raw.length < (z - a + 1) * 2) throw new Error('AI เขียนบทภาพ ' + a + '–' + z + ' ไม่ครบ');
+            const cnt = z - a + 1, w0 = Math.max(0, a - 3), w1 = Math.min(sh.length - 1, z + 3), outline = sh.slice(w0, w1 + 1).map((x, i) => (w0 + i) + ': ' + lineOf(x)).join('\n');
+            let raw = [];
+            try {
+              raw = await retry(async () => {
+                const r = await llmJson(env, s, `เขียนบทพูดพากย์ของคลิปไลฟ์สไตล์ "${title}" ให้ตัวเอกหญิงชาวเกาหลีชื่อ ${who} พูดเป็นภาษาจีนกลาง (ตัวย่อ) น้ำเสียงเป็นกันเอง อบอุ่น เล่าไปพร้อมกับภาพ (คนดูอ่านซับไทย) บุคลิก: ${PRES_TONE[pr.tone] || PRES_TONE.bright}\nช็อตรอบๆ ช่วงนี้ (ภาพ ${w0}–${w1} จากทั้งหมด ${sh.length}):\n${outline}\nให้เขียนเฉพาะภาพ ${a} ถึง ${z} ${gi === 0 ? '(เป็นช่วงเปิดคลิป ทักทายและดึงความสนใจใน 3 วินาทีแรก)' : ''}${z === sh.length - 1 ? ' (เป็นช่วงปิด สรุปอบอุ่นแล้วชวนกดติดตาม)' : ' (ยังไม่จบเรื่อง ห้ามสรุปหรือร่ำลา)'}\nกติกา:\n- ภาพละ 1 ประโยคสั้นๆ ยาวราว 3–4 วินาที (ไม่เกิน 14 ตัวอักษรจีน) เรื่องที่พูดต้องเข้ากับภาพนั้นและต่อเนื่องจากภาพก่อนหน้า · ภาพสัตว์เลี้ยง/วิวที่ไม่ต้องพูดให้ข้ามภาพนั้นไปได้ (ไม่เกิน 2 ภาพต่อช่วง)\n- zh = ประโยคภาษาจีนกลางตัวย่อ ห้ามมีวงเล็บหรือคำกำกับ · th = ซับไทยสั้น อ่านทันใน 3 วินาที ผู้พูดเป็นผู้หญิง ใช้ ฉัน/เรา ลงท้าย ค่ะ/นะคะ/นะ ห้ามใช้ ผม/ครับ\n- ข้อเท็จจริงต้องเป็นเรื่องที่รู้กันทั่วไป ห้ามแต่งตัวเลขหรือชื่อเอง\n- img = เลขภาพที่แสดงตอนพูด (${a}–${z}) เรียงจากน้อยไปมาก\nตอบ JSON array เท่านั้น: [{"zh":"...","th":"...","img":${a}}]`, 3000);
+                const arr = Array.isArray(r) ? r : (r && Array.isArray(r.lines) ? r.lines : []);
+                const r0 = arr.map(x => ({ ko: String((x && x.zh) || '').trim().slice(0, 90), th: thFem(String((x && x.th) || '').trim().slice(0, 160)), img: Number.isFinite(+(x && x.img)) ? Math.max(a, Math.min(z, Math.round(+x.img))) : a })).filter(x => x.ko && x.th);
+                if (r0.length < Math.ceil(cnt * 0.6)) throw new Error('บทภาพ ' + a + '–' + z + ' ไม่ครบ');
+                return r0;
+              }, 2);
+            } catch (e) { raw = []; }
             let cur = a; raw.forEach(x => { x.img = Math.max(cur, x.img); cur = x.img; });
-            return raw;
-          })).catch(e => { throw e; });
-          const lines = parts.flat();
-          const sc = { series: true, clip: true, lang: 'Chinese', epno: await serNextEp(env, pr.k), motion: [0, 2, 3].includes(+b.motion) ? +b.motion : 2, outfit: String(o.outfit || '').trim().slice(0, 120) || presOutfit(pr), hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)], pets, place, scenes: [{ title, settings: sh.map(x => ({ t: x.t, p: x.p, f: x.f, m: x.m })), lines }] };
+            const have = new Set(raw.map(x => x.img)), spoken = raw.length;
+            for (let i = a; i <= z; i++) if (!have.has(i)) raw.push({ ko: '', th: '', img: i, dur: 3 });
+            raw.sort((p, q) => p.img - q.img);
+            return { raw, spoken };
+          }));
+          const spokenN = parts.reduce((t, x) => t + x.spoken, 0);
+          if (spokenN < Math.ceil(sh.length * 0.5)) return json({ error: 'AI เขียนบทพากย์ได้ ' + spokenN + ' จาก ' + sh.length + ' ช็อต (โควตา AI ฟรีอาจใกล้หมด) ลองกดใหม่อีกครั้ง' }, 500);
+          const lines = parts.flatMap(x => x.raw);
+          const sc = { series: true, clip: true, aspect: b.aspect === '9:16' ? '9:16' : '16:9', fps: +b.fps || (b.aspect === '9:16' ? 25 : 60), interp: +b.interp ? 1 : 0, lang: 'Chinese', epno: await serNextEp(env, pr.k), motion: [0, 2, 3].includes(+b.motion) ? +b.motion : 2, outfit: String(o.outfit || '').trim().slice(0, 120) || presOutfit(pr), hair: PRS_HS[Math.floor(Math.random() * PRS_HS.length)], pets, place, scenes: [{ title, settings: sh.map(x => ({ t: x.t, p: x.p, f: x.f, m: x.m })), lines }] };
           await env.DB.prepare("INSERT INTO pres_eps (pk,topic,title,status,script,caption,created) VALUES (?,?,?,'draft',?,?,?)").bind(pr.k, theme.slice(0, 200), title, JSON.stringify(sc), String(o.caption || '').slice(0, 2000), Date.now()).run();
         }
         if (act === 'pres_series') { // รายการ "<ชื่อ>สอนทำอาหารกับเล่าเรื่องปริศนา EPn": AI ออกแบบโครง 3 ซีน → presTick เขียนบททีละช่วงเอง → รออนุมัติ
