@@ -56,7 +56,7 @@ setInterval(()=>{if(cs.some(c=>c.pending))loadChars()},15000);
 const mkb=(t,cls,fn)=>{const b=document.createElement('button');b.textContent=t;b.className=cls;b.onclick=async()=>{try{await fn()}catch(e){busy(e.message)}};return b};
 const vidU=id=>String(cfg.url||'').replace(/\/+$/,'')+'/vid/'+id+'?k='+encodeURIComponent(cfg.key||'');
 let E50=[],EF={},EOK=0;async function loadEps(){const box=$('eps');if(!sid){box.innerHTML='';return}try{const r=await api({act:'eps',series_id:sid});E50=r.eps;EF=r.efinal||{};EOK=r.ok||0;drawEps()}catch(e){busy(e.message)}}
-function epState(e){if(!e.script_id)return'ยังไม่เขียนบท';if(e.sb>=0)return'กำลังแตกช็อต (เหตุการณ์ '+(e.sb+1)+')';if(e.fin)return'✅ เสร็จ ('+e.tot+' ช็อต)';return'ภาพคีย์ '+e.img+'/'+e.tot+' · วิดีโอ '+e.vid+'/'+e.tot}
+function epState(e){if(!e.script_id)return'ยังไม่เขียนบท';if(e.sb>=0)return'กำลังแตกช็อต (เหตุการณ์ '+(e.sb+1)+')';if(e.fin)return'✅ เสร็จ ('+e.tot+' ช็อต)';if(e.ready&&!e.ok)return'🖼 ภาพครบ '+e.tot+' ช็อต ตรวจแล้ว · รออนุมัติทำอนิเมะ';return'ภาพคีย์ '+e.img+'/'+e.tot+' · วิดีโอ '+e.vid+'/'+e.tot}
 async function planEps(){let f=1;while(f>0){busy('วางโครงตอนที่ '+f+'/12…');f=(await api({act:'ep_plan',series_id:sid,from:f})).next}busy('');await loadEps()}
 function drawEps(){const box=$('eps');box.innerHTML='';const c=document.createElement('div');c.className='c';
 c.innerHTML='<b>4 · 12 ตอน (ตอนละ 15 นาที = 3 ซีน ซีนละ 5 นาที)</b><br><small>กด ▶️ แล้วระบบเลือกวิธีทำเอง (ช็อตมีตัวละคร = SDXL+LoRA · ฉาก/บรรยากาศ = FLUX · ช็อตสำคัญ = วิดีโอ · ที่เหลือ = ภาพนิ่งซูมเลื่อน) ทำตอนที่ 1 ให้ก่อน แล้วรอคุณตรวจ (ปิดเว็บได้) · เลือกตัวละครที่ใช้ในข้อ 2</small><br>';
@@ -65,7 +65,7 @@ const run=E50.filter(e=>e.auto&&!e.fin).length;
 c.append(mkb(run?'⏸ หยุดทุกตอน':'▶️ ทำทุกตอนให้เลย','',async()=>{await api({act:'ep_auto',series_id:sid,on:!run});await loadEps()}));box.append(c);
 let lastEp=0;E50.forEach(e=>{if(e.ep!==lastEp){lastEp=e.ep;const g=document.createElement('div');g.className='c';g.innerHTML='<b>ตอนที่ '+e.ep+' (15 นาที)</b> ';const sc=E50.filter(x=>x.ep===e.ep);if(sc.length===3&&sc.every(x=>x.fin)){if(EOK>=e.ep)g.append('✅ ตรวจผ่านแล้ว');else g.append(mkb('ตรวจแล้ว ผ่าน → ทำตอนต่อไป','',async()=>{await api({act:'ep_ok',series_id:sid,ep:e.ep});await loadEps()}))}else if(e.ep>EOK+1)g.append(Object.assign(document.createElement('small'),{textContent:'รอตรวจตอนก่อนหน้า'}));box.append(g)}const d=document.createElement('div');d.className='c';const t=document.createElement('b');t.textContent='ซีน '+e.sc+' · '+e.title;
 const s=document.createElement('div');s.innerHTML='<small></small>';s.firstChild.textContent=e.logline+' — '+epState(e)+(e.auto&&!e.fin?' · ⏳ กำลังทำ':'');d.append(t,s);
-if(e.fin)d.append(mkb('▶️ เล่นซีนนี้','',()=>playScene(e,d)));
+if(e.fin)d.append(mkb('▶️ เล่นซีนนี้','',()=>playScene(e,d)));if(e.ready&&!e.ok&&!e.fin)d.append(mkb('✅ อนุมัติทำอนิเมะซีนนี้','',async()=>{if(!confirm('อนุมัติทำอนิเมะซีนนี้ ('+e.tot+' ช็อต)? ระบบจะเริ่มทำคลิปทุกช็อตของซีนนี้'))return;await api({act:'sc_ok',script_id:e.script_id});await loadEps()}));if(e.ok&&!e.fin)d.append(Object.assign(document.createElement('small'),{textContent:' ✅ อนุมัติแล้ว กำลังทำคลิป '}));
 d.append(mkb(e.auto&&!e.fin?'⏸ หยุด':'▶️ ทำตอนนี้','',async()=>{await api({act:'ep_auto',id:e.id,on:!(e.auto&&!e.fin)});await loadEps()}));
 if(e.script_id)d.append(mkb('ดู/แก้ช็อต','g',async()=>{pid=e.script_id;await loadShots();$('sb').scrollIntoView({behavior:'smooth'})}));
 box.append(d)})}

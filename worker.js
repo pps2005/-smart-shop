@@ -1461,7 +1461,7 @@ async function castList(env, sr) { // บทในเรื่อง (ชื่�
 }
 // ประเภทงาน: กำหนดจำนวนซีน/ช็อตต่อซีน และแนวการเล่าเรื่อง (สัดส่วนภาพ/สไตล์ตั้งจากหน้าเว็บตอนกดเลือก)
 const WORK = {
-  anime: { scenes: 3, shots: 20, beats: '5-7', note: 'งานนี้เป็นอนิเมะ: แอ็กชันและอารมณ์ชัดเจน มุมกล้องหลากหลาย มีช็อตเคลื่อนไหวเด่นๆ' },
+  anime: { scenes: 3, shots: 90, beats: '10-12', note: 'งานนี้เป็นอนิเมะ: แอ็กชันและอารมณ์ชัดเจน มุมกล้องหลากหลาย มีช็อตเคลื่อนไหวเด่นๆ · 1 ซีนยาวราว 5 นาที แตกเป็นภาพ 80-100 ภาพ (ภาพละ ~3 วินาที) จึงต้องมีเหตุการณ์ย่อยละเอียดเรียงตามเวลา' },
   film: { scenes: 3, shots: 16, beats: '5-6', note: 'งานนี้เป็นหนังสั้นโทนภาพยนตร์: จังหวะนิ่ง ช็อตกว้างสลับโคลสอัพ แสงเงาแบบหนัง เล่าด้วยภาพมากกว่าคำพูด' },
   series: { scenes: 3, shots: 14, beats: '5-6', note: 'งานนี้เป็นซีรีส์ดราม่า: เน้นบทสนทนาและสีหน้าตัวละคร จบซีนด้วยปมให้อยากดูต่อ' },
   ad: { scenes: 1, shots: 8, beats: '4', note: 'งานนี้เป็นโฆษณาสั้นราว 30 วินาที: เปิดด้วยภาพดึงสายตา → ปัญหาหรือความต้องการ → จุดขาย → ปิดด้วยคำชวน' }
@@ -1479,11 +1479,12 @@ async function shotLoraMap(env, seriesId) { // LoRA ที่พร้อมใ�
 // คำเรียก LoRA ในคำสั่งวาด: คำกระตุ้น + เพศ + ลักษณะเด่นสั้นๆ ของตัวนั้น (คำกระตุ้นอย่างเดียวไม่พอ โมเดลจะวาดเป็นคนอื่น — เจอจริงกับ LoRA ชุดแรก)
 const loraTag = c => { const d = String(c.desc || ''), g = /\b(woman|girl|female)\b/i.test(d) ? '1girl' : /\b(man|boy|male)\b/i.test(d) ? '1boy' : ''; return ['chr' + c.cid + 'x', g, d.split(',').slice(0, 4).join(',').slice(0, 170)].filter(Boolean).join(', '); };
 // LoRA ที่ช็อตนี้ควรใช้: ตัวละคร/ศัตรูในช็อต (สูงสุด 2) + สไตล์ของเรื่อง + สถานที่ (ถ้ายังไม่เกิน 3 ตัว — ซ้อนมากกว่านี้ภาพเริ่มเละ)
+const styleW = wm => Math.min(0.9, Math.max(0.8, +(wm || {})['สไตล์'] || 0.85)); // LoRA สไตล์ลายเส้น: น้ำหนัก 0.8–0.9 (ตั้งค่าเฉพาะเรื่องได้ที่ lw:<เรื่อง> คีย์ 'สไตล์' แต่ถูกบีบให้อยู่ในช่วงนี้)
 function shotLoraPick(sh, L) {
   let names = []; try { names = JSON.parse(sh.chars || '[]'); } catch (e) { names = []; }
   const seen = new Set(), m = [];
   for (const c of L.lc) if (names.includes(c.name) && !seen.has(+c.lid) && m.length < 2) { seen.add(+c.lid); m.push({ cid: c.cid, lid: c.lid, w: +(L.wm || {})[c.name] || 0.9, k: 'char', tag: loraTag(c) }); }
-  const st = (L.xl || []).find(x => x.kind === 'style'); if (st) m.push({ cid: st.cid, lid: st.lid, w: 0.6, k: 'style' });
+  const st = (L.xl || []).find(x => x.kind === 'style'); if (st) m.push({ cid: st.cid, lid: st.lid, w: styleW(L.wm), k: 'style' });
   const pl = sh.loc && (L.xl || []).find(x => x.kind === 'place' && x.name === sh.loc); if (pl && m.length < 3) m.push({ cid: pl.cid, lid: pl.lid, w: 0.7, k: 'place' });
   return { names, m };
 }
@@ -1555,6 +1556,27 @@ async function qcRun(env, story, budget, onlySid) {
 // ===== สตอรีบอร์ดแบบมังงะ (v2): บทพูดกับภาพเกิดพร้อมกันทีละช่อง · มุมกล้องเป็นตัวเลือกตายตัว · รูปลักษณ์ตัวละครใส่จากบทเสมอ · มีรอบ "อ่านทวน" ให้ AI เติมช่องที่ขาดจนเรื่องต่อกัน =====
 const SHOTS = { wide: 'wide shot', medium: 'medium shot, waist up', closeup: 'close-up of the face', two: 'two-shot', ots: 'over-the-shoulder shot', low: 'low angle shot', high: 'high angle shot from above', insert: 'extreme close-up insert shot of an object or hands, no face', back: 'view from behind' };
 const thOnly = t => String(t == null ? '' : t).replace(/[぀-ヿ㐀-鿿＀-￯]+/g, '').replace(/\s+/g, ' ').trim(); // ตัดอักษรจีน/ญี่ปุ่นที่ AI ชอบหลุดมา
+// ===== ตัวคุมมุมกล้องของซีน (ทำหลัง AI เขียนช่อง): ชนิดช็อตไม่ซ้ำเกิน 2 ติด · มุมพิเศษ (ต่ำ/สูง/หลัง/ของ) ไม่ซ้ำติดกัน · 2 คน→ข้ามไหล่/สองคน · ไม่มีคน→กว้าง/ของ · กระจายให้ครบทั้งซีน (ข้ามท่าสู้ต่อเนื่อง chain) =====
+const SHOT_BY_PREFIX = Object.entries(SHOTS).sort((a, b) => b[1].length - a[1].length);
+const shotOfEn = en => { const e = String(en || ''); const f = SHOT_BY_PREFIX.find(([k, v]) => e.startsWith(v)); return f ? f[0] : ''; };
+const camStrip = en => String(en || '').replace(/\b(extreme close-up|close-up|medium shot|wide shot|establishing shot|two-shot|over-the-shoulder shot|low[- ]angle shot|high[- ]angle shot|bird's-eye view|worm's-eye view|view from behind)\b(?: of)?,?\s*/gi, '').replace(/\s{2,}/g, ' ').trim();
+function camFix(list, prevTypes) {
+  const hist = (prevTypes || []).slice(-2), use = {}, odd = new Set(['low', 'high', 'back', 'insert']); let fixed = 0;
+  for (const p of list) {
+    if (p.chain) { hist.push(p.shot); use[p.shot] = (use[p.shot] || 0) + 1; continue; }
+    const n = (p.chars || []).length, a = hist[hist.length - 1], b = hist[hist.length - 2];
+    let bad = p.shot === a && p.shot === b; // 3 ติด
+    if (!bad && p.shot === a && odd.has(p.shot)) bad = true; // มุมพิเศษซ้ำติดกัน
+    if (!bad && n === 0 && !['wide', 'insert', 'high', 'low'].includes(p.shot)) bad = true; // ช่องไม่มีคน ต้องเป็นภาพฉาก/ของ
+    if (bad) {
+      const pool = n >= 2 ? ['ots', 'two', 'closeup', 'medium', 'low', 'high', 'back'] : n === 1 ? ['closeup', 'medium', 'low', 'high', 'back', 'wide', 'insert'] : ['wide', 'insert', 'high', 'low'];
+      const ok = pool.filter(k => k !== a && !(k === b && k === a) && !(odd.has(k) && k === a)), pick = (ok.length ? ok : pool).sort((x, y) => (use[x] || 0) - (use[y] || 0))[0];
+      if (pick && pick !== p.shot) { const old = SHOTS[p.shot] || ''; const body = p.en.startsWith(old) ? p.en.slice(old.length).replace(/^,\s*/, '') : p.en; p.en = SHOTS[pick] + ', ' + camStrip(body); p.shot = pick; fixed++; }
+    }
+    hist.push(p.shot); use[p.shot] = (use[p.shot] || 0) + 1;
+  }
+  return fixed;
+}
 function cleanPanel(x, names, places) {
   const fix = w => { w = thOnly(w); if (!w) return ''; if (names.includes(w)) return w; const f = names.find(n => n.includes(w) || w.includes(n)); return f || null; };
   const solo = (Array.isArray(x.chars) ? x.chars : []).map(fix).filter(Boolean), lines = (Array.isArray(x.lines) ? x.lines : []).map(l => { let w = fix(l && l.who); if (w === '' && l && String(l.who || '').trim() && solo.length === 1) w = solo[0]; /* ชื่อคนพูดเป็นอักษรต่างชาติ: ถ้าช่องนั้นมีตัวละครเดียว ถือว่าเป็นคนนั้น */ return { who: w, say: thOnly(l && l.say).slice(0, 120) }; }).filter(l => l.say && l.who !== null && !/^(ฟังนะ|ว่าไง|ดีไหม|อะไรนะ|เอาล่ะ)$/.test(l.say)).slice(0, 3);
@@ -1618,7 +1640,7 @@ async function sbTighten(env, s, sid) {
   if (rows.length < 6) return { cut: 0, fix: 0 };
   const keep = new Set(); rows.forEach((r, i) => { if (+r.chain || +((rows[i + 1] || {}).chain)) keep.add(i + 1); }); // ชุดท่าต่อเนื่องของฉากสู้: ห้ามตัด/ห้ามแก้ prompt (ต้องคงมุมกล้องและฉากเดิม)
   const o = await llmJson(env, s, `นี่คือสตอรีบอร์ดของ 1 ซีน เรียงตามลำดับ (เลข: คำอธิบาย | prompt ภาพ)\n${rows.map((r, i) => `${i + 1}: ${r.th} | ${String(r.en).slice(0, 160)}`).join('\n')}\n\nตรวจแล้วแก้ให้เป็นสตอรีบอร์ดที่กระชับและดูดี:\n1) drop = เลขช็อตที่ควรตัดทิ้ง เพราะซ้ำกับช็อตก่อนหน้า (เหตุการณ์เดิม ท่าเดิม) หรือไม่ช่วยเล่าเรื่อง ช็อตติดกันที่เป็นการกระทำต่อเนื่องเดียวกัน (เช่น เดินเข้าไป → หยุด → มองรอบๆ หรือ ยืนฟัง → ยืนเงียบ) ให้เหลือช็อตเดียวที่ดีที่สุด ตัดให้เด็ดขาด ไม่ต้องเกรงใจ ห้ามตัดช็อตแรกและช็อตสุดท้าย ห้ามตัดเกินครึ่งของทั้งหมด ห้ามตัดช็อตที่มีเหตุการณ์สำคัญหรือตัวละครใหม่เข้าฉาก\n2) fix = ช็อตที่เหลือซึ่งมุมกล้องซ้ำกับช็อตติดกัน ให้เขียน prompt ภาพใหม่เป็นภาษาอังกฤษ เปลี่ยนมุมกล้อง/ขนาดภาพให้หลากหลาย (wide shot, close-up, low angle, over-the-shoulder ฯลฯ) โดยคงฉากและการกระทำเดิม ห้ามใส่ชื่อตัวละคร\nตอบเป็น JSON: {"drop":[เลข],"fix":[{"n":เลข,"en":"new English image prompt"}]}`);
-  const N = rows.length, dropN = [...new Set((Array.isArray(o.drop) ? o.drop : []).map(Number).filter(n => n > 1 && n < N && !keep.has(n)))].slice(0, Math.floor(N / 2));
+  const N = rows.length, dropN = [...new Set((Array.isArray(o.drop) ? o.drop : []).map(Number).filter(n => n > 1 && n < N && !keep.has(n)))].slice(0, Math.min(Math.floor(N / 2), Math.max(0, N - 85))); // เป้า 80-100 ช็อตต่อซีน: ตัดได้เฉพาะส่วนที่เกิน ~85
   const dropSet = new Set(dropN), fixes = (Array.isArray(o.fix) ? o.fix : []).filter(f => f && +f.n >= 1 && +f.n <= N && !dropSet.has(+f.n) && !keep.has(+f.n) && typeof f.en === 'string' && f.en.trim().length >= 20).slice(0, Math.ceil(N / 2));
   const st = [], touch = [];
   for (const n of dropN) { const r = rows[n - 1]; touch.push(r); st.push(env.DB.prepare('DELETE FROM shots WHERE id=?').bind(r.id)); }
@@ -1723,20 +1745,20 @@ async function animeAdvance(env, s) {
       let r; try { r = await animeApi(env, { act: 'sb_panels', script_id: sid, beat: e.sb, shots: m.W.shots }); }
       catch (x) { await setSetting(env, fk, (fn >= 3 ? 1 : fn + 1) + '|' + Date.now()); await env.DB.prepare('INSERT INTO vlog (msg,created) VALUES (?,?)').bind(`⚠️ เขียนสตอรีบอร์ดซีน ${sid} เหตุการณ์ ${e.sb + 1} ไม่สำเร็จ: ${String(x && x.message || x).slice(0, 300)}`, Date.now()).run().catch(() => { }); return; }
       if (fn) await env.DB.prepare('DELETE FROM settings WHERE key=?').bind(fk).run();
-      if (r.next < 0) { await setSetting(env, 'sbfix:' + sid, '0,0'); await setSetting(env, 'sbsay:' + sid, 'v2'); await env.DB.prepare("DELETE FROM settings WHERE key IN (?,?)").bind('sbrev:' + sid, 'sbdone:' + sid).run(); }
+      if (r.next < 0) { await setSetting(env, 'sbfix:' + sid, '0,0'); await setSetting(env, 'sbsay:' + sid, 'v2'); await env.DB.prepare("DELETE FROM settings WHERE key IN (?,?,?)").bind('sbrev:' + sid, 'sbdone:' + sid, 'sbok:' + sid).run(); }
       await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
     if (e.sb >= 0) { const r = await animeApi(env, { act: 'sb_beat', script_id: sid, beat: e.sb, shots: m.W.shots }); await env.DB.prepare('UPDATE scenes SET sb=? WHERE id=?').bind(r.next, e.id).run(); return; }
     if (gsb && s['sbsay:' + sid] === 'v2' && s['sbrev:' + sid] == null) { let r = { edit: 0, add: 0 }; try { const pl = await readPlan(env, m.title), names = ((pl && pl.roles) || []).filter(x => x.tier !== 'none').map(x => x.key), places = ((pl && pl.locs) || []).map(l => l.name); r = await sbReview(env, s, sid, names, places); } catch (x) { } await setSetting(env, 'sbrev:' + sid, r.edit + ',' + r.add); return; }
     if (gsb && s['sbfix:' + sid] == null) { let r = { cut: 0, fix: 0 }; try { r = await sbTighten(env, s, sid); } catch (x) { } await setSetting(env, 'sbfix:' + sid, r.cut + ',' + r.fix); return; } // แตกช็อตครบ → ให้ AI ตรวจตัดช็อตซ้ำ/แก้มุมกล้องก่อนวาด
     if (gsb && s['sbsay:' + sid] == null) { let n = 0; try { n = await sbSay(env, s, sid); } catch (x) { } await setSetting(env, 'sbsay:' + sid, String(n)); return; } // บทพูดรายช็อต
-    if (gsb && s['sbdone:' + sid] === '1') continue; // ซีนนี้ภาพครบและตรวจแล้ว รออนุมัติ: ไม่ต้องอ่านอะไรอีก
+    if (gsb && s['sbdone:' + sid] === '1' && s['sbok:' + sid] !== '1') continue; // ซีนนี้ภาพครบและตรวจแล้ว รออนุมัติ: ไม่ต้องอ่านอะไรอีก
     const rows = (await env.DB.prepare('SELECT id,en,kproj,say,chars,chain FROM shots WHERE script_id=? ORDER BY idx').bind(sid).all()).results;
     const hasImg = (await env.DB.prepare('SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj)').bind(sid).first()).n;
     if (hasImg < rows.length) {
       const need = (await env.DB.prepare("SELECT COUNT(*) n FROM shots s WHERE s.script_id=? AND NOT EXISTS (SELECT 1 FROM images i WHERE i.project=s.kproj) AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.project=s.kproj AND j.status IN ('queued','running','kaggle'))").bind(sid).first()).n;
       if (!need) continue; // ทุกช็อตที่ขาดภาพเข้าคิวแล้ว: รอวาด
       const r = await animeApi(env, { act: 'kf', script_id: sid }); if (r.queued) return; continue; } // ภาพคีย์เข้าคิวครบแล้ว → ไปเตรียมซีนถัดไประหว่างรอวาด
-    if (gsb) { if (!m.qc) { m.qc = 1; const q = await qcRun(env, m.title, 4, sid).catch(() => null); if (q && !q.left && !(q.eps || []).some(E => E.fixing)) await setSetting(env, 'sbdone:' + sid, '1'); } continue; } // ระหว่างรอ: AI ตรวจภาพทีละ 4 ใบ ภาพเสียลบแล้ววาดใหม่เอง (สูงสุด 2 รอบต่อช็อต) · สตอรีบอร์ดซีนนี้ครบแล้ว: รอผู้ใช้กดอนุมัติก่อนทำคลิป (ระหว่างนี้ไปทำซีนถัดไปของตอนเดียวกัน)
+    if (gsb && s['sbok:' + sid] !== '1') { if (!m.qc) { m.qc = 1; const q = await qcRun(env, m.title, 4, sid).catch(() => null); if (q && !q.left && !(q.eps || []).some(E => E.fixing)) await setSetting(env, 'sbdone:' + sid, '1'); } continue; } // ระหว่างรอ: AI ตรวจภาพทีละ 4 ใบ ภาพเสียลบแล้ววาดใหม่เอง (สูงสุด 2 รอบต่อช็อต) · สตอรีบอร์ดซีนนี้ครบแล้ว: รอผู้ใช้กดอนุมัติก่อนทำคลิป (ระหว่างนี้ไปทำซีนถัดไปของตอนเดียวกัน)
     if ((m.st[e.ep] || {}).still) { await env.DB.prepare('UPDATE scenes SET fin=1 WHERE id=?').bind(e.id).run(); return; } // ฉบับภาพนิ่ง: ข้ามขั้นทำคลิป ไปรวมตอนเลย
     const q = await animeApi(env, { act: 'vid', script_id: sid });
     let miss = false;
@@ -1837,9 +1859,10 @@ async function animeApi(env, b) {
     const roles = ((plan && plan.roles) || []).filter(r => r.tier !== 'none'), names = roles.map(r => r.key).concat(xs.filter(x => x.kind === 'enemy').map(x => x.name));
     const scn = await env.DB.prepare('SELECT title,logline,ep,sc FROM scenes WHERE script_id=?').bind(sc.id).first();
     const prev = (await env.DB.prepare('SELECT th,say FROM shots WHERE script_id=? ORDER BY idx DESC LIMIT 3').bind(sc.id).all()).results.reverse().map(r => { let y = {}; try { y = JSON.parse(r.say || '{}'); } catch (e) { } return `[${r.th}] ${(y.lines || []).map(l => (l.who || 'บรรยาย') + ': ' + l.say).join(' / ')}`; }).join('\n');
-    const total = +b.shots > 0 ? Math.min(180, +b.shots) : 20, N = Math.min(5, Math.max(3, Math.ceil(total / beats.length)));
-    const arr = await llmJson(env, s, `เรื่อง: ${String(sr ? sr.brief : '').slice(0, 1800)}\nตัวละครที่ใช้ชื่อได้ (ต้องสะกดตามนี้): ${roles.map(r => `${r.key} (${r.g === 'f' ? 'หญิง' : r.g === 'm' ? 'ชาย' : 'ไม่ใช่คน'} ${r.age || ''} ${r.kind}: ${r.look || ''}${r.traits ? ' · ' + r.traits : ''})`).join(' | ')}${xs.filter(x => x.kind === 'enemy').length ? ' | ศัตรู: ' + xs.filter(x => x.kind === 'enemy').map(x => x.name).join(', ') : ''}\nซีน: ${scn ? scn.title + ' — ' + scn.logline : o.title || ''}\nเหตุการณ์ทั้งซีน: ${beats.map((x, i) => (i + 1) + ') ' + x).join(' ').slice(0, 1200)}\nช่องก่อนหน้า:\n${prev || '(เริ่มซีน)'}\n\nเขียนมังงะของ "เหตุการณ์ที่ ${bi + 1}: ${beats[bi]}" เป็น ${N} ช่อง (เพิ่มได้ถึง ${N + 3} ช่องถ้าบทพูดเยอะ) ภาพละ 16:9 ให้คนที่ไม่รู้เรื่องมาก่อนอ่านแล้วเข้าใจ:\n- ${bi === 0 ? 'ช่องแรกเป็นภาพกว้างบอกสถานที่และเวลา พร้อมคำบรรยาย (who ว่าง) ' : 'ต่อจากช่องก่อนหน้าให้เนียน '}ตัวละครที่โผล่ครั้งแรกในซีนต้องมีคำบรรยายสั้นๆ ว่าเป็นใคร\n- บทพูดต้องเล่าเหตุและผล: ใครต้องการอะไร เกิดอะไรขึ้น อีกฝ่ายตอบอย่างไร ห้ามบทพูดลอยๆ คำเดียว (เช่น "ฟังนะ" "ว่าไง" "ดีไหม") ห้ามพูดซ้ำสิ่งที่ภาพบอกแล้ว\n- ช่องละ 1-3 บรรทัด ตัวละครสลับกันพูด ถ้าพูดเยอะให้แตกเป็นหลายช่อง ภาษาไทยล้วน ห้ามมีอักษรจีนหรือญี่ปุ่น\n- shot ต้องหลากหลาย ห้ามซ้ำกันเกิน 2 ช่องติด เลือกจาก: wide (เห็นฉากกว้าง) | medium | closeup (หน้า สีหน้าชัด) | two (สองคนในภาพ) | ots (ข้ามไหล่) | low (มุมต่ำ) | high (มุมสูง) | insert (ภาพของ/มือ/รายละเอียด ไม่มีหน้า) | back (จากด้านหลัง)\n- en = ภาษาอังกฤษ บอกสถานที่ + ใครทำอะไร ท่าทาง สีหน้า เรียกตัวละครว่า the man / the woman / the creature ห้ามใส่ชื่อ ห้ามบรรยายผมหรือชุด ภาพหนึ่งมีคนไม่เกิน 2 คน\n- think = ความคิดในใจสั้นๆ และ ono = คำเสียงประกอบ ใส่เฉพาะช่องจังหวะตลกหรืออารมณ์พุ่ง · loc = ชื่อสถานที่จากรายการ (${places.slice(0, 10).join(' | ') || '-'}) ถ้าตรง · chain = true เฉพาะท่าต่อสู้ที่ต่อจากช่องก่อนในมุมกล้องเดิม\nตอบเป็น JSON array: [{"shot":"wide","th":"ภาพนี้คืออะไร","en":"...","chars":["ชื่อ"],"lines":[{"who":"","say":""}],"think":"","ono":"","loc":"","chain":false}]`);
-    const list = (Array.isArray(arr) ? arr : (arr && Array.isArray(arr.panels) ? arr.panels : [arr])).slice(0, N + 3).map(x => cleanPanel(x || {}, names, places)).filter(Boolean);
+    const total = +b.shots > 0 ? Math.min(180, +b.shots) : WORK.anime.shots, have = ((await env.DB.prepare('SELECT COUNT(*) n FROM shots WHERE script_id=?').bind(sc.id).first()) || {}).n || 0, N = Math.min(10, Math.max(3, Math.ceil((total - have) / Math.max(1, beats.length - bi)))); // ปรับต่อเหตุการณ์ให้รวมทั้งซีนใกล้เป้า (80-100 ช่อง)
+    const prevT = (await env.DB.prepare('SELECT en FROM shots WHERE script_id=? ORDER BY idx DESC LIMIT 2').bind(sc.id).all()).results.reverse().map(r => shotOfEn(r.en)).filter(Boolean);
+    const arr = await llmJson(env, s, `เรื่อง: ${String(sr ? sr.brief : '').slice(0, 1800)}\nตัวละครที่ใช้ชื่อได้ (ต้องสะกดตามนี้): ${roles.map(r => `${r.key} (${r.g === 'f' ? 'หญิง' : r.g === 'm' ? 'ชาย' : 'ไม่ใช่คน'} ${r.age || ''} ${r.kind}: ${r.look || ''}${r.traits ? ' · ' + r.traits : ''})`).join(' | ')}${xs.filter(x => x.kind === 'enemy').length ? ' | ศัตรู: ' + xs.filter(x => x.kind === 'enemy').map(x => x.name).join(', ') : ''}\nซีน: ${scn ? scn.title + ' — ' + scn.logline : o.title || ''}\nเหตุการณ์ทั้งซีน: ${beats.map((x, i) => (i + 1) + ') ' + x).join(' ').slice(0, 2400)}\nช่องก่อนหน้า:\n${prev || '(เริ่มซีน)'}\n\nเขียนมังงะของ "เหตุการณ์ที่ ${bi + 1}: ${beats[bi]}" เป็น ${N} ช่อง (เพิ่มได้ถึง ${N + 3} ช่องถ้าบทพูดเยอะ) ภาพละ 16:9 ให้คนที่ไม่รู้เรื่องมาก่อนอ่านแล้วเข้าใจ:\n- ${bi === 0 ? 'ช่องแรกเป็นภาพกว้างบอกสถานที่และเวลา พร้อมคำบรรยาย (who ว่าง) ' : 'ต่อจากช่องก่อนหน้าให้เนียน '}ตัวละครที่โผล่ครั้งแรกในซีนต้องมีคำบรรยายสั้นๆ ว่าเป็นใคร\n- บทพูดต้องเล่าเหตุและผล: ใครต้องการอะไร เกิดอะไรขึ้น อีกฝ่ายตอบอย่างไร ห้ามบทพูดลอยๆ คำเดียว (เช่น "ฟังนะ" "ว่าไง" "ดีไหม") ห้ามพูดซ้ำสิ่งที่ภาพบอกแล้ว\n- ช่องละ 1-3 บรรทัด ตัวละครสลับกันพูด ถ้าพูดเยอะให้แตกเป็นหลายช่อง ภาษาไทยล้วน ห้ามมีอักษรจีนหรือญี่ปุ่น\n- ซีนนี้มีรวมราว ${total} ช่อง (ตอนนี้มีแล้ว ${have}) เหตุการณ์นี้เขียน ${N} ช่อง แตกเป็นจังหวะละเอียดทีละท่าทาง/สีหน้า/สายตา ไม่ข้ามเหตุการณ์\n- มุมกล้อง: ช่องแรกของเหตุการณ์ใช้ wide หรือ medium บอกตำแหน่งตัวละครในฉาก · ฉากคุยสลับ ots/closeup ของคนพูดกับคนฟัง (ตัวละครอยู่ซ้าย/ขวาเดิมตลอด ไม่ข้ามเส้น 180 องศา) · ใช้ low/high เฉพาะจังหวะอารมณ์หรือแอ็กชัน · แทรก insert (มือ/ของ) และ back (จากด้านหลัง) เป็นครั้งคราว · สัดส่วนทั้งซีนประมาณ wide 10% medium 25% closeup 25% two/ots 20% low/high 10% insert/back 10%\n- shot ต้องหลากหลาย ห้ามซ้ำกันเกิน 2 ช่องติด เลือกจาก: wide (เห็นฉากกว้าง) | medium | closeup (หน้า สีหน้าชัด) | two (สองคนในภาพ) | ots (ข้ามไหล่) | low (มุมต่ำ) | high (มุมสูง) | insert (ภาพของ/มือ/รายละเอียด ไม่มีหน้า) | back (จากด้านหลัง)\n- en = ภาษาอังกฤษ บอกสถานที่ + ใครทำอะไร ท่าทาง สีหน้า เรียกตัวละครว่า the man / the woman / the creature ห้ามใส่ชื่อ ห้ามบรรยายผมหรือชุด ภาพหนึ่งมีคนไม่เกิน 2 คน\n- think = ความคิดในใจสั้นๆ และ ono = คำเสียงประกอบ ใส่เฉพาะช่องจังหวะตลกหรืออารมณ์พุ่ง · loc = ชื่อสถานที่จากรายการ (${places.slice(0, 10).join(' | ') || '-'}) ถ้าตรง · chain = true เฉพาะท่าต่อสู้ที่ต่อจากช่องก่อนในมุมกล้องเดิม\nตอบเป็น JSON array: [{"shot":"wide","th":"ภาพนี้คืออะไร","en":"...","chars":["ชื่อ"],"lines":[{"who":"","say":""}],"think":"","ono":"","loc":"","chain":false}]`, 4800);
+    const list = (Array.isArray(arr) ? arr : (arr && Array.isArray(arr.panels) ? arr.panels : [arr])).slice(0, N + 3).map(x => cleanPanel(x || {}, names, places)).filter(Boolean); camFix(list, prevT);
     if (!list.length) throw new Error('AI เขียนช่องมาใช้ไม่ได้เลย (ตอบ: ' + JSON.stringify(arr).slice(0, 160) + ')');
     const base = ((await env.DB.prepare('SELECT MAX(idx) m FROM shots WHERE script_id=?').bind(sc.id).first()) || {}).m || 0;
     if (list.length) await env.DB.batch(list.map((x, i) => env.DB.prepare('INSERT INTO shots (script_id,idx,beat,th,en,chars,kproj,created,say,chain,loc) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(sc.id, base + i + 1, bi, x.th, x.en, JSON.stringify(x.chars), `ฉาก${sc.id}·${base + i + 1}`, Date.now(), x.say, i > 0 ? x.chain : 0, x.loc)));
@@ -1929,9 +1952,17 @@ async function animeApi(env, b) {
       e.img = (await env.DB.prepare('SELECT COUNT(DISTINCT project) n FROM images WHERE project >= ? AND project < ?').bind(`ฉาก${e.script_id}·`, `ฉาก${e.script_id}·\uffff`).first()).n;
       e.vid = (await env.DB.prepare("SELECT COUNT(DISTINCT shot) n FROM videos WHERE ep=? AND shot<>'final'").bind(ep).first()).n;
       e.final = ((await env.DB.prepare("SELECT MAX(id) id FROM videos WHERE ep=? AND shot='final'").bind(ep).first()) || {}).id || 0;
+      e.ready = s['sbdone:' + e.script_id] === '1' ? 1 : 0; e.ok = s['sbok:' + e.script_id] === '1' ? 1 : 0; // ภาพครบ+ตรวจแล้ว / อนุมัติทำอนิเมะแล้ว
     }
     const ef = {}; for (let k = 1; k <= 12; k++) { const v = await env.DB.prepare("SELECT MAX(id) id FROM videos WHERE ep=? AND shot='final'").bind('E' + (+b.series_id) + 'x' + k).first(); if (v && v.id) ef[k] = v.id; }
     return { eps: rows, efinal: ef, ok: +s['anime_ok_' + (+b.series_id)] || 0 };
+  }
+  if (act === 'sc_ok') { // อนุมัติทำอนิเมะ 1 ซีน: ภาพคีย์ของซีนนี้ผ่านแล้ว → เริ่มทำคลิป/วิดีโอทุกช็อตของซีนนี้ (ซีนอื่นไม่ถูกแตะ)
+    const sid = +b.script_id; if (!sid) throw new Error('ไม่พบซีน');
+    const sc = await env.DB.prepare('SELECT id FROM scenes WHERE script_id=?').bind(sid).first(); if (!sc) throw new Error('ไม่พบซีนนี้');
+    await setSetting(env, 'sbok:' + sid, b.on === false ? '0' : '1');
+    if (b.on !== false) await env.DB.prepare('UPDATE scenes SET auto=1 WHERE id=? AND fin=0').bind(sc.id).run();
+    return { ok: true };
   }
   if (act === 'ep_ok') { await setSetting(env, 'anime_ok_' + (+b.series_id), String(+b.ep || 0)); return { ok: true }; }
   if (act === 'ep_auto') { // เปิด/ปิดให้ทำเอง: ส่ง id = ตอนเดียว ไม่ส่ง = ทุกตอนที่ยังไม่เสร็จของซีรีส์
