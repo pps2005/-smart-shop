@@ -1,1 +1,62 @@
-<!doctype html><meta charset="utf-8"><title>Xiress Studio</title><script>location.replace("index.html"+location.search+location.hash)</script><a href="index.html">ไป Xiress Studio</a>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Xire.ai Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Kanit', sans-serif; background: #f8f6f3; color: #2c2c2c; }
+header { padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1px solid #eee; }
+.logo { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 600; }
+nav a { color: #2c2c2c; text-decoration: none; margin-left: 28px; font-size: 15px; }
+.container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+h1 { font-family: 'Playfair Display', serif; font-size: 36px; margin-bottom: 8px; }
+.sub { color: #777; margin-bottom: 32px; }
+.card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+.card h2 { font-size: 20px; margin-bottom: 12px; }
+.btn { display: inline-block; background: #2c2c2c; color: #fff; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-size: 15px; margin-top: 12px; }
+.btn:hover { background: #444; }
+textarea, input[type=text] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; margin: 8px 0; }
+footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+<div class="logo">Xire.ai</div>
+<nav>
+<a href="index.html">หน้าหลัก</a>
+<a href="#create">สร้าง</a>
+<a href="#gallery">แกลเลอรี</a>
+</nav>
+</header>
+
+<div class="container">
+<h1>Studio</h1>
+<p class="sub">สร้างซีรีส์ ตัวละคร ฉาก และวิดีโอด้วย Xire.ai</p>
+
+<div class="card" id="create">
+<h2>เริ่มเรื่องใหม่</h2>
+<p>อัปโหลดเนื้อเรื่อง หรือวางชื่อเรื่อง</p>
+<textarea rows="4" placeholder="เขียนเนื้อเรื่องที่นี่..."></textarea>
+<input type="text" placeholder="ชื่อเรื่อง">
+<a href="#" class="btn" onclick="alert('ระบบสร้างกำลังพัฒนา จะเชื่อมทีละส่วน')">สร้างเรื่อง</a>
+</div>
+
+<div class="card" id="gallery">
+<h2>ตัวละคร & ฉาก</h2>
+<p>สร้างตัวละครสมจริง และฉากสำหรับซีรีส์</p>
+<a href="#" class="btn" onclick="alert('ระบบสร้างตัวละครกำลังพัฒนา')">สร้างตัวละคร</a>
+</div>
+
+<div class="card">
+<h2>ระบบอัตโนมัติ</h2>
+<p>สร้างภาพ วิดีโอ เสียงพากย์ และสั่งอัปโหลดทันที</p>
+<a href="#" class="btn" onclick="alert('ระบบคิวอัตโนมัติกำลังพัฒนา')">เริ่มสร้าง</a>
+</div>
+</div>
+
+<footer>Xire.ai Studio</footer>
+</body>
+</html>
