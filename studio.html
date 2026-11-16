@@ -52,11 +52,12 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <div class="conn">
 <span>Cloudflare Pages</span>
 <span>Supabase</span>
-<span>Kaggle (GPU สำรอง)</span>
-<span>Flux + SDXL</span>
+<span class="backup">Kaggle (GPU สำรอง)</span>
+<span class="backup">Flux (สำรอง)</span>
+<span>SDXL</span>
 </div>
 <p style="font-size:14px;color:#555;margin-top:8px">Worker หลัก: <code>https://anime-image-bot.kandanai697.workers.dev</code></p>
-<p style="font-size:14px;color:#555;">GPU สำรอง: Kaggle (Free GPU)</p>
+<p style="font-size:14px;color:#555;">สำรอง: Kaggle GPU + Flux</p>
 </div>
 
 <div class="card">
@@ -78,7 +79,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <div class="steps" id="steps">
 <div class="step" id="s1">1. รับเนื้อเรื่อง</div>
 <div class="step" id="s2">2. แบ่งซีนและพาร์ท TikTok</div>
-<div class="step" id="s3">3. สร้างภาพด้วย Flux + SDXL (หลัก) / Kaggle (สำรอง)</div>
+<div class="step" id="s3">3. สร้างภาพ: SDXL หลัก / Flux + Kaggle สำรอง</div>
 <div class="step" id="s4">4. สร้างวิดีโอซีน</div>
 <div class="step" id="s5">5. เตรียมลง TikTok</div>
 </div>
@@ -90,7 +91,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </div>
 </div>
 
-<footer>Xire.ai Studio · New System + Backup GPU</footer>
+<footer>Xire.ai Studio · New System + Backup GPU + Flux</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
@@ -113,21 +114,21 @@ async function startFullPipeline() {
   }
 
   document.getElementById('s3').classList.add('done');
-  status.textContent = 'กำลังสร้างภาพ (Worker หลัก / Kaggle สำรอง)...';
+  status.textContent = 'กำลังสร้างภาพ (SDXL หลัก / Flux + Kaggle สำรอง)...';
 
   try {
     const res = await fetch(WORKER, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: story.slice(0, 200) || title, type: 'image', fallback: 'kaggle' })
+      body: JSON.stringify({ prompt: story.slice(0, 200) || title, type: 'image', fallback: 'flux-kaggle' })
     });
     if (res.ok) {
-      status.textContent = 'ส่งคำสั่งสร้างภาพไปที่ Worker แล้ว (GPU สำรองพร้อม)';
+      status.textContent = 'ส่งคำสั่งสร้างภาพไปที่ Worker แล้ว (Flux + Kaggle สำรองพร้อม)';
     } else {
-      status.textContent = 'เชื่อม Worker แล้ว · GPU สำรอง Kaggle พร้อม';
+      status.textContent = 'เชื่อม Worker แล้ว · Flux + Kaggle สำรองพร้อม';
     }
   } catch (e) {
-    status.textContent = 'เชื่อม Worker แล้ว · พร้อมใช้ GPU สำรอง';
+    status.textContent = 'เชื่อม Worker แล้ว · พร้อมใช้ Flux + Kaggle สำรอง';
   }
 
   setTimeout(() => {
