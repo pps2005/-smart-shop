@@ -40,6 +40,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 .daily-box { background: linear-gradient(135deg, #fce4ec, #f8bbd0); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
 .daily-box h2 { color: #c2185b; }
 .auto-note { background: #e8f5e9; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
+.limit { background: #fff3e0; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -53,20 +54,19 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">รันอัตโนมัติ · ตัวละครคงที่ · ไม่ต้องพึ่ง Grok</p>
+<p class="sub">ไลฟ์สไตล์ · เคลื่อนไหวสมูท · หน้าคงที่</p>
 
 <div class="daily-box">
 <h2>คอนเทนต์วันนี้</h2>
-<p style="margin:8px 0;color:#555">สาวผมยาวโทนเกาหลี + แมวนุ่มๆ · 6 ซีน</p>
+<p style="margin:8px 0;color:#555">สาวผมยาวโทนเกาหลี · ชุดเดิม · เคลื่อนไหวสมูทแบบคนแสดง</p>
 <button class="btn btn-daily btn-full" onclick="generateDailyContent()">สร้างคอนเทนต์วันนี้</button>
-<div class="auto-note">ระบบรันอัตโนมัติ: เปิดหน้านี้ทุกวัน → กดปุ่มข้างบน → เปิด Worker ดูรูป → ดาวน์โหลดไปลง TikTok</div>
 <div class="status" id="dailyStatus"></div>
 </div>
 
 <div class="card">
-<h2>ตัวละครหลัก (ล็อคเข้าไว้)</h2>
-<textarea id="character" rows="4">1girl, long dark brown hair with soft Korean highlights, slightly wavy hair, slim tall figure, oval face, soft facial features, natural makeup, photorealistic, Korean style, consistent character, same face every scene</textarea>
-<div class="note">หน้าและหุ่นคงที่ทุกซีน · ชุดและฉากเปลี่ยนได้</div>
+<h2>ตัวละครหลัก</h2>
+<textarea id="character" rows="3">1girl, long dark brown hair with soft Korean highlights, slightly wavy, slim figure, oval face, soft features, natural makeup, black t-shirt, wide leg jeans, white sneakers, photorealistic Korean style, same face, consistent character</textarea>
+<div class="note">หน้าคงที่ทุกมุม · ชุดเดิม (เสื้อดำ + กางเกงกว้าง)</div>
 </div>
 
 <div class="card">
@@ -82,15 +82,15 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </div>
 
 <div class="card">
-<h2>สร้างเอง (ถ้าไม่ใช่คอนเทนต์วันนี้)</h2>
-<input type="text" id="title" value="คอนเทนต์พิเศษ">
-<textarea id="story" rows="3">เดินผ่านสวน เห็นแมวนุ่มๆ
-ยืนมือออกหาอาหาร
-อุ้มแมวขึ้นมากอด</textarea>
+<h2>สร้างเอง</h2>
+<input type="text" id="title" value="ไลฟ์สไตล์วันนี้">
+<textarea id="story" rows="3">เดินผ่านร้านกาแฟ ยืนมองไปรอบๆ
+นั่งดื่มกาแฟ ยิ้มเบาๆ
+เดินต่อมาทางเดิน ลมพัดผม</textarea>
 <div class="row">
 <select id="template">
-<option value="kdrama-soft" selected>เกาหลีนุ่มๆ</option>
-<option value="anime-high">อนิเมะ</option>
+<option value="lifestyle" selected>ไลฟ์สไตล์ + เคลื่อนไหวสมูท</option>
+<option value="kdrama-soft">เกาหลีนุ่มๆ</option>
 </select>
 <select id="partsCount">
 <option value="6" selected>6 ซีน</option>
@@ -109,51 +109,44 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <button class="btn btn-small" onclick="openWorker()">เปิด Worker</button>
 <button class="btn btn-small" onclick="clearQueue()">ล้างคิว</button>
 </div>
+<div class="limit">หมายเหตุ: ระบบปัจจุบันสร้างรูปนิ่ง (ไม่ใช่วิดีโอเคลื่อนไหวจริง) · ถ้าต้องการเคลื่อนไหวสมูทแบบวิดีโอ ต้องใช้เครื่องมือเพิ่มเช่น Runway / Kling / Luma</div>
 </div>
 </div>
 
-<footer>Xire.ai Studio · รันอัตโนมัติได้โดยไม่ต้องพึ่ง Grok</footer>
+<footer>Xire.ai Studio</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
 const TEMPLATES = {
-  'kdrama-soft': 'photorealistic, soft natural lighting, Korean drama style, warm tones, shallow depth of field, cinematic, detailed skin, consistent character',
-  'anime-high': 'masterpiece, best quality, anime style, detailed, cinematic lighting'
+  'lifestyle': 'photorealistic, soft natural lighting, Korean lifestyle, warm tones, shallow depth of field, cinematic, natural movement, smooth motion, actor performance',
+  'kdrama-soft': 'photorealistic, soft natural lighting, Korean drama style, warm tones, shallow depth of field, cinematic, detailed skin'
 };
 
 const DAILY_SCENES = [
   [
-    'walking on tree-lined path, soft sunlight, gentle expression, cream off-shoulder sweater',
-    'crouching down toward fluffy white gray cat on stone step, warm smile',
-    'reaching hand to pet fluffy cat, soft bokeh, park setting',
-    'standing on sidewalk, cat walking beside her, afternoon light',
-    'holding fluffy cat in arms, looking down gently, indoor warm light',
-    'sitting on sofa with cat nearby, soft indoor lighting, relaxed'
+    'walking slowly on tree-lined path, natural stride, soft sunlight, gentle expression, cream sweater',
+    'crouching down smoothly toward fluffy cat, natural body movement, warm smile',
+    'reaching hand gently to pet cat, soft motion, park setting',
+    'standing and looking down at cat walking beside her, natural pose',
+    'picking up cat carefully with both hands, smooth movement',
+    'walking while holding cat, natural gait, indoor warm light'
   ],
   [
-    'sitting on park bench with coffee, soft morning light, black t-shirt and wide jeans',
-    'small fluffy cat approaching, curious expression, dappled sunlight',
-    'offering hand, cat sniffing fingers, gentle interaction',
-    'laughing softly, cat on her lap, golden hour lighting',
-    'standing up, cat following, tree-lined path',
-    'close-up face, soft Korean hair highlights, tender expression'
+    'sitting at cafe, sipping coffee slowly, soft morning light, black t-shirt',
+    'looking out window, slight head turn, natural expression',
+    'standing up from chair, smooth movement, wide jeans',
+    'walking past shops, natural stride, looking at windows',
+    'stopping to look at fluffy cat, slight smile, natural reaction',
+    'walking away with soft smile, golden hour lighting'
   ],
   [
-    'walking through autumn park, falling leaves, casual outfit',
-    'stopping to look at fluffy cat on low wall, slight smile',
-    'kneeling, cat walking toward her, mutual curiosity',
-    'picking up cat carefully, cat relaxed in her arms',
-    'carrying cat home, back view, modern building',
-    'close-up hair and face, soft natural light'
-  ],
-  [
-    'standing at cafe outdoor, black t-shirt, wide jeans, soft daylight',
-    'walking past shops, looking at window, gentle expression',
-    'sitting at cafe table, coffee in hand, soft smile',
-    'fluffy cat under table looking up, curious',
-    'leaning down to pet cat, warm interaction',
-    'leaving cafe with cat following, golden hour'
+    'walking through park, natural arm swing, falling leaves',
+    'stopping mid-step, turning head to look at cat, natural motion',
+    'kneeling down slowly, cat approaching, mutual curiosity',
+    'petting cat gently, soft hand movement',
+    'standing up with cat in arms, careful movement',
+    'walking home, back view, natural posture'
   ]
 ];
 
@@ -164,7 +157,7 @@ function getTodayIndex() {
 
 function buildPrompt(scene) {
   const char = document.getElementById('character').value.trim();
-  const style = TEMPLATES[document.getElementById('template').value] || TEMPLATES['kdrama-soft'];
+  const style = TEMPLATES[document.getElementById('template').value] || TEMPLATES['lifestyle'];
   return `${style}, ${char}, ${scene}`;
 }
 
@@ -199,7 +192,7 @@ async function generateDailyContent() {
     if (data.ok) {
       await fetch(WORKER + '/api/resume', { method: 'POST' });
       await fetch(WORKER + '/api/runnow', { method: 'POST' });
-      status.textContent = `ส่งคิวแล้ว ${data.added} ซีน\n${title}\n\nเปิด Worker เพื่อดูรูป\nเมื่อเสร็จกด "ดึงรูปกลับมาแสดง"`;
+      status.textContent = `ส่งคิวแล้ว ${data.added} ซีน\n${title}\n\nเปิด Worker เพื่อดูรูป`;
     } else {
       status.textContent = 'ส่งไม่สำเร็จ';
     }
