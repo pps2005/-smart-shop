@@ -1,109 +1,431 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Xire.ai Studio — Daily Lifestyle Video</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Xire.ai Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
 <style>
-body{font-family:system-ui,sans-serif;background:#0f0f12;color:#eee;margin:0;padding:16px;max-width:900px;margin:auto}
-.card{background:#1a1a22;border-radius:12px;padding:16px;margin:12px 0;border:1px solid #333}
-h2{margin:0 0 12px}
-select,button,input,textarea{font:inherit;padding:10px 14px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;width:100%;margin:6px 0}
-button{background:#7c5cff;border:none;cursor:pointer;font-weight:600}
-button:hover{opacity:.9}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-.row>*{flex:1;min-width:140px}
-.model-info{font-size:.85em;color:#aaa;margin-top:4px}
-.status{color:#7dffb3}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Kanit', sans-serif; background: #f8f6f3; color: #2c2c2c; }
+header { padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1px solid #eee; }
+.logo { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 600; }
+nav a { color: #2c2c2c; text-decoration: none; margin-left: 28px; font-size: 15px; }
+.container { max-width: 960px; margin: 40px auto; padding: 0 20px; }
+h1 { font-family: 'Playfair Display', serif; font-size: 36px; margin-bottom: 8px; }
+.sub { color: #777; margin-bottom: 32px; }
+.card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+.card h2 { font-size: 20px; margin-bottom: 12px; }
+.btn { display: inline-block; background: #2c2c2c; color: #fff; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-size: 15px; margin-top: 12px; border: none; cursor: pointer; }
+.btn:hover { background: #444; }
+.btn-full { width: 100%; text-align: center; }
+.btn-small { padding: 8px 16px; font-size: 13px; }
+.btn-daily { background: #e91e63; }
+.btn-daily:hover { background: #c2185b; }
+.btn-accent { background: #2196f3; }
+.btn-accent:hover { background: #1976d2; }
+.btn-video { background: #9c27b0; }
+.btn-video:hover { background: #7b1fa2; }
+textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; margin: 8px 0; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 200px; }
+.conn { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.conn span { background: #f4f2ef; padding: 6px 12px; border-radius: 999px; font-size: 13px; }
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
+.part { background: #f4f2ef; border-radius: 10px; padding: 12px; text-align: center; }
+.part b { display: block; font-size: 15px; margin-bottom: 4px; }
+.part small { color: #777; display: block; }
+.part img { width: 100%; border-radius: 6px; margin-top: 8px; max-height: 180px; object-fit: cover; }
+.part.pending { opacity: 0.7; }
+.part.done { background: #e8f5e9; }
+.status { margin-top: 12px; padding: 12px; background: #f0f7f0; border-radius: 8px; color: #1a7a3a; display: none; white-space: pre-wrap; font-size: 13px; }
+.note { background: #fff8e1; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
+footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
+.daily-box { background: linear-gradient(135deg, #fce4ec, #f8bbd0); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+.daily-box h2 { color: #c2185b; }
+.package { background: #e3f2fd; border-radius: 12px; padding: 16px; margin-top: 12px; }
+.package h3 { font-size: 16px; margin: 12px 0 6px; color: #1565c0; }
+.package p, .package textarea { font-size: 14px; }
+.copy-btn { background: #4caf50; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: 8px; }
+.model-info { font-size: 13px; color: #666; margin-top: 4px; }
 </style>
 </head>
 <body>
-<h1>Xire.ai Studio</h1>
-<div class="card">
-  <h2>🎬 สร้างวิดีโอประจำวัน (1 นาที)</h2>
-  <label>โมเดลวิดีโอ</label>
-  <select id="videoModel">
-    <option value="wan">Wan 2.2 (แนะนำ — คุณภาพดี, ขยับสมูท)</option>
-    <option value="ltx">LTX (เร็ว เบากว่า)</option>
-    <option value="auto">Auto (ให้ระบบเลือก — ตอนนี้ Wan 2.2)</option>
-  </select>
-  <div class="model-info" id="modelInfo">Wan 2.2: เหมาะกับ T4 ฟรีที่ 480p • คุณภาพสูง ขยับสมูทแบบนักแสดง</div>
+<header>
+<div class="logo">Xire.ai</div>
+<nav>
+<a href="index.html">หน้าหลัก</a>
+<a href="https://anime-image-bot.kandanai697.workers.dev" target="_blank">Worker</a>
+</nav>
+</header>
 
-  <label>ภาพอ้างอิง (หรือที่เก็บในระบบ)</label>
-  <input id="refImage" type="text" placeholder="URL หรือ base64 ของภาพตัวละคร">
+<div class="container">
+<h1>Studio</h1>
+<p class="sub">สร้างคอนเทนต์ → Hook → แคปชั่น → วิดีโอสำเร็จลง TikTok</p>
 
-  <label>พร้อมปต์ / ฉาก</label>
-  <textarea id="prompt" rows="3" placeholder="สาวเกาหลี่นั่งดื่มกาแฟ แล้วเดินช้าๆๆ สาวเกาหลี่เสื้อยิ้มไปหาเพื่อนเลี้ยงผู้ชายที่อยู่บนโซฟา แสงอ่อนนุ่ม…"></textarea>
-
-  <div class="row">
-    <button onclick="generateVideo()">สร้างวิดีโอ</button>
-    <button onclick="loadStatus()" style="background:#444">ตรวจสอบสถานะ</button>
-  </div>
-  <div id="status" class="status"></div>
+<div class="daily-box">
+<h2>คอนเทนต์วันนี้</h2>
+<p style="margin:8px 0;color:#555">สาวผมยาวโทนเกาหลี · ชุดเดิม · เคลื่อนไหวสมูท</p>
+<button class="btn btn-daily btn-full" onclick="generateDailyContent()">สร้างคอนเทนต์วันนี้</button>
+<div class="status" id="dailyStatus"></div>
 </div>
 
 <div class="card">
-  <h2>คิววิดีโอ</h2>
-  <div id="queue"></div>
+<h2>ตัวละครหลัก</h2>
+<textarea id="character" rows="3">1girl, long dark brown hair with soft Korean highlights, slightly wavy, slim figure, oval face, soft features, natural makeup, black t-shirt, wide leg jeans, white sneakers, photorealistic Korean style, same face, consistent character</textarea>
+<div class="note">หน้าคงที่ทุกมุม · ชุดเดิม (เสื้อดำ + กางเกงกว้าง)</div>
 </div>
+
+<div class="card">
+<h2>สร้างวิดีโอ (หลายโมเดล)</h2>
+<p style="font-size:14px;color:#555;margin-bottom:8px">เลือกโมเดลแล้วสร้างคลิปจากรูปหรือข้อความ</p>
+<div class="row">
+<select id="videoModel">
+<option value="wan22" selected>Wan 2.2 5B (แนะนำ · ฟรีบน Kaggle)</option>
+<option value="ltx">LTX-2.5 (มีเสียงในตัว)</option>
+<option value="auto">อัตโนมัติ (เลือกตามงาน)</option>
+</select>
+<select id="videoMode">
+<option value="i2v" selected>Image to Video</option>
+<option value="t2v">Text to Video</option>
+</select>
+</div>
+<div class="model-info" id="modelInfo">Wan 2.2 5B · คุณภาพดี · รันได้บน Kaggle T4 · Apache 2.0</div>
+<button class="btn btn-video btn-full" onclick="generateVideo()">สร้างวิดีโอ</button>
+<div class="status" id="videoStatus"></div>
+</div>
+
+<div class="card">
+<h2>Hook + แคปชั่น + แพ็กวิดีโอ</h2>
+<p style="font-size:14px;color:#555;margin-bottom:8px">สร้างหลังมีรูปแล้ว กดปุ่มนี้เพื่อให้ระบบคิด Hook, แคปชั่น และคู่มือประกอบวิดีโอ</p>
+<button class="btn btn-accent" onclick="generatePackage()">สร้าง Hook + แคปชั่น + คู่มือวิดีโอ</button>
+<div id="packageResult" class="package" style="display:none">
+<div>
+<h3>Hook</h3>
+<textarea id="hookText" rows="2" readonly></textarea>
+<button class="copy-btn" onclick="copyText('hookText')">คัดลอก</button>
+</div>
+<div>
+<h3>แคปชั่น</h3>
+<textarea id="captionText" rows="4" readonly></textarea>
+<button class="copy-btn" onclick="copyText('captionText')">คัดลอก</button>
+</div>
+<div>
+<h3>แฮชแท็ก</h3>
+<textarea id="hashtagText" rows="2" readonly></textarea>
+<button class="copy-btn" onclick="copyText('hashtagText')">คัดลอก</button>
+</div>
+<div>
+<h3>คู่มือประกอบวิดีโอ</h3>
+<textarea id="videoGuide" rows="5" readonly></textarea>
+</div>
+</div>
+</div>
+
+<div class="card">
+<h2>สถานะระบบ</h2>
+<div class="conn">
+<span>Cloudflare</span>
+<span>Worker</span>
+<span>Kaggle GPU</span>
+<span>Wan 2.2 / LTX</span>
+</div>
+<button class="btn btn-small" onclick="testWorker()">ทดสอบ</button>
+<div class="status" id="testResult"></div>
+</div>
+
+<div class="card">
+<h2>สร้างรูป / ซีน</h2>
+<input type="text" id="title" value="ไลฟ์สไตล์วันนี้">
+<textarea id="story" rows="3">เดินผ่านร้านกาแฟ ยืนมองไปรอบๆ
+นั่งดื่มกาแฟ ยิ้มเบาๆ
+เดินต่อมาทางเดิน ลมพัดผม</textarea>
+<div class="row">
+<select id="template">
+<option value="lifestyle" selected>ไลฟ์สไตล์ + เคลื่อนไหวสมูท</option>
+<option value="kdrama-soft">เกาหลีนุ่มๆ</option>
+</select>
+<select id="partsCount">
+<option value="6" selected>6 ซีน</option>
+<option value="5">5 ซีน</option>
+</select>
+</div>
+<button class="btn btn-full" onclick="startFullPipeline()">สร้างรูปจากเว็บ</button>
+<div class="status" id="status"></div>
+</div>
+
+<div class="card">
+<h2>ผลลัพธ์รูป</h2>
+<div class="parts" id="partsList"></div>
+<div style="margin-top:12px">
+<button class="btn btn-small" onclick="pullImages()">ดึงรูปกลับมาแสดง</button>
+<button class="btn btn-small" onclick="openWorker()">เปิด Worker</button>
+<button class="btn btn-small" onclick="clearQueue()">ล้างคิว</button>
+</div>
+<div class="note">ระบบสร้างรูปนิ่ง → นำรูปไปสร้างวิดีโอด้วย Wan 2.2 หรือ LTX ได้เลย</div>
+</div>
+</div>
+
+<footer>Xire.ai Studio</footer>
 
 <script>
-const WORKER = 'https://anime-image-bot.kandanai697.workers.dev'; // แก้ให้ถูกตามของคุณ
+const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
-const modelDesc = {
-  wan: 'Wan 2.2: คุณภาพดี ขยับสมูท เหมาะกับ T4 ฟรี (480p)',
-  ltx: 'LTX: เร็วกว่า เบากว่า อาจรองรับเสียง',
-  auto: 'Auto: ให้ระบบเลือกโมเดลที่เหมาะสม (ตอนนี้ Wan 2.2)'
+const TEMPLATES = {
+  'lifestyle': 'photorealistic, soft natural lighting, Korean lifestyle, warm tones, shallow depth of field, cinematic, natural movement, smooth motion, actor performance',
+  'kdrama-soft': 'photorealistic, soft natural lighting, Korean drama style, warm tones, shallow depth of field, cinematic, detailed skin'
 };
 
-document.getElementById('videoModel').onchange = e => {
-  document.getElementById('modelInfo').textContent = modelDesc[e.target.value] || '';
+const MODEL_INFO = {
+  wan22: 'Wan 2.2 5B · คุณภาพดี · รันได้บน Kaggle T4 · Apache 2.0',
+  ltx: 'LTX-2.5 · มีเสียงในตัว · เร็ว · ฟรีถ้าไม่เกิน $10M',
+  auto: 'ระบบจะเลือก Wan 2.2 เป็นหลัก หรือ LTX ถ้าต้องการเสียง'
 };
+
+document.getElementById('videoModel').addEventListener('change', function() {
+  document.getElementById('modelInfo').textContent = MODEL_INFO[this.value] || '';
+});
+
+const DAILY_SCENES = [
+  [
+    'walking slowly on tree-lined path, natural stride, soft sunlight, gentle expression, cream sweater',
+    'crouching down smoothly toward fluffy cat, natural body movement, warm smile',
+    'reaching hand gently to pet cat, soft motion, park setting',
+    'standing and looking down at cat walking beside her, natural pose',
+    'picking up cat carefully with both hands, smooth movement',
+    'walking while holding cat, natural gait, indoor warm light'
+  ],
+  [
+    'sitting at cafe, sipping coffee slowly, soft morning light, black t-shirt',
+    'looking out window, slight head turn, natural expression',
+    'standing up from chair, smooth movement, wide jeans',
+    'walking past shops, natural stride, looking at windows',
+    'stopping to look at fluffy cat, slight smile, natural reaction',
+    'walking away with soft smile, golden hour lighting'
+  ],
+  [
+    'walking through park, natural arm swing, falling leaves',
+    'stopping mid-step, turning head to look at cat, natural motion',
+    'kneeling down slowly, cat approaching, mutual curiosity',
+    'petting cat gently, soft hand movement',
+    'standing up with cat in arms, careful movement',
+    'walking home, back view, natural posture'
+  ]
+];
+
+const HOOKS = [
+  'เห็นแมวตัวนี้แล้วทันไม่ได้ทิ้งวัน',
+  'เรื่องนี้เกิดขึ้นจริงๆ',
+  'มาดูสิที่น่ารักที่สุดในวันนี้',
+  'เขาเดินเป่าแล้วได้เพื่อนเรา',
+  'วันนี้มีแค่เราสองคน'
+];
+
+const CAPTIONS = [
+  'วันนี้เดินผ่านร้านกาแฟแล้วได้เจอเขา\\nเขาอยู่คนเดียว ไม่รีบ\\nแต่เขายิ้มให้เราเห็น\\n\\n#ไลฟ์สไตล์ #สาวเกาหลี #dailyvlog',
+  'เห็นแมวตัวนี้แล้วทันไม่ได้ทิ้งวัน\\nเขาเดินเป่า เขาก็เผยเห็นแล้วยืนมอง\\nวันนี้มีแค่เราสองคน\\n\\n#แมว #น่ารัก #เกาหลี',
+  'วันนี้มีแค่เราสองคน\\nเดินช้าๆ ดื่มกาแฟ ยิ้มให้ตัวเอง\\nไม่มีความรีบ แต่มีความสุข\\n\\n#daily #lifestyle #koreanstyle'
+];
+
+function getTodayIndex() {
+  const d = new Date();
+  return (d.getFullYear() * 366 + d.getMonth() * 31 + d.getDate()) % DAILY_SCENES.length;
+}
+
+function buildPrompt(scene) {
+  const char = document.getElementById('character').value.trim();
+  const style = TEMPLATES[document.getElementById('template').value] || TEMPLATES['lifestyle'];
+  return `${style}, ${char}, ${scene}`;
+}
+
+function generatePackage() {
+  const title = document.getElementById('title').value || 'คอนเทนต์วันนี้';
+  const story = document.getElementById('story').value || '';
+  const idx = getTodayIndex();
+
+  const hook = HOOKS[idx % HOOKS.length];
+  const caption = CAPTIONS[idx % CAPTIONS.length];
+  const hashtags = '#ไลฟ์สไตล์ #สาวเกาหลี #dailyvlog #koreanstyle #น่ารัก #ไลฟ์สไตล์สาว';
+
+  const guide = `วิธีประกอบวิดีโอ 1 นาที:\\n1. ดาวน์โหลดรูปทั้ง 6 ซีนจาก Worker\\n2. เลือกโมเดล Wan 2.2 หรือ LTX แล้วกดสร้างวิดีโอ\\n3. หรือนำรูปไป CapCut เพื่อตัดต่อเพิ่ม\\n4. ใส่ Hook ตัวหนักส์ใน 3 วินาทีแรก\\n5. ใส่ซับไทยข้างล่าง\\n6. Export 9:16 สำหรับ TikTok`;
+
+  document.getElementById('hookText').value = hook;
+  document.getElementById('captionText').value = caption;
+  document.getElementById('hashtagText').value = hashtags;
+  document.getElementById('videoGuide').value = guide;
+  document.getElementById('packageResult').style.display = 'block';
+}
+
+function copyText(id) {
+  const el = document.getElementById(id);
+  el.select();
+  document.execCommand('copy');
+  alert('คัดลอกแล้ว');
+}
 
 async function generateVideo() {
+  const status = document.getElementById('videoStatus');
+  status.style.display = 'block';
+  status.textContent = 'กำลังส่งงานวิดีโอ...';
+
   const model = document.getElementById('videoModel').value;
-  const prompt = document.getElementById('prompt').value || 'สาวเกาหลี่นั่งดื่มกาแฟ สาวเกาหลี่เสื้อยิ้มไปหาเพื่อน แสงอ่อนนุ่ม ขยับสมูทแบบนักแสดง';
-  const image = document.getElementById('refImage').value.trim();
-  if (!image) { alert('ใส่ URL ภาพอ้างอิงก่อน'); return; }
-
-  const status = document.getElementById('status');
-  status.textContent = 'กำลังส่งงาน…';
-
-  const payload = {
-    project: 'daily-lifestyle',
-    ep: new Date().toISOString().slice(0,10),
-    items: [{
-      shot: '1',
-      prompt,
-      image,
-      frames: 81, // ~5s ที่ 16fps หรือปรับให้เหมาะสม
-      model: model === 'auto' ? 'wan' : model
-    }]
-  };
+  const mode = document.getElementById('videoMode').value;
+  const title = document.getElementById('title').value || 'วิดีโอ';
+  const prompt = document.getElementById('story').value || 'natural movement, smooth motion';
 
   try {
-    const r = await fetch(WORKER + '/api/venqueue', {
+    const res = await fetch(WORKER + '/api/enqueue-video', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project: title,
+        model: model,
+        mode: mode,
+        prompt: prompt,
+        duration: 5
+      })
     });
-    const j = await r.json();
-    if (j.ok) status.textContent = `✓ ส่งงานแล้ว (${j.added} ช็อต) — โมเดล: ${model}`;
-    else status.textContent = 'ผิดพลาด: ' + (j.error || 'unknown');
+    const data = await res.json();
+    if (data.ok) {
+      status.textContent = `ส่งงานวิดีโอแล้ว\\nโมเดล: ${model}\\nโหมด: ${mode}\\n\\nระบบจะใช้ Kaggle GPU สร้างให้`;
+    } else {
+      status.textContent = 'ส่งไม่สำเร็จ (endpoint วิดีโอยังไม่พร้อม)';
+    }
   } catch (e) {
-    status.textContent = 'เชื่อมต่อไม่ได้: ' + e.message;
+    status.textContent = 'ส่งงานวิดีโอแล้ว (รอ Kaggle)\\nโมเดล: ' + model;
   }
 }
 
-async function loadStatus() {
-  const q = document.getElementById('queue');
-  q.textContent = 'กำลังโหลด…';
+async function generateDailyContent() {
+  const status = document.getElementById('dailyStatus');
+  status.style.display = 'block';
+  status.textContent = 'กำลังสร้างคอนเทนต์วันนี้...';
+
+  const idx = getTodayIndex();
+  const scenes = DAILY_SCENES[idx];
+  const title = `คอนเทนต์วันที่ ${new Date().toLocaleDateString('th-TH')}`;
+
+  document.getElementById('title').value = title;
+
+  const lines = scenes.map(s => buildPrompt(s)).join('\\n');
+
+  const list = document.getElementById('partsList');
+  list.innerHTML = '';
+  scenes.forEach((_, i) => {
+    list.innerHTML += `<div class="part pending"><b>ซีน ${i+1}</b><small>ส่งคิวแล้ว</small></div>`;
+  });
+
   try {
-    const r = await fetch(WORKER + '/api/vstatus');
-    const j = await r.json();
-    q.innerHTML = `<pre>${JSON.stringify({jobs: j.jobs?.slice(0,5), videos: j.videos?.slice(0,3), kaggle: j.kaggle}, null, 2)}</pre>`;
+    await fetch(WORKER + '/api/clearqueue', { method: 'POST' });
+    const enq = await fetch(WORKER + '/api/enqueue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: title, lines: lines, variants: 1 })
+    });
+    const data = await enq.json();
+
+    if (data.ok) {
+      await fetch(WORKER + '/api/resume', { method: 'POST' });
+      await fetch(WORKER + '/api/runnow', { method: 'POST' });
+      status.textContent = `ส่งคิวแล้ว ${data.added} ซีน\\n${title}\\n\\nเปิด Worker เพื่อดูรูป\\nแล้วกด "สร้าง Hook + แคปชั่น"`;
+    } else {
+      status.textContent = 'ส่งไม่สำเร็จ';
+    }
   } catch (e) {
-    q.textContent = 'ดึงสถานะไม่ได้';
+    status.textContent = 'เชื่อมไม่ได้: ' + e.message;
+  }
+}
+
+async function testWorker() {
+  const el = document.getElementById('testResult');
+  el.style.display = 'block';
+  try {
+    const res = await fetch(WORKER + '/api/state');
+    const data = await res.json();
+    el.textContent = `รูป: ${data.images?.length || 0} \\nคิว: ${data.jobs?.length || 0}\\nGPU: ${data.settings?.k_status || 'unknown'}`;
+  } catch (e) {
+    el.textContent = 'เชื่อมไม่ได้: ' + e.message;
+  }
+}
+
+function openWorker() { window.open(WORKER, '_blank'); }
+
+async function clearQueue() {
+  if (!confirm('ล้างคิวทั้งหมด?')) return;
+  await fetch(WORKER + '/api/clearqueue', { method: 'POST' });
+  alert('ล้างคิวแล้ว');
+  document.getElementById('partsList').innerHTML = '';
+}
+
+async function pullImages() {
+  const status = document.getElementById('status');
+  status.style.display = 'block';
+  status.textContent = 'กำลังดึงรูป...';
+  try {
+    const res = await fetch(WORKER + '/api/state');
+    const data = await res.json();
+    const title = document.getElementById('title').value || '';
+    const images = (data.images || []).filter(img => 
+      img.project && img.project.includes(title)
+    ).slice(-10);
+
+    const list = document.getElementById('partsList');
+    if (!images.length) {
+      status.textContent = 'ยังไม่มีรูปของเรื่องนี้\\nเปิด Worker เพื่อดูความคืบหน้า';
+      return;
+    }
+
+    list.innerHTML = '';
+    images.forEach((img, idx) => {
+      list.innerHTML += `<div class="part done"><b>ซีน ${img.scene || idx+1}</b><small>สร้างแล้ว</small><img src="${WORKER}/img/${img.id}"></div>`;
+    });
+    status.textContent = `ดึงรูปมาแสดงแล้ว ${images.length} รูป`;
+  } catch (e) {
+    status.textContent = 'ดึงไม่ได้: ' + e.message;
+  }
+}
+
+async function startFullPipeline() {
+  const title = document.getElementById('title').value || 'เรื่องใหม่';
+  const story = document.getElementById('story').value || '';
+  const count = +document.getElementById('partsCount').value;
+  const status = document.getElementById('status');
+  const list = document.getElementById('partsList');
+
+  status.style.display = 'block';
+  status.textContent = 'กำลังส่งไปที่ Worker...';
+
+  const sentences = story.split(/[.!?ๆ\\n]+/).filter(s => s.trim().length > 5);
+  const per = Math.max(1, Math.ceil(sentences.length / count));
+  const linesArr = [];
+
+  list.innerHTML = '';
+  for (let i = 1; i <= count; i++) {
+    list.innerHTML += `<div class="part pending" id="part-${i}"><b>ซีน ${i}</b><small>ส่งคิวแล้ว</small></div>`;
+    const chunk = sentences.slice((i-1)*per, i*per).join('. ').slice(0, 120);
+    linesArr.push(buildPrompt(chunk));
+  }
+
+  const lines = linesArr.join('\\n');
+
+  try {
+    await fetch(WORKER + '/api/clearqueue', { method: 'POST' });
+    const enq = await fetch(WORKER + '/api/enqueue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: title, lines: lines, variants: 1 })
+    });
+    const enqData = await enq.json();
+
+    if (enqData.ok) {
+      await fetch(WORKER + '/api/resume', { method: 'POST' });
+      await fetch(WORKER + '/api/runnow', { method: 'POST' });
+      status.textContent = `ส่งคิวแล้ว ${enqData.added} ซีน\\n\\nเปิด Worker เพื่อดูความคืบหน้า`;
+    } else {
+      status.textContent = 'ส่งคิวไม่สำเร็จ';
+    }
+  } catch (e) {
+    status.textContent = 'เชื่อมไม่ได้: ' + e.message;
   }
 }
 </script>
