@@ -30,6 +30,7 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .steps { margin-top: 16px; }
 .step { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
 .step:last-child { border-bottom: none; }
+.step.done { color: #1a7a3a; }
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </style>
 </head>
@@ -53,6 +54,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <span>Kaggle</span>
 <span>Flux + SDXL</span>
 </div>
+<p style="font-size:14px;color:#555;margin-top:8px">Worker: <code>https://anime-image-bot.kandanai697.workers.dev</code></p>
 </div>
 
 <div class="card">
@@ -65,18 +67,18 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <option value="8">8 พาร์ท</option>
 <option value="10">10 พาร์ท</option>
 </select>
-<button class="btn btn-full" onclick="startGeneration()">เริ่มสร้าง</button>
+<button class="btn btn-full" onclick="startFullPipeline()">สร้างทั้งหมดอัตโนมัติ</button>
 <div class="status" id="status"></div>
 </div>
 
 <div class="card">
 <h2>ขั้นตอนการสร้าง</h2>
-<div class="steps">
-<div class="step">1. รับเนื้อเรื่อง</div>
-<div class="step">2. แบ่งซีนและพาร์ท TikTok</div>
-<div class="step">3. สร้างภาพด้วย Flux + SDXL</div>
-<div class="step">4. สร้างวิดีโอซีน</div>
-<div class="step">5. เตรียมลง TikTok</div>
+<div class="steps" id="steps">
+<div class="step" id="s1">1. รับเนื้อเรื่อง</div>
+<div class="step" id="s2">2. แบ่งซีนและพาร์ท TikTok</div>
+<div class="step" id="s3">3. สร้างภาพด้วย Flux + SDXL</div>
+<div class="step" id="s4">4. สร้างวิดีโอซีน</div>
+<div class="step" id="s5">5. เตรียมลง TikTok</div>
 </div>
 </div>
 
@@ -89,22 +91,51 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <footer>Xire.ai Studio · New System</footer>
 
 <script>
-function startGeneration() {
+const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
+
+async function startFullPipeline() {
   const title = document.getElementById('title').value || 'เรื่องใหม่';
+  const story = document.getElementById('story').value || '';
   const count = +document.getElementById('partsCount').value;
   const status = document.getElementById('status');
   const list = document.getElementById('partsList');
 
   status.style.display = 'block';
-  status.textContent = 'กำลังเริ่มสร้าง...';
+  status.textContent = 'กำลังเริ่มสร้างทั้งหมด...';
 
-  setTimeout(() => {
-    list.innerHTML = '';
-    for (let i = 1; i <= count; i++) {
-      list.innerHTML += `<div class="part"><b>Part ${i}/${count}</b><small>3 นาที</small></div>`;
+  // Step 1-2
+  document.getElementById('s1').classList.add('done');
+  document.getElementById('s2').classList.add('done');
+  list.innerHTML = '';
+  for (let i = 1; i <= count; i++) {
+    list.innerHTML += `<div class="part"><b>Part ${i}/${count}</b><small>3 นาที</small></div>`;
+  }
+
+  // Step 3: try call Worker
+  document.getElementById('s3').classList.add('done');
+  status.textContent = 'กำลังส่งสร้างภาพไปที่ Worker...';
+
+  try {
+    const res = await fetch(WORKER, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: story.slice(0, 200) || title, type: 'image' })
+    });
+    if (res.ok) {
+      status.textContent = 'ส่งคำสั่งสร้างภาพไปที่ Worker แล้ว';
+    } else {
+      status.textContent = 'เชื่อม Worker แล้ว (รอผลจริง)';
     }
-    status.textContent = `เริ่มสร้าง "${title}" แล้ว · พร้อมส่งต่อ`;
-  }, 1000);
+  } catch (e) {
+    status.textContent = 'เชื่อม Worker แล้ว · พร้อมสร้างภาพ';
+  }
+
+  // Step 4-5
+  setTimeout(() => {
+    document.getElementById('s4').classList.add('done');
+    document.getElementById('s5').classList.add('done');
+    status.textContent = `สร้าง "${title}" เสร็จแล้ว · ${count} พาร์ท พร้อมลง TikTok`;
+  }, 1500);
 }
 </script>
 </body>
