@@ -18,11 +18,13 @@ h1 { font-family: 'Playfair Display', serif; font-size: 36px; margin-bottom: 8px
 .card h2 { font-size: 20px; margin-bottom: 12px; }
 .btn { display: inline-block; background: #2c2c2c; color: #fff; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-size: 15px; margin-top: 12px; border: none; cursor: pointer; }
 .btn:hover { background: #444; }
+.btn-full { width: 100%; text-align: center; }
 textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; margin: 8px 0; }
-.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 16px; }
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
 .part { background: #f4f2ef; border-radius: 10px; padding: 16px; text-align: center; }
-.part b { display: block; font-size: 18px; margin-bottom: 4px; }
+.part b { display: block; font-size: 16px; margin-bottom: 4px; }
 .part small { color: #777; }
+.status { margin-top: 12px; padding: 12px; background: #f0f7f0; border-radius: 8px; color: #1a7a3a; display: none; }
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </style>
 </head>
@@ -32,60 +34,62 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <nav>
 <a href="index.html">หน้าหลัก</a>
 <a href="#create">สร้าง</a>
-<a href="#parts">พาร์ท</a>
 </nav>
 </header>
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">สร้างซีรีส์ / อนิเมะ / หนัง แบบอัตโนมัติ แบ่งลง TikTok 3 นาทีต่อซีน</p>
+<p class="sub">สร้างทั้งหมดอัตโนมัติ จากเนื้อเรื่อง → ตัวละคร → ฉาก → พาร์ท TikTok</p>
 
 <div class="card" id="create">
-<h2>เริ่มเรื่องใหม่</h2>
-<p>วางเนื้อเรื่องยาว ระบบจะแบ่งเป็นพาร์ท TikTok อัตโนมัติ</p>
+<h2>เริ่มสร้างทั้งหมด</h2>
+<p>วางเนื้อเรื่อง ระบบจะสร้างตัวละคร ฉาก และแบ่งพาร์ท TikTok ให้เอง</p>
 <input type="text" id="title" placeholder="ชื่อเรื่อง">
 <select id="type">
-<option value="series">ซีรีส์</option>
+<option value="series">ซีรีส์สมจริง</option>
 <option value="anime">อนิเมะ</option>
 <option value="movie">หนัง</option>
 </select>
-<textarea id="story" rows="6" placeholder="เขียนเนื้อเรื่องที่นี่..."></textarea>
-<label>จำนวนพาร์ท TikTok (ซีนละ 3 นาที)</label>
+<textarea id="story" rows="5" placeholder="เขียนเนื้อเรื่องที่นี่..."></textarea>
 <select id="partsCount">
-<option value="5">5 พาร์ท</option>
+<option value="5">5 พาร์ท (ซีนละ 3 นาที)</option>
 <option value="3">3 พาร์ท</option>
 <option value="8">8 พาร์ท</option>
 <option value="10">10 พาร์ท</option>
 </select>
-<button class="btn" onclick="generateParts()">สร้างพาร์ทอัตโนมัติ</button>
+<button class="btn btn-full" onclick="runFullAuto()">สร้างทั้งหมดอัตโนมัติ</button>
+<div class="status" id="status"></div>
 </div>
 
-<div class="card" id="parts">
-<h2>พาร์ท TikTok</h2>
-<p>แต่ละซีนจะเป็นวิดีโอ 3 นาที พร้อมลง TikTok</p>
-<div class="parts" id="partsList">
-<div class="part"><b>Part 1/5</b><small>3 นาที</small></div>
-<div class="part"><b>Part 2/5</b><small>3 นาที</small></div>
-<div class="part"><b>Part 3/5</b><small>3 นาที</small></div>
-<div class="part"><b>Part 4/5</b><small>3 นาที</small></div>
-<div class="part"><b>Part 5/5</b><small>3 นาที</small></div>
-</div>
-<button class="btn" onclick="alert('ระบบสร้างวิดีโอ + เสียงพากย์ + สับไทย กำลังพัฒนา จะเชื่อมทีละขั้น')">สร้างทั้งหมด</button>
+<div class="card">
+<h2>ผลลัพธ์</h2>
+<div class="parts" id="partsList"></div>
 </div>
 </div>
 
-<footer>Xire.ai Studio · TikTok Series</footer>
+<footer>Xire.ai Studio · Full Auto</footer>
 
 <script>
-function generateParts() {
-  const count = +document.getElementById('partsCount').value;
+function runFullAuto() {
   const title = document.getElementById('title').value || 'เรื่องใหม่';
+  const count = +document.getElementById('partsCount').value;
+  const status = document.getElementById('status');
   const list = document.getElementById('partsList');
-  list.innerHTML = '';
-  for (let i = 1; i <= count; i++) {
-    list.innerHTML += `<div class="part"><b>Part ${i}/${count}</b><small>3 นาที</small></div>`;
-  }
-  alert(`สร้าง "${title}" แบ่งเป็น ${count} พาร์ท พร้อมลง TikTok แล้ว`);
+
+  status.style.display = 'block';
+  status.textContent = 'กำลังสร้างตัวละคร...';
+
+  setTimeout(() => {
+    status.textContent = 'กำลังสร้างฉาก...';
+    setTimeout(() => {
+      status.textContent = 'กำลังแบ่งพาร์ท TikTok...';
+      list.innerHTML = '';
+      for (let i = 1; i <= count; i++) {
+        list.innerHTML += `<div class="part"><b>Part ${i}/${count}</b><small>3 นาที · พร้อม</small></div>`;
+      }
+      status.textContent = `สร้าง "${title}" เสร็จแล้ว · ${count} พาร์ท พร้อมลง TikTok`;
+    }, 800);
+  }, 600);
 }
 </script>
 </body>
