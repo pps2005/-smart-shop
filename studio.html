@@ -49,7 +49,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">ระบบใหม่ · Cloudflare · Supabase · Kaggle · Flux + SDXL</p>
+<p class="sub">ระบบใหม่ · Advanced Prompting</p>
 
 <div class="card">
 <h2>สถานะระบบ</h2>
@@ -69,10 +69,22 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <input type="text" id="title" placeholder="ชื่อเรื่อง">
 <textarea id="story" rows="4" placeholder="เขียนเนื้อเรื่องที่นี่..."></textarea>
 <select id="style">
-<option value="cinematic realistic Korean drama">สัมจริง สไตล์ซีรีส์เกาหลี</option>
-<option value="cinematic Japanese drama realistic">สัมจริง สไตล์ซีรีส์ญี่ปุ่น</option>
-<option value="anime style high quality">อนิเมะคุณภาพสูง</option>
-<option value="cinematic movie still realistic">สัมจริงหนังภาพยนตร์</option>
+<option value="cinematic realistic Korean drama, teal and orange color grading">สัมจริง สไตล์ซีรีส์เกาหลี</option>
+<option value="cinematic Japanese drama realistic, muted tones">สัมจริง สไตล์ซีรีส์ญี่ปุ่น</option>
+<option value="anime style high quality, detailed">อนิเมะคุณภาพสูง</option>
+<option value="cinematic movie still realistic, film grain">สัมจริงหนังภาพยนตร์</option>
+</select>
+<select id="lighting">
+<option value="cinematic lighting, Rembrandt lighting on face">Rembrandt</option>
+<option value="golden hour rim light, warm lighting">Golden Hour</option>
+<option value="dramatic rim light, chiaroscuro">Rim Light</option>
+<option value="soft diffused lighting, overcast">Soft Light</option>
+</select>
+<select id="camera">
+<option value="shallow depth of field, 85mm lens, film still">85mm Portrait</option>
+<option value="low angle shot, cinematic composition">Low Angle</option>
+<option value="wide shot, rule of thirds">Wide Shot</option>
+<option value="close-up, highly detailed face">Close-up</option>
 </select>
 <select id="partsCount">
 <option value="5">5 พาร์ท TikTok</option>
@@ -103,14 +115,14 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </div>
 </div>
 
-<footer>Xire.ai Studio · Better Prompts</footer>
+<footer>Xire.ai Studio · Advanced Prompting</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
-function buildPrompt(title, part, total, story, style) {
-  const scene = story.slice(0, 120).replace(/\n/g, ' ');
-  return `masterpiece, best quality, 8k, ultra detailed, cinematic lighting, ${style}, ${title}, scene ${part} of ${total}, ${scene}, emotional atmosphere, film still, highly detailed face, professional photography, shallow depth of field`;
+function buildPrompt(title, part, total, story, style, lighting, camera) {
+  const scene = story.slice(0, 100).replace(/\n/g, ' ').trim();
+  return `masterpiece, best quality, ultra detailed, 8k, film still, ${style}, ${lighting}, ${camera}, ${title}, scene ${part} of ${total}, ${scene}, highly detailed face, professional photography, emotional atmosphere, shot on 35mm film`;
 }
 
 function getHistory() { return JSON.parse(localStorage.getItem('xire_history') || '[]'); }
@@ -125,6 +137,8 @@ function saveStory() {
     parts: +document.getElementById('partsCount').value,
     model: document.getElementById('model').value,
     style: document.getElementById('style').value,
+    lighting: document.getElementById('lighting').value,
+    camera: document.getElementById('camera').value,
     time: new Date().toLocaleString('th-TH')
   };
   localStorage.setItem('xire_story', JSON.stringify(data));
@@ -146,6 +160,8 @@ function loadStory(data) {
   document.getElementById('partsCount').value = data.parts || 5;
   document.getElementById('model').value = data.model || 'sdxl';
   document.getElementById('style').value = data.style || document.getElementById('style').options[0].value;
+  document.getElementById('lighting').value = data.lighting || document.getElementById('lighting').options[0].value;
+  document.getElementById('camera').value = data.camera || document.getElementById('camera').options[0].value;
   document.getElementById('savedInfo').textContent = `โหลด: ${data.title}`;
 }
 
@@ -208,6 +224,8 @@ async function startFullPipeline() {
   const count = +document.getElementById('partsCount').value;
   const model = document.getElementById('model').value;
   const style = document.getElementById('style').value;
+  const lighting = document.getElementById('lighting').value;
+  const camera = document.getElementById('camera').value;
   const status = document.getElementById('status');
   const list = document.getElementById('partsList');
 
@@ -224,7 +242,7 @@ async function startFullPipeline() {
 
   for (let i = 1; i <= count; i++) {
     updatePart(i, 'pending');
-    const prompt = buildPrompt(title, i, count, story, style);
+    const prompt = buildPrompt(title, i, count, story, style, lighting, camera);
     try {
       const res = await fetch(WORKER, {
         method: 'POST',
