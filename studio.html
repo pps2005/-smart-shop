@@ -23,10 +23,14 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .conn { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .conn span { background: #f4f2ef; padding: 6px 12px; border-radius: 999px; font-size: 13px; }
 .conn span.backup { background: #fff3e0; }
-.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
-.part { background: #f4f2ef; border-radius: 10px; padding: 16px; text-align: center; }
-.part b { display: block; font-size: 16px; margin-bottom: 4px; }
-.part small { color: #777; }
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 16px; }
+.part { background: #f4f2ef; border-radius: 10px; padding: 12px; text-align: center; }
+.part b { display: block; font-size: 15px; margin-bottom: 4px; }
+.part small { color: #777; display: block; }
+.part img { width: 100%; border-radius: 6px; margin-top: 8px; }
+.part.pending { opacity: 0.7; }
+.part.done { background: #e8f5e9; }
+.part.error { background: #ffebee; }
 .status { margin-top: 12px; padding: 12px; background: #f0f7f0; border-radius: 8px; color: #1a7a3a; display: none; }
 .steps { margin-top: 16px; }
 .step { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
@@ -85,18 +89,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </div>
 
 <div class="card">
-<h2>ขั้นตอนการสร้าง</h2>
-<div class="steps" id="steps">
-<div class="step" id="s1">1. รับเนื้อเรื่อง</div>
-<div class="step" id="s2">2. แบ่งซีนและพาร์ท TikTok</div>
-<div class="step" id="s3">3. สร้างภาพ: SDXL หลัก / Flux + Kaggle สำรอง</div>
-<div class="step" id="s4">4. สร้างวิดีโอซีน</div>
-<div class="step" id="s5">5. เตรียมลง TikTok</div>
-</div>
-</div>
-
-<div class="card">
-<h2>พาร์ท TikTok</h2>
+<h2>คิวการสร้าง</h2>
 <div class="parts" id="partsList"></div>
 </div>
 </div>
@@ -144,7 +137,7 @@ function renderHistory() {
   const list = document.getElementById('historyList');
   const h = getHistory();
   if (!h.length) {
-    list.innerHTML = '<div class="mu" style="color:#777">ยังไม่มีเรื่องที่บันทึก</div>';
+    list.innerHTML = '<div style="color:#777">ยังไม่มีเรื่องที่บันทึก</div>';
     return;
   }
   list.innerHTML = h.map((s, i) => `
@@ -160,6 +153,18 @@ function loadFromHistory(i) {
   if (h[i]) loadStory(h[i]);
 }
 
+function updatePart(i, status, imgUrl) {
+  const el = document.getElementById(`part-${i}`);
+  if (!el) return;
+  el.className = `part ${status}`;
+  el.querySelector('small').textContent = status === 'done' ? 'เสร็จ' : status === 'error' ? 'ผิดพลาด' : 'กำลังสร้าง...';
+  if (imgUrl) {
+    const img = el.querySelector('img') || document.createElement('img');
+    img.src = imgUrl;
+    el.appendChild(img);
+  }
+}
+
 async function startFullPipeline() {
   saveStory();
   const title = document.getElementById('title').value || 'เรื่องใหม่';
@@ -169,34 +174,36 @@ async function startFullPipeline() {
   const list = document.getElementById('partsList');
 
   status.style.display = 'block';
-  status.textContent = 'กำลังเริ่มสร้างทั้งหมด...';
+  status.textContent = 'กำลังเริ่มสร้าง...';
 
-  document.getElementById('s1').classList.add('done');
-  document.getElementById('s2').classList.add('done');
   list.innerHTML = '';
   for (let i = 1; i <= count; i++) {
-    list.innerHTML += `<div class="part"><b>Part ${i}/${count}</b><small>3 นาที</small></div>`;
+    list.innerHTML += `<div class="part pending" id="part-${i}"><b>Part ${i}/${count}</b><small>รอสร้าง</small></div>`;
   }
 
-  document.getElementById('s3').classList.add('done');
-  status.textContent = 'กำลังสร้างภาพ (SDXL หลัก / Flux + Kaggle สำรอง)...';
-
-  try {
-    const res = await fetch(WORKER, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: story.slice(0, 200) || title, type: 'image', fallback: 'flux-kaggle' })
-    });
-    status.textContent = res.ok ? 'ส่งคำสั่งไปที่ Worker แล้ว' : 'เชื่อม Worker แล้ว · พร้อมสำรอง';
-  } catch (e) {
-    status.textContent = 'เชื่อม Worker แล้ว · พร้อมใช้ Flux + Kaggle สำรอง';
+  for (let i = 1; i <= count; i++) {
+    updatePart(i, 'pending');
+    try {
+      const res = await fetch(WORKER, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: `${title} - part ${i}: ${story.slice(0, 100)}`, type: 'image', fallback: 'flux-kaggle' })
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const img = data.image || data.url || null;
+        updatePart(i, 'done', img);
+        status.textContent = `สร้างพาร์ท ${i}/${count} เสร็จ`;
+      } else {
+        updatePart(i, 'error');
+      }
+    } catch (e) {
+      updatePart(i, 'error');
+    }
+    await new Promise(r => setTimeout(r, 800));
   }
 
-  setTimeout(() => {
-    document.getElementById('s4').classList.add('done');
-    document.getElementById('s5').classList.add('done');
-    status.textContent = `สร้าง "${title}" เสร็จแล้ว · ${count} พาร์ท พร้อมลง TikTok`;
-  }, 1200);
+  status.textContent = `สร้าง "${title}" เสร็จทั้งหมด · ${count} พาร์ท`;
 }
 
 loadStory();
