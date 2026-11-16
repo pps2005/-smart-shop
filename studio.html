@@ -22,6 +22,8 @@ h1 { font-family: 'Playfair Display', serif; font-size: 36px; margin-bottom: 8px
 .btn-small { padding: 8px 16px; font-size: 13px; }
 .btn-daily { background: #e91e63; }
 .btn-daily:hover { background: #c2185b; }
+.btn-accent { background: #2196f3; }
+.btn-accent:hover { background: #1976d2; }
 textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; margin: 8px 0; }
 .row { display: flex; gap: 12px; flex-wrap: wrap; }
 .row > * { flex: 1; min-width: 200px; }
@@ -39,8 +41,10 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 .daily-box { background: linear-gradient(135deg, #fce4ec, #f8bbd0); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
 .daily-box h2 { color: #c2185b; }
-.auto-note { background: #e8f5e9; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
-.limit { background: #fff3e0; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
+.package { background: #e3f2fd; border-radius: 12px; padding: 16px; margin-top: 12px; }
+.package h3 { font-size: 16px; margin: 12px 0 6px; color: #1565c0; }
+.package p, .package textarea { font-size: 14px; }
+.copy-btn { background: #4caf50; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: 8px; }
 </style>
 </head>
 <body>
@@ -54,11 +58,11 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">ไลฟ์สไตล์ · เคลื่อนไหวสมูท · หน้าคงที่</p>
+<p class="sub">สร้างคอนเทนต์ → Hook → แคปชั่น → วิดีโอสำเร็จลง TikTok</p>
 
 <div class="daily-box">
 <h2>คอนเทนต์วันนี้</h2>
-<p style="margin:8px 0;color:#555">สาวผมยาวโทนเกาหลี · ชุดเดิม · เคลื่อนไหวสมูทแบบคนแสดง</p>
+<p style="margin:8px 0;color:#555">สาวผมยาวโทนเกาหลี · ชุดเดิม · เคลื่อนไหวสมูท</p>
 <button class="btn btn-daily btn-full" onclick="generateDailyContent()">สร้างคอนเทนต์วันนี้</button>
 <div class="status" id="dailyStatus"></div>
 </div>
@@ -67,6 +71,33 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <h2>ตัวละครหลัก</h2>
 <textarea id="character" rows="3">1girl, long dark brown hair with soft Korean highlights, slightly wavy, slim figure, oval face, soft features, natural makeup, black t-shirt, wide leg jeans, white sneakers, photorealistic Korean style, same face, consistent character</textarea>
 <div class="note">หน้าคงที่ทุกมุม · ชุดเดิม (เสื้อดำ + กางเกงกว้าง)</div>
+</div>
+
+<div class="card">
+<h2>Hook + แคปชั่น + แพ็กวิดีโอ</h2>
+<p style="font-size:14px;color:#555;margin-bottom:8px">สร้างหลังมีรูปแล้ว กดปุ่มนี้เพื่อให้ระบบคิด Hook, แคปชั่น และคู่มือประกอบวิดีโอ</p>
+<button class="btn btn-accent" onclick="generatePackage()">สร้าง Hook + แคปชั่น + คู่มือวิดีโอ</button>
+<div id="packageResult" class="package" style="display:none">
+<div>
+<h3>Hook</h3>
+<textarea id="hookText" rows="2" readonly></textarea>
+<button class="copy-btn" onclick="copyText('hookText')">คัดลอก</button>
+</div>
+<div>
+<h3>แคปชั่น</h3>
+<textarea id="captionText" rows="4" readonly></textarea>
+<button class="copy-btn" onclick="copyText('captionText')">คัดลอก</button>
+</div>
+<div>
+<h3>แฮชแท็ก</h3>
+<textarea id="hashtagText" rows="2" readonly></textarea>
+<button class="copy-btn" onclick="copyText('hashtagText')">คัดลอก</button>
+</div>
+<div>
+<h3>คู่มือประกอบวิดีโอ</h3>
+<textarea id="videoGuide" rows="5" readonly></textarea>
+</div>
+</div>
 </div>
 
 <div class="card">
@@ -82,7 +113,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </div>
 
 <div class="card">
-<h2>สร้างเอง</h2>
+<h2>สร้างรูป / ซีน</h2>
 <input type="text" id="title" value="ไลฟ์สไตล์วันนี้">
 <textarea id="story" rows="3">เดินผ่านร้านกาแฟ ยืนมองไปรอบๆ
 นั่งดื่มกาแฟ ยิ้มเบาๆ
@@ -97,19 +128,19 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <option value="5">5 ซีน</option>
 </select>
 </div>
-<button class="btn btn-full" onclick="startFullPipeline()">สร้างเอง</button>
+<button class="btn btn-full" onclick="startFullPipeline()">สร้างรูปจากเว็บ</button>
 <div class="status" id="status"></div>
 </div>
 
 <div class="card">
-<h2>ผลลัพธ์</h2>
+<h2>ผลลัพธ์รูป</h2>
 <div class="parts" id="partsList"></div>
 <div style="margin-top:12px">
 <button class="btn btn-small" onclick="pullImages()">ดึงรูปกลับมาแสดง</button>
 <button class="btn btn-small" onclick="openWorker()">เปิด Worker</button>
 <button class="btn btn-small" onclick="clearQueue()">ล้างคิว</button>
 </div>
-<div class="limit">หมายเหตุ: ระบบปัจจุบันสร้างรูปนิ่ง (ไม่ใช่วิดีโอเคลื่อนไหวจริง) · ถ้าต้องการเคลื่อนไหวสมูทแบบวิดีโอ ต้องใช้เครื่องมือเพิ่มเช่น Runway / Kling / Luma</div>
+<div class="note">ระบบสร้างรูปนิ่ง → นำรูปไปตัดต่อเป็นคลิปสั้นๆ ใน CapCut / CapCut Web / Runway / Kling แล้วตัดต่อเป็นวิดีโอ 1 นาที</div>
 </div>
 </div>
 
@@ -150,6 +181,20 @@ const DAILY_SCENES = [
   ]
 ];
 
+const HOOKS = [
+  'เห็นแมวตัวนี้แล้วทันไม่ได้ทิ้งวัน',
+  'เรื่องนี้เกิดขึ้นจริงๆ',
+  'มาดูสิที่น่ารักที่สุดในวันนี้',
+  'เขาเดินเป่าแล้วได้เพื่อนเรา',
+  'วันนี้มีแค่เราสองคน'
+];
+
+const CAPTIONS = [
+  'วันนี้เดินผ่านร้านกาแฟแล้วได้เจอเขา\nเขาอยู่คนเดียว ไม่รีบ\nแต่เขายิ้มให้เราเห็น\n\n#ไลฟ์สไตล์ #สาวเกาหลี #dailyvlog',
+  'เห็นแมวตัวนี้แล้วทันไม่ได้ทิ้งวัน\nเขาเดินเป่า เขาก็เผยเห็นแล้วยืนมอง\nวันนี้มีแค่เราสองคน\n\n#แมว #น่ารัก #เกาหลี',
+  'วันนี้มีแค่เราสองคน\nเดินช้าๆ ดื่มกาแฟ ยิ้มให้ตัวเอง\nไม่มีความรีบ แต่มีความสุข\n\n#daily #lifestyle #koreanstyle'
+];
+
 function getTodayIndex() {
   const d = new Date();
   return (d.getFullYear() * 366 + d.getMonth() * 31 + d.getDate()) % DAILY_SCENES.length;
@@ -159,6 +204,31 @@ function buildPrompt(scene) {
   const char = document.getElementById('character').value.trim();
   const style = TEMPLATES[document.getElementById('template').value] || TEMPLATES['lifestyle'];
   return `${style}, ${char}, ${scene}`;
+}
+
+function generatePackage() {
+  const title = document.getElementById('title').value || 'คอนเทนต์วันนี้';
+  const story = document.getElementById('story').value || '';
+  const idx = getTodayIndex();
+
+  const hook = HOOKS[idx % HOOKS.length];
+  const caption = CAPTIONS[idx % CAPTIONS.length];
+  const hashtags = '#ไลฟ์สไตล์ #สาวเกาหลี #dailyvlog #koreanstyle #น่ารัก #ไลฟ์สไตล์สาว';
+
+  const guide = `วิธีประกอบวิดีโอ 1 นาที:\n1. ดาวน์โหลดรูปทั้ง 6 ซีนจาก Worker\n2. เปิด CapCut หรือ CapCut Web\n3. นำรูปใส่ตามลำดับซีน (5-8 วินาที/ซีน)\n4. เพิ่มเพลงเบาๆ หรือใช้ AI ขยับรูปให้เคลื่อนไหว\n5. ใส่ Hook ตัวหนักส์ใน 3 วินาทีแรก\n6. ใส่ซับไทยข้างล่าง\n7. Export 9:16 สำหรับ TikTok`;
+
+  document.getElementById('hookText').value = hook;
+  document.getElementById('captionText').value = caption;
+  document.getElementById('hashtagText').value = hashtags;
+  document.getElementById('videoGuide').value = guide;
+  document.getElementById('packageResult').style.display = 'block';
+}
+
+function copyText(id) {
+  const el = document.getElementById(id);
+  el.select();
+  document.execCommand('copy');
+  alert('คัดลอกแล้ว');
 }
 
 async function generateDailyContent() {
@@ -192,7 +262,7 @@ async function generateDailyContent() {
     if (data.ok) {
       await fetch(WORKER + '/api/resume', { method: 'POST' });
       await fetch(WORKER + '/api/runnow', { method: 'POST' });
-      status.textContent = `ส่งคิวแล้ว ${data.added} ซีน\n${title}\n\nเปิด Worker เพื่อดูรูป`;
+      status.textContent = `ส่งคิวแล้ว ${data.added} ซีน\n${title}\n\nเปิด Worker เพื่อดูรูป\nแล้วกด "สร้าง Hook + แคปชั่น"`;
     } else {
       status.textContent = 'ส่งไม่สำเร็จ';
     }
