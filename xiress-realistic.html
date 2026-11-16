@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xiress Studio — ซีรีส์ AI สมจริง</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Kanit', sans-serif;
+      background: #f8f6f3;
+      color: #2c2c2c;
+    }
+    header {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 10;
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.3), transparent);
+    }
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+    nav a {
+      color: #fff;
+      text-decoration: none;
+      margin-left: 28px;
+      font-size: 15px;
+      opacity: 0.9;
+    }
+    nav a:hover { opacity: 1; }
+
+    .hero {
+      height: 100vh;
+      background: url('images/IX5lI.jpg') center/cover no-repeat;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      color: #fff;
+      text-align: center;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.45));
+    }
+    .hero-content { position: relative; z-index: 2; }
+    .hero h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(42px, 7vw, 72px);
+      font-weight: 500;
+      margin-bottom: 12px;
+      text-shadow: 0 2px 20px rgba(0,0,0,0.4);
+    }
+    .hero p {
+      font-size: 18px;
+      opacity: 0.9;
+      letter-spacing: 1px;
+    }
+
+    .section { padding: 80px 40px; max-width: 1200px; margin: 0 auto; }
+    .section h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 36px;
+      text-align: center;
+      margin-bottom: 12px;
+      color: #3a3a3a;
+    }
+    .section .sub {
+      text-align: center;
+      color: #777;
+      margin-bottom: 48px;
+      font-size: 16px;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      transition: transform 0.3s;
+    }
+    .card:hover { transform: translateY(-6px); }
+    .card img {
+      width: 100%;
+      height: 320px;
+      object-fit: cover;
+    }
+    .card-body { padding: 18px 20px; }
+    .card-body h3 { font-size: 18px; margin-bottom: 6px; }
+    .card-body p { color: #777; font-size: 14px; }
+
+    .cta-box {
+      text-align: center;
+      padding: 60px 20px;
+      background: #fff;
+    }
+    .btn {
+      display: inline-block;
+      background: #2c2c2c;
+      color: #fff;
+      padding: 14px 36px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-size: 15px;
+      margin-top: 16px;
+    }
+    .btn:hover { background: #444; }
+
+    footer {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+      font-size: 13px;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Xiress</div>
+    <nav>
+      <a href="#stories">เรื่อง</a>
+      <a href="#gallery">แกลเลอรี</a>
+      <a href="#studio">สตูดิโอ</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-content">
+      <h1>ซีรีส์ AI สมจริง</h1>
+      <p>เกาหลี · ญี่ปุ่น · วอลเปเปอร์คุณภาพสูง</p>
+    </div>
+  </section>
+
+  <section class="section" id="stories">
+    <h2>เรื่องราวที่กำลังสร้าง</h2>
+    <p class="sub">ซีรีส์สมจริง สไตล์เกาหลี-ญี่ปุ่น</p>
+    <div class="gallery">
+      <div class="card">
+        <img src="images/z4nZO.jpg" alt="ตัวละครหลัก" />
+        <div class="card-body">
+          <h3>สาเหตุที่ฉันรัก</h3>
+          <p>ตอนที่ 1 · กำลังสร้าง</p>
+        </div>
+      </div>
+      <div class="card">
+        <img src="images/j0GWw.jpg" alt="ตัวละคร" />
+        <div class="card-body">
+          <h3>ตัวละครหลัก</h3>
+          <p>สไตล์สมจริง · LoRA พร้อมใช้</p>
+        </div>
+      </div>
+      <div class="card">
+        <img src="images/jTQZS.jpg" alt="ฉากกลางคืน" />
+        <div class="card-body">
+          <h3>ฉากเมืองยามค่ำ</h3>
+          <p>วอลเปเปอร์ · 16:9</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="cta-box">
+    <h2 style="font-family:'Playfair Display',serif;margin-bottom:8px;">เริ่มสร้างเรื่องของคุณ</h2>
+    <p style="color:#777;margin-bottom:20px;">อัปโหลดเนื้อเรื่อง แล้วให้ระบบสร้างภาพและวิดีโออัตโนมัติ</p>
+    <a href="https://smart-shop-8op.pages.dev/anime-studio" class="btn">เข้าสู่สตูดิโอ</a>
+  </div>
+
+  <footer>Xiress Studio · AI Realistic Series</footer>
+</body>
+</html>
