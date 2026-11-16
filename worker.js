@@ -1961,6 +1961,14 @@ async function animeApi(env, b) {
   await animeSchema(env);
   const act = b.act || 'list', s = await getSettings(env);
   const shape = '{"title":"ชื่อซีน","logline":"สรุป 1-2 ประโยค","beats":["เหตุการณ์ตามลำดับเวลา"]}';
+  if (act === 'short') { // คลิปสั้น 1-3 นาที: เรื่องสั้น / ความรู้ (ไม่ใช้ตัวละครคงที่)
+    const kind = { story: 'เรื่องสั้นจบในตอน มีต้น-กลาง-จบ หักมุมหรือซึ้งตอนท้าย', know: 'ให้ความรู้จากมุมมองผู้เชี่ยวชาญอาชีพที่กำหนด เข้าใจง่าย มีตัวอย่างจริง', mix: 'เรื่องสั้นที่แฝงความรู้ ดูจบแล้วได้เคล็ดลับไปใช้จริง' }[b.kind] || 'เรื่องสั้นจบในตอน';
+    const min = Math.min(3, Math.max(1, +b.min || 1)), nsc = min * 6, n = Math.min(2, Math.max(1, +b.n || 1));
+    const topic = String(b.topic || '').trim().slice(0, 300), job = String(b.job || '').trim().slice(0, 60);
+    const shape = '{"title":"ชื่อคลิป","hook":"ประโยคเปิด 3 วิแรกให้คนไม่เลื่อนผ่าน","scenes":[{"voice":"บทพากย์ภาษาไทย 1-2 ประโยค","visual":"ภาพประกอบ อธิบายสั้นๆ เป็นภาษาอังกฤษ ไม่มีตัวหนังสือในภาพ"}],"cta":"ประโยคปิดท้ายชวนกดติดตาม"}';
+    const arr = await llmJson(env, s, `ทำสคริปต์คลิป TikTok แนวตั้ง ความยาว ${min} นาที (${nsc} ฉาก ฉากละราว 10 วินาที) ประเภท: ${kind}\n${job ? 'อาชีพผู้เล่า: ' + job + '\n' : ''}${topic ? 'หัวข้อ: ' + topic + '\n' : 'เลือกหัวข้อที่น่าสนใจและไม่ซ้ำใคร\n'}ห้ามใช้ตัวละครประจำ ทุกคลิปจบในตัว ตอบเป็น JSON array ของ ${n} สคริปต์ รูปแบบ ${shape}`, 6000);
+    return { ok: true, items: (Array.isArray(arr) ? arr : [arr]).slice(0, n) };
+  }
   if (act === 'new') {
     const brief = String(b.brief || '').trim().slice(0, 14000); if (!brief) throw new Error('พิมพ์ก่อนว่าอยากได้อนิเมะแบบไหน');
     const r = await env.DB.prepare('INSERT INTO series (title,brief,created) VALUES (?,?,?)').bind(String(b.title || '').slice(0, 80) || brief.slice(0, 40), brief, Date.now()).run();
