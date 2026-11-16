@@ -17,6 +17,8 @@ nav a:hover { opacity: 1; }
 .hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.25), rgba(0,0,0,0.5)); }
 .hero-content { position: relative; z-index: 2; }
 .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(48px, 8vw, 90px); font-weight: 500; text-shadow: 0 2px 20px rgba(0,0,0,0.5); }
+.upload-btn { position: absolute; bottom: 40px; right: 40px; z-index: 5; background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 10px 20px; border-radius: 999px; cursor: pointer; font-size: 14px; }
+.upload-btn:hover { background: rgba(0,0,0,0.8); }
 .section { padding: 80px 40px; max-width: 1200px; margin: 0 auto; }
 .section h2 { font-family: 'Playfair Display', serif; font-size: 36px; text-align: center; margin-bottom: 12px; color: #3a3a3a; }
 .section .sub { text-align: center; color: #777; margin-bottom: 48px; font-size: 16px; }
@@ -44,12 +46,16 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; backgr
 </header>
 
 <section class="hero">
-<video autoplay muted loop playsinline poster="https://picsum.photos/id/1011/1920/1080">
+<video id="heroVideo" autoplay muted loop playsinline poster="https://picsum.photos/id/1011/1920/1080">
 <source src="https://cdn.coverr.co/videos/coverr-a-woman-walking-on-a-city-street-1573/1080p.mp4" type="video/mp4">
 </video>
 <div class="hero-content">
 <h1>Xire.ai</h1>
 </div>
+<label class="upload-btn">
+อัปโหลดวิดีโอพื้นหลัง
+<input type="file" accept="video/*" style="display:none" onchange="changeVideo(this)">
+</label>
 </section>
 
 <section class="section" id="stories">
@@ -87,5 +93,16 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; backgr
 </div>
 
 <footer>Xire.ai</footer>
+
+<script>
+function changeVideo(input) {
+  if (input.files && input.files[0]) {
+    const video = document.getElementById('heroVideo');
+    const url = URL.createObjectURL(input.files[0]);
+    video.src = url;
+    video.play();
+  }
+}
+</script>
 </body>
 </html>
