@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xiress Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --card: #14141c;
+      --accent: #ff4d8d;
+      --accent2: #7c5cff;
+      --text: #f0f0f5;
+      --muted: #8888a0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Kanit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .bg-decor {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: 
+        radial-gradient(ellipse at 20% 20%, rgba(255,77,141,0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(124,92,255,0.12) 0%, transparent 50%),
+        var(--bg);
+    }
+    .floating-img {
+      position: absolute;
+      border-radius: 16px;
+      opacity: 0.25;
+      filter: blur(1px);
+      pointer-events: none;
+      animation: float 20s infinite ease-in-out;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-30px) rotate(2deg); }
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10,10,15,0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .nav-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text);
+      padding: 8px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .nav-btn:hover, .nav-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .hero {
+      text-align: center;
+      padding: 80px 20px 40px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--accent), #ff8ab8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      color: var(--muted);
+      font-size: 18px;
+      max-width: 500px;
+      margin: 0 auto 32px;
+    }
+    .cta {
+      background: linear-gradient(135deg, var(--accent), #ff6b9d);
+      color: #fff;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 999px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 8px 32px rgba(255,77,141,0.4);
+      transition: transform 0.2s;
+    }
+    .cta:hover { transform: translateY(-2px); }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px 60px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+    }
+    .card-img {
+      height: 160px;
+      background: linear-gradient(135deg, #1a1a28, #252538);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .card-body { padding: 16px; }
+    .card-body h3 { font-size: 16px; margin-bottom: 6px; }
+    .card-body p { color: var(--muted); font-size: 13px; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--card);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 480px;
+      border: 1px solid rgba(255,255,255,0.08);
+      animation: modalIn 0.3s ease;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-header {
+      padding: 20px 24px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h2 { font-size: 20px; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .modal-body { padding: 20px 24px 24px; }
+    .modal input, .modal select, .modal textarea {
+      width: 100%;
+      padding: 12px 14px;
+      background: #0d0d14;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    .modal textarea { min-height: 80px; resize: vertical; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+    }
+    .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+    .tab {
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--muted);
+      border-radius: 999px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    footer {
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-decor">
+    <div class="floating-img" style="width:200px;height:280px;top:10%;left:5%;background:#222;"></div>
+    <div class="floating-img" style="width:180px;height:240px;top:60%;right:8%;background:#1a1a28;animation-delay:-10s;"></div>
+  </div>
+
+  <header>
+    <div class="logo">Xiress Studio</div>
+    <div style="display:flex;gap:10px;">
+      <button class="nav-btn" onclick="openModal('new-project')">+ โปรเจกต์ใหม่</button>
+      <button class="nav-btn" onclick="openModal('settings')">ตั้งค่า</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <h1>สร้าง<span>หนัง</span>และ<span>ซีรีส์</span><br>ในคลิกเดียว</h1>
+    <p>จากเนื้อเรื่องสู่คลิปพร้อมโพสต์ TikTok — ระบบอัตโนมัติครบวงจร</p>
+    <button class="cta" onclick="openModal('new-project')">เริ่มสร้างโปรเจกต์</button>
+  </section>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" data-tab="projects">โปรเจกต์</button>
+      <button class="tab" data-tab="gallery">คลังภาพ</button>
+      <button class="tab" data-tab="queue">คิวงาน</button>
+    </div>
+
+    <div id="panel-projects">
+      <div class="grid" id="project-grid">
+        <div class="card" onclick="openModal('project-detail')">
+          <div class="card-img">ใส่รูปที่เจนได้ที่นี่</div>
+          <div class="card-body">
+            <h3>สาเหตุที่ฉันรัก</h3>
+            <p>ซีรีส์ · 12 ตอน · กำลังทำ</p>
+          </div>
+        </div>
+        <div class="card" onclick="openModal('new-project')">
+          <div class="card-img" style="display:flex;align-items:center;justify-content:center;font-size:40px;color:#444;">+</div>
+          <div class="card-body">
+            <h3>สร้างโปรเจกต์ใหม่</h3>
+            <p>หนัง · ซีรีส์ · โฆษณา · TikTok</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-gallery" style="display:none;">
+      <div class="grid" id="gallery-grid">
+        <div class="card">
+          <div class="card-img">รูปจากคิวงานจะมาที่นี่</div>
+          <div class="card-body"><h3>ฉาก 1</h3><p>รอสร้างภาพ</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-queue" style="display:none;">
+      <div class="card" style="padding:20px;">
+        <p style="color:var(--muted);">คิวงานจะแสดงที่นี่เมื่อเชื่อมกับ Worker</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>Xiress Studio · สร้างวิดีโอด้วย AI</footer>
+
+  <div class="modal-overlay" id="modal-new-project">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>สร้างโปรเจกต์ใหม่</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input id="p-name" placeholder="ชื่อโปรเจกต์" />
+        <select id="p-type">
+          <option value="series">ซีรีส์</option>
+          <option value="movie">หนัง</option>
+          <option value="ad">โฆษณา</option>
+          <option value="tiktok">TikTok</option>
+          <option value="mv">MV</option>
+        </select>
+        <textarea id="p-story" placeholder="วางเนื้อเรื่องหรือสคริปต์ที่นี่..."></textarea>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeModal()">ยกเลิก</button>
+          <button class="btn-primary" onclick="createProject()">สร้าง</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-project-detail">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>สาเหตุที่ฉันรัก</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--muted);margin-bottom:16px;">ซีรีส์ · 12 ตอน</p>
+        <button class="btn-primary" style="width:100%;margin-bottom:10px;" onclick="openModal('add-scene')">+ เพิ่มฉาก</button>
+        <button class="btn-secondary" style="width:100%;" onclick="alert('ส่งออก')">ส่งออกวิดีโอ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-add-scene">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>เพิ่มฉาก</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <textarea placeholder="คำอธิบายฉาก / prompt..."></textarea>
+        <input type="file" accept="image/*,video/*" style="margin-bottom:12px;" />
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeModal()">ยกเลิก</button>
+          <button class="btn-primary">บันทึก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-settings">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>ตั้งค่า</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label style="font-size:13px;color:var(--muted);">Worker URL</label>
+        <input value="https://anime-image-bot.kandanai697.workers.dev" />
+        <label style="font-size:13px;color:var(--muted);">สัดส่วนเริ่มต้น</label>
+        <select>
+          <option>16:9</option>
+          <option>9:16</option>
+          <option>1:1</option>
+        </select>
+        <div class="modal-actions">
+          <button class="btn-primary" onclick="closeModal()">บันทึก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function openModal(id) {
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+      document.getElementById('modal-' + id).classList.add('show');
+    }
+    function closeModal() {
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+    }
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+      m.addEventListener('click', e => { if (e.target === m) closeModal(); });
+    });
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const name = tab.dataset.tab;
+        document.getElementById('panel-projects').style.display = name === 'projects' ? 'block' : 'none';
+        document.getElementById('panel-gallery').style.display = name === 'gallery' ? 'block' : 'none';
+        document.getElementById('panel-queue').style.display = name === 'queue' ? 'block' : 'none';
+      });
+    });
+
+    function createProject() {
+      const name = document.getElementById('p-name').value || 'โปรเจกต์ใหม่';
+      alert('สร้างโปรเจกต์: ' + name + '\n(เชื่อม API จริงในภายหลัง)');
+      closeModal();
+    }
+  </script>
+</body>
+</html>
