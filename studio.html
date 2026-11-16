@@ -1,1 +1,111 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Xire.ai Studio — Daily Lifestyle Video</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#0f0f12;color:#eee;margin:0;padding:16px;max-width:900px;margin:auto}
+.card{background:#1a1a22;border-radius:12px;padding:16px;margin:12px 0;border:1px solid #333}
+h2{margin:0 0 12px}
+select,button,input,textarea{font:inherit;padding:10px 14px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;width:100%;margin:6px 0}
+button{background:#7c5cff;border:none;cursor:pointer;font-weight:600}
+button:hover{opacity:.9}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:140px}
+.model-info{font-size:.85em;color:#aaa;margin-top:4px}
+.status{color:#7dffb3}
+</style>
+</head>
+<body>
+<h1>Xire.ai Studio</h1>
+<div class="card">
+  <h2>🎬 สร้างวิดีโอประจำวัน (1 นาที)</h2>
+  <label>โมเดลวิดีโอ</label>
+  <select id="videoModel">
+    <option value="wan">Wan 2.2 (แนะนำ — คุณภาพดี, ขยับสมูท)</option>
+    <option value="ltx">LTX (เร็ว เบากว่า)</option>
+    <option value="auto">Auto (ให้ระบบเลือก — ตอนนี้ Wan 2.2)</option>
+  </select>
+  <div class="model-info" id="modelInfo">Wan 2.2: เหมาะกับ T4 ฟรีที่ 480p • คุณภาพสูง ขยับสมูทแบบนักแสดง</div>
+
+  <label>ภาพอ้างอิง (หรือที่เก็บในระบบ)</label>
+  <input id="refImage" type="text" placeholder="URL หรือ base64 ของภาพตัวละคร">
+
+  <label>พร้อมปต์ / ฉาก</label>
+  <textarea id="prompt" rows="3" placeholder="สาวเกาหลี่นั่งดื่มกาแฟ แล้วเดินช้าๆๆ สาวเกาหลี่เสื้อยิ้มไปหาเพื่อนเลี้ยงผู้ชายที่อยู่บนโซฟา แสงอ่อนนุ่ม…"></textarea>
+
+  <div class="row">
+    <button onclick="generateVideo()">สร้างวิดีโอ</button>
+    <button onclick="loadStatus()" style="background:#444">ตรวจสอบสถานะ</button>
+  </div>
+  <div id="status" class="status"></div>
+</div>
+
+<div class="card">
+  <h2>คิววิดีโอ</h2>
+  <div id="queue"></div>
+</div>
+
+<script>
+const WORKER = 'https://anime-image-bot.kandanai697.workers.dev'; // แก้ให้ถูกตามของคุณ
+
+const modelDesc = {
+  wan: 'Wan 2.2: คุณภาพดี ขยับสมูท เหมาะกับ T4 ฟรี (480p)',
+  ltx: 'LTX: เร็วกว่า เบากว่า อาจรองรับเสียง',
+  auto: 'Auto: ให้ระบบเลือกโมเดลที่เหมาะสม (ตอนนี้ Wan 2.2)'
+};
+
+document.getElementById('videoModel').onchange = e => {
+  document.getElementById('modelInfo').textContent = modelDesc[e.target.value] || '';
+};
+
+async function generateVideo() {
+  const model = document.getElementById('videoModel').value;
+  const prompt = document.getElementById('prompt').value || 'สาวเกาหลี่นั่งดื่มกาแฟ สาวเกาหลี่เสื้อยิ้มไปหาเพื่อน แสงอ่อนนุ่ม ขยับสมูทแบบนักแสดง';
+  const image = document.getElementById('refImage').value.trim();
+  if (!image) { alert('ใส่ URL ภาพอ้างอิงก่อน'); return; }
+
+  const status = document.getElementById('status');
+  status.textContent = 'กำลังส่งงาน…';
+
+  const payload = {
+    project: 'daily-lifestyle',
+    ep: new Date().toISOString().slice(0,10),
+    items: [{
+      shot: '1',
+      prompt,
+      image,
+      frames: 81, // ~5s ที่ 16fps หรือปรับให้เหมาะสม
+      model: model === 'auto' ? 'wan' : model
+    }]
+  };
+
+  try {
+    const r = await fetch(WORKER + '/api/venqueue', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const j = await r.json();
+    if (j.ok) status.textContent = `✓ ส่งงานแล้ว (${j.added} ช็อต) — โมเดล: ${model}`;
+    else status.textContent = 'ผิดพลาด: ' + (j.error || 'unknown');
+  } catch (e) {
+    status.textContent = 'เชื่อมต่อไม่ได้: ' + e.message;
+  }
+}
+
+async function loadStatus() {
+  const q = document.getElementById('queue');
+  q.textContent = 'กำลังโหลด…';
+  try {
+    const r = await fetch(WORKER + '/api/vstatus');
+    const j = await r.json();
+    q.innerHTML = `<pre>${JSON.stringify({jobs: j.jobs?.slice(0,5), videos: j.videos?.slice(0,3), kaggle: j.kaggle}, null, 2)}</pre>`;
+  } catch (e) {
+    q.textContent = 'ดึงสถานะไม่ได้';
+  }
+}
+</script>
+</body>
+</html>
