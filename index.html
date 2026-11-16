@@ -1,57 +1,12 @@
 <!doctype html>
-<html lang="th"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Xiress Studio · คลิปสั้น</title>
-<style>
-:root{--bg:#fff;--fg:#1a1a1a;--c:#f3f4f6;--on:#1a1a1a;--onfg:#fff;--mu:#6b7280}
-@media(prefers-color-scheme:dark){:root{--bg:#121212;--fg:#eee;--c:#1f1f1f;--on:#eee;--onfg:#121212;--mu:#9ca3af}}
-body{margin:0;padding:12px;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;max-width:640px;margin:auto}
-h1{font-size:20px}h2{font-size:15px;margin:16px 0 6px}
-.row{display:flex;flex-wrap:wrap;gap:8px}
-button,input{font:inherit;padding:10px 14px;border-radius:12px;border:1px solid #8885;background:var(--c);color:var(--fg)}
-button.on{background:var(--on);color:var(--onfg)}
-input{width:100%;box-sizing:border-box}
-.go{width:100%;margin-top:16px;background:var(--on);color:var(--onfg);font-weight:600}
-.card{background:var(--c);border-radius:14px;padding:12px;margin:12px 0}
-.mu{color:var(--mu);font-size:13px}.err{color:#c0392b}
-.sc{border-top:1px solid #8883;padding:8px 0}
-</style></head><body>
-<h1>🎬 สตูดิโอคลิปสั้น</h1>
-<div class="mu">เรื่องสั้น / ความรู้ จบในตอน ไม่ต้องล็อกหน้าตัวละคร · <a href="anime-studio.html">🎌 สตูดิโออนิเมะเดิม</a></div>
-<div id="app"></div>
-<script>
-const S={kind:'story',min:1,job:'',topic:'',busy:false,out:null,err:''};
-const KINDS=[['story','📖 เรื่องสั้น'],['know','💡 ความรู้'],['mix','✨ เรื่องสั้นแฝงความรู้']];
-const JOBS=['นักบัญชี','ทนายความ','เชฟ','หมอ (ข้อมูลทั่วไป)','นักออกแบบ','ครู','นักการตลาด','ช่างซ่อม'];
-const cfg=()=>{try{return JSON.parse(localStorage.getItem('ss_imgbot')||'{}')||{}}catch(e){return{}}};
-const u=p=>String(cfg().url||'').replace(/\/+$/,'')+p+'?k='+encodeURIComponent(cfg().key||'');
-const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-function btn(g,v,l,cur){return `<button class="${cur===v?'on':''}" data-g="${g}" data-v="${esc(v)}">${l}</button>`}
-function draw(){
-  let h=`<h2>1 · ประเภท</h2><div class="row">${KINDS.map(k=>btn('kind',k[0],k[1],S.kind)).join('')}</div>
-  <h2>2 · ความยาว</h2><div class="row">${[1,2,3].map(m=>btn('min',m,m+' นาที',S.min)).join('')}</div>`;
-  if(S.kind!=='story')h+=`<h2>3 · อาชีพผู้เล่า</h2><div class="row">${JOBS.map(j=>btn('job',j,j,S.job)).join('')}</div>`;
-  h+=`<h2>${S.kind==='story'?3:4} · หัวข้อ (เว้นว่าง = ให้ระบบคิดเอง)</h2><input id="tp" placeholder="เช่น ลูกค้าเบี้ยวจ่าย" value="${esc(S.topic)}">
-  <button class="go" id="go" ${S.busy?'disabled':''}>${S.busy?'กำลังเขียนบท…':'เขียนสคริปต์'}</button>`;
-  if(!cfg().url)h+=`<div class="card err">ยังไม่ได้ตั้งลิงก์บอท — ตั้งในหน้า Xiress Studio เดิมก่อน (ใช้ค่าชุดเดียวกัน)</div>`;
-  if(S.err)h+=`<div class="card err">${esc(S.err)}</div>`;
-  (S.out||[]).forEach((x,i)=>{h+=`<div class="card"><b>${esc(x.title)}</b><div class="mu">🪝 ${esc(x.hook)}</div>
-  ${(x.scenes||[]).map((s,j)=>`<div class="sc"><div>${j+1}. ${esc(s.voice)}</div><div class="mu">🖼 ${esc(s.visual)}</div></div>`).join('')}
-  <div class="mu">📣 ${esc(x.cta)}</div><button data-copy="${i}">คัดลอกสคริปต์</button></div>`});
-  document.getElementById('app').innerHTML=h;
-  document.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{const g=b.dataset.g;S[g]=g==='min'?+b.dataset.v:(g==='job'&&S.job===b.dataset.v?'':b.dataset.v);S.topic=document.getElementById('tp').value;draw()});
-  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{const x=S.out[+b.dataset.copy];navigator.clipboard.writeText([x.title,x.hook,...x.scenes.map((s,j)=>(j+1)+'. '+s.voice),x.cta].join('\n')).then(()=>b.textContent='คัดลอกแล้ว ✓')});
-  document.getElementById('go').onclick=run;
-}
-async function run(){
-  S.topic=document.getElementById('tp').value;S.busy=true;S.err='';draw();
-  try{
-    const r=await fetch(u('/api/anime'),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({act:'short',kind:S.kind,min:S.min,job:S.job,topic:S.topic})});
-    if(r.status===401)throw new Error('รหัสผ่านบอทไม่ถูกต้อง');
-    const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||'HTTP '+r.status);
-    S.out=j.items;
-  }catch(e){S.err=/fetch/i.test(e.message)?'ติดต่อบอทไม่ได้ — ต้อง deploy worker.js ตัวใหม่ก่อน':e.message}
-  S.busy=false;draw();
-}
-draw();
-</script></body></html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url=xiress-realistic.html">
+<title>Xiress Studio</title>
+<script>location.replace('xiress-realistic.html'+location.search+location.hash)</script>
+</head>
+<body>
+<p>กำลังย้ายไปหน้าใหม่... <a href="xiress-realistic.html">คลิกที่นี่</a></p>
+</body>
+</html>
