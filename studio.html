@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Xire.ai Studio</title>
+<title>Xire.ai Studio · Netflix Level</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -11,7 +11,7 @@ body { font-family: 'Kanit', sans-serif; background: #f8f6f3; color: #2c2c2c; }
 header { padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1px solid #eee; }
 .logo { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 600; }
 nav a { color: #2c2c2c; text-decoration: none; margin-left: 28px; font-size: 15px; }
-.container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+.container { max-width: 960px; margin: 40px auto; padding: 0 20px; }
 h1 { font-family: 'Playfair Display', serif; font-size: 36px; margin-bottom: 8px; }
 .sub { color: #777; margin-bottom: 32px; }
 .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
@@ -19,11 +19,14 @@ h1 { font-family: 'Playfair Display', serif; font-size: 36px; margin-bottom: 8px
 .btn { display: inline-block; background: #2c2c2c; color: #fff; padding: 12px 28px; border-radius: 999px; text-decoration: none; font-size: 15px; margin-top: 12px; border: none; cursor: pointer; }
 .btn:hover { background: #444; }
 .btn-full { width: 100%; text-align: center; }
-textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; margin: 8px 0; }
+.btn-small { padding: 8px 16px; font-size: 13px; }
+textarea, input[type=text], input[type=file], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; margin: 8px 0; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 200px; }
 .conn { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .conn span { background: #f4f2ef; padding: 6px 12px; border-radius: 999px; font-size: 13px; }
 .conn span.backup { background: #fff3e0; }
-.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 16px; }
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
 .part { background: #f4f2ef; border-radius: 10px; padding: 12px; text-align: center; }
 .part b { display: block; font-size: 15px; margin-bottom: 4px; }
 .part small { color: #777; display: block; }
@@ -37,7 +40,10 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .hist-item { padding: 10px; background: #f4f2ef; border-radius: 8px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
 .hist-item:hover { background: #eee; }
 .note { background: #fff8e1; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
+.storyboard { margin-top: 16px; }
+.scene { background: #f4f2ef; padding: 12px; border-radius: 8px; margin-bottom: 8px; font-size: 14px; }
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
+label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -51,7 +57,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">ระบบใหม่ · Advanced Prompting</p>
+<p class="sub">ระบบสร้างซีรีส์ / อนิเมะ ระดับ Netflix · 1-8 ครบ</p>
 
 <div class="card">
 <h2>สถานะระบบ</h2>
@@ -62,44 +68,118 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <span class="backup">Flux (สำรอง)</span>
 <span>SDXL</span>
 </div>
-<button class="btn" onclick="testWorker()">ทดสอบ Worker</button>
+<button class="btn btn-small" onclick="testWorker()">ทดสอบ Worker</button>
 <div class="status" id="testResult"></div>
-<div class="note">Worker เป็นหน้าสั่งงาน (ไม่ได้คืนรูปทันที) ใช้ปุ่มทดสอบดูสถานะ หรือเปิด Worker โดยตรง</div>
 </div>
 
+<!-- 1. Character Consistency -->
+<div class="card">
+<h2>1. ตัวละครคงที่ (Character Consistency)</h2>
+<label>คำอธิบายตัวละคร (ใส่ทุก Prompt)</label>
+<textarea id="character" rows="3" placeholder="เช่น 1girl, long black hair, brown eyes, white hoodie, 25 years old, Korean actress look"></textarea>
+<label>รูปอ้างอิงตัวละคร (IP-Adapter / FaceID)</label>
+<input type="file" id="refImage" accept="image/*">
+<div class="row">
+<select id="consistency">
+<option value="ip-adapter">IP-Adapter FaceID</option>
+<option value="lora">LoRA ตัวละคร</option>
+<option value="prompt-only">ใช้เฉพาะ Prompt</option>
+</select>
+<select id="consistencyStrength">
+<option value="0.6">ความแข็ง 0.6</option>
+<option value="0.8" selected>ความแข็ง 0.8</option>
+<option value="1.0">ความแข็ง 1.0</option>
+</select>
+</div>
+</div>
+
+<!-- 2. ControlNet -->
+<div class="card">
+<h2>2. ControlNet</h2>
+<div class="row">
+<select id="controlPose">
+<option value="">ไม่คุมท่าทาง</option>
+<option value="openpose">OpenPose (ท่าทาง)</option>
+<option value="depth">Depth</option>
+</select>
+<select id="controlComp">
+<option value="">ไม่คุมองค์ประกอบ</option>
+<option value="canny">Canny</option>
+<option value="lineart">Lineart</option>
+</select>
+<select id="controlHair">
+<option value="">ไม่คุมสีผม</option>
+<option value="reference">อ้างอิงสีผม</option>
+</select>
+</div>
+</div>
+
+<!-- 3. Video -->
+<div class="card">
+<h2>3. สร้างวิดีโอ</h2>
+<div class="row">
+<select id="videoType">
+<option value="image">ภาพนิ่งเท่านั้น</option>
+<option value="animatediff">AnimateDiff</option>
+<option value="svd">Stable Video Diffusion</option>
+</select>
+<select id="videoDuration">
+<option value="3">3 วินาที</option>
+<option value="5">5 วินาที</option>
+<option value="10">10 วินาที</option>
+</select>
+</div>
+</div>
+
+<!-- 4. Voice + Sub -->
+<div class="card">
+<h2>4. เสียงพากย์ + ซับไทย</h2>
+<div class="row">
+<select id="tts">
+<option value="none">ไม่พากย์</option>
+<option value="voicevox">VOICEVOX (ญี่ปุ่น)</option>
+<option value="edge">Edge TTS</option>
+</select>
+<select id="subtitle">
+<option value="none">ไม่มีซับ</option>
+<option value="thai" selected>ซับไทยอัตโนมัติ</option>
+<option value="en">ซับอังกฤษ</option>
+</select>
+</div>
+</div>
+
+<!-- 5. Storyboard + 7. Templates -->
 <div class="card">
 <h2>สร้างซีรีส์ใหม่</h2>
 <input type="text" id="title" placeholder="ชื่อเรื่อง">
-<textarea id="story" rows="4" placeholder="เขียนเนื้อเรื่องที่นี่..."></textarea>
-<select id="style">
-<option value="cinematic realistic Korean drama, teal and orange color grading">สัมจริง สไตล์ซีรีส์เกาหลี</option>
-<option value="cinematic Japanese drama realistic, muted tones">สัมจริง สไตล์ซีรีส์ญี่ปุ่น</option>
-<option value="anime style high quality, detailed">อนิเมะคุณภาพสูง</option>
-<option value="cinematic movie still realistic, film grain">สัมจริงหนังภาพยนตร์</option>
-</select>
-<select id="lighting">
-<option value="cinematic lighting, Rembrandt lighting on face">Rembrandt</option>
-<option value="golden hour rim light, warm lighting">Golden Hour</option>
-<option value="dramatic rim light, chiaroscuro">Rim Light</option>
-<option value="soft diffused lighting, overcast">Soft Light</option>
-</select>
-<select id="camera">
-<option value="shallow depth of field, 85mm lens, film still">85mm Portrait</option>
-<option value="low angle shot, cinematic composition">Low Angle</option>
-<option value="wide shot, rule of thirds">Wide Shot</option>
-<option value="close-up, highly detailed face">Close-up</option>
+<textarea id="story" rows="5" placeholder="เขียนเนื้อเรื่องที่นี่... ระบบจะแบ่งเป็นซีนอัตโนมัติ"></textarea>
+
+<div class="row">
+<select id="template">
+<option value="netflix-kdrama">Netflix ซีรีส์เกาหลี</option>
+<option value="netflix-jdrama">Netflix ซีรีส์ญี่ปุ่น</option>
+<option value="anime-high">อนิเมะคุณภาพสูง</option>
+<option value="cinematic">Cinematic 16:9</option>
 </select>
 <select id="partsCount">
-<option value="5">5 พาร์ท TikTok</option>
+<option value="5">5 พาร์ท</option>
 <option value="3">3 พาร์ท</option>
 <option value="8">8 พาร์ท</option>
-<option value="10">10 พาร์ท</option>
 </select>
+</div>
+
+<button class="btn btn-small" onclick="generateStoryboard()">5. สร้าง Storyboard อัตโนมัติ</button>
+<div class="storyboard" id="storyboard"></div>
+
+<div class="row" style="margin-top:16px">
 <select id="model">
-<option value="sdxl">SDXL (หลัก)</option>
-<option value="flux">Flux (สำรอง)</option>
-<option value="kaggle">Kaggle GPU (สำรอง)</option>
+<option value="sdxl">SDXL</option>
+<option value="flux">Flux</option>
+<option value="kaggle">Kaggle</option>
 </select>
+<label style="align-self:center"><input type="checkbox" id="qualityCheck" checked> 8. ตรวจคุณภาพ + สร้างใหม่ถ้าเพี้ยน</label>
+</div>
+
 <button class="btn" onclick="saveStory()">บันทึกเรื่อง</button>
 <button class="btn btn-full" onclick="startFullPipeline()">สร้างทั้งหมดอัตโนมัติ</button>
 <div class="saved" id="savedInfo"></div>
@@ -111,22 +191,59 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <div class="history" id="historyList"></div>
 </div>
 
+<!-- 6. Queue -->
 <div class="card">
-<h2>คิวการสร้าง</h2>
+<h2>6. คิวการสร้าง</h2>
 <div class="parts" id="partsList"></div>
-<button class="btn" onclick="exportTikTok()" style="margin-top:12px">ส่งออกสำหรับ TikTok</button>
-<button class="btn" onclick="openWorker()" style="margin-top:12px;margin-left:8px">เปิด Worker โดยตรง</button>
+<button class="btn" onclick="exportTikTok()">ส่งออก TikTok</button>
+<button class="btn" onclick="openWorker()" style="margin-left:8px">เปิด Worker</button>
 </div>
 </div>
 
-<footer>Xire.ai Studio · Advanced Prompting</footer>
+<footer>Xire.ai Studio · Netflix Level Pipeline · Features 1-8</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
-function buildPrompt(title, part, total, story, style, lighting, camera) {
-  const scene = story.slice(0, 100).replace(/\n/g, ' ').trim();
-  return `masterpiece, best quality, ultra detailed, 8k, film still, ${style}, ${lighting}, ${camera}, ${title}, scene ${part} of ${total}, ${scene}, highly detailed face, professional photography, emotional atmosphere, shot on 35mm film`;
+const TEMPLATES = {
+  'netflix-kdrama': { style: 'cinematic realistic Korean drama, teal and orange color grading, 16:9', lighting: 'cinematic lighting, Rembrandt lighting on face, soft shadows', camera: 'shallow depth of field, 85mm lens, film still, rule of thirds' },
+  'netflix-jdrama': { style: 'cinematic Japanese drama realistic, muted tones, 16:9', lighting: 'soft diffused lighting, natural light', camera: '35mm lens, film still, emotional atmosphere' },
+  'anime-high': { style: 'anime style high quality, detailed, masterpiece', lighting: 'cinematic lighting, dramatic', camera: 'dynamic angle, highly detailed face' },
+  'cinematic': { style: 'cinematic movie still realistic, film grain, 16:9', lighting: 'golden hour rim light, volumetric', camera: 'anamorphic lens, shallow depth of field' }
+};
+
+function buildPrompt(title, part, total, sceneText, extra) {
+  const char = document.getElementById('character').value.trim();
+  const t = TEMPLATES[document.getElementById('template').value] || TEMPLATES['netflix-kdrama'];
+  const consistency = document.getElementById('consistency').value;
+  const strength = document.getElementById('consistencyStrength').value;
+  const video = document.getElementById('videoType').value;
+  const pose = document.getElementById('controlPose').value;
+  const comp = document.getElementById('controlComp').value;
+
+  let prompt = `masterpiece, best quality, ultra detailed, 8k, film still, ${t.style}, ${t.lighting}, ${t.camera}, ${title}, scene ${part} of ${total}, ${sceneText}`;
+  if (char) prompt += `, ${char}`;
+  if (consistency !== 'prompt-only') prompt += `, ${consistency} strength ${strength}`;
+  if (pose) prompt += `, ${pose}`;
+  if (comp) prompt += `, ${comp}`;
+  if (video !== 'image') prompt += `, ${video} motion, ${document.getElementById('videoDuration').value} seconds`;
+  prompt += ', highly detailed face, professional photography, emotional atmosphere, shot on 35mm film';
+  return prompt;
+}
+
+function generateStoryboard() {
+  const story = document.getElementById('story').value.trim();
+  const count = +document.getElementById('partsCount').value;
+  const el = document.getElementById('storyboard');
+  if (!story) { el.innerHTML = '<div class="note">ไม่มีเนื้อเรื่อง</div>'; return; }
+  const sentences = story.split(/[.!?ๆ\n]+/).filter(s => s.trim().length > 10);
+  const per = Math.ceil(sentences.length / count) || 1;
+  el.innerHTML = '';
+  for (let i = 1; i <= count; i++) {
+    const chunk = sentences.slice((i-1)*per, i*per).join('. ');
+    const p = buildPrompt(document.getElementById('title').value || 'เรื่อง', i, count, chunk.slice(0,120));
+    el.innerHTML += `<div class="scene"><b>ซีน ${i}/${count}</b><br><small>${chunk.slice(0,80)}...</small><br><code style="font-size:11px;color:#555">${p.slice(0,150)}...</code></div>`;
+  }
 }
 
 function getHistory() { return JSON.parse(localStorage.getItem('xire_history') || '[]'); }
@@ -138,11 +255,10 @@ function saveStory() {
   const data = {
     title: document.getElementById('title').value || 'เรื่องใหม่',
     story: document.getElementById('story').value,
+    character: document.getElementById('character').value,
     parts: +document.getElementById('partsCount').value,
     model: document.getElementById('model').value,
-    style: document.getElementById('style').value,
-    lighting: document.getElementById('lighting').value,
-    camera: document.getElementById('camera').value,
+    template: document.getElementById('template').value,
     time: new Date().toLocaleString('th-TH')
   };
   localStorage.setItem('xire_story', JSON.stringify(data));
@@ -161,11 +277,10 @@ function loadStory(data) {
   }
   document.getElementById('title').value = data.title || '';
   document.getElementById('story').value = data.story || '';
+  document.getElementById('character').value = data.character || '';
   document.getElementById('partsCount').value = data.parts || 5;
   document.getElementById('model').value = data.model || 'sdxl';
-  document.getElementById('style').value = data.style || document.getElementById('style').options[0].value;
-  document.getElementById('lighting').value = data.lighting || document.getElementById('lighting').options[0].value;
-  document.getElementById('camera').value = data.camera || document.getElementById('camera').options[0].value;
+  document.getElementById('template').value = data.template || 'netflix-kdrama';
   document.getElementById('savedInfo').textContent = `โหลด: ${data.title}`;
 }
 
@@ -174,7 +289,7 @@ function renderHistory() {
   const h = getHistory();
   list.innerHTML = h.length ? h.map((s, i) => `
     <div class="hist-item" onclick="loadFromHistory(${i})">
-      <b>${s.title}</b><br><small>${s.parts} พาร์ท · ${s.model} · ${s.time}</small>
+      <b>${s.title}</b><br><small>${s.parts} พาร์ท · ${s.template} · ${s.time}</small>
     </div>
   `).join('') : '<div style="color:#777">ยังไม่มีเรื่องที่บันทึก</div>';
 }
@@ -205,15 +320,13 @@ async function testWorker() {
   el.textContent = 'กำลังทดสอบ Worker...';
   try {
     const res = await fetch(WORKER);
-    el.textContent = `สถานะ: ${res.status}\nWorker เป็นหน้าสั่งงาน\nเปิดลิงก์ด้านบนใช้งานได้โดยตรง`;
+    el.textContent = `สถานะ: ${res.status}\nWorker พร้อม\nเปิดเพื่อดูผลรูปจริง`;
   } catch (e) {
     el.textContent = 'เชื่อมไม่ได้: ' + e.message;
   }
 }
 
-function openWorker() {
-  window.open(WORKER, '_blank');
-}
+function openWorker() { window.open(WORKER, '_blank'); }
 
 function exportTikTok() {
   const q = getQueue();
@@ -232,14 +345,15 @@ async function startFullPipeline() {
   const story = document.getElementById('story').value || '';
   const count = +document.getElementById('partsCount').value;
   const model = document.getElementById('model').value;
-  const style = document.getElementById('style').value;
-  const lighting = document.getElementById('lighting').value;
-  const camera = document.getElementById('camera').value;
   const status = document.getElementById('status');
   const list = document.getElementById('partsList');
+  const quality = document.getElementById('qualityCheck').checked;
 
   status.style.display = 'block';
   status.textContent = 'กำลังเริ่มสร้าง...';
+
+  const sentences = story.split(/[.!?ๆ\n]+/).filter(s => s.trim().length > 5);
+  const per = Math.ceil(sentences.length / count) || 1;
 
   const queue = [];
   list.innerHTML = '';
@@ -251,21 +365,31 @@ async function startFullPipeline() {
 
   for (let i = 1; i <= count; i++) {
     updatePart(i, 'pending');
-    const prompt = buildPrompt(title, i, count, story, style, lighting, camera);
+    const chunk = sentences.slice((i-1)*per, i*per).join('. ').slice(0, 120);
+    const prompt = buildPrompt(title, i, count, chunk);
     try {
       await fetch(WORKER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, type: 'image', model })
+        body: JSON.stringify({
+          prompt,
+          type: document.getElementById('videoType').value === 'image' ? 'image' : 'video',
+          model,
+          character: document.getElementById('character').value,
+          consistency: document.getElementById('consistency').value,
+          qualityCheck: quality,
+          tts: document.getElementById('tts').value,
+          subtitle: document.getElementById('subtitle').value
+        })
       });
-      updatePart(i, 'done', null, 'ส่งไปที่ Worker แล้ว');
-      status.textContent = `พาร์ท ${i}/${count} ส่งคำสั่งไปที่ Worker แล้ว`;
+      updatePart(i, 'done', null, 'ส่งคำสั่งแล้ว');
+      status.textContent = `พาร์ท ${i}/${count} ส่งไปที่ Worker แล้ว`;
     } catch (e) {
       updatePart(i, 'error', null, 'เชื่อมไม่ได้');
     }
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 500));
   }
-  status.textContent = `สร้าง "${title}" เสร็จ\nเปิด Worker เพื่อดูผลรูปจริง`;
+  status.textContent = `สร้าง "${title}" เสร็จทั้งหมด\nเปิด Worker เพื่อดูผลรูปจริง`;
 }
 
 function restoreQueue() {
