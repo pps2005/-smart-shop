@@ -20,6 +20,8 @@ h1 { font-family: 'Playfair Display', serif; font-size: 36px; margin-bottom: 8px
 .btn:hover { background: #444; }
 .btn-full { width: 100%; text-align: center; }
 textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; margin: 8px 0; }
+.conn { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.conn span { background: #f4f2ef; padding: 6px 12px; border-radius: 999px; font-size: 13px; }
 .parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
 .part { background: #f4f2ef; border-radius: 10px; padding: 16px; text-align: center; }
 .part b { display: block; font-size: 16px; margin-bottom: 4px; }
@@ -33,63 +35,63 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <div class="logo">Xire.ai</div>
 <nav>
 <a href="index.html">หน้าหลัก</a>
-<a href="#create">สร้าง</a>
 </nav>
 </header>
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">สร้างทั้งหมดอัตโนมัติ จากเนื้อเรื่อง → ตัวละคร → ฉาก → พาร์ท TikTok</p>
+<p class="sub">ระบบใหม่ · เชื่อม Cloudflare · Supabase · Kaggle · Flux + SDXL</p>
 
-<div class="card" id="create">
-<h2>เริ่มสร้างทั้งหมด</h2>
-<p>วางเนื้อเรื่อง ระบบจะสร้างตัวละคร ฉาก และแบ่งพาร์ท TikTok ให้เอง</p>
+<div class="card">
+<h2>สถานะระบบ</h2>
+<div class="conn">
+<span>Cloudflare Pages</span>
+<span>Supabase</span>
+<span>Kaggle</span>
+<span>Flux + SDXL</span>
+</div>
+<p style="color:#777;font-size:14px;margin-top:8px">ระบบตัวละคร ฉาก LoRA และบทเก่าถูกลบออกแล้ว จะสร้างใหม่ทั้งหมด</p>
+</div>
+
+<div class="card">
+<h2>สร้างซีรีส์ใหม่</h2>
 <input type="text" id="title" placeholder="ชื่อเรื่อง">
-<select id="type">
-<option value="series">ซีรีส์สมจริง</option>
-<option value="anime">อนิเมะ</option>
-<option value="movie">หนัง</option>
-</select>
 <textarea id="story" rows="5" placeholder="เขียนเนื้อเรื่องที่นี่..."></textarea>
 <select id="partsCount">
-<option value="5">5 พาร์ท (ซีนละ 3 นาที)</option>
+<option value="5">5 พาร์ท TikTok (ซีนละ 3 นาที)</option>
 <option value="3">3 พาร์ท</option>
 <option value="8">8 พาร์ท</option>
 <option value="10">10 พาร์ท</option>
 </select>
-<button class="btn btn-full" onclick="runFullAuto()">สร้างทั้งหมดอัตโนมัติ</button>
+<button class="btn btn-full" onclick="createNew()">สร้างใหม่</button>
 <div class="status" id="status"></div>
 </div>
 
 <div class="card">
-<h2>ผลลัพธ์</h2>
+<h2>พาร์ท TikTok</h2>
 <div class="parts" id="partsList"></div>
 </div>
 </div>
 
-<footer>Xire.ai Studio · Full Auto</footer>
+<footer>Xire.ai Studio · New System</footer>
 
 <script>
-function runFullAuto() {
+function createNew() {
   const title = document.getElementById('title').value || 'เรื่องใหม่';
   const count = +document.getElementById('partsCount').value;
   const status = document.getElementById('status');
   const list = document.getElementById('partsList');
 
   status.style.display = 'block';
-  status.textContent = 'กำลังสร้างตัวละคร...';
+  status.textContent = 'กำลังเตรียมระบบใหม่...';
 
   setTimeout(() => {
-    status.textContent = 'กำลังสร้างฉาก...';
-    setTimeout(() => {
-      status.textContent = 'กำลังแบ่งพาร์ท TikTok...';
-      list.innerHTML = '';
-      for (let i = 1; i <= count; i++) {
-        list.innerHTML += `<div class="part"><b>Part ${i}/${count}</b><small>3 นาที · พร้อม</small></div>`;
-      }
-      status.textContent = `สร้าง "${title}" เสร็จแล้ว · ${count} พาร์ท พร้อมลง TikTok`;
-    }, 800);
-  }, 600);
+    list.innerHTML = '';
+    for (let i = 1; i <= count; i++) {
+      list.innerHTML += `<div class="part"><b>Part ${i}/${count}</b><small>3 นาที</small></div>`;
+    }
+    status.textContent = `พร้อมสร้าง "${title}" · ${count} พาร์ท`;
+  }, 800);
 }
 </script>
 </body>
