@@ -27,6 +27,9 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .part b { display: block; font-size: 16px; margin-bottom: 4px; }
 .part small { color: #777; }
 .status { margin-top: 12px; padding: 12px; background: #f0f7f0; border-radius: 8px; color: #1a7a3a; display: none; }
+.steps { margin-top: 16px; }
+.step { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+.step:last-child { border-bottom: none; }
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </style>
 </head>
@@ -40,7 +43,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">ระบบใหม่ · เชื่อม Cloudflare · Supabase · Kaggle · Flux + SDXL</p>
+<p class="sub">ระบบใหม่ · Cloudflare · Supabase · Kaggle · Flux + SDXL</p>
 
 <div class="card">
 <h2>สถานะระบบ</h2>
@@ -50,21 +53,31 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <span>Kaggle</span>
 <span>Flux + SDXL</span>
 </div>
-<p style="color:#777;font-size:14px;margin-top:8px">ระบบตัวละคร ฉาก LoRA และบทเก่าถูกลบออกแล้ว จะสร้างใหม่ทั้งหมด</p>
 </div>
 
 <div class="card">
 <h2>สร้างซีรีส์ใหม่</h2>
 <input type="text" id="title" placeholder="ชื่อเรื่อง">
-<textarea id="story" rows="5" placeholder="เขียนเนื้อเรื่องที่นี่..."></textarea>
+<textarea id="story" rows="4" placeholder="เขียนเนื้อเรื่องที่นี่..."></textarea>
 <select id="partsCount">
 <option value="5">5 พาร์ท TikTok (ซีนละ 3 นาที)</option>
 <option value="3">3 พาร์ท</option>
 <option value="8">8 พาร์ท</option>
 <option value="10">10 พาร์ท</option>
 </select>
-<button class="btn btn-full" onclick="createNew()">สร้างใหม่</button>
+<button class="btn btn-full" onclick="startGeneration()">เริ่มสร้าง</button>
 <div class="status" id="status"></div>
+</div>
+
+<div class="card">
+<h2>ขั้นตอนการสร้าง</h2>
+<div class="steps">
+<div class="step">1. รับเนื้อเรื่อง</div>
+<div class="step">2. แบ่งซีนและพาร์ท TikTok</div>
+<div class="step">3. สร้างภาพด้วย Flux + SDXL</div>
+<div class="step">4. สร้างวิดีโอซีน</div>
+<div class="step">5. เตรียมลง TikTok</div>
+</div>
 </div>
 
 <div class="card">
@@ -76,22 +89,22 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <footer>Xire.ai Studio · New System</footer>
 
 <script>
-function createNew() {
+function startGeneration() {
   const title = document.getElementById('title').value || 'เรื่องใหม่';
   const count = +document.getElementById('partsCount').value;
   const status = document.getElementById('status');
   const list = document.getElementById('partsList');
 
   status.style.display = 'block';
-  status.textContent = 'กำลังเตรียมระบบใหม่...';
+  status.textContent = 'กำลังเริ่มสร้าง...';
 
   setTimeout(() => {
     list.innerHTML = '';
     for (let i = 1; i <= count; i++) {
       list.innerHTML += `<div class="part"><b>Part ${i}/${count}</b><small>3 นาที</small></div>`;
     }
-    status.textContent = `พร้อมสร้าง "${title}" · ${count} พาร์ท`;
-  }, 800);
+    status.textContent = `เริ่มสร้าง "${title}" แล้ว · พร้อมส่งต่อ`;
+  }, 1000);
 }
 </script>
 </body>
