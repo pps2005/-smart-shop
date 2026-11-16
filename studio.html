@@ -31,11 +31,12 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .part.pending { opacity: 0.7; }
 .part.done { background: #e8f5e9; }
 .part.error { background: #ffebee; }
-.status { margin-top: 12px; padding: 12px; background: #f0f7f0; border-radius: 8px; color: #1a7a3a; display: none; }
+.status { margin-top: 12px; padding: 12px; background: #f0f7f0; border-radius: 8px; color: #1a7a3a; display: none; white-space: pre-wrap; font-size: 13px; }
 .saved { font-size: 13px; color: #777; margin-top: 8px; }
 .history { margin-top: 12px; }
 .hist-item { padding: 10px; background: #f4f2ef; border-radius: 8px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
 .hist-item:hover { background: #eee; }
+.note { background: #fff8e1; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </style>
 </head>
@@ -44,6 +45,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <div class="logo">Xire.ai</div>
 <nav>
 <a href="index.html">หน้าหลัก</a>
+<a href="https://anime-image-bot.kandanai697.workers.dev" target="_blank">Worker</a>
 </nav>
 </header>
 
@@ -61,7 +63,8 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <span>SDXL</span>
 </div>
 <button class="btn" onclick="testWorker()">ทดสอบ Worker</button>
-<div class="status" id="testResult" style="display:none"></div>
+<div class="status" id="testResult"></div>
+<div class="note">Worker เป็นหน้าสั่งงาน (ไม่ได้คืนรูปทันที) ใช้ปุ่มทดสอบดูสถานะ หรือเปิด Worker โดยตรง</div>
 </div>
 
 <div class="card">
@@ -112,10 +115,11 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <h2>คิวการสร้าง</h2>
 <div class="parts" id="partsList"></div>
 <button class="btn" onclick="exportTikTok()" style="margin-top:12px">ส่งออกสำหรับ TikTok</button>
+<button class="btn" onclick="openWorker()" style="margin-top:12px;margin-left:8px">เปิด Worker โดยตรง</button>
 </div>
 </div>
 
-<footer>Xire.ai Studio · Advanced Prompting · Updated</footer>
+<footer>Xire.ai Studio · Advanced Prompting</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
@@ -177,11 +181,11 @@ function renderHistory() {
 
 function loadFromHistory(i) { const h = getHistory(); if (h[i]) loadStory(h[i]); }
 
-function updatePart(i, status, imgUrl) {
+function updatePart(i, status, imgUrl, msg) {
   const el = document.getElementById(`part-${i}`);
   if (!el) return;
   el.className = `part ${status}`;
-  el.querySelector('small').textContent = status === 'done' ? 'เสร็จ' : status === 'error' ? 'ผิดพลาด' : 'กำลังสร้าง...';
+  el.querySelector('small').textContent = msg || (status === 'done' ? 'ส่งคำสั่งแล้ว' : status === 'error' ? 'ผิดพลาด' : 'กำลังสร้าง...');
   if (imgUrl) {
     let img = el.querySelector('img');
     if (!img) { img = document.createElement('img'); el.appendChild(img); }
@@ -191,6 +195,7 @@ function updatePart(i, status, imgUrl) {
   const item = q.find(x => x.id === i) || { id: i };
   item.status = status;
   item.img = imgUrl || item.img;
+  item.msg = msg;
   setQueue(q);
 }
 
@@ -199,21 +204,25 @@ async function testWorker() {
   el.style.display = 'block';
   el.textContent = 'กำลังทดสอบ Worker...';
   try {
-    const res = await fetch(WORKER, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'test cinematic', type: 'image' }) });
-    const text = await res.text();
-    el.textContent = `ตอบกลับ: ${res.status}\n${text.slice(0, 200)}`;
+    const res = await fetch(WORKER);
+    el.textContent = `สถานะ: ${res.status}\nWorker เป็นหน้าสั่งงาน\nเปิดลิงก์ด้านบนใช้งานได้โดยตรง`;
   } catch (e) {
     el.textContent = 'เชื่อมไม่ได้: ' + e.message;
   }
 }
 
+function openWorker() {
+  window.open(WORKER, '_blank');
+}
+
 function exportTikTok() {
   const q = getQueue();
-  const text = q.map(p => `Part ${p.id}: ${p.status}`).join('\n');
-  const blob = new Blob([text], { type: 'text/plain' });
+  const title = document.getElementById('title').value || 'เรื่อง';
+  const text = `เรื่อง: ${title}\n` + q.map(p => `Part ${p.id}: ${p.status} ${p.msg || ''}`).join('\n');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'tiktok-export.txt';
+  a.download = `${title}-tiktok.txt`;
   a.click();
 }
 
@@ -244,20 +253,19 @@ async function startFullPipeline() {
     updatePart(i, 'pending');
     const prompt = buildPrompt(title, i, count, story, style, lighting, camera);
     try {
-      const res = await fetch(WORKER, {
+      await fetch(WORKER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, type: 'image', model, fallback: 'flux-kaggle' })
+        body: JSON.stringify({ prompt, type: 'image', model })
       });
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        updatePart(i, 'done', data.image || data.url);
-        status.textContent = `พาร์ท ${i}/${count} เสร็จ (${model})`;
-      } else updatePart(i, 'error');
-    } catch (e) { updatePart(i, 'error'); }
-    await new Promise(r => setTimeout(r, 600));
+      updatePart(i, 'done', null, 'ส่งไปที่ Worker แล้ว');
+      status.textContent = `พาร์ท ${i}/${count} ส่งคำสั่งไปที่ Worker แล้ว`;
+    } catch (e) {
+      updatePart(i, 'error', null, 'เชื่อมไม่ได้');
+    }
+    await new Promise(r => setTimeout(r, 400));
   }
-  status.textContent = `สร้าง "${title}" เสร็จทั้งหมด`;
+  status.textContent = `สร้าง "${title}" เสร็จ\nเปิด Worker เพื่อดูผลรูปจริง`;
 }
 
 function restoreQueue() {
@@ -266,7 +274,7 @@ function restoreQueue() {
   const list = document.getElementById('partsList');
   list.innerHTML = '';
   q.forEach(p => {
-    list.innerHTML += `<div class="part ${p.status}" id="part-${p.id}"><b>Part ${p.id}</b><small>${p.status}</small>${p.img ? `<img src="${p.img}">` : ''}</div>`;
+    list.innerHTML += `<div class="part ${p.status}" id="part-${p.id}"><b>Part ${p.id}</b><small>${p.msg || p.status}</small>${p.img ? `<img src="${p.img}">` : ''}</div>`;
   });
 }
 
