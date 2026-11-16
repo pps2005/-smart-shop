@@ -12,7 +12,7 @@ header { position: absolute; top: 0; left: 0; right: 0; z-index: 10; padding: 20
 .logo { font-family: 'Playfair Display', serif; font-size: 28px; color: #fff; font-weight: 600; letter-spacing: 1px; }
 nav a { color: #fff; text-decoration: none; margin-left: 28px; font-size: 15px; opacity: 0.9; }
 nav a:hover { opacity: 1; }
-.hero { height: 100vh; position: relative; display: flex; align-items: center; justify-content: center; color: #fff; text-align: center; overflow: hidden; }
+.hero { height: 100vh; position: relative; display: flex; align-items: center; justify-content: center; color: #fff; text-align: center; overflow: hidden; background: #333 url('https://picsum.photos/id/1011/1920/1080') center/cover; }
 .hero video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.25), rgba(0,0,0,0.5)); }
 .hero-content { position: relative; z-index: 2; }
@@ -44,8 +44,8 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; backgr
 </header>
 
 <section class="hero">
-<video autoplay muted loop playsinline>
-<source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+<video autoplay muted loop playsinline poster="https://picsum.photos/id/1011/1920/1080">
+<source src="https://cdn.coverr.co/videos/coverr-a-woman-walking-on-a-city-street-1573/1080p.mp4" type="video/mp4">
 </video>
 <div class="hero-content">
 <h1>Xire.ai</h1>
