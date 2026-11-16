@@ -37,9 +37,9 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .status { margin-top: 12px; padding: 12px; background: #f0f7f0; border-radius: 8px; color: #1a7a3a; display: none; white-space: pre-wrap; font-size: 13px; }
 .note { background: #fff8e1; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
-label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 .daily-box { background: linear-gradient(135deg, #fce4ec, #f8bbd0); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
 .daily-box h2 { color: #c2185b; }
+.auto-note { background: #e8f5e9; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -53,19 +53,20 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">ตัวละครหลัก · สาวเกาหลี · เผชียวผมโทนนุ่มๆ</p>
+<p class="sub">รันอัตโนมัติ · ตัวละครคงที่ · ไม่ต้องพึ่ง Grok</p>
 
 <div class="daily-box">
 <h2>คอนเทนต์วันนี้</h2>
-<p style="margin:8px 0;color:#555">สาวผมยาว + แมวนุ่มๆ สไตล์เกาหลีสมจริง</p>
-<button class="btn btn-daily btn-full" onclick="generateDailyContent()">สร้างคอนเทนต์วันนี้ (1 นาที)</button>
+<p style="margin:8px 0;color:#555">สาวผมยาวโทนเกาหลี + แมวนุ่มๆ · 6 ซีน</p>
+<button class="btn btn-daily btn-full" onclick="generateDailyContent()">สร้างคอนเทนต์วันนี้</button>
+<div class="auto-note">ระบบรันอัตโนมัติ: เปิดหน้านี้ทุกวัน → กดปุ่มข้างบน → เปิด Worker ดูรูป → ดาวน์โหลดไปลง TikTok</div>
 <div class="status" id="dailyStatus"></div>
 </div>
 
 <div class="card">
-<h2>ตัวละครหลัก</h2>
-<textarea id="character" rows="3">1girl, long dark brown hair with soft Korean highlights, slightly wavy, slim figure, oval face, soft features, natural makeup, photorealistic Korean style</textarea>
-<div class="note">หน้าและหุ่นคงที่ · ชุดและฉากเปลี่ยนได้</div>
+<h2>ตัวละครหลัก (ล็อคเข้าไว้)</h2>
+<textarea id="character" rows="4">1girl, long dark brown hair with soft Korean highlights, slightly wavy hair, slim tall figure, oval face, soft facial features, natural makeup, photorealistic, Korean style, consistent character, same face every scene</textarea>
+<div class="note">หน้าและหุ่นคงที่ทุกซีน · ชุดและฉากเปลี่ยนได้</div>
 </div>
 
 <div class="card">
@@ -76,29 +77,27 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 <span>Kaggle GPU</span>
 <span>SDXL / Flux</span>
 </div>
-<button class="btn btn-small" onclick="testWorker()">ทดสอบ Worker</button>
+<button class="btn btn-small" onclick="testWorker()">ทดสอบ</button>
 <div class="status" id="testResult"></div>
 </div>
 
 <div class="card">
-<h2>สร้างเอง</h2>
-<input type="text" id="title" value="คอนเทนต์วันนี้">
-<textarea id="story" rows="4">เดินผ่านสวน เห็นแมวนุ่มๆนั่งอยู่ข้างทางเดิน
-ยืนดูแล้วยืนมือออกหาอาหาร
-แมวติดมือเธอแล้วยิ้มอ่อนโยน
-อุ้มแมวขึ้นมากอดไปบ้าน</textarea>
+<h2>สร้างเอง (ถ้าไม่ใช่คอนเทนต์วันนี้)</h2>
+<input type="text" id="title" value="คอนเทนต์พิเศษ">
+<textarea id="story" rows="3">เดินผ่านสวน เห็นแมวนุ่มๆ
+ยืนมือออกหาอาหาร
+อุ้มแมวขึ้นมากอด</textarea>
 <div class="row">
 <select id="template">
 <option value="kdrama-soft" selected>เกาหลีนุ่มๆ</option>
 <option value="anime-high">อนิเมะ</option>
-<option value="cinematic">Cinematic</option>
 </select>
 <select id="partsCount">
-<option value="6" selected>6 ซีน (~1 นาที)</option>
+<option value="6" selected>6 ซีน</option>
 <option value="5">5 ซีน</option>
 </select>
 </div>
-<button class="btn btn-full" onclick="startFullPipeline()">สร้างจากเว็บ</button>
+<button class="btn btn-full" onclick="startFullPipeline()">สร้างเอง</button>
 <div class="status" id="status"></div>
 </div>
 
@@ -110,19 +109,17 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 <button class="btn btn-small" onclick="openWorker()">เปิด Worker</button>
 <button class="btn btn-small" onclick="clearQueue()">ล้างคิว</button>
 </div>
-<div class="note">กดปุ่มสร้าง → เปิด Worker ดูความคืบหน้า → กลับมากดดึงรูป</div>
 </div>
 </div>
 
-<footer>Xire.ai Studio</footer>
+<footer>Xire.ai Studio · รันอัตโนมัติได้โดยไม่ต้องพึ่ง Grok</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
 const TEMPLATES = {
-  'kdrama-soft': 'photorealistic, soft natural lighting, Korean drama style, warm tones, shallow depth of field, cinematic, detailed skin',
-  'anime-high': 'masterpiece, best quality, anime style, detailed, cinematic lighting',
-  'cinematic': 'cinematic movie still, film grain, 16:9, golden hour'
+  'kdrama-soft': 'photorealistic, soft natural lighting, Korean drama style, warm tones, shallow depth of field, cinematic, detailed skin, consistent character',
+  'anime-high': 'masterpiece, best quality, anime style, detailed, cinematic lighting'
 };
 
 const DAILY_SCENES = [
@@ -140,7 +137,7 @@ const DAILY_SCENES = [
     'offering hand, cat sniffing fingers, gentle interaction',
     'laughing softly, cat on her lap, golden hour lighting',
     'standing up, cat following, tree-lined path',
-    'close-up face with soft Korean hair highlights, tender expression'
+    'close-up face, soft Korean hair highlights, tender expression'
   ],
   [
     'walking through autumn park, falling leaves, casual outfit',
@@ -148,7 +145,15 @@ const DAILY_SCENES = [
     'kneeling, cat walking toward her, mutual curiosity',
     'picking up cat carefully, cat relaxed in her arms',
     'carrying cat home, back view, modern building',
-    'close-up hair and face, soft natural light, Korean style'
+    'close-up hair and face, soft natural light'
+  ],
+  [
+    'standing at cafe outdoor, black t-shirt, wide jeans, soft daylight',
+    'walking past shops, looking at window, gentle expression',
+    'sitting at cafe table, coffee in hand, soft smile',
+    'fluffy cat under table looking up, curious',
+    'leaning down to pet cat, warm interaction',
+    'leaving cafe with cat following, golden hour'
   ]
 ];
 
@@ -173,7 +178,6 @@ async function generateDailyContent() {
   const title = `คอนเทนต์วันที่ ${new Date().toLocaleDateString('th-TH')}`;
 
   document.getElementById('title').value = title;
-  document.getElementById('template').value = 'kdrama-soft';
 
   const lines = scenes.map(s => buildPrompt(s)).join('\n');
 
@@ -195,7 +199,7 @@ async function generateDailyContent() {
     if (data.ok) {
       await fetch(WORKER + '/api/resume', { method: 'POST' });
       await fetch(WORKER + '/api/runnow', { method: 'POST' });
-      status.textContent = `ส่งคิวแล้ว ${data.added} ซีน\nชื่อเรื่อง: ${title}\n\nเปิด Worker เพื่อดูความคืบหน้า`;
+      status.textContent = `ส่งคิวแล้ว ${data.added} ซีน\n${title}\n\nเปิด Worker เพื่อดูรูป\nเมื่อเสร็จกด "ดึงรูปกลับมาแสดง"`;
     } else {
       status.textContent = 'ส่งไม่สำเร็จ';
     }
