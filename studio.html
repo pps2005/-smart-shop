@@ -33,6 +33,9 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .step:last-child { border-bottom: none; }
 .step.done { color: #1a7a3a; }
 .saved { font-size: 13px; color: #777; margin-top: 8px; }
+.history { margin-top: 12px; }
+.hist-item { padding: 10px; background: #f4f2ef; border-radius: 8px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
+.hist-item:hover { background: #eee; }
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </style>
 </head>
@@ -77,6 +80,11 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </div>
 
 <div class="card">
+<h2>เรื่องที่บันทึกไว้</h2>
+<div class="history" id="historyList"></div>
+</div>
+
+<div class="card">
 <h2>ขั้นตอนการสร้าง</h2>
 <div class="steps" id="steps">
 <div class="step" id="s1">1. รับเนื้อเรื่อง</div>
@@ -98,6 +106,13 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
+function getHistory() {
+  return JSON.parse(localStorage.getItem('xire_history') || '[]');
+}
+function setHistory(h) {
+  localStorage.setItem('xire_history', JSON.stringify(h.slice(0, 10)));
+}
+
 function saveStory() {
   const data = {
     title: document.getElementById('title').value || 'เรื่องใหม่',
@@ -106,17 +121,43 @@ function saveStory() {
     time: new Date().toLocaleString('th-TH')
   };
   localStorage.setItem('xire_story', JSON.stringify(data));
+  const h = getHistory();
+  h.unshift(data);
+  setHistory(h);
   document.getElementById('savedInfo').textContent = `บันทึก "${data.title}" แล้ว · ${data.time}`;
+  renderHistory();
 }
 
-function loadStory() {
-  const raw = localStorage.getItem('xire_story');
-  if (!raw) return;
-  const data = JSON.parse(raw);
+function loadStory(data) {
+  if (!data) {
+    const raw = localStorage.getItem('xire_story');
+    if (!raw) return;
+    data = JSON.parse(raw);
+  }
   document.getElementById('title').value = data.title || '';
   document.getElementById('story').value = data.story || '';
   document.getElementById('partsCount').value = data.parts || 5;
-  document.getElementById('savedInfo').textContent = `โหลดเรื่องล่าสุด: ${data.title} · ${data.time}`;
+  document.getElementById('savedInfo').textContent = `โหลด: ${data.title} · ${data.time}`;
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const h = getHistory();
+  if (!h.length) {
+    list.innerHTML = '<div class="mu" style="color:#777">ยังไม่มีเรื่องที่บันทึก</div>';
+    return;
+  }
+  list.innerHTML = h.map((s, i) => `
+    <div class="hist-item" onclick="loadFromHistory(${i})">
+      <b>${s.title}</b><br>
+      <small>${s.parts} พาร์ท · ${s.time}</small>
+    </div>
+  `).join('');
+}
+
+function loadFromHistory(i) {
+  const h = getHistory();
+  if (h[i]) loadStory(h[i]);
 }
 
 async function startFullPipeline() {
@@ -159,6 +200,7 @@ async function startFullPipeline() {
 }
 
 loadStory();
+renderHistory();
 </script>
 </body>
 </html>
