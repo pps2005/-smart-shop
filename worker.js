@@ -56,7 +56,7 @@ export default {
   },
   async scheduled(event, env0, ctx) {
     const acc = { n: 0 }, env = { ...env0, DB: meterDB(env0.DB, acc) }, jobs = [];
-    await presSeed(env).catch(() => { }); await presFix(env).catch(() => { }); await presMig1(env).catch(() => { }); await presMig2(env).catch(() => { }); await presAutoGo(env).catch(() => { }); await presTick(env, ctx).catch(() => { }); // ครั้งเดียว: ตั้งพรีเซนเตอร์ 2 คนจากภาพต้นแบบ แล้วเริ่มวาดชุดฝึก
+    // (เอาระบบพรีเซนเตอร์/ซีรีส์คนจริงออกแล้ว: คิวทำเฉพาะอนิเมะ)
     await handleCron(event, env, { waitUntil: p => jobs.push(p) });
     ctx.waitUntil(Promise.allSettled(jobs).then(async () => { await flushReads(env0.DB, acc, 1); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare("DELETE FROM settings WHERE key LIKE 'rr:%' AND key < ?").bind('rr:' + new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); if (new Date().getUTCMinutes() === 7) await env0.DB.prepare('DELETE FROM rmeter WHERE day < ?').bind(new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)).run().catch(() => { }); }));
   },
@@ -142,7 +142,6 @@ async function handleCron(event, env, ctx) {
     ctx.waitUntil(cpuKTick(tagged(env, 'bg:kaggle')).catch(() => { })); // ผู้ช่วย (ครอบครัว) ที่ผูก API ของ Kaggle ไว้: เปิดเครื่องบัญชีเขาเองเมื่อคิวงานเยอะ
     ctx.waitUntil(castBatch(tagged(env, 'bg:cast'), 0, false).catch(() => {}));
     ctx.waitUntil(audDaily(tagged(env, 'bg:aud')).catch(() => {}));
-    ctx.waitUntil(kdPlaceTick(tagged(env, 'bg:kdplace')).catch(() => {}));
 }
 
 // ---------- ซ่อมงานที่พังอัตโนมัติ ----------
@@ -881,7 +880,7 @@ async function placeSetup(env, story) {
 // ===== ฉากซีรี่ย์เกาหลี (คนจริง): สุ่มสร้าง LoRA ฉากเรื่อยๆ เอง (ผู้ใช้สั่ง 16 พ.ย.) =====
 // ภาพถ่ายสมจริง ไม่มีคน 16 มุม → xlTick เทรน LoRA ฉากให้เอง · ตัวละครใช้โหมดภาพ real (act=look)
 const KD_STORY = 'ซีรี่ย์เกาหลี'; // เรื่องที่ชื่อมีคำว่า "เกาหลี" = ลุคคนจริงเสมอ (ไม่ขึ้นกับสวิตช์ลุคทั้งระบบ) · เรื่องอื่น (อนิเมะ) ยังเป็นไปตามสวิตช์เดิม
-const isKdStory = t => String(t || '').indexOf('เกาหลี') >= 0;
+const isKdStory = t => false; // เอาซีรีส์เกาหลีคนจริงออกแล้ว ทุกเรื่องเป็นอนิเมะ
 const KD_PLACES = [
   ['สนามบาสกลางแจ้ง', 'outdoors, public basketball court in Seoul, blue and red painted court, chain-link fence, concrete bleachers, green trees, afternoon sun'],
   ['ร้านกาแฟมินิมอลฮงแด', 'indoors, minimalist Korean cafe in Hongdae, white walls, wooden tables, large window, hanging plants, pastry display counter'],
@@ -946,11 +945,19 @@ async function kdPlaceTick(env) {
   if (pend) return;
   const m = await kdPlaceAdd(env, KD_STORY, 1); if (m.length) await setSetting(env, 'kd_place_cnt', day + '|' + (done + 1));
 }
+// ชุดฝึก LoRA สถานที่: วาด 16 มุมเป็น 16:9 (1344×768, SDXL) ไม่มีคน
+async function xlPlaceRefs(env, c, n) {
+  const pj = charProj(c), tags = String(c.desc || ''), have = (await env.DB.prepare("SELECT (SELECT COUNT(*) FROM images WHERE project=?1)+(SELECT COUNT(*) FROM vjobs WHERE kind='img' AND project=?1 AND status IN ('queued','running','hold')) n").bind(pj).first()).n || 0;
+  let t = Date.now();
+  for (let i = have; i < (n || 16); i++) { const v = xlVar(c, i);
+    await env.DB.prepare("INSERT INTO vjobs (project,ep,shot,prompt,neg,image,frames,status,tries,created,kind,opt) VALUES (?,'','0',?,'','',0,'queued',0,?,'img',?)").bind(pj, 'no humans, scenery, ' + tags + ', ' + v + ', horizontal 16:9 wide composition, detailed background, anime screencap, anime coloring, flat color, clean lineart, simple cel shading, bright clean colors', t++, JSON.stringify({ engine: 'sdxl', w: 1344, h: 768, steps: 30, seed: 0, loras: [], scene: i + 1, neg: '1girl, 1boy, people, person, human, crowd, text, letters, signature, monochrome, greyscale, blurry', takes: 2, np: 0, qref: 1, qc: ['a detailed anime background painting of ' + tags.split(', ').slice(0, 5).join(', ') + ' with no people', 'anime scenery, ' + v], qneg: ['a person standing in the picture', 'words and letters written on signs', 'a blurry messy unfinished picture'] })).run(); }
+}
 async function xlNew(env, story, kind, name, desc) {
   await animeSchema(env);
   name = String(name || '').replace(/[·\n]/g, ' ').trim().slice(0, 40); if (!name || !XL_VARS[kind]) return { error: 'ข้อมูลไม่ครบ' };
   if (await env.DB.prepare('SELECT id FROM chars WHERE series_id=0 AND name=?').bind(name).first()) return { error: `มีชื่อ "${name}" อยู่แล้ว`, dup: true };
   const r = await env.DB.prepare('INSERT INTO chars (series_id,name,desc,created,kind,story) VALUES (0,?,?,?,?,?)').bind(name, String(desc || '').slice(0, 500), Date.now(), kind, story).run(), id = r.meta.last_row_id;
+  if (kind === 'place') { await xlPlaceRefs(env, { id, name, desc: String(desc || '').slice(0, 500), kind: 'place', series_id: 0, story }, 16); return { ok: true, id }; } // ฉาก = ชุดฝึก 16:9 (1344×768)
   await charRefs(env, id, 16);
   await env.DB.prepare("UPDATE jobs SET steps=8 WHERE project=? AND status='queued'").bind('ซีรีส์0·' + name).run();
   return { ok: true, id };
@@ -1154,7 +1161,7 @@ const DEF_STYLE = 'Japanese-Korean anime style, beautiful detailed anime illustr
 // ลุคภาพ (ผู้ใช้สั่ง 16 พ.ย.: ซีรีส์เกาหลีคุณภาพเน็ตฟลิกซ์) — settings img_look='real' = ภาพคนจริงทั้งระบบ (ฐาน RealVisXL, ใช้หารายได้ได้) · ค่าอื่น = อนิเมะเดิม
 const KR_STYLE = 'Korean drama cinematography, cinematic film still, 35mm lens, shallow depth of field, soft natural window light, subtle film grain, muted teal and warm skin-tone colour grade, realistic skin texture, photorealistic, anamorphic 2.39:1 look';
 const KR_NEG = 'anime, cartoon, illustration, drawing, 3d render, cgi, doll, plastic skin, airbrushed, oversaturated, lowres, blurry, jpeg artifacts, bad anatomy, bad hands, extra fingers, deformed face, text, watermark, celebrity, real person lookalike, collage, split screen, multiple views';
-const isReal = s => !!s && s.img_look === 'real';
+const isReal = s => false; // คิวทำเฉพาะอนิเมะ (เดิม: s.img_look === 'real')
 function curStyle(s) { return isReal(s) ? KR_STYLE : (String((s && s.style) || '').trim() || DEF_STYLE); }
 function envStyle(s) { return curStyle(s).split(',').map(x => x.trim()).filter(x => x && !/hair|fabric|character|face|portrait|girl|person|people|skin|beautiful/i.test(x)).join(', ') || 'soft anime style, detailed anime background art'; }
 // สไตล์สำหรับ "ของ/ชุด/สัตว์/อาวุธ" (งานออกแบบวัตถุ): ตัดคำที่ดึงให้โมเดลวาดหน้าคน/ผม/สาวสวย ออก (Flux ไม่มี negative prompt คำว่า hair/beautiful จึงดึงหน้าเข้ามา)
@@ -7001,8 +7008,16 @@ async function castApi(req, env, url, body) {
         const c = await env.DB.prepare("SELECT * FROM chars WHERE id=? AND series_id=0 AND kind IN ('enemy','place','style')").bind(+b.id).first(); if (!c) return json({ error: 'ไม่พบ' }, 404);
         const pj = charProj(c), ls = (await env.DB.prepare('SELECT id FROM loras WHERE char_id=?').bind(c.id).all()).results;
         for (const l of ls) await supaDelLora(env, l.id);
-        await env.DB.batch([env.DB.prepare('DELETE FROM loras WHERE char_id=?').bind(c.id), env.DB.prepare("DELETE FROM vjobs WHERE kind='lora' AND status<>'running' AND project=?").bind(pj), env.DB.prepare('DELETE FROM jobs WHERE project=?').bind(pj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(c.id)]);
+        await env.DB.batch([env.DB.prepare('DELETE FROM loras WHERE char_id=?').bind(c.id), env.DB.prepare("DELETE FROM vjobs WHERE kind IN ('lora','img') AND status<>'running' AND project=?").bind(pj), env.DB.prepare('DELETE FROM jobs WHERE project=?').bind(pj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(c.id)]);
         return json({ ok: true });
+      }
+      if (act === 'xl_del_places') { // ลบ LoRA สถานที่ทั้งหมด (ไฟล์ LoRA + ภาพชุดฝึก + งานค้าง) เพื่อทำใหม่เป็น 16:9
+        await animeSchema(env);
+        const cs = (await env.DB.prepare("SELECT * FROM chars WHERE series_id=0 AND kind='place'").all()).results; let n = 0;
+        for (const c of cs) { const pj = charProj(c), ls = (await env.DB.prepare('SELECT id FROM loras WHERE char_id=?').bind(c.id).all()).results;
+          for (const l of ls) await supaDelLora(env, l.id).catch(() => { });
+          await env.DB.batch([env.DB.prepare('DELETE FROM loras WHERE char_id=?').bind(c.id), env.DB.prepare("DELETE FROM vjobs WHERE kind IN ('lora','img') AND status<>'running' AND project=?").bind(pj), env.DB.prepare('DELETE FROM jobs WHERE project=?').bind(pj), env.DB.prepare('DELETE FROM images WHERE project=?').bind(pj), env.DB.prepare('DELETE FROM chars WHERE id=?').bind(c.id)]); n++; }
+        return json({ ok: true, removed: n });
       }
       if (act === 'lorapick') { // เลือก LoRA ที่เทรนเสร็จแล้วให้บทนี้ (lora=0 → ถอดออก) · รับเฉพาะ status=ready เท่านั้น
         const r = plan.roles.find(x => x.key === b.key); if (!r) return json({ error: 'ไม่พบบทนี้' }, 400);
@@ -7011,7 +7026,7 @@ async function castApi(req, env, url, body) {
         if (!l || l.status !== 'ready') return json({ error: 'LoRA นี้ยังเทรนไม่เสร็จ เลือกได้เฉพาะตัวที่เสร็จแล้ว' }, 400);
         const c = await env.DB.prepare('SELECT id,name,cast_role,cast_story FROM aud_cands WHERE char_id=?').bind(l.char_id).first();
         if (!c) return json({ error: 'LoRA นี้ไม่อยู่ในคลังนักแสดง' }, 400);
-        if (c.cast_role && c.cast_story && c.cast_story !== story) return json({ error: `${c.name} ใช้อยู่ในเรื่อง "${c.cast_story}" แล้ว ถอดออกจากเรื่องนั้นก่อน` }, 400);
+        // เริ่มเรื่องใหม่ได้: LoRA ที่ใช้อยู่ในเรื่องอื่นย้ายมาใช้เรื่องนี้ได้เลย (เรื่องเดิมจะเสียบทนี้ไป)
         await env.DB.batch([
           env.DB.prepare('UPDATE aud_cands SET cast_role=NULL, cast_story=NULL, chosen=0 WHERE cast_role=? AND cast_story=?').bind(r.key, story),
           env.DB.prepare('UPDATE aud_cands SET cast_role=?, cast_story=?, chosen=1, kept=1 WHERE id=?').bind(r.key, story, c.id)]);
