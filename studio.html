@@ -20,6 +20,8 @@ h1 { font-family: 'Playfair Display', serif; font-size: 36px; margin-bottom: 8px
 .btn:hover { background: #444; }
 .btn-full { width: 100%; text-align: center; }
 .btn-small { padding: 8px 16px; font-size: 13px; }
+.btn-daily { background: #e91e63; }
+.btn-daily:hover { background: #c2185b; }
 textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; margin: 8px 0; }
 .row { display: flex; gap: 12px; flex-wrap: wrap; }
 .row > * { flex: 1; min-width: 200px; }
@@ -36,6 +38,8 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .note { background: #fff8e1; padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
+.daily-box { background: linear-gradient(135deg, #fce4ec, #f8bbd0); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+.daily-box h2 { color: #c2185b; }
 </style>
 </head>
 <body>
@@ -49,7 +53,14 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">สร้างซีรีส์อนิเมะจากเว็บ · พร้อมใช้งาน</p>
+<p class="sub">สร้างคอนเทนต์รายวัน · 1 นาที · ไม่ซ้ำทุกวัน</p>
+
+<div class="daily-box">
+<h2>คอนเทนต์วันนี้</h2>
+<p style="margin:8px 0;color:#555">สาว + แมวนุ่มๆ บรรยากาศสวย สไตล์เกาหลีสมจริง</p>
+<button class="btn btn-daily btn-full" onclick="generateDailyContent()">สร้างคอนเทนต์วันนี้ (1 นาที)</button>
+<div class="status" id="dailyStatus"></div>
+</div>
 
 <div class="card">
 <h2>สถานะระบบ</h2>
@@ -64,26 +75,27 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 </div>
 
 <div class="card">
-<h2>สร้างซีรีส์</h2>
-<input type="text" id="title" value="คืนหนึ่งในเมือง">
-<textarea id="character" rows="2">1girl, long black hair, white hoodie, beautiful anime girl</textarea>
-<textarea id="story" rows="5">ยืนบนดาดฟ้าตอนกลางคืน มองเมืองที่สว่างไปด้วยฟ้าเมือง
-ยิ้มเบาๆ ไต้แสงจันทร์ ลมพัดผม
-นั่งดูฝนข้างหน้าต่าง อารมณ์เสียวเสียว
-เดินผ่านถนนนีออน สีสันสว่าง
-มองท้องฟ้าตอนรุ่งอรุณ อารมณ์หวังใหม่</textarea>
+<h2>สร้างเอง (กำหนดเอง)</h2>
+<input type="text" id="title" value="สาวกับแมว">
+<textarea id="character" rows="2">1girl, long blonde hair, off shoulder cream sweater, beige pleated skirt, white boots, beautiful Korean style</textarea>
+<textarea id="story" rows="4">เดินผ่านสวน เห็นแมวนุ่มๆนั่งอยู่ข้างทางเดิน
+ยืนดูแล้วยืนมือออกหาอาหาร
+แมวติดมือเธอแล้วยิ้มอ่อนโยน
+อุ้มแมวขึ้นมากอดไปบ้าน
+เพื่อนนั่งอ่านหนังสือ มองกันแล้วยิ้ม</textarea>
 <div class="row">
 <select id="template">
-<option value="anime-high" selected>อนิเมะคุณภาพสูง</option>
-<option value="netflix-kdrama">Netflix เกาหลี</option>
+<option value="kdrama-soft" selected>เกาหลีนุ่มๆ (สาว+แมว)</option>
+<option value="anime-high">อนิเมะ</option>
 <option value="cinematic">Cinematic</option>
 </select>
 <select id="partsCount">
-<option value="5" selected>5 พาร์ท</option>
-<option value="3">3 พาร์ท</option>
+<option value="6" selected>6 ซีน (~1 นาที)</option>
+<option value="5">5 ซีน</option>
+<option value="4">4 ซีน</option>
 </select>
 </div>
-<button class="btn btn-full" onclick="startFullPipeline()">สร้างทั้งหมดจากเว็บ</button>
+<button class="btn btn-full" onclick="startFullPipeline()">สร้างจากเว็บ</button>
 <div class="status" id="status"></div>
 </div>
 
@@ -95,7 +107,7 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 <button class="btn btn-small" onclick="openWorker()">เปิด Worker</button>
 <button class="btn btn-small" onclick="clearQueue()">ล้างคิว</button>
 </div>
-<div class="note">กดปุ่มสร้าง → รอสักครู่ → กดดึงรูปกลับมาแสดง (หรือเปิด Worker ดูความคืบหน้า)</div>
+<div class="note">กดปุ่มสร้าง → เปิด Worker ดูความคืบหน้า → กลับมากดดึงรูป</div>
 </div>
 </div>
 
@@ -105,15 +117,89 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
 const TEMPLATES = {
+  'kdrama-soft': 'photorealistic, soft natural lighting, Korean drama style, warm tones, shallow depth of field, cinematic',
   'anime-high': 'masterpiece, best quality, anime style, detailed, cinematic lighting',
-  'netflix-kdrama': 'cinematic realistic Korean drama, teal and orange, 16:9, film still',
   'cinematic': 'cinematic movie still, film grain, 16:9, golden hour'
 };
 
-function buildPrompt(part, scene) {
+const DAILY_SCENES = [
+  [
+    '1girl, long blonde hair, cream off-shoulder sweater, walking on tree-lined path, soft sunlight, gentle expression',
+    'fluffy white and gray ragdoll cat sitting on stone step, looking up curiously, green foliage background',
+    '1girl crouching down, reaching hand toward fluffy cat, warm smile, park setting',
+    '1girl petting fluffy cat head gently, cat eyes closed happy, soft bokeh background',
+    '1girl standing, fluffy cat walking beside her on sidewalk, afternoon light, trees and building',
+    '1girl holding fluffy cat in arms, walking into modern apartment, warm indoor lighting'
+  ],
+  [
+    '1girl, long blonde hair, cream sweater, sitting on park bench with coffee, soft morning light',
+    'small fluffy cat approaching from bushes, curious expression, dappled sunlight',
+    '1girl offering hand, cat sniffing fingers, gentle interaction, green park',
+    '1girl laughing softly, cat on her lap, warm golden hour lighting',
+    '1girl standing up, cat following her, tree-lined path, soft shadows',
+    '1girl and cat looking at each other, close-up, tender moment, blurred trees'
+  ],
+  [
+    '1girl walking through autumn park, cream sweater and beige skirt, falling leaves',
+    'fluffy cat sitting on low wall, watching her, soft afternoon light',
+    '1girl stopping to look at cat, slight smile, wind in hair',
+    '1girl kneeling, cat walking toward her, mutual curiosity',
+    '1girl picking up cat carefully, cat relaxed in her arms',
+    '1girl carrying cat home, back view, modern building entrance, warm light'
+  ]
+];
+
+function getTodayIndex() {
+  const d = new Date();
+  return (d.getFullYear() * 366 + d.getMonth() * 31 + d.getDate()) % DAILY_SCENES.length;
+}
+
+function buildPrompt(scene) {
   const char = document.getElementById('character').value.trim();
-  const style = TEMPLATES[document.getElementById('template').value] || TEMPLATES['anime-high'];
+  const style = TEMPLATES[document.getElementById('template').value] || TEMPLATES['kdrama-soft'];
   return `${style}, ${char}, ${scene}`;
+}
+
+async function generateDailyContent() {
+  const status = document.getElementById('dailyStatus');
+  status.style.display = 'block';
+  status.textContent = 'กำลังสร้างคอนเทนต์วันนี้...';
+
+  const idx = getTodayIndex();
+  const scenes = DAILY_SCENES[idx];
+  const title = `คอนเทนต์วันที่ ${new Date().toLocaleDateString('th-TH')}`;
+
+  document.getElementById('title').value = title;
+  document.getElementById('template').value = 'kdrama-soft';
+  document.getElementById('partsCount').value = '6';
+
+  const lines = scenes.map(s => buildPrompt(s)).join('\n');
+
+  const list = document.getElementById('partsList');
+  list.innerHTML = '';
+  scenes.forEach((_, i) => {
+    list.innerHTML += `<div class="part pending"><b>ซีน ${i+1}</b><small>ส่งคิวแล้ว</small></div>`;
+  });
+
+  try {
+    await fetch(WORKER + '/api/clearqueue', { method: 'POST' });
+    const enq = await fetch(WORKER + '/api/enqueue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: title, lines: lines, variants: 1 })
+    });
+    const data = await enq.json();
+
+    if (data.ok) {
+      await fetch(WORKER + '/api/resume', { method: 'POST' });
+      await fetch(WORKER + '/api/runnow', { method: 'POST' });
+      status.textContent = `ส่งคิวแล้ว ${data.added} ซีน\nชื่อเรื่อง: ${title}\n\nเปิด Worker เพื่อดูความคืบหน้า`;
+    } else {
+      status.textContent = 'ส่งไม่สำเร็จ';
+    }
+  } catch (e) {
+    status.textContent = 'เชื่อมไม่ได้: ' + e.message;
+  }
 }
 
 async function testWorker() {
@@ -157,7 +243,7 @@ async function pullImages() {
 
     list.innerHTML = '';
     images.forEach((img, idx) => {
-      list.innerHTML += `<div class="part done"><b>Part ${img.scene || idx+1}</b><small>สร้างแล้ว</small><img src="${WORKER}/img/${img.id}"></div>`;
+      list.innerHTML += `<div class="part done"><b>ซีน ${img.scene || idx+1}</b><small>สร้างแล้ว</small><img src="${WORKER}/img/${img.id}"></div>`;
     });
     status.textContent = `ดึงรูปมาแสดงแล้ว ${images.length} รูป`;
   } catch (e) {
@@ -181,9 +267,9 @@ async function startFullPipeline() {
 
   list.innerHTML = '';
   for (let i = 1; i <= count; i++) {
-    list.innerHTML += `<div class="part pending" id="part-${i}"><b>Part ${i}</b><small>ส่งคิวแล้ว</small></div>`;
+    list.innerHTML += `<div class="part pending" id="part-${i}"><b>ซีน ${i}</b><small>ส่งคิวแล้ว</small></div>`;
     const chunk = sentences.slice((i-1)*per, i*per).join('. ').slice(0, 120);
-    linesArr.push(buildPrompt(i, chunk));
+    linesArr.push(buildPrompt(chunk));
   }
 
   const lines = linesArr.join('\n');
@@ -200,9 +286,9 @@ async function startFullPipeline() {
     if (enqData.ok) {
       await fetch(WORKER + '/api/resume', { method: 'POST' });
       await fetch(WORKER + '/api/runnow', { method: 'POST' });
-      status.textContent = `ส่งคิวแล้ว ${enqData.added} ซีน\n\nเปิด Worker เพื่อดูความคืบหน้า\nหรือกด "ดึงรูปกลับมาแสดง" เมื่อสร้างเสร็จ`;
+      status.textContent = `ส่งคิวแล้ว ${enqData.added} ซีน\n\nเปิด Worker เพื่อดูความคืบหน้า`;
     } else {
-      status.textContent = 'ส่งคิวไม่สำเร็จ: ' + (enqData.error || '');
+      status.textContent = 'ส่งคิวไม่สำเร็จ';
     }
   } catch (e) {
     status.textContent = 'เชื่อมไม่ได้: ' + e.message;
