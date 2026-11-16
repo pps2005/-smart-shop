@@ -32,10 +32,6 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .part.done { background: #e8f5e9; }
 .part.error { background: #ffebee; }
 .status { margin-top: 12px; padding: 12px; background: #f0f7f0; border-radius: 8px; color: #1a7a3a; display: none; }
-.steps { margin-top: 16px; }
-.step { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-.step:last-child { border-bottom: none; }
-.step.done { color: #1a7a3a; }
 .saved { font-size: 13px; color: #777; margin-top: 8px; }
 .history { margin-top: 12px; }
 .hist-item { padding: 10px; background: #f4f2ef; border-radius: 8px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
@@ -64,7 +60,8 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <span class="backup">Flux (สำรอง)</span>
 <span>SDXL</span>
 </div>
-<p style="font-size:14px;color:#555;margin-top:8px">Worker หลัก: <code>https://anime-image-bot.kandanai697.workers.dev</code></p>
+<button class="btn" onclick="testWorker()">ทดสอบ Worker</button>
+<div class="status" id="testResult" style="display:none"></div>
 </div>
 
 <div class="card">
@@ -72,10 +69,15 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <input type="text" id="title" placeholder="ชื่อเรื่อง">
 <textarea id="story" rows="4" placeholder="เขียนเนื้อเรื่องที่นี่..."></textarea>
 <select id="partsCount">
-<option value="5">5 พาร์ท TikTok (ซีนละ 3 นาที)</option>
+<option value="5">5 พาร์ท TikTok</option>
 <option value="3">3 พาร์ท</option>
 <option value="8">8 พาร์ท</option>
 <option value="10">10 พาร์ท</option>
+</select>
+<select id="model">
+<option value="sdxl">SDXL (หลัก)</option>
+<option value="flux">Flux (สำรอง)</option>
+<option value="kaggle">Kaggle GPU (สำรอง)</option>
 </select>
 <button class="btn" onclick="saveStory()">บันทึกเรื่อง</button>
 <button class="btn btn-full" onclick="startFullPipeline()">สร้างทั้งหมดอัตโนมัติ</button>
@@ -91,33 +93,33 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <div class="card">
 <h2>คิวการสร้าง</h2>
 <div class="parts" id="partsList"></div>
+<button class="btn" onclick="exportTikTok()" style="margin-top:12px">ส่งออกสำหรับ TikTok</button>
 </div>
 </div>
 
-<footer>Xire.ai Studio · New System</footer>
+<footer>Xire.ai Studio · Complete</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
-function getHistory() {
-  return JSON.parse(localStorage.getItem('xire_history') || '[]');
-}
-function setHistory(h) {
-  localStorage.setItem('xire_history', JSON.stringify(h.slice(0, 10)));
-}
+function getHistory() { return JSON.parse(localStorage.getItem('xire_history') || '[]'); }
+function setHistory(h) { localStorage.setItem('xire_history', JSON.stringify(h.slice(0, 10))); }
+function getQueue() { return JSON.parse(localStorage.getItem('xire_queue') || '[]'); }
+function setQueue(q) { localStorage.setItem('xire_queue', JSON.stringify(q)); }
 
 function saveStory() {
   const data = {
     title: document.getElementById('title').value || 'เรื่องใหม่',
     story: document.getElementById('story').value,
     parts: +document.getElementById('partsCount').value,
+    model: document.getElementById('model').value,
     time: new Date().toLocaleString('th-TH')
   };
   localStorage.setItem('xire_story', JSON.stringify(data));
   const h = getHistory();
   h.unshift(data);
   setHistory(h);
-  document.getElementById('savedInfo').textContent = `บันทึก "${data.title}" แล้ว · ${data.time}`;
+  document.getElementById('savedInfo').textContent = `บันทึก "${data.title}" แล้ว`;
   renderHistory();
 }
 
@@ -130,28 +132,21 @@ function loadStory(data) {
   document.getElementById('title').value = data.title || '';
   document.getElementById('story').value = data.story || '';
   document.getElementById('partsCount').value = data.parts || 5;
-  document.getElementById('savedInfo').textContent = `โหลด: ${data.title} · ${data.time}`;
+  document.getElementById('model').value = data.model || 'sdxl';
+  document.getElementById('savedInfo').textContent = `โหลด: ${data.title}`;
 }
 
 function renderHistory() {
   const list = document.getElementById('historyList');
   const h = getHistory();
-  if (!h.length) {
-    list.innerHTML = '<div style="color:#777">ยังไม่มีเรื่องที่บันทึก</div>';
-    return;
-  }
-  list.innerHTML = h.map((s, i) => `
+  list.innerHTML = h.length ? h.map((s, i) => `
     <div class="hist-item" onclick="loadFromHistory(${i})">
-      <b>${s.title}</b><br>
-      <small>${s.parts} พาร์ท · ${s.time}</small>
+      <b>${s.title}</b><br><small>${s.parts} พาร์ท · ${s.model} · ${s.time}</small>
     </div>
-  `).join('');
+  `).join('') : '<div style="color:#777">ยังไม่มีเรื่องที่บันทึก</div>';
 }
 
-function loadFromHistory(i) {
-  const h = getHistory();
-  if (h[i]) loadStory(h[i]);
-}
+function loadFromHistory(i) { const h = getHistory(); if (h[i]) loadStory(h[i]); }
 
 function updatePart(i, status, imgUrl) {
   const el = document.getElementById(`part-${i}`);
@@ -159,10 +154,38 @@ function updatePart(i, status, imgUrl) {
   el.className = `part ${status}`;
   el.querySelector('small').textContent = status === 'done' ? 'เสร็จ' : status === 'error' ? 'ผิดพลาด' : 'กำลังสร้าง...';
   if (imgUrl) {
-    const img = el.querySelector('img') || document.createElement('img');
+    let img = el.querySelector('img');
+    if (!img) { img = document.createElement('img'); el.appendChild(img); }
     img.src = imgUrl;
-    el.appendChild(img);
   }
+  const q = getQueue();
+  const item = q.find(x => x.id === i) || { id: i };
+  item.status = status;
+  item.img = imgUrl || item.img;
+  setQueue(q);
+}
+
+async function testWorker() {
+  const el = document.getElementById('testResult');
+  el.style.display = 'block';
+  el.textContent = 'กำลังทดสอบ Worker...';
+  try {
+    const res = await fetch(WORKER, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'test', type: 'image' }) });
+    const text = await res.text();
+    el.textContent = `ตอบกลับ: ${res.status}\n${text.slice(0, 200)}`;
+  } catch (e) {
+    el.textContent = 'เชื่อมไม่ได้: ' + e.message;
+  }
+}
+
+function exportTikTok() {
+  const q = getQueue();
+  const text = q.map(p => `Part ${p.id}: ${p.status}`).join('\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'tiktok-export.txt';
+  a.click();
 }
 
 async function startFullPipeline() {
@@ -170,16 +193,20 @@ async function startFullPipeline() {
   const title = document.getElementById('title').value || 'เรื่องใหม่';
   const story = document.getElementById('story').value || '';
   const count = +document.getElementById('partsCount').value;
+  const model = document.getElementById('model').value;
   const status = document.getElementById('status');
   const list = document.getElementById('partsList');
 
   status.style.display = 'block';
   status.textContent = 'กำลังเริ่มสร้าง...';
 
+  const queue = [];
   list.innerHTML = '';
   for (let i = 1; i <= count; i++) {
     list.innerHTML += `<div class="part pending" id="part-${i}"><b>Part ${i}/${count}</b><small>รอสร้าง</small></div>`;
+    queue.push({ id: i, status: 'pending' });
   }
+  setQueue(queue);
 
   for (let i = 1; i <= count; i++) {
     updatePart(i, 'pending');
@@ -187,27 +214,32 @@ async function startFullPipeline() {
       const res = await fetch(WORKER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: `${title} - part ${i}: ${story.slice(0, 100)}`, type: 'image', fallback: 'flux-kaggle' })
+        body: JSON.stringify({ prompt: `${title} part ${i}: ${story.slice(0, 80)}`, type: 'image', model, fallback: 'flux-kaggle' })
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        const img = data.image || data.url || null;
-        updatePart(i, 'done', img);
-        status.textContent = `สร้างพาร์ท ${i}/${count} เสร็จ`;
-      } else {
-        updatePart(i, 'error');
-      }
-    } catch (e) {
-      updatePart(i, 'error');
-    }
-    await new Promise(r => setTimeout(r, 800));
+        updatePart(i, 'done', data.image || data.url);
+        status.textContent = `พาร์ท ${i}/${count} เสร็จ (${model})`;
+      } else updatePart(i, 'error');
+    } catch (e) { updatePart(i, 'error'); }
+    await new Promise(r => setTimeout(r, 600));
   }
+  status.textContent = `สร้าง "${title}" เสร็จทั้งหมด`;
+}
 
-  status.textContent = `สร้าง "${title}" เสร็จทั้งหมด · ${count} พาร์ท`;
+function restoreQueue() {
+  const q = getQueue();
+  if (!q.length) return;
+  const list = document.getElementById('partsList');
+  list.innerHTML = '';
+  q.forEach(p => {
+    list.innerHTML += `<div class="part ${p.status}" id="part-${p.id}"><b>Part ${p.id}</b><small>${p.status}</small>${p.img ? `<img src="${p.img}">` : ''}</div>`;
+  });
 }
 
 loadStory();
 renderHistory();
+restoreQueue();
 </script>
 </body>
 </html>
