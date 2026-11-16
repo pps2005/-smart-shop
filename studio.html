@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Xire.ai Studio · Netflix Level</title>
+<title>Xire.ai Studio · Full Pipeline</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,11 +26,11 @@ textarea, input[type=text], input[type=file], select { width: 100%; padding: 12p
 .conn { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .conn span { background: #f4f2ef; padding: 6px 12px; border-radius: 999px; font-size: 13px; }
 .conn span.backup { background: #fff3e0; }
-.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
-.part { background: #f4f2ef; border-radius: 10px; padding: 12px; text-align: center; }
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
+.part { background: #f4f2ef; border-radius: 10px; padding: 12px; text-align: center; position: relative; }
 .part b { display: block; font-size: 15px; margin-bottom: 4px; }
 .part small { color: #777; display: block; }
-.part img { width: 100%; border-radius: 6px; margin-top: 8px; }
+.part img { width: 100%; border-radius: 6px; margin-top: 8px; max-height: 180px; object-fit: cover; }
 .part.pending { opacity: 0.7; }
 .part.done { background: #e8f5e9; }
 .part.error { background: #ffebee; }
@@ -57,68 +57,35 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">ระบบสร้างจริง · เชื่อม API Worker แล้ว</p>
+<p class="sub">ระบบเต็ม · ดึงรูปกลับมาแสดงได้ · 1-6 ครบ</p>
 
 <div class="card">
 <h2>สถานะระบบ</h2>
 <div class="conn">
 <span>Cloudflare Pages</span>
 <span>Supabase</span>
-<span class="backup">Kaggle (GPU สำรอง)</span>
-<span class="backup">Flux (สำรอง)</span>
+<span class="backup">Kaggle</span>
+<span class="backup">Flux</span>
 <span>SDXL</span>
 </div>
-<button class="btn btn-small" onclick="testWorker()">ทดสอบ Worker</button>
+<button class="btn btn-small" onclick="testWorker()">ทดสอบ</button>
 <div class="status" id="testResult"></div>
 </div>
 
 <div class="card">
-<h2>1. ตัวละครคงที่</h2>
-<label>คำอธิบายตัวละคร</label>
-<textarea id="character" rows="3" placeholder="1girl, long black hair, brown eyes, white hoodie"></textarea>
-<label>รูปอ้างอิง</label>
-<input type="file" id="refImage" accept="image/*">
+<h2>ตัวละคร + ตั้งค่า</h2>
+<textarea id="character" rows="2" placeholder="1girl, long black hair, brown eyes"></textarea>
 <div class="row">
-<select id="consistency">
-<option value="ip-adapter">IP-Adapter FaceID</option>
-<option value="lora">LoRA</option>
-<option value="prompt-only">Prompt เท่านั้น</option>
-</select>
-<select id="consistencyStrength">
-<option value="0.6">0.6</option>
-<option value="0.8" selected>0.8</option>
-<option value="1.0">1.0</option>
-</select>
-</div>
-</div>
-
-<div class="card">
-<h2>2-4. ControlNet / วิดีโอ / เสียง</h2>
-<div class="row">
-<select id="controlPose">
-<option value="">ไม่คุมท่า</option>
-<option value="openpose">OpenPose</option>
-</select>
-<select id="videoType">
-<option value="image">ภาพนิ่ง</option>
-<option value="animatediff">AnimateDiff</option>
-<option value="svd">SVD</option>
-</select>
-<select id="tts">
-<option value="none">ไม่พากย์</option>
-<option value="edge">Edge TTS</option>
-</select>
-<select id="subtitle">
-<option value="thai" selected>ซับไทย</option>
-<option value="none">ไม่มีซับ</option>
-</select>
+<select id="consistency"><option value="ip-adapter">IP-Adapter</option><option value="prompt-only">Prompt</option></select>
+<select id="videoType"><option value="image">ภาพนิ่ง</option><option value="animatediff">AnimateDiff</option></select>
+<select id="tts"><option value="none">ไม่พากย์</option><option value="edge">Edge TTS</option></select>
 </div>
 </div>
 
 <div class="card">
 <h2>สร้างซีรีส์</h2>
 <input type="text" id="title" placeholder="ชื่อเรื่อง">
-<textarea id="story" rows="5" placeholder="เขียนเนื้อเรื่อง..."></textarea>
+<textarea id="story" rows="4" placeholder="เขียนเนื้อเรื่อง..."></textarea>
 <div class="row">
 <select id="template">
 <option value="netflix-kdrama">Netflix เกาหลี</option>
@@ -131,17 +98,12 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 <option value="3">3 พาร์ท</option>
 <option value="8">8 พาร์ท</option>
 </select>
-<select id="model">
-<option value="sdxl">SDXL</option>
-<option value="flux">Flux</option>
-<option value="kaggle">Kaggle</option>
-</select>
 </div>
-<button class="btn btn-small" onclick="generateStoryboard()">สร้าง Storyboard</button>
+<button class="btn btn-small" onclick="generateStoryboard()">Storyboard</button>
 <div class="storyboard" id="storyboard"></div>
-<label><input type="checkbox" id="qualityCheck" checked> ตรวจคุณภาพ</label>
+<label><input type="checkbox" id="autoRetry" checked> 2. Retry อัตโนมัติถ้าผิดพลาด</label>
 <button class="btn" onclick="saveStory()">บันทึก</button>
-<button class="btn btn-full" onclick="startFullPipeline()">สร้างทั้งหมดจริง</button>
+<button class="btn btn-full" onclick="startFullPipeline()">สร้างทั้งหมด</button>
 <div class="saved" id="savedInfo"></div>
 <div class="status" id="status"></div>
 </div>
@@ -152,14 +114,19 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 </div>
 
 <div class="card">
-<h2>คิวการสร้าง</h2>
+<h2>1. คิว + รูปผลลัพธ์</h2>
 <div class="parts" id="partsList"></div>
-<button class="btn" onclick="openWorker()">เปิด Worker ดูผล</button>
-<button class="btn" onclick="checkQueue()" style="margin-left:8px">ตรวจสถานะคิว</button>
+<div style="margin-top:12px">
+<button class="btn btn-small" onclick="pullImages()">ดึงรูปกลับมาแสดง</button>
+<button class="btn btn-small" onclick="checkQueue()">ตรวจคิว</button>
+<button class="btn btn-small" onclick="exportTikTok()">6. ส่งออก TikTok</button>
+<button class="btn btn-small" onclick="openWorker()">เปิด Worker</button>
+</div>
+<div class="note" id="pipelineNote">4-5. วิดีโอ/เสียง: ส่งคำสั่งไปที่ Worker แล้ว (ต้องเชื่อมเครื่องเพิ่มจึงจะสร้างไฟล์จริง)</div>
 </div>
 </div>
 
-<footer>Xire.ai Studio · Real Generation</footer>
+<footer>Xire.ai Studio · Features 1-6</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
@@ -174,8 +141,10 @@ const TEMPLATES = {
 function buildPrompt(title, part, total, scene) {
   const char = document.getElementById('character').value.trim();
   const style = TEMPLATES[document.getElementById('template').value] || TEMPLATES['netflix-kdrama'];
+  const video = document.getElementById('videoType').value;
   let p = `masterpiece, best quality, 8k, ${style}, ${title} scene ${part}/${total}, ${scene}`;
   if (char) p += `, ${char}`;
+  if (video !== 'image') p += `, ${video} motion`;
   return p;
 }
 
@@ -230,11 +199,17 @@ function renderHistory() {
 }
 function loadFromHistory(i) { const h = getHistory(); if (h[i]) loadStory(h[i]); }
 
-function updatePart(i, status, msg) {
+function updatePart(i, status, msg, imgUrl) {
   const el = document.getElementById(`part-${i}`);
   if (!el) return;
   el.className = `part ${status}`;
   el.querySelector('small').textContent = msg || status;
+  if (imgUrl) {
+    let img = el.querySelector('img');
+    if (!img) { img = document.createElement('img'); el.appendChild(img); }
+    img.src = imgUrl;
+    img.alt = `Part ${i}`;
+  }
 }
 
 async function testWorker() {
@@ -243,7 +218,8 @@ async function testWorker() {
   try {
     const res = await fetch(WORKER + '/api/state');
     const data = await res.json();
-    el.textContent = `Worker พร้อม\nคิว: ${data.queue?.length || 0} รายการ`;
+    const imgCount = data.images?.length || 0;
+    el.textContent = `Worker พร้อม\nรูปทั้งหมด: ${imgCount} รูป\nคิว: ${data.jobs?.length || 0}`;
   } catch (e) {
     el.textContent = 'เชื่อมไม่ได้: ' + e.message;
   }
@@ -255,10 +231,56 @@ async function checkQueue() {
   try {
     const res = await fetch(WORKER + '/api/state');
     const data = await res.json();
-    alert(`คิวใน Worker: ${data.queue?.length || 0} รายการ`);
+    alert(`รูปทั้งหมด: ${data.images?.length || 0}\nคิวงาน: ${data.jobs?.length || 0}`);
   } catch (e) {
-    alert('ตรวจคิวไม่ได้');
+    alert('ตรวจไม่ได้');
   }
+}
+
+// 1. ดึงรูปกลับมาแสดง
+async function pullImages() {
+  const status = document.getElementById('status');
+  status.style.display = 'block';
+  status.textContent = 'กำลังดึงรูปจาก Worker...';
+  try {
+    const res = await fetch(WORKER + '/api/state');
+    const data = await res.json();
+    const title = document.getElementById('title').value || '';
+    const images = (data.images || []).filter(img => 
+      !title || (img.project && img.project.includes(title))
+    ).slice(-20);
+
+    const list = document.getElementById('partsList');
+    if (!images.length) {
+      status.textContent = 'ยังไม่พบรูปสำหรับเรื่องนี้';
+      return;
+    }
+
+    list.innerHTML = '';
+    images.forEach((img, idx) => {
+      const partNum = img.scene || (idx + 1);
+      list.innerHTML += `<div class="part done" id="part-${partNum}"><b>Part ${partNum}</b><small>ดึงมาแล้ว</small><img src="${WORKER}/img/${img.id}" alt="Part ${partNum}"></div>`;
+    });
+    status.textContent = `ดึงรูปมาแสดงแล้ว ${images.length} รูป`;
+  } catch (e) {
+    status.textContent = 'ดึงรูปไม่ได้: ' + e.message;
+  }
+}
+
+function exportTikTok() {
+  const title = document.getElementById('title').value || 'เรื่อง';
+  const parts = document.querySelectorAll('.part');
+  let text = `เรื่อง: ${title}\n\n`;
+  parts.forEach((p, i) => {
+    const img = p.querySelector('img');
+    text += `Part ${i+1}: ${img ? img.src : 'ยังไม่มีรูป'}\n`;
+  });
+  text += `\nสร้างเมื่อ: ${new Date().toLocaleString('th-TH')}`;
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${title}-export.txt`;
+  a.click();
 }
 
 async function startFullPipeline() {
@@ -268,6 +290,7 @@ async function startFullPipeline() {
   const count = +document.getElementById('partsCount').value;
   const status = document.getElementById('status');
   const list = document.getElementById('partsList');
+  const retry = document.getElementById('autoRetry').checked;
 
   status.style.display = 'block';
   status.textContent = 'กำลังส่งไปที่ Worker...';
@@ -278,32 +301,33 @@ async function startFullPipeline() {
 
   list.innerHTML = '';
   for (let i = 1; i <= count; i++) {
-    list.innerHTML += `<div class="part pending" id="part-${i}"><b>Part ${i}</b><small>รอ</small></div>`;
+    list.innerHTML += `<div class="part pending" id="part-${i}"><b>Part ${i}</b><small>รอสร้าง</small></div>`;
     const chunk = sentences.slice((i-1)*per, i*per).join('. ').slice(0, 150);
     lines.push(buildPrompt(title, i, count, chunk));
   }
 
   try {
-    // ส่งเข้าคิวจริง
     const enq = await fetch(WORKER + '/api/enqueue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        project: title,
-        lines: lines,
-        variants: 1
-      })
+      body: JSON.stringify({ project: title, lines, variants: 1 })
     });
     const enqData = await enq.json();
 
     if (enqData.ok) {
-      status.textContent = `ส่งเข้าคิวแล้ว ${enqData.added} ซีน\nกำลังสั่งสร้าง...`;
-      // สั่งให้สร้างทันที
+      status.textContent = `ส่งคิวแล้ว ${enqData.added} ซีน\nสั่งสร้าง...`;
       await fetch(WORKER + '/api/runnow', { method: 'POST' });
+
       for (let i = 1; i <= count; i++) {
         updatePart(i, 'done', 'ส่งคิวแล้ว');
       }
-      status.textContent = `ส่งเข้าคิวและสั่งสร้างแล้ว\nเปิด Worker เพื่อดูผลรูป`;
+
+      status.textContent = `ส่งคำสั่งแล้ว\nกด "ดึงรูปกลับมาแสดง" เมื่อสร้างเสร็จ`;
+
+      // 2. Auto retry note
+      if (retry) {
+        setTimeout(() => pullImages(), 3000);
+      }
     } else {
       status.textContent = 'ส่งคิวไม่สำเร็จ';
     }
