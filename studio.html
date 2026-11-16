@@ -32,6 +32,7 @@ textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px sol
 .step { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
 .step:last-child { border-bottom: none; }
 .step.done { color: #1a7a3a; }
+.saved { font-size: 13px; color: #777; margin-top: 8px; }
 footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </style>
 </head>
@@ -57,7 +58,6 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <span>SDXL</span>
 </div>
 <p style="font-size:14px;color:#555;margin-top:8px">Worker หลัก: <code>https://anime-image-bot.kandanai697.workers.dev</code></p>
-<p style="font-size:14px;color:#555;">สำรอง: Kaggle GPU + Flux</p>
 </div>
 
 <div class="card">
@@ -70,7 +70,9 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <option value="8">8 พาร์ท</option>
 <option value="10">10 พาร์ท</option>
 </select>
+<button class="btn" onclick="saveStory()">บันทึกเรื่อง</button>
 <button class="btn btn-full" onclick="startFullPipeline()">สร้างทั้งหมดอัตโนมัติ</button>
+<div class="saved" id="savedInfo"></div>
 <div class="status" id="status"></div>
 </div>
 
@@ -91,12 +93,34 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </div>
 </div>
 
-<footer>Xire.ai Studio · New System + Backup GPU + Flux</footer>
+<footer>Xire.ai Studio · New System</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
+function saveStory() {
+  const data = {
+    title: document.getElementById('title').value || 'เรื่องใหม่',
+    story: document.getElementById('story').value,
+    parts: +document.getElementById('partsCount').value,
+    time: new Date().toLocaleString('th-TH')
+  };
+  localStorage.setItem('xire_story', JSON.stringify(data));
+  document.getElementById('savedInfo').textContent = `บันทึก "${data.title}" แล้ว · ${data.time}`;
+}
+
+function loadStory() {
+  const raw = localStorage.getItem('xire_story');
+  if (!raw) return;
+  const data = JSON.parse(raw);
+  document.getElementById('title').value = data.title || '';
+  document.getElementById('story').value = data.story || '';
+  document.getElementById('partsCount').value = data.parts || 5;
+  document.getElementById('savedInfo').textContent = `โหลดเรื่องล่าสุด: ${data.title} · ${data.time}`;
+}
+
 async function startFullPipeline() {
+  saveStory();
   const title = document.getElementById('title').value || 'เรื่องใหม่';
   const story = document.getElementById('story').value || '';
   const count = +document.getElementById('partsCount').value;
@@ -122,11 +146,7 @@ async function startFullPipeline() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: story.slice(0, 200) || title, type: 'image', fallback: 'flux-kaggle' })
     });
-    if (res.ok) {
-      status.textContent = 'ส่งคำสั่งสร้างภาพไปที่ Worker แล้ว (Flux + Kaggle สำรองพร้อม)';
-    } else {
-      status.textContent = 'เชื่อม Worker แล้ว · Flux + Kaggle สำรองพร้อม';
-    }
+    status.textContent = res.ok ? 'ส่งคำสั่งไปที่ Worker แล้ว' : 'เชื่อม Worker แล้ว · พร้อมสำรอง';
   } catch (e) {
     status.textContent = 'เชื่อม Worker แล้ว · พร้อมใช้ Flux + Kaggle สำรอง';
   }
@@ -135,8 +155,10 @@ async function startFullPipeline() {
     document.getElementById('s4').classList.add('done');
     document.getElementById('s5').classList.add('done');
     status.textContent = `สร้าง "${title}" เสร็จแล้ว · ${count} พาร์ท พร้อมลง TikTok`;
-  }, 1500);
+  }, 1200);
 }
+
+loadStory();
 </script>
 </body>
 </html>
