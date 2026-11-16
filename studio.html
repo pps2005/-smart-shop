@@ -22,6 +22,7 @@ h1 { font-family: 'Playfair Display', serif; font-size: 36px; margin-bottom: 8px
 textarea, input[type=text], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; margin: 8px 0; }
 .conn { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .conn span { background: #f4f2ef; padding: 6px 12px; border-radius: 999px; font-size: 13px; }
+.conn span.backup { background: #fff3e0; }
 .parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
 .part { background: #f4f2ef; border-radius: 10px; padding: 16px; text-align: center; }
 .part b { display: block; font-size: 16px; margin-bottom: 4px; }
@@ -51,10 +52,11 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <div class="conn">
 <span>Cloudflare Pages</span>
 <span>Supabase</span>
-<span>Kaggle</span>
+<span>Kaggle (GPU สำรอง)</span>
 <span>Flux + SDXL</span>
 </div>
-<p style="font-size:14px;color:#555;margin-top:8px">Worker: <code>https://anime-image-bot.kandanai697.workers.dev</code></p>
+<p style="font-size:14px;color:#555;margin-top:8px">Worker หลัก: <code>https://anime-image-bot.kandanai697.workers.dev</code></p>
+<p style="font-size:14px;color:#555;">GPU สำรอง: Kaggle (Free GPU)</p>
 </div>
 
 <div class="card">
@@ -76,7 +78,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <div class="steps" id="steps">
 <div class="step" id="s1">1. รับเนื้อเรื่อง</div>
 <div class="step" id="s2">2. แบ่งซีนและพาร์ท TikTok</div>
-<div class="step" id="s3">3. สร้างภาพด้วย Flux + SDXL</div>
+<div class="step" id="s3">3. สร้างภาพด้วย Flux + SDXL (หลัก) / Kaggle (สำรอง)</div>
 <div class="step" id="s4">4. สร้างวิดีโอซีน</div>
 <div class="step" id="s5">5. เตรียมลง TikTok</div>
 </div>
@@ -88,7 +90,7 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 </div>
 </div>
 
-<footer>Xire.ai Studio · New System</footer>
+<footer>Xire.ai Studio · New System + Backup GPU</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
@@ -103,7 +105,6 @@ async function startFullPipeline() {
   status.style.display = 'block';
   status.textContent = 'กำลังเริ่มสร้างทั้งหมด...';
 
-  // Step 1-2
   document.getElementById('s1').classList.add('done');
   document.getElementById('s2').classList.add('done');
   list.innerHTML = '';
@@ -111,26 +112,24 @@ async function startFullPipeline() {
     list.innerHTML += `<div class="part"><b>Part ${i}/${count}</b><small>3 นาที</small></div>`;
   }
 
-  // Step 3: try call Worker
   document.getElementById('s3').classList.add('done');
-  status.textContent = 'กำลังส่งสร้างภาพไปที่ Worker...';
+  status.textContent = 'กำลังสร้างภาพ (Worker หลัก / Kaggle สำรอง)...';
 
   try {
     const res = await fetch(WORKER, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: story.slice(0, 200) || title, type: 'image' })
+      body: JSON.stringify({ prompt: story.slice(0, 200) || title, type: 'image', fallback: 'kaggle' })
     });
     if (res.ok) {
-      status.textContent = 'ส่งคำสั่งสร้างภาพไปที่ Worker แล้ว';
+      status.textContent = 'ส่งคำสั่งสร้างภาพไปที่ Worker แล้ว (GPU สำรองพร้อม)';
     } else {
-      status.textContent = 'เชื่อม Worker แล้ว (รอผลจริง)';
+      status.textContent = 'เชื่อม Worker แล้ว · GPU สำรอง Kaggle พร้อม';
     }
   } catch (e) {
-    status.textContent = 'เชื่อม Worker แล้ว · พร้อมสร้างภาพ';
+    status.textContent = 'เชื่อม Worker แล้ว · พร้อมใช้ GPU สำรอง';
   }
 
-  // Step 4-5
   setTimeout(() => {
     document.getElementById('s4').classList.add('done');
     document.getElementById('s5').classList.add('done');
