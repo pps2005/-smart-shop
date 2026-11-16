@@ -57,7 +57,7 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 
 <div class="container">
 <h1>Studio</h1>
-<p class="sub">ระบบสร้างซีรีส์ / อนิเมะ ระดับ Netflix · 1-8 ครบ</p>
+<p class="sub">ระบบสร้างจริง · เชื่อม API Worker แล้ว</p>
 
 <div class="card">
 <h2>สถานะระบบ</h2>
@@ -72,182 +72,129 @@ label { font-size: 13px; color: #555; display: block; margin-top: 8px; }
 <div class="status" id="testResult"></div>
 </div>
 
-<!-- 1. Character Consistency -->
 <div class="card">
-<h2>1. ตัวละครคงที่ (Character Consistency)</h2>
-<label>คำอธิบายตัวละคร (ใส่ทุก Prompt)</label>
-<textarea id="character" rows="3" placeholder="เช่น 1girl, long black hair, brown eyes, white hoodie, 25 years old, Korean actress look"></textarea>
-<label>รูปอ้างอิงตัวละคร (IP-Adapter / FaceID)</label>
+<h2>1. ตัวละครคงที่</h2>
+<label>คำอธิบายตัวละคร</label>
+<textarea id="character" rows="3" placeholder="1girl, long black hair, brown eyes, white hoodie"></textarea>
+<label>รูปอ้างอิง</label>
 <input type="file" id="refImage" accept="image/*">
 <div class="row">
 <select id="consistency">
 <option value="ip-adapter">IP-Adapter FaceID</option>
-<option value="lora">LoRA ตัวละคร</option>
-<option value="prompt-only">ใช้เฉพาะ Prompt</option>
+<option value="lora">LoRA</option>
+<option value="prompt-only">Prompt เท่านั้น</option>
 </select>
 <select id="consistencyStrength">
-<option value="0.6">ความแข็ง 0.6</option>
-<option value="0.8" selected>ความแข็ง 0.8</option>
-<option value="1.0">ความแข็ง 1.0</option>
+<option value="0.6">0.6</option>
+<option value="0.8" selected>0.8</option>
+<option value="1.0">1.0</option>
 </select>
 </div>
 </div>
 
-<!-- 2. ControlNet -->
 <div class="card">
-<h2>2. ControlNet</h2>
+<h2>2-4. ControlNet / วิดีโอ / เสียง</h2>
 <div class="row">
 <select id="controlPose">
-<option value="">ไม่คุมท่าทาง</option>
-<option value="openpose">OpenPose (ท่าทาง)</option>
-<option value="depth">Depth</option>
+<option value="">ไม่คุมท่า</option>
+<option value="openpose">OpenPose</option>
 </select>
-<select id="controlComp">
-<option value="">ไม่คุมองค์ประกอบ</option>
-<option value="canny">Canny</option>
-<option value="lineart">Lineart</option>
-</select>
-<select id="controlHair">
-<option value="">ไม่คุมสีผม</option>
-<option value="reference">อ้างอิงสีผม</option>
-</select>
-</div>
-</div>
-
-<!-- 3. Video -->
-<div class="card">
-<h2>3. สร้างวิดีโอ</h2>
-<div class="row">
 <select id="videoType">
-<option value="image">ภาพนิ่งเท่านั้น</option>
+<option value="image">ภาพนิ่ง</option>
 <option value="animatediff">AnimateDiff</option>
-<option value="svd">Stable Video Diffusion</option>
+<option value="svd">SVD</option>
 </select>
-<select id="videoDuration">
-<option value="3">3 วินาที</option>
-<option value="5">5 วินาที</option>
-<option value="10">10 วินาที</option>
-</select>
-</div>
-</div>
-
-<!-- 4. Voice + Sub -->
-<div class="card">
-<h2>4. เสียงพากย์ + ซับไทย</h2>
-<div class="row">
 <select id="tts">
 <option value="none">ไม่พากย์</option>
-<option value="voicevox">VOICEVOX (ญี่ปุ่น)</option>
 <option value="edge">Edge TTS</option>
 </select>
 <select id="subtitle">
+<option value="thai" selected>ซับไทย</option>
 <option value="none">ไม่มีซับ</option>
-<option value="thai" selected>ซับไทยอัตโนมัติ</option>
-<option value="en">ซับอังกฤษ</option>
 </select>
 </div>
 </div>
 
-<!-- 5. Storyboard + 7. Templates -->
 <div class="card">
-<h2>สร้างซีรีส์ใหม่</h2>
+<h2>สร้างซีรีส์</h2>
 <input type="text" id="title" placeholder="ชื่อเรื่อง">
-<textarea id="story" rows="5" placeholder="เขียนเนื้อเรื่องที่นี่... ระบบจะแบ่งเป็นซีนอัตโนมัติ"></textarea>
-
+<textarea id="story" rows="5" placeholder="เขียนเนื้อเรื่อง..."></textarea>
 <div class="row">
 <select id="template">
-<option value="netflix-kdrama">Netflix ซีรีส์เกาหลี</option>
-<option value="netflix-jdrama">Netflix ซีรีส์ญี่ปุ่น</option>
-<option value="anime-high">อนิเมะคุณภาพสูง</option>
-<option value="cinematic">Cinematic 16:9</option>
+<option value="netflix-kdrama">Netflix เกาหลี</option>
+<option value="netflix-jdrama">Netflix ญี่ปุ่น</option>
+<option value="anime-high">อนิเมะ</option>
+<option value="cinematic">Cinematic</option>
 </select>
 <select id="partsCount">
 <option value="5">5 พาร์ท</option>
 <option value="3">3 พาร์ท</option>
 <option value="8">8 พาร์ท</option>
 </select>
-</div>
-
-<button class="btn btn-small" onclick="generateStoryboard()">5. สร้าง Storyboard อัตโนมัติ</button>
-<div class="storyboard" id="storyboard"></div>
-
-<div class="row" style="margin-top:16px">
 <select id="model">
 <option value="sdxl">SDXL</option>
 <option value="flux">Flux</option>
 <option value="kaggle">Kaggle</option>
 </select>
-<label style="align-self:center"><input type="checkbox" id="qualityCheck" checked> 8. ตรวจคุณภาพ + สร้างใหม่ถ้าเพี้ยน</label>
 </div>
-
-<button class="btn" onclick="saveStory()">บันทึกเรื่อง</button>
-<button class="btn btn-full" onclick="startFullPipeline()">สร้างทั้งหมดอัตโนมัติ</button>
+<button class="btn btn-small" onclick="generateStoryboard()">สร้าง Storyboard</button>
+<div class="storyboard" id="storyboard"></div>
+<label><input type="checkbox" id="qualityCheck" checked> ตรวจคุณภาพ</label>
+<button class="btn" onclick="saveStory()">บันทึก</button>
+<button class="btn btn-full" onclick="startFullPipeline()">สร้างทั้งหมดจริง</button>
 <div class="saved" id="savedInfo"></div>
 <div class="status" id="status"></div>
 </div>
 
 <div class="card">
-<h2>เรื่องที่บันทึกไว้</h2>
+<h2>เรื่องที่บันทึก</h2>
 <div class="history" id="historyList"></div>
 </div>
 
-<!-- 6. Queue -->
 <div class="card">
-<h2>6. คิวการสร้าง</h2>
+<h2>คิวการสร้าง</h2>
 <div class="parts" id="partsList"></div>
-<button class="btn" onclick="exportTikTok()">ส่งออก TikTok</button>
-<button class="btn" onclick="openWorker()" style="margin-left:8px">เปิด Worker</button>
+<button class="btn" onclick="openWorker()">เปิด Worker ดูผล</button>
+<button class="btn" onclick="checkQueue()" style="margin-left:8px">ตรวจสถานะคิว</button>
 </div>
 </div>
 
-<footer>Xire.ai Studio · Netflix Level Pipeline · Features 1-8</footer>
+<footer>Xire.ai Studio · Real Generation</footer>
 
 <script>
 const WORKER = 'https://anime-image-bot.kandanai697.workers.dev';
 
 const TEMPLATES = {
-  'netflix-kdrama': { style: 'cinematic realistic Korean drama, teal and orange color grading, 16:9', lighting: 'cinematic lighting, Rembrandt lighting on face, soft shadows', camera: 'shallow depth of field, 85mm lens, film still, rule of thirds' },
-  'netflix-jdrama': { style: 'cinematic Japanese drama realistic, muted tones, 16:9', lighting: 'soft diffused lighting, natural light', camera: '35mm lens, film still, emotional atmosphere' },
-  'anime-high': { style: 'anime style high quality, detailed, masterpiece', lighting: 'cinematic lighting, dramatic', camera: 'dynamic angle, highly detailed face' },
-  'cinematic': { style: 'cinematic movie still realistic, film grain, 16:9', lighting: 'golden hour rim light, volumetric', camera: 'anamorphic lens, shallow depth of field' }
+  'netflix-kdrama': 'cinematic realistic Korean drama, teal and orange, 16:9, Rembrandt lighting, 85mm, film still',
+  'netflix-jdrama': 'cinematic Japanese drama, muted tones, 16:9, soft lighting, 35mm',
+  'anime-high': 'anime style high quality, detailed, masterpiece, dynamic',
+  'cinematic': 'cinematic movie still, film grain, 16:9, golden hour, anamorphic'
 };
 
-function buildPrompt(title, part, total, sceneText, extra) {
+function buildPrompt(title, part, total, scene) {
   const char = document.getElementById('character').value.trim();
-  const t = TEMPLATES[document.getElementById('template').value] || TEMPLATES['netflix-kdrama'];
-  const consistency = document.getElementById('consistency').value;
-  const strength = document.getElementById('consistencyStrength').value;
-  const video = document.getElementById('videoType').value;
-  const pose = document.getElementById('controlPose').value;
-  const comp = document.getElementById('controlComp').value;
-
-  let prompt = `masterpiece, best quality, ultra detailed, 8k, film still, ${t.style}, ${t.lighting}, ${t.camera}, ${title}, scene ${part} of ${total}, ${sceneText}`;
-  if (char) prompt += `, ${char}`;
-  if (consistency !== 'prompt-only') prompt += `, ${consistency} strength ${strength}`;
-  if (pose) prompt += `, ${pose}`;
-  if (comp) prompt += `, ${comp}`;
-  if (video !== 'image') prompt += `, ${video} motion, ${document.getElementById('videoDuration').value} seconds`;
-  prompt += ', highly detailed face, professional photography, emotional atmosphere, shot on 35mm film';
-  return prompt;
+  const style = TEMPLATES[document.getElementById('template').value] || TEMPLATES['netflix-kdrama'];
+  let p = `masterpiece, best quality, 8k, ${style}, ${title} scene ${part}/${total}, ${scene}`;
+  if (char) p += `, ${char}`;
+  return p;
 }
 
 function generateStoryboard() {
   const story = document.getElementById('story').value.trim();
   const count = +document.getElementById('partsCount').value;
   const el = document.getElementById('storyboard');
-  if (!story) { el.innerHTML = '<div class="note">ไม่มีเนื้อเรื่อง</div>'; return; }
-  const sentences = story.split(/[.!?ๆ\n]+/).filter(s => s.trim().length > 10);
-  const per = Math.ceil(sentences.length / count) || 1;
+  if (!story) return;
+  const sentences = story.split(/[.!?ๆ\n]+/).filter(s => s.trim().length > 8);
+  const per = Math.max(1, Math.ceil(sentences.length / count));
   el.innerHTML = '';
   for (let i = 1; i <= count; i++) {
     const chunk = sentences.slice((i-1)*per, i*per).join('. ');
-    const p = buildPrompt(document.getElementById('title').value || 'เรื่อง', i, count, chunk.slice(0,120));
-    el.innerHTML += `<div class="scene"><b>ซีน ${i}/${count}</b><br><small>${chunk.slice(0,80)}...</small><br><code style="font-size:11px;color:#555">${p.slice(0,150)}...</code></div>`;
+    el.innerHTML += `<div class="scene"><b>ซีน ${i}</b>: ${chunk.slice(0,100)}</div>`;
   }
 }
 
 function getHistory() { return JSON.parse(localStorage.getItem('xire_history') || '[]'); }
-function setHistory(h) { localStorage.setItem('xire_history', JSON.stringify(h.slice(0, 10))); }
+function setHistory(h) { localStorage.setItem('xire_history', JSON.stringify(h.slice(0,10))); }
 function getQueue() { return JSON.parse(localStorage.getItem('xire_queue') || '[]'); }
 function setQueue(q) { localStorage.setItem('xire_queue', JSON.stringify(q)); }
 
@@ -257,70 +204,46 @@ function saveStory() {
     story: document.getElementById('story').value,
     character: document.getElementById('character').value,
     parts: +document.getElementById('partsCount').value,
-    model: document.getElementById('model').value,
     template: document.getElementById('template').value,
     time: new Date().toLocaleString('th-TH')
   };
   localStorage.setItem('xire_story', JSON.stringify(data));
-  const h = getHistory();
-  h.unshift(data);
-  setHistory(h);
-  document.getElementById('savedInfo').textContent = `บันทึก "${data.title}" แล้ว`;
+  const h = getHistory(); h.unshift(data); setHistory(h);
+  document.getElementById('savedInfo').textContent = 'บันทึกแล้ว';
   renderHistory();
 }
 
 function loadStory(data) {
-  if (!data) {
-    const raw = localStorage.getItem('xire_story');
-    if (!raw) return;
-    data = JSON.parse(raw);
-  }
+  if (!data) { const raw = localStorage.getItem('xire_story'); if (!raw) return; data = JSON.parse(raw); }
   document.getElementById('title').value = data.title || '';
   document.getElementById('story').value = data.story || '';
   document.getElementById('character').value = data.character || '';
   document.getElementById('partsCount').value = data.parts || 5;
-  document.getElementById('model').value = data.model || 'sdxl';
   document.getElementById('template').value = data.template || 'netflix-kdrama';
-  document.getElementById('savedInfo').textContent = `โหลด: ${data.title}`;
 }
 
 function renderHistory() {
-  const list = document.getElementById('historyList');
   const h = getHistory();
-  list.innerHTML = h.length ? h.map((s, i) => `
-    <div class="hist-item" onclick="loadFromHistory(${i})">
-      <b>${s.title}</b><br><small>${s.parts} พาร์ท · ${s.template} · ${s.time}</small>
-    </div>
-  `).join('') : '<div style="color:#777">ยังไม่มีเรื่องที่บันทึก</div>';
+  document.getElementById('historyList').innerHTML = h.length ? h.map((s,i) =>
+    `<div class="hist-item" onclick="loadFromHistory(${i})"><b>${s.title}</b><br><small>${s.parts} พาร์ท · ${s.time}</small></div>`
+  ).join('') : 'ยังไม่มี';
 }
-
 function loadFromHistory(i) { const h = getHistory(); if (h[i]) loadStory(h[i]); }
 
-function updatePart(i, status, imgUrl, msg) {
+function updatePart(i, status, msg) {
   const el = document.getElementById(`part-${i}`);
   if (!el) return;
   el.className = `part ${status}`;
-  el.querySelector('small').textContent = msg || (status === 'done' ? 'ส่งคำสั่งแล้ว' : status === 'error' ? 'ผิดพลาด' : 'กำลังสร้าง...');
-  if (imgUrl) {
-    let img = el.querySelector('img');
-    if (!img) { img = document.createElement('img'); el.appendChild(img); }
-    img.src = imgUrl;
-  }
-  const q = getQueue();
-  const item = q.find(x => x.id === i) || { id: i };
-  item.status = status;
-  item.img = imgUrl || item.img;
-  item.msg = msg;
-  setQueue(q);
+  el.querySelector('small').textContent = msg || status;
 }
 
 async function testWorker() {
   const el = document.getElementById('testResult');
   el.style.display = 'block';
-  el.textContent = 'กำลังทดสอบ Worker...';
   try {
-    const res = await fetch(WORKER);
-    el.textContent = `สถานะ: ${res.status}\nWorker พร้อม\nเปิดเพื่อดูผลรูปจริง`;
+    const res = await fetch(WORKER + '/api/state');
+    const data = await res.json();
+    el.textContent = `Worker พร้อม\nคิว: ${data.queue?.length || 0} รายการ`;
   } catch (e) {
     el.textContent = 'เชื่อมไม่ได้: ' + e.message;
   }
@@ -328,15 +251,14 @@ async function testWorker() {
 
 function openWorker() { window.open(WORKER, '_blank'); }
 
-function exportTikTok() {
-  const q = getQueue();
-  const title = document.getElementById('title').value || 'เรื่อง';
-  const text = `เรื่อง: ${title}\n` + q.map(p => `Part ${p.id}: ${p.status} ${p.msg || ''}`).join('\n');
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${title}-tiktok.txt`;
-  a.click();
+async function checkQueue() {
+  try {
+    const res = await fetch(WORKER + '/api/state');
+    const data = await res.json();
+    alert(`คิวใน Worker: ${data.queue?.length || 0} รายการ`);
+  } catch (e) {
+    alert('ตรวจคิวไม่ได้');
+  }
 }
 
 async function startFullPipeline() {
@@ -344,67 +266,54 @@ async function startFullPipeline() {
   const title = document.getElementById('title').value || 'เรื่องใหม่';
   const story = document.getElementById('story').value || '';
   const count = +document.getElementById('partsCount').value;
-  const model = document.getElementById('model').value;
   const status = document.getElementById('status');
   const list = document.getElementById('partsList');
-  const quality = document.getElementById('qualityCheck').checked;
 
   status.style.display = 'block';
-  status.textContent = 'กำลังเริ่มสร้าง...';
+  status.textContent = 'กำลังส่งไปที่ Worker...';
 
   const sentences = story.split(/[.!?ๆ\n]+/).filter(s => s.trim().length > 5);
-  const per = Math.ceil(sentences.length / count) || 1;
+  const per = Math.max(1, Math.ceil(sentences.length / count));
+  const lines = [];
 
-  const queue = [];
   list.innerHTML = '';
   for (let i = 1; i <= count; i++) {
-    list.innerHTML += `<div class="part pending" id="part-${i}"><b>Part ${i}/${count}</b><small>รอสร้าง</small></div>`;
-    queue.push({ id: i, status: 'pending' });
+    list.innerHTML += `<div class="part pending" id="part-${i}"><b>Part ${i}</b><small>รอ</small></div>`;
+    const chunk = sentences.slice((i-1)*per, i*per).join('. ').slice(0, 150);
+    lines.push(buildPrompt(title, i, count, chunk));
   }
-  setQueue(queue);
 
-  for (let i = 1; i <= count; i++) {
-    updatePart(i, 'pending');
-    const chunk = sentences.slice((i-1)*per, i*per).join('. ').slice(0, 120);
-    const prompt = buildPrompt(title, i, count, chunk);
-    try {
-      await fetch(WORKER, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          type: document.getElementById('videoType').value === 'image' ? 'image' : 'video',
-          model,
-          character: document.getElementById('character').value,
-          consistency: document.getElementById('consistency').value,
-          qualityCheck: quality,
-          tts: document.getElementById('tts').value,
-          subtitle: document.getElementById('subtitle').value
-        })
-      });
-      updatePart(i, 'done', null, 'ส่งคำสั่งแล้ว');
-      status.textContent = `พาร์ท ${i}/${count} ส่งไปที่ Worker แล้ว`;
-    } catch (e) {
-      updatePart(i, 'error', null, 'เชื่อมไม่ได้');
+  try {
+    // ส่งเข้าคิวจริง
+    const enq = await fetch(WORKER + '/api/enqueue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project: title,
+        lines: lines,
+        variants: 1
+      })
+    });
+    const enqData = await enq.json();
+
+    if (enqData.ok) {
+      status.textContent = `ส่งเข้าคิวแล้ว ${enqData.added} ซีน\nกำลังสั่งสร้าง...`;
+      // สั่งให้สร้างทันที
+      await fetch(WORKER + '/api/runnow', { method: 'POST' });
+      for (let i = 1; i <= count; i++) {
+        updatePart(i, 'done', 'ส่งคิวแล้ว');
+      }
+      status.textContent = `ส่งเข้าคิวและสั่งสร้างแล้ว\nเปิด Worker เพื่อดูผลรูป`;
+    } else {
+      status.textContent = 'ส่งคิวไม่สำเร็จ';
     }
-    await new Promise(r => setTimeout(r, 500));
+  } catch (e) {
+    status.textContent = 'เชื่อมไม่ได้: ' + e.message;
   }
-  status.textContent = `สร้าง "${title}" เสร็จทั้งหมด\nเปิด Worker เพื่อดูผลรูปจริง`;
-}
-
-function restoreQueue() {
-  const q = getQueue();
-  if (!q.length) return;
-  const list = document.getElementById('partsList');
-  list.innerHTML = '';
-  q.forEach(p => {
-    list.innerHTML += `<div class="part ${p.status}" id="part-${p.id}"><b>Part ${p.id}</b><small>${p.msg || p.status}</small>${p.img ? `<img src="${p.img}">` : ''}</div>`;
-  });
 }
 
 loadStory();
 renderHistory();
-restoreQueue();
 </script>
 </body>
 </html>
