@@ -48,6 +48,22 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 .package p, .package textarea { font-size: 14px; }
 .copy-btn { background: #4caf50; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: 8px; }
 .model-info { font-size: 13px; color: #666; margin-top: 4px; }
+
+.hz{background:#14181c;color:#e8ecef;border-radius:12px;padding:22px;margin-bottom:20px}
+.hz h2{color:#fff;font-size:22px;margin-bottom:4px}
+.hz .sub2{color:#9aa7b0;font-size:13px;margin-bottom:14px}
+.hz .eps{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.hz .eps button{background:#222a31;color:#cfd8de;border:1px solid #33404a;border-radius:999px;padding:8px 14px;font-family:inherit;font-size:14px;cursor:pointer}
+.hz .eps button.on{background:#b3261e;border-color:#b3261e;color:#fff}
+.hz .sc{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #2a343c;font-size:14px}
+.hz .sc .n{min-width:34px;color:#7f8e99}
+.hz .sc .t{flex:1}
+.hz .sc.done .t{color:#6fcf97}
+.hz .sc button{background:#2b3640;color:#fff;border:0;border-radius:8px;padding:7px 12px;font-family:inherit;font-size:13px;cursor:pointer}
+.hz .all{background:#b3261e;color:#fff;border:0;border-radius:999px;padding:12px 22px;font-family:inherit;font-size:15px;cursor:pointer;margin:6px 8px 12px 0}
+.hz .all.alt{background:#2b3640}
+.hz .st{margin-top:10px;font-size:13px;color:#9bd1ff;white-space:pre-wrap}
+.hz textarea{background:#1d242a;color:#e8ecef;border-color:#33404a;font-size:12px}
 </style>
 </head>
 <body>
@@ -62,6 +78,19 @@ footer { text-align: center; padding: 40px; color: #999; font-size: 13px; }
 <div class="container">
 <h1>Studio</h1>
 <p class="sub">สร้างคอนเทนต์ → Hook → แคปชั่น → วิดีโอสำเร็จลง TikTok</p>
+
+
+<div class="hz" id="hz">
+<h2>ซีรีส์สยอง: ศพไม่ยอมนอน</h2>
+<p class="sub2">8 ตอน · 80 ซีน · ซีนละ 3 นาที (ภาพนิ่ง 8 ภาพต่อซีน + เสียง + ซูม) · ผีผสมซอมบี้</p>
+<div class="eps" id="hzEps"></div>
+<div id="hzScenes"></div>
+<button class="all" onclick="hzSendEp()">ส่งทั้งตอนเข้าคิวภาพ</button>
+<button class="all alt" onclick="hzResetEp()">ล้างติ๊กตอนนี้</button>
+<button class="all alt" onclick="hzShow()">ดูพรอมต์ซีนที่เลือก</button>
+<textarea id="hzPrompt" rows="6" style="display:none" readonly></textarea>
+<div class="st" id="hzSt"></div>
+</div>
 
 <div class="daily-box">
 <h2>คอนเทนต์วันนี้</h2>
@@ -428,6 +457,70 @@ async function startFullPipeline() {
     status.textContent = 'เชื่อมไม่ได้: ' + e.message;
   }
 }
+
+/* ===== ซีรีส์สยอง: ศพไม่ยอมนอน ===== */
+const HZ_EPS = [
+ {t:'คืนเดือนดับ', s:['ใบข้าวเข้าเวรห้องเก็บศพ เห็นผีผู้ชายมองตู้ช่อง 7','ธีร์ตรวจเวร ประตูห้องเปิดค้าง ไฟกระพริบ','ผีพิมพ์เตือน อย่าเปิดช่อง 7','ศพในช่อง 7 ลุกขึ้นเอง ใบข้าววิ่งหนี','ธีร์ยิงศพไม่ตาย ศพลุกอีก','ผู้ป่วยในหอไข้ตายพร้อมกันหลายเตียง','หมอวรวุฒิสั่งปิดตึก ศพเริ่มเดินออกทุกชั้น','ใบข้าวเห็นผีนับร้อยลอยออกจากโรงพยาบาล','กลุ่มรอดชีวิตหนีขึ้นดาดฟ้า','เสียงระฆังวัดดังไกลๆ ซอมบี้หยุดนิ่ง']},
+ {t:'เสียงระฆัง', s:['ซอมบี้หยุดนิ่งชั่วครู่ แล้วถอยหนี','ธีร์สังเกตว่าเสียงระฆังคือจุดอ่อน','ใบข้าวให้พิมพ์พาไปหาคนที่รู้เรื่อง','กลุ่มรอดออกจากโรงพยาบาลทางบันไดหนีไฟ','ระหว่างทางเจอครอบครัวหนึ่งหลบในรถ มีน้องมิ้นด้วย','น้องมิ้นพูดภาษาคนตายโดยไม่รู้ตัว','ธีร์ถูกซอมบี้ข่วนที่แขน เก็บเป็นความลับ','ไปถึงวัดร้างที่ยายเพียรอยู่','ยายเพียรรู้ทันทีว่ามีคนไปรบกวนศิลา','ยายเห็นรอยข่วนของธีร์ เหลือเวลา 1 ชั่วโมง']},
+ {t:'พิธีขับผี', s:['ยายเตรียมพิธีขับผีจากแผลของธีร์','ใบข้าวและมิ้นช่วยเตรียมข้าวสารเสก','ธีร์ได้ยินเสียงผีในหัว','พิธีเริ่ม ผีในตัวธีร์ต่อต้านรุนแรง','ผีในตัวธีร์คือเพื่อนทหารที่เสียชีวิต','พิมพ์เข้าไปคุยกับผีนั้นจนยอมออก','ธีร์รอด แต่หมดแรง','ซอมบี้ฝูงใหญ่ตามมาถึงวัด','ยายสวดตั้งแนวสายสิญจน์รอบวัด','หมอวรวุฒิตัดสินใจเชื่อ เมื่อเห็นผีตัวจริงด้วยตา']},
+ {t:'เบื้องหลังศิลา', s:['ยายเล่าตำนานศิลาต่ออายุใต้วัดร้าง','ใบข้าวสงสัยว่าใครกล้าทำเรื่องนี้','หมอวรวุฒิพบเอกสารลับ มีชื่อธนากร','ธีร์นึกได้ว่าเคยเห็นพระปลอมเข้าออกโรงพยาบาล','ทีมวางแผนกลับไปที่โรงพยาบาลหาหลักฐาน','ตอนกลางวัน ซอมบี้ช้าลง ทีมเคลื่อนที่ได้','เจอผู้รอดชีวิตกลุ่มอื่นในห้างใกล้โรงพยาบาล','หัวหน้ากลุ่มไม่ไว้ใจ ต้องต่อรอง','หนึ่งในกลุ่มถูกกัดแต่ปิดบัง','เขาเปลี่ยนเป็นซอมบี้กลางห้าง จบค้าง']},
+ {t:'ห้องลับใต้ดิน', s:['ทีมแตกในห้าง บางส่วนหนี บางส่วนสู้','ธีร์พาทีมหนีผ่านลานจอดรถ','ถึงโรงพยาบาล เข้าทางท่อระบายอากาศ','พบห้องลับใต้ดิน เต็มไปด้วยยันต์และหีบเก็บวิญญาณ','มิ้นเริ่มสั่นและพูดด้วยเสียงผู้ชายแก่','ผีในตัวมิ้นเผยว่าครูฤทธิ์คือผู้วางพิธีผิดตั้งแต่แรก','พบสมุดจดพิธีของครูฤทธิ์','ธนากรเดินเข้ามาพร้อมคนคุ้นกัน ยิ้มอย่างสุภาพ','เขายอมรับทุกอย่างและเสนอข้อตกลง','ทีมปฏิเสธ แต่ถูกจับขัง']},
+ {t:'ผีที่ไม่มีที่ไป', s:['ทีมถูกขังในห้องเก็บศพเก่า','พิมพ์ผ่านกำแพงมาหา เล่าว่าตัวเองก็ถูกศิลาดูดไว้เหมือนกัน','ใบข้าวรู้ว่าพี่สาวเสียชีวิตเพราะพิธีรอบแรก 10 ปีก่อน','ใบข้าวโกรธและเสียใจ','หมอวรวุฒิค้นพบวิธีทำลายศิลาจากสมุดของครูฤทธิ์','วิธีนั้นต้องมีคนสละเพื่อเปิดทางให้ผีผ่านไป','ยายเพียรเงียบ รู้ว่าตัวเองต้องเป็นคนนั้น','ซอมบี้บุกเข้าห้องขัง เพราะธนากรปล่อยเข้ามาเอง','ธีร์ฝ่าฝูงซอมบี้พาทุกคนหนี','ทีมแยกกันหนีสองทาง']},
+ {t:'เจ้าของศิลา', s:['ใบข้าวกับมิ้นหนีไปวัดร้างเพื่อกลับไปหาศิลา','ธีร์กับหมอวรวุฒิถ่วงเวลาซอมบี้','ครูฤทธิ์ตามไปที่วัดร้าง ขู่ว่าจะทำพิธีรอบสอง','ครูฤทธิ์ถูกผีที่เขาเคยดูดวิญญาณรุมเล่นงาน','ธนากรมาถึง ถือหีบเก็บวิญญาณลูกสุดท้าย','เขาจะใช้วิญญาณใบข้าวเป็นตัวเริ่มพิธี','มิ้นเรียกผีนับร้อยในหมู่บ้านให้มาช่วย','พิมพ์สู้กับธนากรจนหีบแตก','ยายเพียรมาถึงทัน เริ่มพิธีทำลายศิลา','พื้นวัดสั่น ศิลาเรืองแสงแดง จบค้าง']},
+ {t:'ปล่อยให้ไป', s:['ยายเพียรสวดสู้กับพลังศิลา','ธนากรพยายามแย่งศิลา กลายเป็นซอมบี้ผีดุ','ธีร์มาถึงช่วยกันซอมบี้ที่ล้อมวัด','หมอวรวุฒิช่วยใบข้าวส่งสายสิญจน์เข้าไปในศิลา','พิมพ์ต้องอยู่เป็นคนสุดท้ายเพื่อเปิดทางให้ผีไปเกิด','ใบข้าวต้องตัดสินใจ ปล่อยพี่สาวไป','ผีนับร้อยลอยขึ้นฟ้าทีละดวง ศพล้มลงนอนสงบ','ยายเพียรเสียชีวิตอย่างสงบข้างศิลาที่แตก','ฟ้าสาง ผู้รอดชีวิตไม่กี่คนเดินออกจากวัด','ฉากจบ: ใบข้าวกลับเข้าเวรห้องเก็บศพ เห็นผีผู้ชายตัวเดิมยืนยิ้มแล้วหายไป']}
+];
+const HZ_CHAR = {
+ 'ใบข้าว':'Thai woman 24, shoulder-length black hair, hospital morgue staff uniform, calm worried eyes',
+ 'ธีร์':'Thai man 30, short hair, tall athletic ex-soldier, dark security guard uniform, stern face',
+ 'ยาย':'elderly Thai nun 68, shaved head, white robe, wrinkled kind face',
+ 'มิ้น':'Thai girl 10, bob haircut, pale, oversized t-shirt, wide eyes',
+ 'หมอ':'Thai doctor 45, glasses, white coat, tired face',
+ 'พิมพ์':'translucent ghost of a young Thai woman 24, long wet hair, pale white dress, gentle sad face, faint glow',
+ 'ธนากร':'wealthy Thai businessman 60, grey hair, black suit, polite smile',
+ 'ครูฤทธิ์':'Thai monk 50 in orange robe, sly smile'
+};
+const HZ_STYLE = 'cinematic Thai horror film, photorealistic, dark teal and sickly green grading, fog, low-key lighting, film grain, 9:16 vertical';
+const HZ_SHOTS = ['wide establishing shot','medium shot of the main character','close-up of face, fearful','over-the-shoulder shot','low angle shot','detail shot of hands or object','zombie or ghost lurking in the background','reaction close-up'];
+let hzE = 0, hzSel = 0;
+const hzKey = () => 'ss_hz_done';
+const hzDone = () => { try { return JSON.parse(localStorage.getItem(hzKey()) || '{}'); } catch (e) { return {}; } };
+function hzMark(e, s, v) { const d = hzDone(); d[e + '-' + s] = v; try { localStorage.setItem(hzKey(), JSON.stringify(d)); } catch (x) {} }
+function hzLines(e, s) {
+  const txt = HZ_EPS[e].s[s];
+  const who = Object.keys(HZ_CHAR).filter(k => txt.indexOf(k) >= 0).map(k => HZ_CHAR[k]).join('; ');
+  return HZ_SHOTS.map(sh => `${HZ_STYLE}, ${sh}, ${who ? who + ', ' : ''}${txt}`);
+}
+function hzRender() {
+  const eps = document.getElementById('hzEps');
+  eps.innerHTML = HZ_EPS.map((x, i) => `<button class="${i === hzE ? 'on' : ''}" onclick="hzE=${i};hzSel=0;hzRender()">ตอน ${i + 1}</button>`).join('');
+  const d = hzDone();
+  document.getElementById('hzScenes').innerHTML = `<p style="margin-bottom:6px;font-size:15px">ตอน ${hzE + 1}: ${HZ_EPS[hzE].t}</p>` +
+    HZ_EPS[hzE].s.map((t, i) => `<div class="sc ${d[hzE + '-' + i] ? 'done' : ''}"><span class="n">${hzE * 10 + i + 1}</span><span class="t">${t}</span><button onclick="hzSendOne(${i})">${d[hzE + '-' + i] ? 'ส่งซ้ำ' : 'ส่งซีนนี้'}</button></div>`).join('');
+}
+async function hzEnqueue(project, lines) {
+  const st = document.getElementById('hzSt');
+  st.textContent = 'กำลังส่ง ' + lines.length + ' ภาพเข้าคิว...';
+  try {
+    const r = await fetch(WORKER + '/api/enqueue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project, lines: lines.join('\n'), variants: 1 }) });
+    const j = await r.json();
+    if (!j.ok) { st.textContent = 'ส่งไม่สำเร็จ ลองกดอีกครั้ง'; return false; }
+    await fetch(WORKER + '/api/resume', { method: 'POST' });
+    await fetch(WORKER + '/api/runnow', { method: 'POST' });
+    st.textContent = 'ส่งแล้ว ' + (j.added || lines.length) + ' ภาพ ดูผลที่ปุ่ม "ดึงรูปกลับมาแสดง" ด้านล่าง';
+    return true;
+  } catch (e) { st.textContent = 'เชื่อม Worker ไม่ได้: ' + e.message; return false; }
+}
+async function hzSendOne(i) {
+  hzSel = i;
+  if (await hzEnqueue('ศพไม่ยอมนอน-ตอน' + (hzE + 1) + '-ซีน' + (i + 1), hzLines(hzE, i))) { hzMark(hzE, i, 1); hzRender(); }
+}
+async function hzSendEp() {
+  const all = []; HZ_EPS[hzE].s.forEach((t, i) => all.push(...hzLines(hzE, i)));
+  if (await hzEnqueue('ศพไม่ยอมนอน-ตอน' + (hzE + 1), all)) { HZ_EPS[hzE].s.forEach((t, i) => hzMark(hzE, i, 1)); hzRender(); }
+}
+function hzResetEp() { HZ_EPS[hzE].s.forEach((t, i) => hzMark(hzE, i, 0)); hzRender(); }
+function hzShow() { const b = document.getElementById('hzPrompt'); b.style.display = 'block'; b.value = hzLines(hzE, hzSel).join('\n\n'); }
+hzRender();
 </script>
 </body>
 </html>
