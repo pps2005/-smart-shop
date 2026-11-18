@@ -649,7 +649,7 @@ function render(){const A=$('#app');try{const st=$('#sl_st'),ep=$('#sl_ep');if(s
   /* แถบ 📋 สรุปงาน: ลิงก์ตั้งค่าเครื่องอื่น + โควตาฐานข้อมูล + แผนงานในคิว + โควตาฟรีทั้งหมด + ผู้ช่วย Kaggle (ผู้ใช้สั่งแยกเป็นหน้าเอง) */
   if(!pl&&ST.tab==='lora')ST.tab='story';
   {const qp=quotaPct();h+=`<div class="row" style="margin:8px 0"><button class="${ST.tab!=='lora'&&ST.tab!=='sum'&&ST.tab!=='pres'?'on':''}" data-tab="story">🎬 เรื่อง</button><button class="${ST.tab==='pres'?'on':''}" data-tab="pres">🎞 คอนเทนต์</button>${pl?`<button class="${ST.tab==='lora'?'on':''}" data-tab="lora">🧬 LoRA (${ST.lib.length})</button>`:''}<button class="${ST.tab==='sum'?'on':''}" data-tab="sum">📋 สรุปงาน <span style="color:${qp>=97?'#c0392b':qp>=85?'#e67e22':'#27ae60'}">${qp.toFixed(0)}%</span></button></div>`;}
-  if(ST.tab==='sum'){if(botCfg().url)h+=`<div class="c" style="display:flex;gap:8px;align-items:center"><span class="mu" style="flex:1;font-size:13px">📲 เปิดสตูดิโอบน iPad / เครื่องอื่น ให้เห็นเหมือนเครื่องนี้</span><button data-sync>ส่งลิงก์ตั้งค่า</button></div>`;h+=meterCard();h+=quotaCard();h+=helperCard();}
+  if(ST.tab==='sum'){if(botCfg().url)h+=`<div class="c" style="display:flex;gap:8px;align-items:center"><span class="mu" style="flex:1;font-size:13px">📲 เปิดสตูดิโอบน iPad / เครื่องอื่น ให้เห็นเหมือนเครื่องนี้</span><button data-sync>ส่งลิงก์ตั้งค่า</button></div>`;h+=meterCard();h+=quotaCard();h+=helperCard();h+=adminCards();}
   if(pl&&ST.tab==='lora'){h+=loraTab(pl);A.innerHTML=h;bindTabs(A);bindLora(A);return;}
   if(ST.tab==='pres'){h+=presTab();A.innerHTML=h;bindTabs(A);bindPres(A);if(!ST.presAt||Date.now()-ST.presAt>20000)presLoad();return;}
   if(ST.tab!=='sum'){
@@ -871,6 +871,12 @@ async function wipeRebuild(){
     await api('autos_off');ST.onlyReady=false;localStorage.setItem('ss_onlyready','0');LG.clear();for(const k in LT)delete LT[k];ST.lib=[];
     toast('ลบแล้ว '+(r.removed||0)+' คน เริ่มเรียกนักแสดงใหม่');ST.busy='';await load();await startAll();
   }catch(e){ST.busy='';ST.msg='⚠️ '+botErr(e);await load();}}
+function adminCards(){let h='';
+  {const a=ST.autos,on=a?[a.fill&&'เติมคิวภาพเอง',a.lora&&'เทรน LoRA เอง (ฝั่งบอท)',a.cast&&'แคสติ้งรายวัน',a.aud&&'ออดิชันรายวัน'].filter(Boolean):[];
+   h+=`<div class="c"><h2>⛔ ระบบอัตโนมัติเก่า</h2>${a?(on.length?`<div class="warn">ยังเปิดอยู่: ${esc(on.join(' · '))}</div>`:'<div class="ok">ปิดครบแล้ว — ตอนนี้ทำงานเฉพาะที่สตูดิโอสั่งเท่านั้น</div>'):'<div class="mu">อ่านสถานะไม่ได้ (บอทอาจเป็นเวอร์ชันเก่า)</div>'}<div class="mu" style="margin-top:4px">ปิด: เติมคิวภาพเอง · เทรน LoRA เองฝั่งบอท · แคสติ้ง/ออดิชันรายวัน และล้างคิวงานเทรน/ภาพที่ค้าง (ตอนที่สร้างอยู่ใน 🎬 เรื่องไม่ถูกแตะ)</div><button data-autoff="1" style="margin-top:8px">⛔ ปิดทั้งหมด + ล้างคิวค้าง</button></div>`;}
+  h+=`<div class="c"><h2>🔌 การเชื่อมบอท</h2><button data-test="1">🧪 ทดสอบการเชื่อมต่อ</button><button data-bot="1">เชื่อมบอทใหม่</button>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
+  h+=`<div class="c"><h2>♻️ เริ่มใหม่ทั้งหมด</h2><div class="mu">ลบคลังนักแสดงเก่า (ผู้สมัคร ตัวละคร LoRA และภาพทั้งหมด) แล้วเรียกนักแสดงใหม่ เทรน LoRA ใหม่ให้ตัวหลัก ลบแล้วกู้คืนไม่ได้</div><button data-wipe="1" style="margin-top:8px;border-color:var(--bad);color:var(--bad)">🗑 ลบคลังเก่า + สร้าง LoRA ใหม่</button></div>`;
+  return h;}
 function loraTab(pl){
   const roles=pl.roles.filter(r=>live(r)),lib=ST.lib,tr=ST.train||[],mb=x=>x.size?Math.round(x.size/1048576)+' MB':'';
   const usedBy=x=>x.cast_role?(x.cast_story===ST.story?'ใช้เป็นบท: <b>'+esc(x.cast_role)+'</b>':'ใช้อยู่ในเรื่อง “'+esc(x.cast_story)+'”'):'ยังว่าง';
@@ -896,10 +902,6 @@ function loraTab(pl){
       <select data-lp="${esc(r.key)}" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);font:inherit;margin-top:4px"><option value="0">— ไม่เลือก —</option>${lib.map(x=>{const other=x.cast_role&&x.cast_story&&x.cast_story!==ST.story,took=x.cast_role&&x.cast_story===ST.story&&x.cast_role!==r.key;return `<option value="${x.lid}" ${+cur===+x.lid?'selected':''} ${other?'disabled':''}>${esc(x.name)}${other?' (ใช้เรื่องอื่นอยู่)':took?' (ย้ายจากบท '+esc(x.cast_role)+')':''}</option>`;}).join('')}</select>
       ${cur?`<div class="row" style="margin-top:6px;flex-wrap:nowrap"><span class="mu" style="white-space:nowrap">น้ำหนัก <b data-lwv="${esc(r.key)}">${(w/100).toFixed(2)}</b></span><input type="range" min="30" max="120" step="5" value="${w}" data-lw="${esc(r.key)}" style="flex:1"></div><div class="mu" style="font-size:12px">ต่ำ = หน้านุ่ม/อิสระ · สูง = ล็อกหน้าแน่นแต่อาจแข็ง (แนะนำ 0.8)</div>`:''}
       ${t==='main'&&!cur?'<div class="warn" style="font-size:13px">ตัวหลักต้องเลือก LoRA ที่เสร็จแล้วก่อนเริ่มสร้าง</div>':''}</div>`;}).join('')+'</div>';
-  {const a=ST.autos,on=a?[a.fill&&'เติมคิวภาพเอง',a.lora&&'เทรน LoRA เอง (ฝั่งบอท)',a.cast&&'แคสติ้งรายวัน',a.aud&&'ออดิชันรายวัน'].filter(Boolean):[];
-   h+=`<div class="c"><h2>⛔ ระบบอัตโนมัติเก่า</h2>${a?(on.length?`<div class="warn">ยังเปิดอยู่: ${esc(on.join(' · '))}</div>`:'<div class="ok">ปิดครบแล้ว — ตอนนี้ทำงานเฉพาะที่สตูดิโอสั่งเท่านั้น</div>'):'<div class="mu">อ่านสถานะไม่ได้ (บอทอาจเป็นเวอร์ชันเก่า)</div>'}<div class="mu" style="margin-top:4px">ปิด: เติมคิวภาพเอง · เทรน LoRA เองฝั่งบอท · แคสติ้ง/ออดิชันรายวัน และล้างคิวงานเทรน/ภาพที่ค้าง (ตอนที่สร้างอยู่ใน 🎬 เรื่องไม่ถูกแตะ)</div><button data-autoff="1" style="margin-top:8px">⛔ ปิดทั้งหมด + ล้างคิวค้าง</button></div>`;}
-  h+=`<div class="c"><h2>🔌 การเชื่อมบอท</h2><button data-test="1">🧪 ทดสอบการเชื่อมต่อ</button><button data-bot="1">เชื่อมบอทใหม่</button>${ST.testMsg?`<div class="mu" style="margin-top:6px;white-space:pre-wrap">${esc(ST.testMsg)}</div>`:''}</div>`;
-  h+=`<div class="c"><h2>♻️ เริ่มใหม่ทั้งหมด</h2><div class="mu">ลบคลังนักแสดงเก่า (ผู้สมัคร ตัวละคร LoRA และภาพทั้งหมด) แล้วเรียกนักแสดงใหม่ เทรน LoRA ใหม่ให้ตัวหลัก ลบแล้วกู้คืนไม่ได้</div><button data-wipe="1" style="margin-top:8px;border-color:var(--bad);color:var(--bad)">🗑 ลบคลังเก่า + สร้าง LoRA ใหม่</button></div>`;
   return h;}
 function bindLora(A){
   A.querySelectorAll('[data-xauto]').forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent='⏳ AI กำลังอ่านบท…';try{const r=await api('xl_auto');toast(r.made&&r.made.length?'เพิ่มแล้ว: '+r.made.join(', '):'ไม่มีอะไรให้เพิ่ม (มีครบแล้ว)');}catch(e){toast(botErr(e));}await load();});
