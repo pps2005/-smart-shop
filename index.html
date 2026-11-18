@@ -83,7 +83,8 @@ ${s.helpers.length?`<div class="c"><h3>ผู้ช่วย Kaggle รายต
 ${s.flux.length?`<div class="c"><h3>คีย์ Flux รายตัว</h3>${s.flux.map(x=>sw('flux:'+x.id,E(x.name||'คีย์ '+x.id),x.on_==1)).join('')}</div>`:''}
 <h2 style="margin-top:18px">🧠 โมเดล</h2><p class="sub">ลงทะเบียนไว้ ยังไม่มีสูตรงานเรียกใช้ · เปิด = เลือกไว้ใช้</p>${mod}<div class="c"><h3>คิว</h3><div class="mu">รอ ${q.queued||0} · กำลังทำ ${q.running||0} · เสร็จ ${q.done||0} · พลาด ${q.failed||0}</div><div style="margin-top:8px"><button class="dg" id="cl">ปิดงานค้างทั้งหมด</button></div></div>
 <div class="c"><h3>ล้างข้อมูลเก่า</h3><div class="mu">ลบตัวละคร, LoRA, ภาพ, วิดีโอ, บท/ซีรีส์ และคิวเก่า · เก็บการเชื่อม เสียงพากย์ เสียงเอฟเฟกต์ไว้ · กู้คืนไม่ได้</div><input id="wc" placeholder="พิมพ์ ลบทั้งหมด เพื่อยืนยัน"><button class="dg" id="wp">ล้างข้อมูลเก่า</button><div id="wm"></div></div>`};
-P.conn=async()=>{const c=cfg();return `<h2>🔌 เชื่อมต่อ</h2><div class="c"><input id="bu" placeholder="ลิงก์บอท (https://…workers.dev)" value="${E(c.url)}"><input id="bk" type="password" placeholder="รหัสผ่านบอท" value="${E(c.key)}"><button class="pri" id="bs">บันทึก + ทดสอบ</button><div id="bm"></div></div>`};
+P.conn=async()=>{const c=cfg();return `<h2>🔌 เชื่อมต่อ</h2><div class="c"><input id="bu" placeholder="ลิงก์บอท (https://…workers.dev)" value="${E(c.url)}"><input id="bk" type="password" placeholder="รหัสผ่านบอท" value="${E(c.key)}"><button class="pri" id="bs">บันทึก + ทดสอบ</button><div id="bm"></div></div>
+<div class="c"><h3>Kaggle</h3><div class="mu">ใส่ชื่อผู้ใช้และคีย์ API (เก็บในฐานข้อมูลของบอทเหมือนระบบเก่า) · ว่างทั้งคู่แล้วบันทึก = ลบ</div><input id="ku" placeholder="ชื่อผู้ใช้ Kaggle"><input id="kk" type="password" placeholder="คีย์ API Kaggle"><button class="pri" id="ks">บันทึก + ทดสอบ</button><div id="km2"></div></div>`};
 async function show(){const r=(location.hash.replace(/^#\/?/,'')||''),a=P[r]?r:'';
  document.querySelectorAll('nav a').forEach(x=>x.classList.toggle('on',x.getAttribute('href')=='#/'+a||(a==''&&x.getAttribute('href')=='#/')));
  const v=$('#v');try{v.innerHTML=await P[a]();bind(a)}catch(e){v.innerHTML=`<div class="c er">${E(e.message||e)}</div>`}}
@@ -95,6 +96,7 @@ function bind(a){const on=(s,f)=>document.querySelectorAll(s).forEach(f);
  if(g('#kt'))g('#kt').onclick=async()=>{try{g('#km').textContent=(await api('/api/kaggle-test')).msg}catch(e){g('#km').textContent=e.message}};
  if(g('#cl'))g('#cl').onclick=async()=>{if(confirm('ปิดงานที่รอ/กำลังทำทั้งหมด?')){await api('/api/jobs/clear',{});show()}};
  if(g('#wp'))g('#wp').onclick=async()=>{try{const j=await api('/api/wipe',{confirm:g('#wc').value.trim()});g('#wm').innerHTML=`<div class="ms">ล้างแล้ว ${j.dropped} ตาราง และปิดสวิตช์ทั้งหมด</div>`}catch(e){g('#wm').innerHTML=`<div class="er">${E(e.message)}</div>`}};
+ if(g('#ks'))g('#ks').onclick=async()=>{try{await api('/api/kcred',{user:g('#ku').value,key:g('#kk').value});const j=await api('/api/kaggle-test');g('#km2').innerHTML=`<div class="${j.ok?'ms':'er'}">${E(j.msg)}</div>`;g('#kk').value=''}catch(e){g('#km2').innerHTML=`<div class="er">${E(e.message)}</div>`}};
  if(g('#bs'))g('#bs').onclick=async()=>{localStorage.setItem('ss_imgbot',JSON.stringify({url:g('#bu').value.trim(),key:g('#bk').value}));try{const j=await api('/api/ping');g('#bm').innerHTML=`<div class="ms">เชื่อมได้ · ${E(j.ver)}</div>`;ping()}catch(e){g('#bm').innerHTML=`<div class="er">${E(e.message)}</div>`}}}
 addEventListener('hashchange',show);show();ping();
 </script></body></html>

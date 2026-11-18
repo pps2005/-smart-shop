@@ -81,6 +81,15 @@ async function switches(env) {
   return o;
 }
 const setSw = (env, n, on) => env.DB.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind('sw_' + n, on ? '1' : '0').run();
+function kEnv(env, s) { // รับรหัส Kaggle แบบเดียวกับบอทเก่า: secret ชื่อ KAGGLE_KEY/Token ฯลฯ หรือค่าที่กรอกในหน้าเว็บ (เก็บใน settings: k_user / k_key)
+  s = s || {};
+  if (!env.KAGGLE_KEY) env.KAGGLE_KEY = env.Token || env.TOKEN || env.token || env.KAGGLE_TOKEN || s.k_key || '';
+  if (!env.KAGGLE_USERNAME) env.KAGGLE_USERNAME = env.Username || env.USERNAME || env.username || env.KAGGLE_USER || s.k_user || '';
+  env.KAGGLE_USERNAME = String(env.KAGGLE_USERNAME).trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?kaggle\.com\//, '').replace(/\/.*$/, '');
+  env.KAGGLE_KEY = String(env.KAGGLE_KEY).trim();
+  return env;
+}
+async function kenv(env) { const r = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('k_user','k_key')").all().catch(() => ({ results: [] })), s = {}; for (const x of r.results) s[x.key] = x.value; return kEnv({ ...env }, s); }
 const kAuth = env => { const k = env.KAGGLE_KEY || ''; return k.startsWith('KGAT_') ? 'Bearer ' + k : 'Basic ' + btoa((env.KAGGLE_USERNAME || '') + ':' + k); };
 async function kFetch(env, path) {
   const r = await fetch('https://www.kaggle.com/api/v1' + path, { headers: { authorization: kAuth(env), accept: 'application/json', 'user-agent': 'xiress-bot' } });
@@ -88,7 +97,7 @@ async function kFetch(env, path) {
 }
 const rows = async (env, q) => (await env.DB.prepare(q).all().catch(() => ({ results: [] }))).results;
 async function status(env) {
-  await schema(env);
+  await schema(env); let ke;
   const [jobs, helpers, flux, nv, ns, supa] = await Promise.all([
     rows(env, "SELECT status, COUNT(*) n FROM n_jobs GROUP BY status"),
     rows(env, 'SELECT id,name,on_,seen,done FROM helpers'),
@@ -97,7 +106,7 @@ async function status(env) {
     rows(env, "SELECT COUNT(*) n FROM settings WHERE key LIKE 'supa%' AND value<>''")]);
   const sw = await switches(env);
   return { ok: true, ver: VER, sw, models: MODELS.map(m => ({ ...m, on: sw['model_' + m.id] === '1' })), jobs, helpers, flux, voices: (nv[0] || {}).n || 0, sfx: (ns[0] || {}).n || 0,
-    link: { kaggle: !!(env.KAGGLE_USERNAME && env.KAGGLE_KEY), github: !!(env.GH_TOKEN && env.GH_REPO), telegram: !!(env.TG_TOKEN && env.TG_CHAT), supabase: ((supa[0] || {}).n || 0) > 0 } };
+    link: { kaggle: !!((ke = await kenv(env)).KAGGLE_USERNAME && ke.KAGGLE_KEY), github: !!(env.GH_TOKEN && env.GH_REPO), telegram: !!(env.TG_TOKEN && env.TG_CHAT), supabase: ((supa[0] || {}).n || 0) > 0 } };
 }
 async function handle(req, env) {
   const url = new URL(req.url), p = url.pathname;
@@ -108,7 +117,14 @@ async function handle(req, env) {
   await schema(env);
   const b = req.method === 'POST' ? await req.json().catch(() => ({})) : {}, now = Date.now();
   if (p === '/api/status') return json(await status(env));
-  if (p === '/api/kaggle-test') { if (!env.KAGGLE_USERNAME || !env.KAGGLE_KEY) return json({ ok: false, msg: 'ยังไม่ได้ตั้ง KAGGLE_USERNAME / KAGGLE_KEY' }); const r = await kFetch(env, '/kernels/list?user=' + encodeURIComponent(env.KAGGLE_USERNAME) + '&pageSize=1'); return json({ ok: r.ok, msg: r.ok ? 'Kaggle เชื่อมได้' : 'Kaggle ตอบ ' + r.status }); }
+  if (p === '/api/kcred') { // บันทึกรหัส Kaggle (เก็บใน settings เหมือนบอทเก่า · ไม่ส่งกลับมาแสดง) · ว่างทั้งคู่ = ลบ
+    const u = String(b.user || '').trim(), k = String(b.key || '').trim();
+    if (!u && !k) await env.DB.prepare("DELETE FROM settings WHERE key IN ('k_user','k_key')").run();
+    else if (!u || !k) return json({ error: 'ใส่ให้ครบทั้งชื่อผู้ใช้และคีย์' }, 400);
+    else await env.DB.batch([env.DB.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind('k_user', u), env.DB.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind('k_key', k)]);
+    return json({ ok: true });
+  }
+  if (p === '/api/kaggle-test') { const e = await kenv(env); if (!e.KAGGLE_USERNAME || !e.KAGGLE_KEY) return json({ ok: false, msg: 'ยังไม่ได้ตั้งรหัส Kaggle (ใส่ได้ที่ 🔌 เชื่อมต่อ)' }); const r = await kFetch(e, '/kernels/list?user=' + encodeURIComponent(e.KAGGLE_USERNAME) + '&pageSize=1'); return json({ ok: r.ok, msg: r.ok ? 'Kaggle เชื่อมได้' : 'Kaggle ตอบ ' + r.status }); }
   if (p === '/api/switch') { // ปิด/เปิดรายตัว: สวิตช์หลัก, helper:ID, flux:ID
     const n = String(b.name || ''), on = b.on ? 1 : 0, m = n.match(/^(helper|flux):(\d+)$/), md = n.match(/^model:([\w.\-]+)$/);
     if (md && MODELS.some(x => x.id === md[1])) await setSw(env, 'model_' + md[1], on);
