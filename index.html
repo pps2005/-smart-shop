@@ -59,24 +59,29 @@ h.addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-tx;if(Math
 async function ping(){try{const j=await api('/api/ping');$('#d').className='dot on';$('#dt').textContent='บอทเชื่อมอยู่ · '+(j.ver||'')}catch(e){$('#d').className='dot off';$('#dt').textContent=String(e.message||e)}}
 // ---- หน้า
 const SWL={master:'ตัวจัดคิวหลัก (ปิดตัวนี้ = หยุดทุกอย่าง)',queue:'รันคิวงาน',kaggle:'ใช้เครื่อง Kaggle',helpers:'ใช้เครื่องผู้ช่วย'};
-const STL={queued:'รอ',running:'กำลังทำ',done:'เสร็จ',failed:'พลาด',cancelled:'ยกเลิก'};
+const KL={image:'🖼 สร้างรูป',video:'🎬 ทำวิดีโอ',voice:'🎙 ทำเสียง',subs:'💬 ทำซับ',text:'✍️ เขียนบท / ตรวจภาพ',edit:'✂️ ตัดต่อ'};
+const STL={kwait:'รอเครื่อง Kaggle',queued:'รอ',running:'กำลังทำ',done:'เสร็จ',failed:'พลาด',cancelled:'ยกเลิก'};
+const imgUrl=id=>{const c=cfg();return c.url.replace(/\/+$/,'')+'/api/img?id='+id+(c.key?'&k='+encodeURIComponent(c.key):'')};
 const P={};
 P['']=async()=>`<h2>Welcome to Xiress Studio</h2><p class="sub">เลือกประเภทงาน ใส่โจทย์ แล้วให้ระบบทำให้</p>
 <div class="g"><div class="c" onclick="location.hash='#/new'"><div class="e">🎞</div><h3>งานใหม่</h3><div class="mu">สร้างงานเข้าคิว</div></div>
 <div class="c" onclick="location.hash='#/queue'"><div class="e">⏱</div><h3>คิวงาน</h3><div class="mu">ดูและยกเลิกรายงาน</div></div>
 <div class="c" onclick="location.hash='#/sum'"><div class="e">📋</div><h3>สรุปงาน</h3><div class="mu">สวิตช์ปิด/เปิดรายตัว</div></div></div>`;
-P.new=async()=>`<h2>🎞 งานใหม่</h2><p class="sub">ประเภทงานยังว่าง — พิมพ์ชื่อประเภทเอง ระบบจะรับเข้าคิว</p>
-<div class="c"><input id="k" placeholder="ประเภทงาน"><textarea id="i" rows="5" placeholder="โจทย์ / รายละเอียด"></textarea><button class="pri" id="go">เพิ่มเข้าคิว</button><div id="m"></div></div>`;
-P.queue=async()=>{const j=await api('/api/jobs');return `<h2>⏱ คิวงาน</h2><div class="c">${j.jobs.length?j.jobs.map(x=>`<div class="r"><div><b>#${x.id} ${E(x.kind)}</b> <span class="chip">${STL[x.status]||x.status}</span>${x.err?`<div class="er">${E(x.err)}</div>`:''}</div>${x.status=='queued'||x.status=='running'?`<button class="dg" data-c="${x.id}">ปิด</button>`:''}</div>`).join(''):'<div class="mu">ยังไม่มีงาน</div>'}</div>`};
+P.new=async()=>{let ms=[];try{ms=(await api('/api/status')).models.filter(m=>m.fit=='ok')}catch(e){}
+return `<h2>🎞 งานใหม่</h2><p class="sub">เลือกโมเดล แล้วใส่โจทย์ (เปิดสวิตช์โมเดลในสรุปงานก่อน)</p>
+<div class="c"><select id="k" style="width:100%;padding:9px;border-radius:9px;margin-bottom:8px"><option value="image">🖼 รูป · FLUX.1 schnell (Workers AI)</option>${ms.map(m=>`<option value="k:${m.id}">${KL[m.kind]||''} · ${E(m.name)} (Kaggle)</option>`).join('')}</select>
+<textarea id="i" rows="5" placeholder="รูป: อธิบายภาพ (อังกฤษดีสุด) · ซับ: ลิงก์ไฟล์เสียง/วิดีโอ (URL)"></textarea><button class="pri" id="go">เพิ่มเข้าคิว</button><div id="m"></div></div>`};
+P.queue=async()=>{const j=await api('/api/jobs');return `<h2>⏱ คิวงาน</h2><div style="text-align:center;margin-bottom:8px"><button onclick="show()">🔄 รีเฟรช</button></div><div class="c">${j.jobs.length?j.jobs.map(x=>`<div class="r"><div><b>#${x.id} ${E(x.kind)}</b> <span class="chip">${STL[x.status]||x.status}</span>${x.err?`<div class="er">${E(x.err)}</div>`:''}${x.out&&x.out!='img'?`<pre style="white-space:pre-wrap;font:13px/1.5 monospace;margin:6px 0 0">${E(x.out)}</pre>`:''}${x.status=='done'&&(x.kind=='image'||x.out=='img')?`<img src="${imgUrl(x.id)}" style="max-width:100%;border-radius:8px;margin-top:6px">`:''}</div>${['queued','running','kwait'].includes(x.status)?`<button class="dg" data-c="${x.id}">ปิด</button>`:''}</div>`).join(''):'<div class="mu">ยังไม่มีงาน</div>'}</div>`};
 P.sum=async()=>{const s=await api('/api/status'),L=s.link,ch=(t,y)=>`<span class="chip ${y?'y':''}">${t}${y?' ✓':' –'}</span>`,
  sw=(n,l,on)=>`<div class="r"><span>${l}</span><button class="sw ${on?'on':'off'}" data-s="${n}" data-v="${on?0:1}">${on?'เปิด':'ปิด'}</button></div>`,
- q=Object.fromEntries(s.jobs.map(x=>[x.status,x.n]));
+ q=Object.fromEntries(s.jobs.map(x=>[x.status,x.n])),
+ mod=Object.keys(KL).map(k=>{const l=(s.models||[]).filter(m=>m.kind==k);return l.length?`<div class="c"><h3>${KL[k]}</h3>${l.map(m=>`<div class="r"><div><b>${E(m.name)}</b> <span class="chip ${m.fit=='ok'||m.fit=='cf'?'y':''}">${{ok:'พร้อมใช้ (Kaggle)',cf:'พร้อมใช้ (Workers AI)',reg:'ลงทะเบียนไว้',big:'ใหญ่เกินเครื่องฟรี'}[m.fit]||m.run}</span><div class="mu">${E(m.note)}${m.hf?'':' · ชื่อรุ่นต้องตรวจก่อนใช้'}</div></div><button class="sw ${m.on?'on':'off'}" data-s="model:${m.id}" data-v="${m.on?0:1}">${m.on?'เปิด':'ปิด'}</button></div>`).join('')}</div>`:''}).join('');
  return `<h2>📋 สรุปงาน</h2>
 <div class="c"><h3>การเชื่อมต่อ</h3>${ch('Kaggle',L.kaggle)}${ch('GitHub',L.github)}${ch('Telegram',L.telegram)}${ch('Supabase',L.supabase)}${ch('เสียงพากย์ '+s.voices,s.voices>0)}${ch('เสียงเอฟเฟกต์ '+s.sfx,s.sfx>0)}<div style="margin-top:8px"><button id="kt">ทดสอบ Kaggle</button> <span id="km"></span></div></div>
 <div class="c"><h3>ระบบอัตโนมัติ (ปิดไว้ทั้งหมดเป็นค่าเริ่มต้น)</h3>${Object.keys(SWL).map(n=>sw(n,SWL[n],s.sw[n]=='1')).join('')}</div>
 ${s.helpers.length?`<div class="c"><h3>ผู้ช่วย Kaggle รายตัว</h3>${s.helpers.map(x=>sw('helper:'+x.id,E(x.name||'ผู้ช่วย '+x.id),x.on_==1)).join('')}</div>`:''}
 ${s.flux.length?`<div class="c"><h3>คีย์ Flux รายตัว</h3>${s.flux.map(x=>sw('flux:'+x.id,E(x.name||'คีย์ '+x.id),x.on_==1)).join('')}</div>`:''}
-<div class="c"><h3>คิว</h3><div class="mu">รอ ${q.queued||0} · กำลังทำ ${q.running||0} · เสร็จ ${q.done||0} · พลาด ${q.failed||0}</div><div style="margin-top:8px"><button class="dg" id="cl">ปิดงานค้างทั้งหมด</button></div></div>
+<h2 style="margin-top:18px">🧠 โมเดล</h2><p class="sub">ลงทะเบียนไว้ ยังไม่มีสูตรงานเรียกใช้ · เปิด = เลือกไว้ใช้</p>${mod}<div class="c"><h3>คิว</h3><div class="mu">รอ ${q.queued||0} · กำลังทำ ${q.running||0} · เสร็จ ${q.done||0} · พลาด ${q.failed||0}</div><div style="margin-top:8px"><button class="dg" id="cl">ปิดงานค้างทั้งหมด</button></div></div>
 <div class="c"><h3>ล้างข้อมูลเก่า</h3><div class="mu">ลบตัวละคร, LoRA, ภาพ, วิดีโอ, บท/ซีรีส์ และคิวเก่า · เก็บการเชื่อม เสียงพากย์ เสียงเอฟเฟกต์ไว้ · กู้คืนไม่ได้</div><input id="wc" placeholder="พิมพ์ ลบทั้งหมด เพื่อยืนยัน"><button class="dg" id="wp">ล้างข้อมูลเก่า</button><div id="wm"></div></div>`};
 P.conn=async()=>{const c=cfg();return `<h2>🔌 เชื่อมต่อ</h2><div class="c"><input id="bu" placeholder="ลิงก์บอท (https://…workers.dev)" value="${E(c.url)}"><input id="bk" type="password" placeholder="รหัสผ่านบอท" value="${E(c.key)}"><button class="pri" id="bs">บันทึก + ทดสอบ</button><div id="bm"></div></div>`};
 async function show(){const r=(location.hash.replace(/^#\/?/,'')||''),a=P[r]?r:'';
