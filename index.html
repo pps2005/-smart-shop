@@ -32,9 +32,13 @@ button,.bt{font:inherit;border:1px solid var(--line);background:var(--card);colo
 input,textarea{font:inherit;width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);margin:4px 0 8px}
 .chip{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;margin:2px;border:1px solid var(--line)}.chip.y{background:var(--ok);color:#fff;border-color:var(--ok)}
 .er{color:var(--bad);margin:8px 0}.ms{color:var(--ok);margin:8px 0}
+#cs{width:min(92vw,calc(70vh*9/16));margin:0 auto;aspect-ratio:9/16;border-radius:18px;overflow:hidden;position:relative;border:3px solid #111;background:#bfe8ff}
+#cs svg{width:100%;height:100%;display:block}#csub{position:absolute;left:8px;right:8px;bottom:12px;color:#fff;font-weight:700;font-size:clamp(17px,5vw,24px);line-height:1.35;text-shadow:0 0 4px #000,0 2px 6px #000;min-height:3em}
+#cen{position:absolute;left:8px;right:8px;top:10px;color:#222;background:#fffd;border-radius:10px;padding:4px 8px;font-size:14px;display:none}
+.sh{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}.sh figure{margin:0;width:30%;min-width:88px}.sh figcaption{font-size:12px;color:var(--mu)}.sh svg{width:100%;height:96px}.pt svg{height:210px;width:auto}
 </style></head><body>
 <div class="st"><span class="dot" id="d"></span><span id="dt">กำลังเช็กบอท…</span></div>
-<nav id="nav"><b><i>X</i>IRESS</b><a href="#/">🎬 หน้าหลัก</a><a href="#/new">🎞 งานใหม่</a><a href="#/queue">⏱ คิว</a><a href="#/sum">📋 สรุปงาน</a><a href="#/conn">🔌 เชื่อมต่อ</a></nav>
+<nav id="nav"><b><i>X</i>IRESS</b><a href="#/">🎬 หน้าหลัก</a><a href="#/new">🎞 งานใหม่</a><a href="#/queue">⏱ คิว</a><a href="#/cast">🐾 ตัวละคร</a><a href="#/lab">🧩 ชิ้นส่วน</a><a href="#/sum">📋 สรุปงาน</a><a href="#/conn">🔌 เชื่อมต่อ</a></nav>
 <div class="hero" id="hero">
 <div class="sl on"><svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><rect x="110" y="120" width="180" height="120" fill="#222" stroke="#f5c518" stroke-width="4"/><path d="M110 120l30-50h40l-30 50zM170 120l30-50h40l-30 50zM230 120l30-50h40l-30 50z" fill="#f5c518"/><rect x="110" y="88" width="180" height="26" fill="#eee" opacity=".85"/></svg><h1>ยินดีต้อนรับสู่ Xiress Studio</h1><p>สตูดิโอสร้างงานด้วย AI</p></div>
 <div class="sl"><svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><path d="M200 20L90 300h220z" fill="#fff" opacity=".35"/><circle cx="200" cy="24" r="22" fill="#f5c518"/></svg><h1>แสง · กล้อง · แอคชัน</h1><p>เริ่มงานใหม่จากโจทย์เดียว</p></div>
@@ -85,10 +89,124 @@ ${s.flux.length?`<div class="c"><h3>คีย์ Flux รายตัว</h3>${s
 <div class="c"><h3>ล้างข้อมูลเก่า</h3><div class="mu">ลบตัวละคร, LoRA, ภาพ, วิดีโอ, บท/ซีรีส์ และคิวเก่า · เก็บการเชื่อม เสียงพากย์ เสียงเอฟเฟกต์ไว้ · กู้คืนไม่ได้</div><input id="wc" placeholder="พิมพ์ ลบทั้งหมด เพื่อยืนยัน"><button class="dg" id="wp">ล้างข้อมูลเก่า</button><div id="wm"></div></div>`};
 P.conn=async()=>{const c=cfg();return `<h2>🔌 เชื่อมต่อ</h2><div class="c"><input id="bu" placeholder="ลิงก์บอท (https://…workers.dev)" value="${E(c.url)}"><input id="bk" type="password" placeholder="รหัสผ่านบอท" value="${E(c.key)}"><button class="pri" id="bs">บันทึก + ทดสอบ</button><div id="bm"></div></div>
 <div class="c"><h3>Kaggle</h3><div class="mu">ใส่ชื่อผู้ใช้และคีย์ API (เก็บในฐานข้อมูลของบอทเหมือนระบบเก่า) · ว่างทั้งคู่แล้วบันทึก = ลบ</div><input id="ku" placeholder="ชื่อผู้ใช้ Kaggle"><input id="kk" type="password" placeholder="คีย์ API Kaggle"><button class="pri" id="ks">บันทึก + ทดสอบ</button><div id="km2"></div></div>`};
+
+// ===== ชุดตัวละครหลักของช่อง (วาดด้วยโค้ด · ใช้ชุดเดียวกันทุกตอน) =====
+const NS="http://www.w3.org/2000/svg",EL=(t,a,p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e},LN={stroke:"#5b4b4b","stroke-width":4,"stroke-linecap":"round","stroke-linejoin":"round"},KC="#2b2233";
+const CAST=[
+{id:"capy",n:"คาปิ",t:"คาปิบาร่าอ้วนกลม ใจเย็นที่สุดในโลก",d:"ไม่สนใจโลก ไม่รีบ ไม่เครียด · ส้มลูกเล็กบนหัวคือเอกลักษณ์ · คำติดปาก: It’s fine.",c:"#c99a6b",b:"#ecd3b0",rx:62,ry:46,p:.8,r:.9},
+{id:"cat",n:"มิว",t:"แมวส้มตาปรือ ปากแสบ",d:"ทำหน้านิ่งแล้วสวนทุกประโยค · หนวดกับลายพาดหน้าผากคือเอกลักษณ์ · คำติดปาก: Hmm. No.",c:"#f4c28f",b:"#fff1e0",rx:40,ry:60,p:1.1,r:1},
+{id:"dog",n:"โมจิ",t:"ลูกหมาซื่อ รักเพื่อนสุดใจ",d:"พูดความจริงจนทุกคนอึ้ง · แต้มสีน้ำตาลที่ตากับผ้าพันคอแดงคือเอกลักษณ์ · คำติดปาก: Yay!",c:"#f6ead8",b:"#fffaf0",rx:38,ry:44,p:1.7,r:1.15},
+{id:"bobo",n:"โบโบ้",t:"ก้อนกลมจอมขี้เกียจ มั่นใจเกินตัว",d:"ผู้นำที่ไม่เคยทำอะไรแต่เชื่อว่าตัวเองขยัน · ใบไม้บนหัวคือเอกลักษณ์ · คำติดปาก: Productive!",c:"#ffae42",b:"#ffe3b0",rx:58,ry:52,p:1.35,r:1.05},
+{id:"long",n:"ลอง",t:"กระต่ายสูงหน้านิ่ง ปากแสบ",d:"พูดน้อยแต่ทุกประโยคคือคำสวน · แว่นกลมกับตาปรือคือเอกลักษณ์ · คำติดปาก: Approved.",c:"#a99bff",b:"#e4deff",rx:30,ry:88,p:.55,r:.85},
+{id:"pip",n:"ปิ๊ป",t:"ลูกเจี๊ยบจิ๋ว ซื่อจนช็อก",d:"ซื่อไร้พิษภัยแต่พูดความจริงจนทุกคนอึ้ง · เปลือกไข่บนหัวคือเอกลักษณ์ · คำติดปาก: Oopsie!",c:"#ffdc3d",b:"#fff4b0",rx:30,ry:27,p:1.9,r:1.15}];
+const XP={"ปกติ":["n","s"],"ดีใจ":["h","o"],"เกรียน":["sm","g"],"ช็อก":["sh","O"],"ง่วง":["z","f"],"วางแผนร้าย":["sm","w"]};
+function face(r,k){const o=r.o,x=XP[k]||XP["ปกติ"],f=r.fc,ey=-o.ry*1.25,ex=o.id=="long"?17:Math.max(13,o.rx*.38),my=ey+18,m=x[1];f.textContent="";
+ [-1,1].forEach(s=>{const g=EL("g",{transform:`translate(${s*ex} ${ey})`},f),e=x[0];
+  if(e=="h")EL("path",{d:"M-8 3 q8 -11 16 0",fill:"none",...LN},g);
+  else if(e=="z")EL("path",{d:"M-8 0 h16",fill:"none",...LN},g);
+  else if(e=="sh"){EL("circle",{r:10,fill:"#fff",...LN,"stroke-width":3},g);EL("circle",{r:3,fill:KC},g)}
+  else{EL("ellipse",{rx:6,ry:8,fill:KC},g);EL("circle",{cx:2,cy:-3,r:2.2,fill:"#fff"},g);if(e=="sm")EL("path",{d:"M-9 -9 h18 v9 h-18z",fill:o.c,stroke:KC,"stroke-width":3,"stroke-linejoin":"round"},g)}
+  EL("ellipse",{cx:s*9,cy:16,rx:7,ry:4,fill:"#ff9aa8",opacity:.7},g)});
+ r.m0=EL("g",{transform:`translate(0 ${my})`},f);
+ if(m=="s")EL("path",{d:"M-9 0 q9 10 18 0",fill:"none",...LN},r.m0);
+ if(m=="o")EL("path",{d:"M-10 -2 q10 18 20 0z",fill:"#7a2c2c",...LN,"stroke-width":3},r.m0);
+ if(m=="f")EL("path",{d:"M-8 2 h16",fill:"none",...LN},r.m0);
+ if(m=="g"){EL("path",{d:"M-12 -2 q12 18 24 0z",fill:"#7a2c2c",...LN,"stroke-width":3},r.m0);EL("rect",{x:-4,y:-1,width:8,height:7,rx:2,fill:"#fff",stroke:KC,"stroke-width":2},r.m0)}
+ if(m=="w")EL("path",{d:"M-11 2 q5.5 -7 11 0 t11 0",fill:"none",...LN},r.m0);
+ if(m=="O")EL("ellipse",{rx:6,ry:8,fill:"#7a2c2c",...LN,"stroke-width":3},r.m0);
+ r.m1=EL("ellipse",{cx:0,cy:my+3,rx:9,ry:10,fill:"#7a2c2c",...LN,"stroke-width":3,display:"none"},f);
+ if(o.id=="long"){[-1,1].forEach(s=>EL("circle",{cx:s*ex,cy:ey,r:11,fill:"none",stroke:KC,"stroke-width":3},f));EL("path",{d:`M${-(ex-11)} ${ey} h${2*(ex-11)}`,stroke:KC,"stroke-width":3},f)}
+ if(o.id=="capy")EL("ellipse",{cx:0,cy:my-9,rx:9,ry:5.5,fill:"#6b4a33"},f);
+ if(o.id=="cat"){[-9,0,9].forEach((x,i)=>EL("path",{d:`M${x} ${ey-24} v${i==1?9:6}`,stroke:"#d98a4e","stroke-width":3.5,"stroke-linecap":"round"},f));[-1,1].forEach(s=>[0,7].forEach(d=>EL("path",{d:`M${s*(ex+12)} ${my-5+d} l${s*14} ${d*.6-2}`,stroke:"#8a7a7a","stroke-width":2,"stroke-linecap":"round",fill:"none"},f)));EL("ellipse",{cx:0,cy:my-8,rx:4,ry:3,fill:"#ff8fa3"},f)}
+ if(o.id=="dog"){f.insertBefore(EL("ellipse",{cx:-ex,cy:ey+2,rx:15,ry:16,fill:"#d9b48a"}),f.firstChild);EL("ellipse",{cx:0,cy:my-8,rx:6,ry:4.5,fill:KC},f)}}
+function inst(o,par){const r={o},g=EL("g",{},par),b=EL("g",{},g),H=-o.ry*2;r.g=g;r.b=b;
+ if(o.id=="bobo")[-1,1].forEach(s=>EL("circle",{cx:s*o.rx*.6,cy:H*.9,r:16,fill:o.c,...LN,"stroke-width":5},b));
+ if(o.id=="capy")[-1,1].forEach(s=>EL("circle",{cx:s*o.rx*.55,cy:H*.9,r:10,fill:o.c,...LN,"stroke-width":5},b));
+ if(o.id=="cat")[-1,1].forEach(s=>{EL("path",{d:`M${s*37} ${H+30} L${s*33} ${H-18} L${s*10} ${H+3}z`,fill:o.c,...LN,"stroke-width":5},b);EL("path",{d:`M${s*31} ${H+22} L${s*29} ${H-4} L${s*15} ${H+8}z`,fill:"#ffb7c5"},b)});
+ if(o.id=="dog")[-1,1].forEach(s=>EL("ellipse",{cx:s*o.rx*.9,cy:-o.ry*1.3,rx:12,ry:25,fill:"#c4966a",...LN,"stroke-width":5,transform:`rotate(${s*18} ${s*o.rx*.9} ${-o.ry*1.3})`},b));
+ if(o.id=="long")[-1,1].forEach(s=>EL("ellipse",{cx:s*18,cy:H-26,rx:11,ry:42,fill:o.c,...LN,"stroke-width":5,transform:`rotate(${s*8} ${s*18} ${H-26})`},b));
+ r.al=EL("ellipse",{cx:-o.rx,cy:-o.ry,rx:10,ry:18,fill:o.c,...LN,"stroke-width":5},b);r.ar=EL("ellipse",{cx:o.rx,cy:-o.ry,rx:10,ry:18,fill:o.c,...LN,"stroke-width":5},b);
+ EL("ellipse",{cx:0,cy:-o.ry,rx:o.rx,ry:o.ry,fill:o.c,...LN,"stroke-width":5},b);EL("ellipse",{cx:0,cy:-o.ry*.55,rx:o.rx*.62,ry:o.ry*.5,fill:o.b},b);
+ if(o.id=="bobo")EL("path",{d:`M0 ${H+3} q-4 -22 -24 -26 q0 22 24 26z`,fill:"#6fcf6a",...LN,"stroke-width":3},b);
+ if(o.id=="capy"){EL("circle",{cx:0,cy:H-8,r:14,fill:"#ff9f1c",...LN,"stroke-width":3},b);EL("path",{d:`M0 ${H-22} q6 -10 14 -8 q-4 8 -14 8z`,fill:"#6fcf6a"},b)}
+ if(o.id=="dog"){EL("path",{d:`M${-o.rx*.6} ${-o.ry*.6} q${o.rx*.6} 14 ${o.rx*1.2} 0 v12 q${-o.rx*.6} 12 ${-o.rx*1.2} 0z`,fill:"#ff5d5d",...LN,"stroke-width":3},b);EL("path",{d:`M6 ${-o.ry*.6+16} l14 22 l-18 -4z`,fill:"#ff5d5d",...LN,"stroke-width":3},b)}
+ if(o.id=="pip")EL("path",{d:`M-26 ${H+10} l7 -14 l7 10 l7 -16 l7 12 l7 -14 l4 22 q-17 -9 -39 0z`,fill:"#fff",...LN,"stroke-width":3},b);
+ r.fc=EL("g",{},b);r.z=EL("text",{x:o.rx*.6,y:H-6,"font-size":26,"font-weight":"700",fill:"#556",display:"none"},g);r.z.textContent="z z";face(r,"ปกติ");return r}
+function mk(o,k,cl){const s=EL("svg",{viewBox:`${-o.rx-34} ${-o.ry*2-64} ${o.rx*2+68} ${o.ry*2+100}`}),r=inst(o,s);face(r,k);return {s,r}}
+let CS=null;
+function anim(r,t,k,sp,sl){const o=r.o;let by=Math.sin(t*2+k*2)*3,ar=Math.sin(t*1.5+k)*6;if(sp){by=-Math.abs(Math.sin(t*9))*9;ar=Math.sin(t*7)*28}
+ if(sl){r.b.setAttribute("transform",`rotate(${k%2?-82:82}) translate(0 ${-o.ry*.2})`);r.z.setAttribute("display","");r.z.setAttribute("y",-o.ry*2-6-(t*14+k*9)%26);return}
+ r.z.setAttribute("display","none");r.b.setAttribute("transform",`translate(0 ${by}) rotate(${sp?Math.sin(t*6)*3:0})`);
+ r.al.setAttribute("transform",`rotate(${-ar-8} ${-o.rx} ${-o.ry-14})`);r.ar.setAttribute("transform",`rotate(${ar+8} ${o.rx} ${-o.ry-14})`);
+ if(r.m1){const op=sp&&Math.sin(t*18)>0;r.m0.setAttribute("display",op?"none":"");r.m1.setAttribute("display",op?"":"none")}}
+requestAnimationFrame(function lp(n){if(CS&&document.body.contains(CS.sv)){const t=n/1000;CS.ins.forEach((r,k)=>anim(r,t,k,CS.spk==r.o,CS.sl));CS.po.forEach((r,k)=>anim(r,t,k+1,false,false))}requestAnimationFrame(lp)});
+const SC=[["bobo","Today, I will be very productive.","วันนี้ฉันจะขยันสุดๆ ให้ดู","เกรียน"],["long","You said that yesterday.","เมื่อวานก็พูดแบบนี้","ปกติ"],["bobo","Yesterday me was a liar.","ฉันเมื่อวานมันโกหก","วางแผนร้าย"],["pip","I made a nap schedule!","หนูทำตารางงีบแล้ว!","ดีใจ"],["long","...Approved.","...อนุมัติ","เกรียน"],["bobo","Meeting adjourned. Sleep time.","ปิดประชุม ถึงเวลานอน","ดีใจ"]];
+P.cast=async()=>`<h2>🐾 เลือกตัวละครของช่อง</h2><p class="sub">แตะเลือก 3 ตัว (ตัวที่ 1 = หัวหน้าขี้เกียจ · 2 = ปากแสบ · 3 = ซื่อ) แล้วกดทำเป็นการ์ตูน</p><div id="gal" class="sh" style="margin-bottom:12px"></div>
+<div id="cs"><svg id="csv" viewBox="0 0 360 640"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe8ff"/><stop offset="1" stop-color="#fff2c9"/></linearGradient></defs><rect width="360" height="640" fill="url(#cg)"/><circle cx="290" cy="90" r="34" fill="#ffe27a"/><rect y="520" width="360" height="120" fill="#9be08b"/><rect y="520" width="360" height="8" fill="#7cc96d"/></svg><div id="cen"></div><div id="csub"></div></div>
+<div style="text-align:center"><button class="pri" id="cpl">▶ ทำเป็นการ์ตูน</button><button id="cmu">🔊 เสียงอังกฤษ: เปิด</button></div><div id="sheet"></div>`;
+function castInit(){const sv=$("#csv"),X=[90,195,290],RM={bobo:0,long:1,pip:2},root=EL("g",{},sv),sub=$("#csub"),en=$("#cen");let sel=[0,1,2],on=0,snd=true,tm;CS={sv,ins:[],po:[],spk:null,sl:false};
+ const stop=()=>{on=0;clearTimeout(tm);window.speechSynthesis&&speechSynthesis.cancel();CS.spk=null;$("#cpl").textContent="▶ ทำเป็นการ์ตูน"};
+ const gal=$("#gal"),figs=CAST.map((o,i)=>{const f=document.createElement("figure"),c=document.createElement("figcaption");f.style.cssText="cursor:pointer;border-radius:12px;padding:4px";f.append(mk(o,"ปกติ").s,c);f.onclick=()=>{if(!sel.includes(i)){sel=[...sel.slice(sel.length>=3?1:0),i];refresh()}};gal.append(f);return {f,c}});
+ function refresh(){stop();root.textContent="";CS.sl=false;sub.textContent="";en.style.display="none";CS.ins=sel.map((ci,k)=>{const r=inst(CAST[ci],root);r.g.setAttribute("transform",`translate(${X[k]} 505)`);const t=EL("text",{x:0,y:30,"text-anchor":"middle","font-size":17,"font-weight":"700",fill:"#234"},r.g);t.textContent=CAST[ci].n;return r});
+  figs.forEach((q,i)=>{const k=sel.indexOf(i);q.c.textContent=(k>=0?(k+1)+" · ":"")+CAST[i].n;q.f.style.outline=k>=0?"3px solid #f5c518":"none"});
+  CS.po.length=0;$("#sheet").innerHTML=sel.map(ci=>{const o=CAST[ci];return `<div class="c"><div class="pt" data-p="${ci}"></div><h3>${o.n} · ${o.t}</h3><div class="mu">${o.d}</div><div class="sh">${Object.keys(XP).map(k=>`<figure data-x="${ci}|${k}"><figcaption>${k}</figcaption></figure>`).join("")}</div></div>`}).join("");
+  document.querySelectorAll("[data-p]").forEach(d=>{const m=mk(CAST[+d.dataset.p],"ปกติ");d.appendChild(m.s);CS.po.push(m.r)});
+  document.querySelectorAll("[data-x]").forEach(f=>{const[i,k]=f.dataset.x.split("|");f.insertBefore(mk(CAST[+i],k).s,f.firstChild)})}
+ const say=i=>{clearTimeout(tm);const ins=CS.ins;if(i>=SC.length){CS.spk=null;CS.sl=true;ins.forEach(r=>face(r,"ง่วง"));sub.textContent="จบตอน · ฝันดีนะ 💤";en.style.display="none";on=0;$("#cpl").textContent="↺ เล่นใหม่";return}
+  const[w,e,t,x]=SC[i],r=ins[RM[w]],o=r.o;CS.spk=o;face(r,x);sub.textContent=t;en.textContent=o.n+": "+e;en.style.display="block";let done=0;const nx=()=>{if(!done&&on){done=1;tm=setTimeout(()=>say(i+1),350)}};
+  if(snd&&window.speechSynthesis){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(e.replace(/\./g,""));u.lang="en-US";u.pitch=o.p;u.rate=o.r;u.onend=nx;u.onerror=nx;speechSynthesis.speak(u);tm=setTimeout(nx,9000)}else tm=setTimeout(nx,2600)};
+ $("#cpl").onclick=()=>{if(on){stop();return}on=1;CS.sl=false;CS.ins.forEach(r=>face(r,"ปกติ"));$("#cpl").textContent="⏹ หยุด";say(0)};
+ $("#cmu").onclick=()=>{snd=!snd;$("#cmu").textContent="🔊 เสียงอังกฤษ: "+(snd?"เปิด":"ปิด")};refresh()}
+// ===== ตัวละครแบบชิ้นส่วน: ทุกชิ้นแยกกลุ่ม มีจุดหมุนของตัวเอง ขยับอิสระ =====
+const SZ={bobo:1.6,long:1.25,pip:3.2,capy:1.5,cat:1.3,dog:2.1};let LB=null;
+function rig(o,par){const R={o,P:{}},rx=o.rx,ry=o.ry,H=-ry*2,S=SZ[o.id],F={fill:o.c,...LN,"stroke-width":5};R.g=EL("g",{transform:`scale(${S})`},par);R.b=EL("g",{},R.g);
+ const pc=(n,lb,ex,ey,px,py)=>{const q=EL("g",{},R.b),t=EL("text",{x:px,y:py+26/S,"font-size":13/S,"font-weight":"700","text-anchor":"middle",fill:"#234",stroke:"#fff","stroke-width":4/S,"paint-order":"stroke",opacity:0},q);t.textContent=lb;R.P[n]={g:q,ex,ey,px,py,t};return q};
+ let q=pc("tail","หาง",18,0,rx*.85,-ry*.4);EL("circle",{cx:rx*.85,cy:-ry*.4,r:o.id=="long"?9:12,...F},q);
+ if(o.id=="cat"){EL("path",{d:`M${rx*.85} ${-ry*.3} q32 -4 26 -44`,fill:"none",...LN,"stroke-width":16},q);EL("path",{d:`M${rx*.85} ${-ry*.3} q32 -4 26 -44`,fill:"none",stroke:o.c,"stroke-width":9,"stroke-linecap":"round"},q)}
+ if(o.id=="capy")[-1,1].forEach(s=>{q=pc("ear"+s,"หู",s*16,-30,s*rx*.55,H*.8);EL("circle",{cx:s*rx*.55,cy:H*.9,r:10,...F},q)});
+ if(o.id=="cat")[-1,1].forEach(s=>{q=pc("ear"+s,"หู",s*16,-30,s*22,H+14);EL("path",{d:`M${s*37} ${H+30} L${s*33} ${H-18} L${s*10} ${H+3}z`,...F},q);EL("path",{d:`M${s*31} ${H+22} L${s*29} ${H-4} L${s*15} ${H+8}z`,fill:"#ffb7c5"},q)});
+ if(o.id=="dog")[-1,1].forEach(s=>{q=pc("ear"+s,"หู",s*16,-20,s*rx*.8,-ry*1.8);EL("ellipse",{cx:s*rx*.9,cy:-ry*1.3,rx:12,ry:25,...F,fill:"#c4966a",transform:`rotate(${s*18} ${s*rx*.9} ${-ry*1.3})`},q)});
+ if(o.id=="bobo")[-1,1].forEach(s=>{q=pc("ear"+s,"หู",s*16,-30,s*rx*.6,H*.8);EL("circle",{cx:s*rx*.6,cy:H*.9,r:16,...F},q)});
+ if(o.id=="long")[-1,1].forEach(s=>{q=pc("ear"+s,"หู",s*16,-30,s*18,H+6);EL("ellipse",{cx:s*18,cy:H-26,rx:11,ry:42,...F,transform:`rotate(${s*8} ${s*18} ${H-26})`},q)});
+ [-1,1].forEach(s=>{q=pc("foot"+s,"เท้า",s*12,25,s*rx*.45,-6);EL("ellipse",{cx:s*rx*.45,cy:-6,rx:15,ry:9,...F},q)});
+ [-1,1].forEach(s=>{q=pc("arm"+s,"แขน",s*18,0,s*rx,-ry-14);EL("ellipse",{cx:s*rx,cy:-ry,rx:10,ry:18,...F},q)});
+ q=pc("body","ตัว + ท้อง",0,0,0,-6);EL("ellipse",{cx:0,cy:-ry,rx,ry,...F},q);EL("ellipse",{cx:0,cy:-ry*.55,rx:rx*.62,ry:ry*.5,fill:o.b},q);
+ q=pc("face","หน้า (สลับได้ 6 แบบ)",0,ry*1.25+35,0,-ry*1.25);R.fc=EL("g",{},q);face(R,"ปกติ");
+ if(o.id=="bobo"){q=pc("prop","ใบไม้",0,-45,0,H+3);EL("path",{d:`M0 ${H+3} q-4 -22 -24 -26 q0 22 24 26z`,fill:"#6fcf6a",...LN,"stroke-width":3},q)}
+ if(o.id=="pip"){q=pc("prop","เปลือกไข่",0,-45,0,H+10);EL("path",{d:`M-26 ${H+10} l7 -14 l7 10 l7 -16 l7 12 l7 -14 l4 22 q-17 -9 -39 0z`,fill:"#fff",...LN,"stroke-width":3},q)}
+ if(o.id=="capy"){q=pc("prop","ส้ม",0,-45,0,H-8);EL("circle",{cx:0,cy:H-8,r:14,fill:"#ff9f1c",...LN,"stroke-width":3},q);EL("path",{d:`M0 ${H-22} q6 -10 14 -8 q-4 8 -14 8z`,fill:"#6fcf6a"},q)}
+ if(o.id=="dog"){q=pc("prop","ผ้าพันคอ",0,-45,0,-ry*.6);EL("path",{d:`M${-rx*.6} ${-ry*.6} q${rx*.6} 14 ${rx*1.2} 0 v12 q${-rx*.6} 12 ${-rx*1.2} 0z`,fill:"#ff5d5d",...LN,"stroke-width":3},q);EL("path",{d:`M6 ${-ry*.6+16} l14 22 l-18 -4z`,fill:"#ff5d5d",...LN,"stroke-width":3},q)}
+ return R}
+function pose(R,t,st,E){const s=Math.sin,o=R.o,P=R.P;let bx=0,by=0,sx=1,sy=1,br=0,al=s(t*1.5)*6,ar=-al,ear=s(t*2)*5,fl=0,fr=0,tl=s(t*4)*18;
+ if(st=="walk"){const w=t*6;fl=-Math.max(0,s(w))*12;fr=-Math.max(0,-s(w))*12;by=-Math.abs(s(w))*4;br=s(w)*3;al=s(w)*32;ar=-al;ear=s(w-1)*12}
+ if(st=="talk"){by=-Math.abs(s(t*9))*7;al=s(t*7)*26;ar=s(t*6+1)*20;tl=s(t*8)*25}
+ if(st=="jump"){const a=Math.abs(s(t*3));by=-a*70;sx=1.12-a*.2;sy=.88+a*.24;al=-10-40*a;ar=10+40*a;ear=-a*20;fl=fr=-a*8}
+ if(st=="wave"){ar=-(110+s(t*9)*25);al=6}
+ if(st=="shock"){bx=s(t*40)*2.5;sx=.94;sy=1.08;al=-35;ar=35;ear=-15}
+ if(st=="sleep"){br=-80;by=-o.ry*.1;al=ar=ear=tl=0}
+ R.b.setAttribute("transform",`translate(${bx} ${by}) rotate(${br}) scale(${sx} ${sy})`);
+ for(const n in P){const p=P[n];let a="";
+  if(n=="tail")a=`rotate(${tl} ${p.px} ${p.py})`;
+  else if(n.startsWith("ear")||n=="prop")a=`rotate(${n=="ear-1"?-ear:n=="ear1"?ear:ear*.5} ${p.px} ${p.py})`;
+  else if(n=="foot-1")a=`translate(0 ${fl})`;else if(n=="foot1")a=`translate(0 ${fr})`;
+  else if(n=="arm-1")a=`rotate(${-al-8} ${p.px} ${p.py})`;else if(n=="arm1")a=`rotate(${ar+8} ${p.px} ${p.py})`;
+  p.g.setAttribute("transform",`translate(${p.ex*E} ${p.ey*E}) ${a}`);p.t.setAttribute("opacity",E)}
+ if(R.m1){const op=st=="talk"&&s(t*18)>0;R.m0.setAttribute("display",op?"none":"");R.m1.setAttribute("display",op?"":"none")}}
+requestAnimationFrame(function lq(n){if(LB&&LB.R&&document.body.contains(LB.sv)){LB.E+=(LB.tg-LB.E)*.15;pose(LB.R,n/1000,LB.st,LB.E)}requestAnimationFrame(lq)});
+P.lab=async()=>`<h2>🧩 ตัวละครแบบชิ้นส่วน</h2><p class="sub">ทุกชิ้นแยกกัน ขยับอิสระ · ชิ้นเดิมใช้ซ้ำทุกตอน</p>
+<div id="cs"><svg id="lsv" viewBox="-190 -480 380 675"><defs><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe8ff"/><stop offset=".72" stop-color="#fff2c9"/></linearGradient></defs><rect x="-190" y="-480" width="380" height="675" fill="url(#cg2)"/><rect x="-190" y="0" width="380" height="195" fill="#9be08b"/><rect x="-190" y="0" width="380" height="6" fill="#7cc96d"/></svg></div>`;
+function labInit(){const sv=$("#lsv"),box=$("#v");LB={sv,E:0,tg:0,st:"idle",xp:"ปกติ",R:null};
+ const fx=()=>face(LB.R,LB.st=="shock"?"ช็อก":LB.st=="sleep"?"ง่วง":LB.xp);
+ const row=(t,items,fn)=>{const d=document.createElement("div");d.style.cssText="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0";d.innerHTML=`<b style="width:100%;text-align:center;font-size:13px">${t}</b>`+items.map(([k,l])=>`<button data-k="${k}">${l}</button>`).join("");
+  d.onclick=e=>{const k=e.target.dataset.k;if(k==null)return;fn(k);d.querySelectorAll("button").forEach(b=>b.classList.toggle("pri",b.dataset.k==k))};box.appendChild(d);d.querySelector("button").click()};
+ row("ตัวละคร",CAST.map((c,i)=>[i,c.n]),k=>{if(LB.R)LB.R.g.remove();LB.R=rig(CAST[+k],sv);fx()});
+ row("ท่าทาง",[["idle","ยืนนิ่ง"],["walk","เดิน"],["talk","พูด"],["jump","กระโดด"],["wave","โบกมือ"],["shock","ตกใจ"],["sleep","หลับ"]],k=>{LB.st=k;fx()});
+ row("สีหน้า",Object.keys(XP).map(k=>[k,k]),k=>{LB.xp=k;fx()});
+ const w=document.createElement("div"),b=document.createElement("button");w.style.textAlign="center";b.className="pri";b.textContent="🧩 แยกชิ้นส่วน";b.onclick=()=>{LB.tg=LB.tg?0:1;b.textContent=LB.tg?"🧩 รวมกลับ":"🧩 แยกชิ้นส่วน"};w.appendChild(b);box.appendChild(w)}
 async function show(){const r=(location.hash.replace(/^#\/?/,'')||''),a=P[r]?r:'';
  document.querySelectorAll('nav a').forEach(x=>x.classList.toggle('on',x.getAttribute('href')=='#/'+a||(a==''&&x.getAttribute('href')=='#/')));
  const v=$('#v');try{v.innerHTML=await P[a]();bind(a)}catch(e){v.innerHTML=`<div class="c er">${E(e.message||e)}</div>`}}
-function bind(a){const on=(s,f)=>document.querySelectorAll(s).forEach(f);
+function bind(a){if(a=='cast')castInit();if(a=='lab')labInit();const on=(s,f)=>document.querySelectorAll(s).forEach(f);
  on('[data-s]',b=>b.onclick=async()=>{try{await api('/api/switch',{name:b.dataset.s,on:+b.dataset.v});show()}catch(e){alert(e.message)}});
  on('[data-c]',b=>b.onclick=async()=>{await api('/api/job/cancel',{id:+b.dataset.c});show()});
  const g=i=>$(i);
