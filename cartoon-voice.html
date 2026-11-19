@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>พากย์เสียงการ์ตูน · Xiress Studio</title>
+<style>
+:root{color-scheme:light dark;--bg:#faf6ec;--ink:#1b1b1b;--mu:#6b655a;--card:#fff;--line:#e4dccb;--ac:#f5c518;--ok:#2e9e5b;--bad:#d9453b}
+@media(prefers-color-scheme:dark){:root{--bg:#141414;--ink:#f1ede2;--mu:#a39d90;--card:#1f1f1f;--line:#34322d}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Sarabun",sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+header{background:var(--card);border-bottom:3px solid var(--ac);padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px}
+header b{font-size:18px}header a{margin-left:auto;color:var(--ink);font-size:14px}
+main{max-width:760px;margin:0 auto;padding:14px 14px 48px}
+h2{font-size:17px;margin:18px 0 8px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.mu{color:var(--mu);font-size:13px}
+textarea,select,input[type=text],input[type=password]{width:100%;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:14px}
+textarea{resize:vertical;line-height:1.6}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px;cursor:pointer}
+button.pri{background:var(--ac);color:#111;border-color:var(--ac);font-weight:700;width:100%;padding:12px;margin-top:8px}
+.row{display:flex;gap:8px;align-items:center;margin:6px 0}.row>*{flex:1;min-width:0}.row>.n{flex:0 0 36%}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.chips button{padding:4px 10px;font-size:13px;border-radius:99px}
+.er{color:var(--bad)}.ok{color:var(--ok)}
+audio{width:100%;margin-top:8px}canvas{width:100%;height:80px;display:block;border-radius:8px;background:var(--bg);margin-top:8px}
+.seg{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:3px 0;border-bottom:1px dashed var(--line)}
+label.r{display:flex;gap:8px;align-items:flex-start;margin:6px 0;font-size:14px}label.r input{margin-top:5px}
+#msg{margin-top:8px;font-size:14px;white-space:pre-wrap}
+</style></head><body>
+<header><b>🎙 พากย์เสียงการ์ตูน</b><a href="cartoon-characters.html">← ตัวการ์ตูน</a></header>
+<main>
+
+<h2>1. คีย์ Gemini (ฟรี)</h2>
+<div class="c">
+<input type="password" id="key" placeholder="วางคีย์ API ของ Google AI Studio" autocomplete="off">
+<div class="mu" style="margin-top:6px">คีย์ฟรีขอได้ที่ <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> · เก็บในเครื่องนี้เท่านั้น อย่าส่งหน้านี้ให้คนอื่นทั้งที่ใส่คีย์ไว้ · โควตาฟรีน้อยมาก (รายงานล่าสุดราว 10 ครั้ง/วัน) ดูตัวเลขจริงของคุณที่หน้า Rate limit ใน AI Studio · ฟรีเทียร์ Google อาจนำคำขอไปปรับปรุงผลิตภัณฑ์ และควรอ่าน <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">เงื่อนไขการใช้งาน</a> ก่อนใช้หารายได้</div>
+</div>
+
+<h2>2. ตัวละครและเสียง</h2>
+<div class="c" id="chars"></div>
+
+<h2>3. บท</h2>
+<div class="c">
+<div class="mu">แต่ละบรรทัด: <b>ตัวละคร | อารมณ์ | คำพูด</b> (อารมณ์เว้นว่างได้) ขึ้นต้นด้วย # = ข้ามบรรทัด · ใส่เสียงหัวเราะ/ถอนหายใจด้วยแท็กภาษาอังกฤษในคำพูด</div>
+<textarea id="script" rows="9"></textarea>
+<div class="chips" id="tags"></div>
+</div>
+
+<h2>4. วิธีสร้าง</h2>
+<div class="c">
+<label class="r"><input type="radio" name="mode" value="one" checked><span><b>ทั้งบทในครั้งเดียว</b><br><span class="mu">ประหยัดโควตา (1 ครั้งต่อคลิป) ได้ไม่เกิน 2 ตัวละคร และต้องใช้เสียงสำเร็จรูป ระบบเดาช่วงเวลาแต่ละบรรทัดจากความเงียบ</span></span></label>
+<label class="r"><input type="radio" name="mode" value="line"><span><b>ทีละบรรทัด</b><br><span class="mu">ใช้เสียงออกแบบเองได้ ได้เวลาแต่ละบรรทัดตรงเป๊ะ แต่ใช้โควตาเท่าจำนวนบรรทัด และรอ ~21 วิต่อบรรทัด</span></span></label>
+<button class="pri" id="go">สร้างเสียงพากย์</button>
+<button id="stop" style="width:100%;margin-top:6px;display:none">หยุด</button>
+<div id="msg"></div>
+</div>
+
+<div id="out" style="display:none">
+<h2>5. ผลลัพธ์</h2>
+<div class="c">
+<audio id="au" controls></audio>
+<canvas id="wv"></canvas>
+<div id="segs" style="margin-top:8px"></div>
+<div class="row" style="margin-top:10px"><button id="dl">ดาวน์โหลด WAV</button><button id="sv">บันทึกไว้ทำคลิป</button></div>
+<div id="svm" class="mu"></div>
+</div>
+</div>
+</main>
+<script>
+const $=s=>document.querySelector(s),E=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const MODEL='gemini-3.8-flash-tts';
+const VOICES=[['Zephyr','สดใส'],['Puck','ร่าเริง'],['Charon','ให้ข้อมูล'],['Kore','หนักแน่น'],['Fenrir','ตื่นเต้นง่าย'],['Leda','เด็ก/วัยรุ่น'],['Orus','หนักแน่น'],['Aoede','สบายๆ'],['Callirrhoe','ใจเย็น'],['Autonoe','สดใส'],['Enceladus','เสียงลม'],['Iapetus','ชัด'],['Umbriel','ใจเย็น'],['Algieba','นุ่ม'],['Despina','นุ่ม'],['Erinome','ชัด'],['Algenib','แหบห้าว'],['Rasalgethi','ให้ข้อมูล'],['Laomedeia','ร่าเริง'],['Achernar','เบา'],['Alnilam','หนักแน่น'],['Schedar','เรียบ'],['Gacrux','ผู้ใหญ่'],['Pulcherrima','ห้าว'],['Achird','เป็นมิตร'],['Zubenelgenubi','กันเอง'],['Vindemiatrix','อ่อนโยน'],['Sadachbia','มีชีวิตชีวา'],['Sadaltager','รู้จริง'],['Sulafat','อบอุ่น']];
+const TAGS=['<laugh>','<giggle>','<cackle>','<snort>','<snicker>','<sigh>','<gasp>','<shout>','<scream>','<groan>','<cry>','<short pause>','<long pause>'];
+const SAMPLE=`โมจิ | ง่วงๆ ปากแซะ | อ่าว ตื่นแล้วเหรอ <short pause> ช้ากว่าเน็ตบ้านเราอีกนะ <snort>
+ไข่ | หัวร้อน ตะโกน | ใครช้า! ฉันรอแปดปีแล้วนะ <shout> ลิงก์ยังไม่โหลดเลย!
+โมจิ | เสียงเรียบ เหนื่อยหน่าย | ก็ลิงก์ที่แกกดคือโฆษณา... <sigh>
+ไข่ | ตกใจสุดๆ | หา?! <gasp> แล้วเงินสิบบาทที่ฉันเติมล่ะ?
+โมจิ | หัวเราะเยาะ | บรรลุแล้ว <cackle> ขอบคุณที่สนับสนุนนะ`;
+const LSg=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},LSs=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+
+//PURE-START
+function b64ToBytes(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u}
+function parseWav(u8){const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength),tag=o=>String.fromCharCode(u8[o],u8[o+1],u8[o+2],u8[o+3]);
+ if(u8.length>44&&tag(0)==='RIFF'&&tag(8)==='WAVE'){let o=12,rate=24000,start=-1,len=0;
+  while(o+8<=u8.length){const id=tag(o),sz=dv.getUint32(o+4,true);
+   if(id==='fmt ')rate=dv.getUint32(o+12,true);
+   if(id==='data'){start=o+8;len=Math.min(sz,u8.length-start);break}
+   o+=8+sz+(sz&1)}
+  if(start>=0){const n=len>>1,pcm=new Int16Array(n);for(let i=0;i<n;i++)pcm[i]=dv.getInt16(start+i*2,true);return{rate,pcm}}}
+ const n=u8.length>>1,pcm=new Int16Array(n);for(let i=0;i<n;i++)pcm[i]=dv.getInt16(i*2,true);return{rate:24000,pcm}}
+function pcmToWav(pcm,rate){const n=pcm.length,b=new Uint8Array(44+n*2),dv=new DataView(b.buffer),w=(o,s)=>{for(let i=0;i<s.length;i++)b[o+i]=s.charCodeAt(i)};
+ w(0,'RIFF');dv.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,rate,true);dv.setUint32(28,rate*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);w(36,'data');dv.setUint32(40,n*2,true);
+ for(let i=0;i<n;i++)dv.setInt16(44+i*2,pcm[i],true);return b}
+function concatPcm(list,rate,gapSec){const gap=Math.round(rate*gapSec);let total=0;list.forEach((p,i)=>total+=p.length+(i<list.length-1?gap:0));
+ const out=new Int16Array(total),segs=[];let o=0;list.forEach((p,i)=>{out.set(p,o);segs.push({start:o/rate,end:(o+p.length)/rate});o+=p.length+(i<list.length-1?gap:0)});return{pcm:out,segs}}
+function findSegments(pcm,rate){const fr=Math.round(rate*0.02),n=Math.floor(pcm.length/fr),r=new Float32Array(n);let mx=0;
+ for(let i=0;i<n;i++){let s=0;for(let j=0;j<fr;j++){const v=pcm[i*fr+j];s+=v*v}r[i]=Math.sqrt(s/fr);if(r[i]>mx)mx=r[i]}
+ const thr=Math.max(150,mx*0.06),minSil=Math.round(0.35/0.02),segs=[];let st=-1,last=-1;
+ for(let i=0;i<n;i++){if(r[i]>thr){if(st<0)st=i;last=i}else if(st>=0&&i-last>=minSil){segs.push({start:st*0.02,end:(last+1)*0.02});st=-1}}
+ if(st>=0)segs.push({start:st*0.02,end:(last+1)*0.02});
+ return segs.filter(s=>s.end-s.start>=0.25)}
+function parseScript(t){return t.split(/\n/).map(s=>s.trim()).filter(s=>s&&!s.startsWith('#')).map(s=>{const p=s.split('|').map(x=>x.trim());
+ if(p.length>=3)return{spk:p[0],style:p[1],text:p.slice(2).join(' | ')};if(p.length===2)return{spk:p[0],style:'',text:p[1]};return{spk:'',style:'',text:s}})}
+//PURE-END
+
+$('#key').value=LSg('ss_gemini_key','');$('#key').onchange=()=>LSs('ss_gemini_key',$('#key').value.trim());
+$('#script').value=LSg('ss_cv_script',SAMPLE);$('#script').oninput=()=>LSs('ss_cv_script',$('#script').value);
+const CH=LSg('ss_cv_chars',[{name:'โมจิ',voice:'Leda',custom:''},{name:'ไข่',voice:'Fenrir',custom:''}]);
+function drawChars(){$('#chars').innerHTML=CH.map((c,i)=>`<div class="row"><input type="text" class="n" data-i="${i}" data-f="name" value="${E(c.name)}" placeholder="ชื่อตัวละคร"><select data-i="${i}" data-f="voice">${VOICES.map(v=>`<option value="${v[0]}" ${v[0]===c.voice?'selected':''}>${v[0]} · ${v[1]}</option>`).join('')}</select></div><input type="text" data-i="${i}" data-f="custom" value="${E(c.custom)}" placeholder="เสียงออกแบบเอง voice_... (ไม่บังคับ ใช้ได้เฉพาะโหมดทีละบรรทัด)" style="margin-bottom:10px">`).join('')+`<div class="mu">ชื่อต้องตรงกับชื่อหน้าบรรทัดในบท · ออกแบบเสียงเฉพาะตัวได้ที่ <a href="https://aistudio.google.com/generate-speech" target="_blank" rel="noopener">AI Studio</a> (Voice design) แล้วนำรหัส voice_... มาวาง เพื่อให้เสียงตัวละครคงที่ทุกคลิป</div>`;
+ document.querySelectorAll('#chars [data-f]').forEach(el=>el.onchange=()=>{CH[+el.dataset.i][el.dataset.f]=el.value.trim();LSs('ss_cv_chars',CH)})}
+drawChars();
+$('#tags').innerHTML=TAGS.map(t=>`<button type="button" data-t="${E(t)}">${E(t)}</button>`).join('');
+document.querySelectorAll('#tags [data-t]').forEach(b=>b.onclick=()=>{const ta=$('#script'),t=b.dataset.t,s=ta.selectionStart,e=ta.selectionEnd;ta.value=ta.value.slice(0,s)+t+ta.value.slice(e);ta.focus();ta.selectionStart=ta.selectionEnd=s+t.length;LSs('ss_cv_script',ta.value)});
+
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));let stopFlag=false,LAST=null;
+const voiceOf=n=>{const c=CH.find(x=>x.name===n);return c?(c.custom||c.voice):null};
+async function callTTS(key,body){
+ const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,{method:'POST',headers:{'x-goog-api-key':key,'content-type':'application/json'},body:JSON.stringify(body)});
+ const j=await r.json().catch(()=>({}));
+ if(!r.ok){const e=new Error((j.error&&j.error.message)||('HTTP '+r.status));e.status=r.status;throw e}
+ const ps=(((j.candidates||[])[0]||{}).content||{}).parts||[],d=ps.map(x=>(x.inlineData||x.inline_data||{}).data).find(Boolean);
+ if(!d)throw new Error('ไม่ได้รับเสียงกลับมา (อาจถูกตัดเพราะเนื้อหาหรือข้อความยาวเกิน)');return parseWav(b64ToBytes(d))}
+const part=(l,sp)=>{const p={text:l.text},m={};if(sp)m.speaker=sp;if(l.style)m.style=l.style;if(Object.keys(m).length)p.speech_metadata=m;return p};
+const gc=sc=>({responseModalities:['AUDIO'],speechConfig:sc});
+
+$('#stop').onclick=()=>{stopFlag=true};
+$('#go').onclick=async()=>{const msg=$('#msg'),go=$('#go');msg.className='';msg.textContent='';
+ const key=$('#key').value.trim();LSs('ss_gemini_key',key);if(!key){msg.className='er';msg.textContent='ใส่คีย์ Gemini ก่อน';return}
+ const lines=parseScript($('#script').value);if(!lines.length){msg.className='er';msg.textContent='ยังไม่มีบท';return}
+ const bad=lines.find(l=>!voiceOf(l.spk));if(bad){msg.className='er';msg.textContent=`ไม่รู้จักตัวละคร "${bad.spk}" — ชื่อหน้าบรรทัดต้องตรงกับชื่อที่ตั้งไว้ในข้อ 2`;return}
+ const mode=document.querySelector('input[name=mode]:checked').value,names=[...new Set(lines.map(l=>l.spk))];
+ go.disabled=true;$('#stop').style.display='block';stopFlag=false;
+ try{let pcm,rate=24000,segs;
+  if(mode==='one'){
+   if(names.length>2)throw new Error('โหมดครั้งเดียวรองรับไม่เกิน 2 ตัวละคร ใช้โหมดทีละบรรทัดแทน');
+   const cus=names.find(n=>(CH.find(c=>c.name===n)||{}).custom);if(cus)throw new Error(`"${cus}" ใช้เสียงออกแบบเอง ต้องใช้โหมดทีละบรรทัด`);
+   const al=n=>names.length>1?(names.indexOf(n)?'B':'A'):null;
+   const sc=names.length>1?{multiSpeakerVoiceConfig:{speakerVoiceConfigs:names.map(n=>({speaker:al(n),voiceConfig:{prebuiltVoiceConfig:{voiceName:voiceOf(n)}}}))}}:{voiceConfig:{voice:voiceOf(names[0])}};
+   msg.textContent='กำลังสร้างเสียงทั้งบท…';
+   const r=await callTTS(key,{contents:[{role:'user',parts:lines.map(l=>part(l,al(l.spk)))}],generationConfig:gc(sc)});
+   pcm=r.pcm;rate=r.rate;segs=findSegments(pcm,rate);
+   msg.textContent=segs.length===lines.length?'เสร็จ · ผูกเวลาแต่ละบรรทัดได้ครบ':`เสร็จ · ตรวจเจอ ${segs.length} ช่วง แต่บทมี ${lines.length} บรรทัด (ผูกเวลาอัตโนมัติไม่ได้ ใช้โหมดทีละบรรทัดถ้าต้องการเวลาตรง)`;
+   if(segs.length===lines.length)segs=segs.map((s,i)=>({...s,spk:lines[i].spk,text:lines[i].text}));
+  }else{
+   const list=[];let last=0;
+   for(let i=0;i<lines.length;i++){if(stopFlag)throw new Error('หยุดแล้ว');
+    const w=Math.max(0,21000-(Date.now()-last));if(i&&w){for(let t=Math.ceil(w/1000);t>0;t--){if(stopFlag)throw new Error('หยุดแล้ว');msg.textContent=`บรรทัด ${i+1}/${lines.length} · รอคิว ${t} วิ (โควตาฟรีจำกัดต่อนาที)`;await sleep(1000)}}
+    msg.textContent=`กำลังสร้างบรรทัด ${i+1}/${lines.length}…`;last=Date.now();
+    let r;for(let a=0;;a++){try{r=await callTTS(key,{contents:[{role:'user',parts:[part(lines[i],null)]}],generationConfig:gc({voiceConfig:{voice:voiceOf(lines[i].spk)}})});break}
+     catch(e){if(e.status===429&&!/day/i.test(e.message)&&a<2){for(let t=40;t>0;t--){if(stopFlag)throw new Error('หยุดแล้ว');msg.textContent=`ชนลิมิตต่อนาที รอ ${t} วิแล้วลองใหม่…`;await sleep(1000)}last=Date.now();continue}throw e}}
+    rate=r.rate;list.push(r.pcm)}
+   const m=concatPcm(list,rate,0.2);pcm=m.pcm;segs=m.segs.map((s,i)=>({...s,spk:lines[i].spk,text:lines[i].text}));msg.textContent='เสร็จ · ได้เวลาแต่ละบรรทัดตรงเป๊ะ'}
+  LAST={pcm,rate,segs,lines};show();if(!msg.className)msg.className='ok';
+ }catch(e){msg.className='er';let t=e.message;if(e.status===429)t+='\nโควตาหมด: ฟรีเทียร์มีจำกัดต่อวัน ลองใหม่พรุ่งนี้ (รีเซ็ตเที่ยงคืนเวลาแปซิฟิก) หรือเปิดบิลใน Google AI Studio';if(e.status===400||e.status===403)t+='\nเช็กคีย์ และเช็กว่าบัญชีเข้าถึงโมเดล '+MODEL+' ได้';msg.textContent=t}
+ go.disabled=false;$('#stop').style.display='none'};
+
+function show(){const{pcm,rate,segs}=LAST,wav=pcmToWav(pcm,rate),url=URL.createObjectURL(new Blob([wav],{type:'audio/wav'}));LAST.wav=wav;
+ $('#out').style.display='block';$('#au').src=url;
+ const c=$('#wv'),w=c.width=Math.max(300,c.clientWidth*(devicePixelRatio||1)),h=c.height=80*(devicePixelRatio||1),x=c.getContext('2d'),step=Math.max(1,Math.floor(pcm.length/w)),dur=pcm.length/rate;
+ x.clearRect(0,0,w,h);x.fillStyle='#f5c518';for(let i=0;i<w;i++){let m=0;for(let j=0;j<step;j++){const v=Math.abs(pcm[i*step+j]||0);if(v>m)m=v}const bh=Math.max(1,m/32768*h);x.fillRect(i,(h-bh)/2,1,bh)}
+ x.fillStyle='#d9453b';(segs||[]).forEach(s=>x.fillRect(Math.round(s.start/dur*w),0,2,h));
+ $('#segs').innerHTML=(segs||[]).map((s,i)=>`<div class="seg"><span>${i+1}. ${E(s.spk||'')} ${E((s.text||'').slice(0,40))}</span><span>${s.start.toFixed(1)}–${s.end.toFixed(1)} วิ</span></div>`).join('')+`<div class="mu" style="margin-top:4px">ความยาวรวม ${dur.toFixed(1)} วิ</div>`;
+ $('#svm').textContent=''}
+$('#dl').onclick=()=>{if(!LAST)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([LAST.wav],{type:'audio/wav'}));a.download='cartoon-voice.wav';a.click()};
+function idb(){return new Promise((ok,no)=>{const r=indexedDB.open('ss_cc',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+$('#sv').onclick=async()=>{if(!LAST)return;try{const d=await idb();await new Promise((ok,no)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put({wav:new Blob([LAST.wav],{type:'audio/wav'}),rate:LAST.rate,segs:LAST.segs,lines:LAST.lines,at:Date.now()},'voice');t.oncomplete=ok;t.onerror=()=>no(t.error)});$('#svm').className='mu ok';$('#svm').textContent='บันทึกแล้ว พร้อมใช้ในขั้นทำแอนิเมชัน'}catch(e){$('#svm').className='mu er';$('#svm').textContent='บันทึกไม่สำเร็จ: '+e.message}};
+</script></body></html>
