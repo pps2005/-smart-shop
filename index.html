@@ -93,12 +93,9 @@ P.conn=async()=>{const c=cfg();return `<h2>🔌 เชื่อมต่อ</h2>
 // ===== ชุดตัวละครหลักของช่อง (วาดด้วยโค้ด · ใช้ชุดเดียวกันทุกตอน) =====
 const NS="http://www.w3.org/2000/svg",EL=(t,a,p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e},LN={stroke:"#5b4b4b","stroke-width":4,"stroke-linecap":"round","stroke-linejoin":"round"},KC="#2b2233";
 const CAST=[
-{id:"capy",n:"คาปิ",t:"คาปิบาร่าอ้วนกลม ใจเย็นที่สุดในโลก",d:"ไม่สนใจโลก ไม่รีบ ไม่เครียด · ส้มลูกเล็กบนหัวคือเอกลักษณ์ · คำติดปาก: It’s fine.",c:"#c99a6b",b:"#ecd3b0",rx:62,ry:46,p:.8,r:.9},
-{id:"cat",n:"มิว",t:"แมวส้มตาปรือ ปากแสบ",d:"ทำหน้านิ่งแล้วสวนทุกประโยค · หนวดกับลายพาดหน้าผากคือเอกลักษณ์ · คำติดปาก: Hmm. No.",c:"#f4c28f",b:"#fff1e0",rx:40,ry:60,p:1.1,r:1},
-{id:"dog",n:"โมจิ",t:"ลูกหมาซื่อ รักเพื่อนสุดใจ",d:"พูดความจริงจนทุกคนอึ้ง · แต้มสีน้ำตาลที่ตากับผ้าพันคอแดงคือเอกลักษณ์ · คำติดปาก: Yay!",c:"#f6ead8",b:"#fffaf0",rx:38,ry:44,p:1.7,r:1.15},
-{id:"bobo",n:"โบโบ้",t:"ก้อนกลมจอมขี้เกียจ มั่นใจเกินตัว",d:"ผู้นำที่ไม่เคยทำอะไรแต่เชื่อว่าตัวเองขยัน · ใบไม้บนหัวคือเอกลักษณ์ · คำติดปาก: Productive!",c:"#ffae42",b:"#ffe3b0",rx:58,ry:52,p:1.35,r:1.05},
-{id:"long",n:"ลอง",t:"กระต่ายสูงหน้านิ่ง ปากแสบ",d:"พูดน้อยแต่ทุกประโยคคือคำสวน · แว่นกลมกับตาปรือคือเอกลักษณ์ · คำติดปาก: Approved.",c:"#a99bff",b:"#e4deff",rx:30,ry:88,p:.55,r:.85},
-{id:"pip",n:"ปิ๊ป",t:"ลูกเจี๊ยบจิ๋ว ซื่อจนช็อก",d:"ซื่อไร้พิษภัยแต่พูดความจริงจนทุกคนอึ้ง · เปลือกไข่บนหัวคือเอกลักษณ์ · คำติดปาก: Oopsie!",c:"#ffdc3d",b:"#fff4b0",rx:30,ry:27,p:1.9,r:1.15}];
+{id:"pao",n:"เปาเปา",t:"ซาลาเปาใจกล้า ฝันจะเป็นฮีโร่",d:"ซื่อ มั่นใจเกินไส้ · จุกพับบนหัวคือเอกลักษณ์ · คำติดปาก: Don’t steam me!",c:"#fff3e0",b:"#ffe2b8",rx:56,ry:50,p:1.3,r:1.05},
+{id:"kab",n:"ก๊าบ",t:"เป็ดยางปากแสบ ด่าเก่ง แต่รักเพื่อนลึกๆ",d:"ปากไวกว่าสมอง · ปากส้มกับขนจุกบนหัวคือเอกลักษณ์ · คำติดปาก: Quack-tually…",c:"#ffd93b",b:"#fff0a0",rx:42,ry:44,p:1.8,r:1.2},
+{id:"khr",n:"ครึ้ม",t:"ก้อนเมฆดราม่า เศร้าแล้วฝนตก โมโหแล้วฟ้าร้อง",d:"พูดทุ้มช้าๆ แต่ใจอ่อน · รอยสายฟ้าบนแก้มคือเอกลักษณ์ · คำติดปาก: It’s fine. I’m just drizzling.",c:"#cfd9ee",b:"#eef3fb",rx:64,ry:44,p:.6,r:.8}];
 const XP={"ปกติ":["n","s"],"ดีใจ":["h","o"],"เกรียน":["sm","g"],"ช็อก":["sh","O"],"ง่วง":["z","f"],"วางแผนร้าย":["sm","w"]};
 function face(r,k){const o=r.o,x=XP[k]||XP["ปกติ"],f=r.fc,ey=-o.ry*1.25,ex=o.id=="long"?17:Math.max(13,o.rx*.38),my=ey+18,m=x[1];f.textContent="";
  [-1,1].forEach(s=>{const g=EL("g",{transform:`translate(${s*ex} ${ey})`},f),e=x[0];
@@ -125,12 +122,16 @@ function inst(o,par){const r={o},g=EL("g",{},par),b=EL("g",{},g),H=-o.ry*2;r.g=g
  if(o.id=="cat")[-1,1].forEach(s=>{EL("path",{d:`M${s*37} ${H+30} L${s*33} ${H-18} L${s*10} ${H+3}z`,fill:o.c,...LN,"stroke-width":5},b);EL("path",{d:`M${s*31} ${H+22} L${s*29} ${H-4} L${s*15} ${H+8}z`,fill:"#ffb7c5"},b)});
  if(o.id=="dog")[-1,1].forEach(s=>EL("ellipse",{cx:s*o.rx*.9,cy:-o.ry*1.3,rx:12,ry:25,fill:"#c4966a",...LN,"stroke-width":5,transform:`rotate(${s*18} ${s*o.rx*.9} ${-o.ry*1.3})`},b));
  if(o.id=="long")[-1,1].forEach(s=>EL("ellipse",{cx:s*18,cy:H-26,rx:11,ry:42,fill:o.c,...LN,"stroke-width":5,transform:`rotate(${s*8} ${s*18} ${H-26})`},b));
+ if(o.id=="khr")[-1,0,1].forEach(s=>EL("circle",{cx:s*o.rx*.5,cy:H*(s?.9:1.08),r:o.rx*.34,fill:o.c,...LN,"stroke-width":5},b));
  r.al=EL("ellipse",{cx:-o.rx,cy:-o.ry,rx:10,ry:18,fill:o.c,...LN,"stroke-width":5},b);r.ar=EL("ellipse",{cx:o.rx,cy:-o.ry,rx:10,ry:18,fill:o.c,...LN,"stroke-width":5},b);
  EL("ellipse",{cx:0,cy:-o.ry,rx:o.rx,ry:o.ry,fill:o.c,...LN,"stroke-width":5},b);EL("ellipse",{cx:0,cy:-o.ry*.55,rx:o.rx*.62,ry:o.ry*.5,fill:o.b},b);
  if(o.id=="bobo")EL("path",{d:`M0 ${H+3} q-4 -22 -24 -26 q0 22 24 26z`,fill:"#6fcf6a",...LN,"stroke-width":3},b);
  if(o.id=="capy"){EL("circle",{cx:0,cy:H-8,r:14,fill:"#ff9f1c",...LN,"stroke-width":3},b);EL("path",{d:`M0 ${H-22} q6 -10 14 -8 q-4 8 -14 8z`,fill:"#6fcf6a"},b)}
  if(o.id=="dog"){EL("path",{d:`M${-o.rx*.6} ${-o.ry*.6} q${o.rx*.6} 14 ${o.rx*1.2} 0 v12 q${-o.rx*.6} 12 ${-o.rx*1.2} 0z`,fill:"#ff5d5d",...LN,"stroke-width":3},b);EL("path",{d:`M6 ${-o.ry*.6+16} l14 22 l-18 -4z`,fill:"#ff5d5d",...LN,"stroke-width":3},b)}
  if(o.id=="pip")EL("path",{d:`M-26 ${H+10} l7 -14 l7 10 l7 -16 l7 12 l7 -14 l4 22 q-17 -9 -39 0z`,fill:"#fff",...LN,"stroke-width":3},b);
+ if(o.id=="pao"){EL("path",{d:`M-16 ${H+4} q16 -26 32 0 q-16 10 -32 0z`,fill:o.c,...LN,"stroke-width":4},b);EL("path",{d:`M-6 ${H-2} q6 -8 12 0`,fill:"none",stroke:"#c9a27a","stroke-width":3,"stroke-linecap":"round"},b);[-30,0,30].forEach(x=>EL("path",{d:`M${x} ${H+10} v10`,fill:"none",stroke:"#e3c9a5","stroke-width":3,"stroke-linecap":"round"},b))}
+ if(o.id=="kab"){EL("path",{d:`M-6 ${H+4} q-6 -22 4 -26 q2 12 -2 26z M4 ${H+4} q2 -20 12 -20 q-2 12 -6 20z`,fill:o.c,...LN,"stroke-width":3},b);EL("ellipse",{cx:0,cy:-o.ry*1.25+15,rx:19,ry:9,fill:"#ff9f1c",...LN,"stroke-width":4},b)}
+ if(o.id=="khr")EL("path",{d:`M${o.rx*.55} ${-o.ry*1.3} l-9 15 h9 l-7 15 l18 -21 h-10 l8 -9z`,fill:"#ffd23f",...LN,"stroke-width":2.5},b);
  r.fc=EL("g",{},b);r.z=EL("text",{x:o.rx*.6,y:H-6,"font-size":26,"font-weight":"700",fill:"#556",display:"none"},g);r.z.textContent="z z";face(r,"ปกติ");return r}
 function mk(o,k,cl){const s=EL("svg",{viewBox:`${-o.rx-34} ${-o.ry*2-64} ${o.rx*2+68} ${o.ry*2+100}`}),r=inst(o,s);face(r,k);return {s,r}}
 let CS=null;
@@ -140,11 +141,11 @@ function anim(r,t,k,sp,sl){const o=r.o;let by=Math.sin(t*2+k*2)*3,ar=Math.sin(t*
  r.al.setAttribute("transform",`rotate(${-ar-8} ${-o.rx} ${-o.ry-14})`);r.ar.setAttribute("transform",`rotate(${ar+8} ${o.rx} ${-o.ry-14})`);
  if(r.m1){const op=sp&&Math.sin(t*18)>0;r.m0.setAttribute("display",op?"none":"");r.m1.setAttribute("display",op?"":"none")}}
 requestAnimationFrame(function lp(n){if(CS&&document.body.contains(CS.sv)){const t=n/1000;CS.ins.forEach((r,k)=>anim(r,t,k,CS.spk==r.o,CS.sl));CS.po.forEach((r,k)=>anim(r,t,k+1,false,false))}requestAnimationFrame(lp)});
-const SC=[["bobo","Today, I will be very productive.","วันนี้ฉันจะขยันสุดๆ ให้ดู","เกรียน"],["long","You said that yesterday.","เมื่อวานก็พูดแบบนี้","ปกติ"],["bobo","Yesterday me was a liar.","ฉันเมื่อวานมันโกหก","วางแผนร้าย"],["pip","I made a nap schedule!","หนูทำตารางงีบแล้ว!","ดีใจ"],["long","...Approved.","...อนุมัติ","เกรียน"],["bobo","Meeting adjourned. Sleep time.","ปิดประชุม ถึงเวลานอน","ดีใจ"]];
-P.cast=async()=>`<h2>🐾 เลือกตัวละครของช่อง</h2><p class="sub">แตะเลือก 3 ตัว (ตัวที่ 1 = หัวหน้าขี้เกียจ · 2 = ปากแสบ · 3 = ซื่อ) แล้วกดทำเป็นการ์ตูน</p><div id="gal" class="sh" style="margin-bottom:12px"></div>
+const SC=[["pao","Good morning! Today I’m gonna be a hero!","อรุณสวัสดิ์! วันนี้ฉันจะเป็นฮีโร่!","ดีใจ"],["kab","You’re a bun. Heroes don’t get steamed.","แกมันซาลาเปา ฮีโร่ไม่โดนนึ่งหรอก","เกรียน"],["pao","Rude! I have feelings AND fillings!","หยาบคาย! ฉันมีทั้งความรู้สึกและไส้!","ช็อก"],["khr","Sorry… is this the apartment with free Wi-Fi?","ขอโทษนะ… ห้องนี้มีไวไฟฟรีใช่ไหม","ปกติ"],["kab","Why is it raining INSIDE?!","ทำไมฝนตกในห้อง!","ช็อก"],["khr","It’s fine. I’m just… drizzling.","ไม่เป็นไร แค่… ปรอยๆ","ง่วง"],["pao","Great! Free shower for my laundry!","ดีเลย! อาบน้ำฟรีให้ซักผ้า!","ดีใจ"],["kab","Quack-tually, that’s MY towel.","จริงๆ แล้วนั่นผ้าเช็ดตัวฉัน","วางแผนร้าย"],["khr","Then I’ll thunder about it.","งั้นฉันจะฟ้าร้องใส่","วางแผนร้าย"],["kab","…Welcome to the family. Rent is due Friday.","…ยินดีต้อนรับ ค่าเช่าครบกำหนดวันศุกร์","เกรียน"],["pao","To be continued!","โปรดติดตามตอนต่อไป!","ดีใจ"]];
+P.cast=async()=>`<h2>🐾 เลือกตัวละครของช่อง</h2><p class="sub">แก๊งประจำช่อง 3 ตัว: เปาเปา (ซื่อ ใจกล้า) · ก๊าบ (ปากแสบ) · ครึ้ม (ดราม่า) แล้วกดทำเป็นการ์ตูน ตอนที่ 1 "ฝนตกในห้อง"</p><div id="gal" class="sh" style="margin-bottom:12px"></div>
 <div id="cs"><svg id="csv" viewBox="0 0 360 640"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe8ff"/><stop offset="1" stop-color="#fff2c9"/></linearGradient></defs><rect width="360" height="640" fill="url(#cg)"/><circle cx="290" cy="90" r="34" fill="#ffe27a"/><rect y="520" width="360" height="120" fill="#9be08b"/><rect y="520" width="360" height="8" fill="#7cc96d"/></svg><div id="cen"></div><div id="csub"></div></div>
 <div style="text-align:center"><button class="pri" id="cpl">▶ ทำเป็นการ์ตูน</button><button id="cmu">🔊 เสียงอังกฤษ: เปิด</button></div><div id="sheet"></div>`;
-function castInit(){const sv=$("#csv"),X=[90,195,290],RM={bobo:0,long:1,pip:2},root=EL("g",{},sv),sub=$("#csub"),en=$("#cen");let sel=[0,1,2],on=0,snd=true,tm;CS={sv,ins:[],po:[],spk:null,sl:false};
+function castInit(){const sv=$("#csv"),X=[90,195,290],RM={pao:0,kab:1,khr:2},root=EL("g",{},sv),sub=$("#csub"),en=$("#cen");let sel=[0,1,2],on=0,snd=true,tm;CS={sv,ins:[],po:[],spk:null,sl:false};
  const stop=()=>{on=0;clearTimeout(tm);window.speechSynthesis&&speechSynthesis.cancel();CS.spk=null;$("#cpl").textContent="▶ ทำเป็นการ์ตูน"};
  const gal=$("#gal"),figs=CAST.map((o,i)=>{const f=document.createElement("figure"),c=document.createElement("figcaption");f.style.cssText="cursor:pointer;border-radius:12px;padding:4px";f.append(mk(o,"ปกติ").s,c);f.onclick=()=>{if(!sel.includes(i)){sel=[...sel.slice(sel.length>=3?1:0),i];refresh()}};gal.append(f);return {f,c}});
  function refresh(){stop();root.textContent="";CS.sl=false;sub.textContent="";en.style.display="none";CS.ins=sel.map((ci,k)=>{const r=inst(CAST[ci],root);r.g.setAttribute("transform",`translate(${X[k]} 505)`);const t=EL("text",{x:0,y:30,"text-anchor":"middle","font-size":17,"font-weight":"700",fill:"#234"},r.g);t.textContent=CAST[ci].n;return r});
@@ -158,7 +159,7 @@ function castInit(){const sv=$("#csv"),X=[90,195,290],RM={bobo:0,long:1,pip:2},r
  $("#cpl").onclick=()=>{if(on){stop();return}on=1;CS.sl=false;CS.ins.forEach(r=>face(r,"ปกติ"));$("#cpl").textContent="⏹ หยุด";say(0)};
  $("#cmu").onclick=()=>{snd=!snd;$("#cmu").textContent="🔊 เสียงอังกฤษ: "+(snd?"เปิด":"ปิด")};refresh()}
 // ===== ตัวละครแบบชิ้นส่วน: ทุกชิ้นแยกกลุ่ม มีจุดหมุนของตัวเอง ขยับอิสระ =====
-const SZ={bobo:1.6,long:1.25,pip:3.2,capy:1.5,cat:1.3,dog:2.1};let LB=null;
+const SZ={pao:1.6,kab:2.2,khr:1.4};let LB=null;
 function rig(o,par){const R={o,P:{}},rx=o.rx,ry=o.ry,H=-ry*2,S=SZ[o.id],F={fill:o.c,...LN,"stroke-width":5};R.g=EL("g",{transform:`scale(${S})`},par);R.b=EL("g",{},R.g);
  const pc=(n,lb,ex,ey,px,py)=>{const q=EL("g",{},R.b),t=EL("text",{x:px,y:py+26/S,"font-size":13/S,"font-weight":"700","text-anchor":"middle",fill:"#234",stroke:"#fff","stroke-width":4/S,"paint-order":"stroke",opacity:0},q);t.textContent=lb;R.P[n]={g:q,ex,ey,px,py,t};return q};
  let q=pc("tail","หาง",18,0,rx*.85,-ry*.4);EL("circle",{cx:rx*.85,cy:-ry*.4,r:o.id=="long"?9:12,...F},q);
@@ -170,12 +171,17 @@ function rig(o,par){const R={o,P:{}},rx=o.rx,ry=o.ry,H=-ry*2,S=SZ[o.id],F={fill:
  if(o.id=="long")[-1,1].forEach(s=>{q=pc("ear"+s,"หู",s*16,-30,s*18,H+6);EL("ellipse",{cx:s*18,cy:H-26,rx:11,ry:42,...F,transform:`rotate(${s*8} ${s*18} ${H-26})`},q)});
  [-1,1].forEach(s=>{q=pc("foot"+s,"เท้า",s*12,25,s*rx*.45,-6);EL("ellipse",{cx:s*rx*.45,cy:-6,rx:15,ry:9,...F},q)});
  [-1,1].forEach(s=>{q=pc("arm"+s,"แขน",s*18,0,s*rx,-ry-14);EL("ellipse",{cx:s*rx,cy:-ry,rx:10,ry:18,...F},q)});
+ if(o.id=="khr")[-1,0,1].forEach(s=>{q=pc("ear"+s,"ก้อนเมฆ",s*14,-26,s*rx*.5,H*(s?.9:1.08));EL("circle",{cx:s*rx*.5,cy:H*(s?.9:1.08),r:rx*.34,...F},q)});
  q=pc("body","ตัว + ท้อง",0,0,0,-6);EL("ellipse",{cx:0,cy:-ry,rx,ry,...F},q);EL("ellipse",{cx:0,cy:-ry*.55,rx:rx*.62,ry:ry*.5,fill:o.b},q);
+ if(o.id=="kab"){q=pc("beak","ปาก",0,16,0,-ry*1.25+15);EL("ellipse",{cx:0,cy:-ry*1.25+15,rx:19,ry:9,fill:"#ff9f1c",...LN,"stroke-width":4},q)}
  q=pc("face","หน้า (สลับได้ 6 แบบ)",0,ry*1.25+35,0,-ry*1.25);R.fc=EL("g",{},q);face(R,"ปกติ");
  if(o.id=="bobo"){q=pc("prop","ใบไม้",0,-45,0,H+3);EL("path",{d:`M0 ${H+3} q-4 -22 -24 -26 q0 22 24 26z`,fill:"#6fcf6a",...LN,"stroke-width":3},q)}
  if(o.id=="pip"){q=pc("prop","เปลือกไข่",0,-45,0,H+10);EL("path",{d:`M-26 ${H+10} l7 -14 l7 10 l7 -16 l7 12 l7 -14 l4 22 q-17 -9 -39 0z`,fill:"#fff",...LN,"stroke-width":3},q)}
  if(o.id=="capy"){q=pc("prop","ส้ม",0,-45,0,H-8);EL("circle",{cx:0,cy:H-8,r:14,fill:"#ff9f1c",...LN,"stroke-width":3},q);EL("path",{d:`M0 ${H-22} q6 -10 14 -8 q-4 8 -14 8z`,fill:"#6fcf6a"},q)}
  if(o.id=="dog"){q=pc("prop","ผ้าพันคอ",0,-45,0,-ry*.6);EL("path",{d:`M${-rx*.6} ${-ry*.6} q${rx*.6} 14 ${rx*1.2} 0 v12 q${-rx*.6} 12 ${-rx*1.2} 0z`,fill:"#ff5d5d",...LN,"stroke-width":3},q);EL("path",{d:`M6 ${-ry*.6+16} l14 22 l-18 -4z`,fill:"#ff5d5d",...LN,"stroke-width":3},q)}
+ if(o.id=="pao"){q=pc("prop","จุกซาลาเปา",0,-45,0,H+4);EL("path",{d:`M-16 ${H+4} q16 -26 32 0 q-16 10 -32 0z`,fill:o.c,...LN,"stroke-width":4},q)}
+ if(o.id=="kab"){q=pc("prop","ขนจุก",0,-45,0,H+4);EL("path",{d:`M-6 ${H+4} q-6 -22 4 -26 q2 12 -2 26z M4 ${H+4} q2 -20 12 -20 q-2 12 -6 20z`,fill:o.c,...LN,"stroke-width":3},q)}
+ if(o.id=="khr"){q=pc("prop","สายฟ้า",0,-45,rx*.55,-ry*1.3);EL("path",{d:`M${rx*.55} ${-ry*1.3} l-9 15 h9 l-7 15 l18 -21 h-10 l8 -9z`,fill:"#ffd23f",...LN,"stroke-width":2.5},q)}
  return R}
 function pose(R,t,st,E){const s=Math.sin,o=R.o,P=R.P;let bx=0,by=0,sx=1,sy=1,br=0,al=s(t*1.5)*6,ar=-al,ear=s(t*2)*5,fl=0,fr=0,tl=s(t*4)*18;
  if(st=="walk"){const w=t*6;fl=-Math.max(0,s(w))*12;fr=-Math.max(0,-s(w))*12;by=-Math.abs(s(w))*4;br=s(w)*3;al=s(w)*32;ar=-al;ear=s(w-1)*12}
