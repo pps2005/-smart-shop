@@ -38,7 +38,7 @@ input,textarea{font:inherit;width:100%;padding:9px;border:1px solid var(--line);
 .sh{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}.sh figure{margin:0;width:30%;min-width:88px}.sh figcaption{font-size:12px;color:var(--mu)}.sh svg{width:100%;height:96px}.pt svg{height:210px;width:auto}
 </style></head><body>
 <div class="st"><span class="dot" id="d"></span><span id="dt">กำลังเช็กบอท…</span></div>
-<nav id="nav"><b><i>X</i>IRESS</b><a href="#/">🎬 หน้าหลัก</a><a href="#/new">🎞 งานใหม่</a><a href="#/queue">⏱ คิว</a><a href="#/cast">🐾 ตัวละคร</a><a href="#/sum">📋 สรุปงาน</a><a href="#/conn">🔌 เชื่อมต่อ</a></nav>
+<nav id="nav"><b><i>X</i>IRESS</b><a href="#/">🎬 หน้าหลัก</a><a href="#/new">🎞 งานใหม่</a><a href="#/queue">⏱ คิว</a><a href="#/cast">🐾 ตัวละคร</a><a href="#/lab">🧩 ชิ้นส่วน</a><a href="#/sum">📋 สรุปงาน</a><a href="#/conn">🔌 เชื่อมต่อ</a></nav>
 <div class="hero" id="hero">
 <div class="sl on"><svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><rect x="110" y="120" width="180" height="120" fill="#222" stroke="#f5c518" stroke-width="4"/><path d="M110 120l30-50h40l-30 50zM170 120l30-50h40l-30 50zM230 120l30-50h40l-30 50z" fill="#f5c518"/><rect x="110" y="88" width="180" height="26" fill="#eee" opacity=".85"/></svg><h1>ยินดีต้อนรับสู่ Xiress Studio</h1><p>สตูดิโอสร้างงานด้วย AI</p></div>
 <div class="sl"><svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><path d="M200 20L90 300h220z" fill="#fff" opacity=".35"/><circle cx="200" cy="24" r="22" fill="#f5c518"/></svg><h1>แสง · กล้อง · แอคชัน</h1><p>เริ่มงานใหม่จากโจทย์เดียว</p></div>
@@ -72,10 +72,12 @@ P['']=async()=>`<h2>Welcome to Xiress Studio</h2><p class="sub">เลือก�
 <div class="c" onclick="location.hash='#/queue'"><div class="e">⏱</div><h3>คิวงาน</h3><div class="mu">ดูและยกเลิกรายงาน</div></div>
 <div class="c" onclick="location.hash='#/sum'"><div class="e">📋</div><h3>สรุปงาน</h3><div class="mu">สวิตช์ปิด/เปิดรายตัว</div></div></div>`;
 P.new=async()=>{let ms=[];try{ms=(await api('/api/status')).models.filter(m=>m.fit=='ok')}catch(e){}
+const pre=window.PREF||'';window.PREF='';
 return `<h2>🎞 งานใหม่</h2><p class="sub">เลือกโมเดล แล้วใส่โจทย์ (เปิดสวิตช์โมเดลในสรุปงานก่อน)</p>
-<div class="c"><select id="k" style="width:100%;padding:9px;border-radius:9px;margin-bottom:8px"><option value="image">🖼 รูป · FLUX.1 schnell (Workers AI)</option>${ms.map(m=>`<option value="k:${m.id}">${KL[m.kind]||''} · ${E(m.name)} (Kaggle)</option>`).join('')}</select>
-<textarea id="i" rows="5" placeholder="รูป: อธิบายภาพ (อังกฤษดีสุด) · ซับ: ลิงก์ไฟล์เสียง/วิดีโอ (URL)"></textarea><button class="pri" id="go">เพิ่มเข้าคิว</button><div id="m"></div></div>`};
-P.queue=async()=>{const j=await api('/api/jobs');return `<h2>⏱ คิวงาน</h2><div style="text-align:center;margin-bottom:8px"><button onclick="show()">🔄 รีเฟรช</button></div><div class="c">${j.jobs.length?j.jobs.map(x=>`<div class="r"><div><b>#${x.id} ${E(x.kind)}</b> <span class="chip">${STL[x.status]||x.status}</span>${x.err?`<div class="er">${E(x.err)}</div>`:''}${x.out&&x.out!='img'?`<pre style="white-space:pre-wrap;font:13px/1.5 monospace;margin:6px 0 0">${E(x.out)}</pre>`:''}${x.status=='done'&&(x.kind=='image'||x.out=='img')?`<img src="${imgUrl(x.id)}" style="max-width:100%;border-radius:8px;margin-top:6px">`:''}</div>${['queued','running','kwait'].includes(x.status)?`<button class="dg" data-c="${x.id}">ปิด</button>`:''}</div>`).join(''):'<div class="mu">ยังไม่มีงาน</div>'}</div>`};
+<div class="c"><select id="k" style="width:100%;padding:9px;border-radius:9px;margin-bottom:8px"><option value="image">🖼 รูป · FLUX.1 schnell (Workers AI)</option>${ms.map(m=>`<option value="k:${m.id}"${pre&&m.id=='flux2-klein-4b'?' selected':''}>${KL[m.kind]||''} · ${E(m.name)} (Kaggle)</option>`).join('')}</select>
+<div class="mu" style="margin-bottom:8px">📎 ภาพต้นแบบตัวละคร (ใช้กับ FLUX.2 klein)<br><input type="file" id="rf" accept="image/*" style="margin-top:4px"><div id="rfm"></div></div>
+<textarea id="i" rows="5" placeholder="รูป: อธิบายภาพ (อังกฤษดีสุด) · ซับ: ลิงก์ไฟล์เสียง/วิดีโอ (URL)&#10;klein: บรรทัดแรก ref:#เลขงาน (ได้ถึง 4 ภาพ เช่น ref:#12,#15) แล้วบรรทัดต่อไปคือฉาก/ท่าทาง · เสริมได้ size:576x1024 · seed:7">${E(pre)}</textarea><button class="pri" id="go">เพิ่มเข้าคิว</button><div id="m"></div></div>`};
+P.queue=async()=>{const j=await api('/api/jobs');return `<h2>⏱ คิวงาน</h2><div style="text-align:center;margin-bottom:8px"><button onclick="show()">🔄 รีเฟรช</button></div><div class="c">${j.jobs.length?j.jobs.map(x=>`<div class="r"><div><b>#${x.id} ${E(x.kind)}</b> <span class="chip">${STL[x.status]||x.status}</span>${x.err?`<div class="er">${E(x.err)}</div>`:''}${x.out&&x.out!='img'?`<pre style="white-space:pre-wrap;font:13px/1.5 monospace;margin:6px 0 0">${E(x.out)}</pre>`:''}${x.status=='done'&&(x.kind=='image'||x.out=='img')?`<img src="${imgUrl(x.id)}" style="max-width:100%;border-radius:8px;margin-top:6px"><div><button data-rf="${x.id}" style="margin-top:6px">📌 ใช้เป็นภาพต้นแบบ</button></div>`:''}</div>${['queued','running','kwait'].includes(x.status)?`<button class="dg" data-c="${x.id}">ปิด</button>`:''}</div>`).join(''):'<div class="mu">ยังไม่มีงาน</div>'}</div>`};
 P.sum=async()=>{const s=await api('/api/status'),L=s.link,ch=(t,y)=>`<span class="chip ${y?'y':''}">${t}${y?' ✓':' –'}</span>`,
  sw=(n,l,on)=>`<div class="r"><span>${l}</span><button class="sw ${on?'on':'off'}" data-s="${n}" data-v="${on?0:1}">${on?'เปิด':'ปิด'}</button></div>`,
  q=Object.fromEntries(s.jobs.map(x=>[x.status,x.n])),
@@ -209,112 +211,6 @@ function labInit(){const sv=$("#lsv"),box=$("#v");LB={sv,E:0,tg:0,st:"idle",xp:"
  row("ท่าทาง",[["idle","ยืนนิ่ง"],["walk","เดิน"],["talk","พูด"],["jump","กระโดด"],["wave","โบกมือ"],["shock","ตกใจ"],["sleep","หลับ"]],k=>{LB.st=k;fx()});
  row("สีหน้า",Object.keys(XP).map(k=>[k,k]),k=>{LB.xp=k;fx()});
  const w=document.createElement("div"),b=document.createElement("button");w.style.textAlign="center";b.className="pri";b.textContent="🧩 แยกชิ้นส่วน";b.onclick=()=>{LB.tg=LB.tg?0:1;b.textContent=LB.tg?"🧩 รวมกลับ":"🧩 แยกชิ้นส่วน"};w.appendChild(b);box.appendChild(w)}
-// ===== ตัวละคร chibi ชุดใหม่ (เลือกแล้วล็อกทีละตัว) · แทนชุดเดิม · วาดด้วยโค้ดทุกชิ้น หน้า/ตัว/ชุดเหมือนเดิมทุกเฟรม =====
-const CHD={
-A:{t:"สาวตัวเอก · ซุกซน ปากไว ชอบก่อเรื่อง",l:[
-{id:"a1",n:"มิโนะ",k:"h",sk:"#ffe3cf",hc:"#ff8a3d",hs:"twin",oc:"#4aa8ff",ac:"#fff",d:"ผมแกละส้ม ฮู้ดสีฟ้า · คำติดปาก: What could go wrong?"},
-{id:"a2",n:"ซากุ",k:"h",sk:"#ffe3cf",hc:"#ff7eb6",hs:"bob",oc:"#b79cff",ac:"#fff",d:"ผมบ็อบชมพู · คำติดปาก: Don’t blame me!"},
-{id:"a3",n:"เทล",k:"h",sk:"#f6d2b4",hc:"#19b5a5",hs:"pony",oc:"#ffd23f",ac:"#fff",d:"ผมหางม้าเขียวมิ้นต์ · คำติดปาก: Trust me, I’m a genius!"}]},
-B:{t:"หนุ่มซื่อ · ซุ่มซ่าม โดนลากเข้าเรื่องตลอด",l:[
-{id:"b1",n:"บิ๊บ",k:"h",sk:"#ffe3cf",hc:"#6b4a33",hs:"spike",gl:1,oc:"#5cc16a",ac:"#fff",d:"แว่นกลม ผมตั้ง · คำติดปาก: Wait, what just happened?"},
-{id:"b2",n:"โตโน่",k:"h",sk:"#f1c9a5",hc:"#2b2233",hs:"bob",oc:"#ff6b6b",ac:"#fff",d:"ผมชามดำ · คำติดปาก: I didn’t do it!"},
-{id:"b3",n:"แจ็ค",k:"h",sk:"#ffe3cf",hc:"#f2c94c",hs:"spike",gl:1,oc:"#4a6cf7",ac:"#fff",d:"ผมทองตั้ง ใส่แว่น · คำติดปาก: According to my calculations…"}]},
-C:{t:"แมวอ้วน · ขี้เกียจ ปากแซ่บ คอยแซะ",l:[
-{id:"c1",n:"ส้มจุก",k:"cat",w:1.3,sk:"#ffa54a",bl:"#fff0d9",ac:"#ff5d5d",d:"แมวส้มพุงพลุ้ย ผ้าพันคอแดง · คำติดปาก: Meh. Feed me first."},
-{id:"c2",n:"เทาฟู",k:"cat",w:1.3,sk:"#9aa5b1",bl:"#e9eef3",ac:"#3fb6a8",d:"แมวเทาขนฟู ผ้าพันคอเขียว · คำติดปาก: I’m not lazy, I’m saving energy."},
-{id:"c3",n:"ดำมัน",k:"cat",w:1.3,sk:"#4a4356",bl:"#7a728a",ac:"#ffd23f",d:"แมวดำจอมแซะ ผ้าพันคอเหลือง · คำติดปาก: Nobody asked, but okay."}]},
-D:{t:"สัตว์สติหลุด · ตัวป่วน มุกเกรียน ล้อเลียน",l:[
-{id:"d1",n:"แป๊ะ",k:"duck",sk:"#fff3a8",bl:"#fffbe0",ac:"#ff9f1c",d:"เป็ดเหลือง ปากส้ม ขนจุก · คำติดปาก: Quack-tually…"},
-{id:"d2",n:"ฟู่ฟ่า",k:"bun",sk:"#cdeede",bl:"#f1fbf6",ac:"#ff7eb6",d:"กระต่ายมิ้นต์หูยาว · คำติดปาก: Hop, hop, hooray?"},
-{id:"d3",n:"หมีบ้อ",k:"bear",sk:"#b98557",bl:"#e6c9a3",ac:"#4a6cf7",d:"หมีน้ำตาลสติหลุด · คำติดปาก: I have a plan. It’s a bad plan."}]}};
-const CHX={"ปกติ":["n","s"],"ดีใจ":["h","o"],"เกรียน":["sm","g"],"ช็อก":["sh","O"],"ง่วง":["z","f"],"วางแผนร้าย":["sm","w"],"ร้องไห้":["c","d"],"โมโห":["a","fr"],"ขำก๊าก":["h","L"]};
-const chJ=k=>{try{return JSON.parse(localStorage.getItem(k)||"{}")||{}}catch(e){return{}}},chS=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-function chFace(R,k){const o=R.o,w=o.w||1,x=CHX[k]||CHX["ปกติ"],f=R.fc,ey=-152,ex=24*w,my=o.k=="duck"?-118:-128,TN={"stroke-width":3};f.textContent="";
- [-1,1].forEach(s=>{const g=EL("g",{transform:`translate(${s*ex} ${ey})`},f),e=x[0];
-  if(e=="h")EL("path",{d:"M-8 3 q8 -12 16 0",fill:"none",...LN},g);
-  else if(e=="z")EL("path",{d:"M-8 0 h16",fill:"none",...LN},g);
-  else if(e=="sh"){EL("circle",{r:11,fill:"#fff",...LN,...TN},g);EL("circle",{r:3,fill:KC},g)}
-  else{EL("ellipse",{rx:7,ry:10,fill:KC},g);EL("circle",{cx:2,cy:-4,r:2.5,fill:"#fff"},g);
-   if(e=="sm")EL("path",{d:"M-10 -11 h20 v10 h-20z",fill:o.sk,stroke:KC,"stroke-width":3,"stroke-linejoin":"round"},g);
-   if(e=="c")EL("path",{d:"M0 12 q-6 12 0 17 q6 -5 0 -17",fill:"#7ad7ff"},g);
-   if(e=="a")EL("path",{d:`M${-12*s} -17 L${12*s} -7`,fill:"none",...LN},g)}
-  EL("ellipse",{cx:s*9,cy:19,rx:7,ry:4,fill:"#ff9aa8",opacity:.6},g)});
- if(o.gl){[-1,1].forEach(s=>EL("circle",{cx:s*ex,cy:ey,r:17,fill:"none",stroke:KC,"stroke-width":3},f));EL("path",{d:`M${-(ex-17)} ${ey} h${2*(ex-17)}`,stroke:KC,"stroke-width":3},f)}
- const m=x[1];R.m0=EL("g",{transform:`translate(0 ${my})`},f);const M=R.m0;
- if(m=="s")EL("path",{d:"M-9 0 q9 10 18 0",fill:"none",...LN},M);
- if(m=="o")EL("path",{d:"M-10 -2 q10 18 20 0z",fill:"#7a2c2c",...LN,...TN},M);
- if(m=="f")EL("path",{d:"M-8 2 h16",fill:"none",...LN},M);
- if(m=="g"){EL("path",{d:"M-12 -2 q12 18 24 0z",fill:"#7a2c2c",...LN,...TN},M);EL("rect",{x:-4,y:-1,width:8,height:7,rx:2,fill:"#fff",stroke:KC,"stroke-width":2},M)}
- if(m=="w")EL("path",{d:"M-11 2 q5.5 -7 11 0 t11 0",fill:"none",...LN},M);
- if(m=="O")EL("ellipse",{rx:6,ry:8,fill:"#7a2c2c",...LN,...TN},M);
- if(m=="d"||m=="fr")EL("path",{d:"M-9 6 q9 -10 18 0",fill:"none",...LN},M);
- if(m=="L")EL("path",{d:"M-14 -4 q14 28 28 0z",fill:"#7a2c2c",...LN,...TN},M);
- R.m1=EL("ellipse",{cx:0,cy:my+3,rx:9,ry:10,fill:"#7a2c2c",...LN,...TN,display:"none"},f)}
-function chRig(o,par){const R={o,P:{}},w=o.w||1,fur=o.k!="h",F=c=>({fill:c,...LN,"stroke-width":4});
- R.g=EL("g",{},par);EL("ellipse",{cx:0,cy:0,rx:54*w,ry:9,fill:"#0002"},R.g);R.b=EL("g",{},R.g);
- const pt=(n,px,py)=>(R.P[n]={g:EL("g",{},R.b)}).g;let q;
- if(fur){q=pt("tail");if(o.k=="cat")EL("path",{d:`M${16*w} -58 q46 -6 40 -48`,fill:"none",stroke:o.sk,"stroke-width":14,"stroke-linecap":"round"},q);else EL("circle",{cx:26*w,cy:-56,r:o.k=="duck"?8:11,...F(o.bl)},q)}
- [-1,1].forEach(s=>{q=pt(s<0?"ll":"lr");EL("rect",{x:s*16*w-9,y:-52,width:18,height:42,rx:9,...F(fur?o.sk:"#4a4a6a")},q);EL("ellipse",{cx:s*16*w,cy:-7,rx:15,ry:8,...F(fur?o.sk:"#f4f1ea")},q)});
- EL("rect",{x:-30*w,y:-104,width:60*w,height:58,rx:26,...F(fur?o.sk:o.oc)},R.b);
- if(fur){EL("ellipse",{cx:0,cy:-70,rx:20*w,ry:22,fill:o.bl},R.b);EL("rect",{x:-24*w,y:-108,width:48*w,height:12,rx:6,...F(o.ac)},R.b)}else EL("rect",{x:-29*w,y:-72,width:58*w,height:9,fill:o.ac,opacity:.9},R.b);
- [-1,1].forEach(s=>{q=pt(s<0?"al":"ar");EL("ellipse",{cx:s*36*w,cy:-76,rx:9,ry:21,...F(fur?o.sk:o.oc)},q);EL("circle",{cx:s*36*w,cy:-54,r:9,...F(o.sk)},q)});
- q=pt("hd");
- if(o.hs=="twin")[-1,1].forEach(s=>EL("circle",{cx:s*64*w,cy:-128,r:22,...F(o.hc)},q));
- if(o.hs=="bob")[-1,1].forEach(s=>EL("ellipse",{cx:s*60*w,cy:-135,rx:18,ry:36,...F(o.hc)},q));
- if(o.hs=="pony")EL("circle",{cx:58*w,cy:-196,r:20,...F(o.hc)},q);
- [-1,1].forEach(s=>{if(o.k=="cat")EL("path",{d:`M${s*18*w} -202 L${s*50*w} -236 L${s*62*w} -184z`,...F(o.sk)},q);
-  if(o.k=="bun")EL("ellipse",{cx:s*26*w,cy:-246,rx:14,ry:38,transform:`rotate(${s*8} ${s*26*w} -208)`,...F(o.sk)},q);
-  if(o.k=="bear")EL("circle",{cx:s*52*w,cy:-196,r:18,...F(o.sk)},q)});
- EL("ellipse",{cx:0,cy:-150,rx:66*w,ry:58,...F(o.sk)},q);
- if(o.k=="cat"||o.k=="bear")EL("ellipse",{cx:0,cy:-130,rx:28*w,ry:18,fill:o.bl},q);
- if(o.k=="cat")EL("path",{d:"M-5 -140 h10 l-5 7z",fill:"#ff9aa8"},q);
- if(o.k=="bear")EL("ellipse",{cx:0,cy:-138,rx:7,ry:5,fill:KC},q);
- if(o.k=="duck"){EL("ellipse",{cx:0,cy:-134,rx:26,ry:12,...F(o.ac),"stroke-width":3},q);EL("path",{d:"M-6 -206 q-8 -26 6 -30 q2 14 -2 30z M4 -206 q4 -20 14 -22 q-2 14 -8 22z",...F(o.sk),"stroke-width":3},q)}
- if(o.k=="h"){EL("path",{d:`M${-66*w} -152 C${-66*w} -250 ${66*w} -250 ${66*w} -152 C${40*w} -176 ${-40*w} -176 ${-66*w} -152z`,...F(o.hc)},q);
-  if(o.hs=="spike")EL("path",{d:`M${-44*w} -200 l8 -34 l22 24 l14 -38 l16 36 l22 -26 l6 40z`,...F(o.hc)},q)}
- R.fc=EL("g",{},q);R.z=EL("text",{x:54*w,y:-210,"font-size":28,"font-weight":"700",fill:"#556",display:"none"},R.g);R.z.textContent="z z";chFace(R,"ปกติ");R.cx="ปกติ";return R}
-const CHP={
-"ยืน":(t,s)=>({by:s(t*2)*2,al:8+s(t*2)*3,ar:8+s(t*2)*3}),
-"เดิน":(t,s)=>{const w=t*7;return{by:-Math.abs(s(w))*5,br:s(w)*3,ll:s(w)*26,lr:-s(w)*26,al:14+s(w)*22,ar:14-s(w)*22}},
-"วิ่ง":(t,s)=>{const w=t*12;return{by:-Math.abs(s(w))*12,br:8,hr:3,ll:s(w)*45,lr:-s(w)*45,al:40+s(w)*35,ar:40-s(w)*35}},
-"กระโดด":(t,s)=>{const a=Math.abs(s(t*3));return{by:-a*70,sx:1.12-a*.2,sy:.88+a*.24,al:40+a*110,ar:40+a*110,ll:-8*a,lr:8*a}},
-"โบกมือ":(t,s)=>({by:s(t*3)*2,ar:150+s(t*9)*22,al:8}),
-"พูด":(t,s)=>({by:-Math.abs(s(t*9))*5,hr:s(t*3)*3,al:24+s(t*7)*22,ar:24+s(t*6+1)*18,talk:1}),
-"ขำก๊าก":(t,s)=>({by:-Math.abs(s(t*12))*8,hr:s(t*12)*4,al:50,ar:50,x:"ขำก๊าก"}),
-"ตกใจ":(t,s)=>({bx:s(t*40)*2.5,sx:.94,sy:1.08,al:70,ar:70,x:"ช็อก"}),
-"ร้องไห้":(t,s)=>({by:s(t*14)*2,hr:s(t*3)*6,al:20,ar:20,x:"ร้องไห้"}),
-"โมโห":(t,s)=>({by:-Math.abs(s(t*8))*5,hr:s(t*30)*2,al:30,ar:30,x:"โมโห"}),
-"นั่ง":(t,s)=>({by:26+s(t*2)*1.5,ll:68,lr:-68,al:25,ar:25}),
-"ชี้":(t,s)=>({by:s(t*2)*2,hr:-5,ar:95,al:8}),
-"เต้น":(t,s)=>{const d=s(t*6);return{by:-Math.abs(d)*12,br:d*8,al:100+d*60,ar:100-d*60,ll:d*14,lr:d*14}},
-"ต่อย":(t,s)=>{const p=Math.max(0,s(t*8));return{br:-8,bx:p*10,ar:70+p*40,al:30}},
-"ล้ม":(t,s)=>{const u=Math.min(1,(t%3)/.5);return{br:-90*u,al:60*u,ar:60*u,x:"ช็อก"}},
-"ปิดหน้า":(t,s)=>({by:s(t*2),hr:6,ar:155,al:8,x:"ง่วง"}),
-"หลับ":(t,s)=>({br:-82,by:-4,al:10,ar:10,x:"ง่วง",zz:1})};
-function chPose(R,t,st,xp){const q=(CHP[st]||CHP["ยืน"])(t,Math.sin),P=R.P,w=R.o.w||1,x=q.x||xp,A=(n,a,px,py)=>P[n]&&P[n].g.setAttribute("transform",`rotate(${a} ${px} ${py})`);
- if(R.cx!=x){R.cx=x;chFace(R,x)}
- R.b.setAttribute("transform",`translate(${q.bx||0} ${q.by||0}) rotate(${q.br||0}) scale(${q.sx||1} ${q.sy||1})`);
- A("hd",q.hr||0,0,-100);A("al",q.al||0,-30*w,-92);A("ar",-(q.ar||0),30*w,-92);A("ll",q.ll||0,-16*w,-50);A("lr",q.lr||0,16*w,-50);A("tail",Math.sin(t*4)*14,14*w,-58);
- const op=q.talk&&Math.sin(t*18)>0;R.m0.setAttribute("display",op?"none":"");R.m1.setAttribute("display",op?"":"none");R.z.setAttribute("display",q.zz?"":"none")}
-function chMk(o){const s=EL("svg",{viewBox:"-110 -265 220 280"});s.style.height="130px";chPose(chRig(o,s),0,"ยืน","ปกติ");return s}
-let CHS=null;requestAnimationFrame(function chl(n){if(CHS&&document.body.contains(CHS.sv))chPose(CHS.R,n/1000,CHS.st,CHS.xp);requestAnimationFrame(chl)});
-P.cast=async()=>`<h2>🧸 ตัวละคร chibi ของช่อง</h2><p class="sub">แตะเลือกตัวที่ชอบในแต่ละบท · ทุกชิ้นวาดด้วยโค้ด หน้า ตัว ชุด เหมือนเดิมทุกเฟรม · ลองท่าแล้วกด 🔒 เมื่อผ่านทีละตัว</p><div id="chl"></div><div id="chs"></div>`;
-delete P.lab;function labInit(){}
-function castInit(){const L=chJ("ss_chibi"),K=chJ("ss_chibi_lock"),box=$("#chl"),sg=$("#chs"),roles=Object.keys(CHD);let cur=roles[0];
- roles.forEach(r=>{if(!CHD[r].l.some(o=>o.id==L[r]))L[r]=CHD[r].l[0].id});
- const pick=r=>CHD[r].l.find(o=>o.id==L[r]);
- function draw(){box.textContent="";roles.forEach(r=>{const c=document.createElement("div");c.className="c";c.innerHTML=`<h3>${CHD[r].t}</h3><div class="sh"></div>`;const row=c.querySelector(".sh");
-  CHD[r].l.forEach(o=>{const f=document.createElement("figure"),cp=document.createElement("figcaption");f.style.cssText="cursor:pointer;border-radius:12px;padding:4px;outline:"+(L[r]==o.id?"3px solid #f5c518":"none");cp.textContent=(K[o.id]?"🔒 ":"")+o.n;f.append(chMk(o),cp);f.onclick=()=>{L[r]=o.id;chS("ss_chibi",L);cur=r;draw();stage()};row.appendChild(f)});box.appendChild(c)})}
- function stage(){sg.textContent="";const o=pick(cur),c=document.createElement("div");c.className="c";c.innerHTML=`<h3>🎬 ดูท่า: ${o.n}</h3><div class="mu">${o.d}</div>`;
-  const tabs=document.createElement("div");tabs.style.cssText="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:8px 0";
-  roles.forEach(r=>{const b=document.createElement("button");b.textContent=pick(r).n;b.className=r==cur?"pri":"";b.onclick=()=>{cur=r;stage()};tabs.appendChild(b)});
-  const sv=EL("svg",{viewBox:"-150 -290 300 320"});sv.style.cssText="width:100%;max-width:420px;height:auto;display:block;margin:0 auto;background:linear-gradient(#bfe8ff,#fff2c9);border-radius:16px";
-  CHS={sv,R:chRig(o,sv),st:"ยืน",xp:"ปกติ"};
-  const row=(t,ks,fn)=>{const d=document.createElement("div");d.style.cssText="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0";d.innerHTML=`<b style="width:100%;text-align:center;font-size:13px">${t}</b>`;ks.forEach(k=>{const b=document.createElement("button");b.textContent=k;b.onclick=()=>{fn(k);d.querySelectorAll("button").forEach(x=>x.classList.toggle("pri",x==b))};d.appendChild(b)});d.querySelector("button").click();return d};
-  const lk=document.createElement("button"),lw=document.createElement("div"),lt=()=>lk.textContent=K[o.id]?"🔒 ล็อกแล้ว (แตะเพื่อปลดล็อก)":"🔒 ผ่านแล้ว ล็อกตัวนี้";lk.className="pri";lt();lw.style.cssText="text-align:center;margin-top:8px";lw.appendChild(lk);
-  lk.onclick=()=>{if(K[o.id])delete K[o.id];else K[o.id]=1;chS("ss_chibi_lock",K);lt();draw()};
-  c.append(tabs,sv,row("ท่าทาง",Object.keys(CHP),k=>CHS.st=k),row("สีหน้า (บางท่าบังคับสีหน้าเอง)",Object.keys(CHX),k=>CHS.xp=k),lw);sg.appendChild(c)}
- draw();stage()}
 async function show(){const r=(location.hash.replace(/^#\/?/,'')||''),a=P[r]?r:'';
  document.querySelectorAll('nav a').forEach(x=>x.classList.toggle('on',x.getAttribute('href')=='#/'+a||(a==''&&x.getAttribute('href')=='#/')));
  const v=$('#v');try{v.innerHTML=await P[a]();bind(a)}catch(e){v.innerHTML=`<div class="c er">${E(e.message||e)}</div>`}}
@@ -323,6 +219,8 @@ function bind(a){if(a=='cast')castInit();if(a=='lab')labInit();const on=(s,f)=>d
  on('[data-c]',b=>b.onclick=async()=>{await api('/api/job/cancel',{id:+b.dataset.c});show()});
  const g=i=>$(i);
  if(g('#go'))g('#go').onclick=async()=>{try{await api('/api/job/add',{kind:g('#k').value,input:g('#i').value});g('#m').innerHTML='<div class="ms">เพิ่มเข้าคิวแล้ว</div>';g('#i').value=''}catch(e){g('#m').innerHTML=`<div class="er">${E(e.message)}</div>`}};
+ on('[data-rf]',b=>b.onclick=()=>{window.PREF='ref:#'+b.dataset.rf+'\n';location.hash='#/new'});
+ if(g('#rf'))g('#rf').onchange=async e=>{const f=e.target.files[0];if(!f)return;const m=g('#rfm');m.textContent='กำลังอัปโหลด…';try{const im=await createImageBitmap(f),s=Math.min(1,1024/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*s);cv.height=Math.round(im.height*s);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);const j=await api('/api/ref',{b64:cv.toDataURL('image/jpeg',.92).split(',')[1],name:f.name}),t=g('#i'),mm=t.value.match(/^\s*ref\s*:(.*)$/im);t.value=mm?t.value.replace(/^\s*ref\s*:.*$/im,'ref:'+mm[1].trim()+',#'+j.id):'ref:#'+j.id+'\n'+t.value;m.innerHTML=`<div class="ms">อัปโหลดแล้ว = ภาพ #${j.id} (ใส่ ref ให้แล้ว)</div>`}catch(err){m.innerHTML=`<div class="er">${E(err.message||err)}</div>`}};
  if(g('#kt'))g('#kt').onclick=async()=>{try{g('#km').textContent=(await api('/api/kaggle-test')).msg}catch(e){g('#km').textContent=e.message}};
  if(g('#cl'))g('#cl').onclick=async()=>{if(confirm('ปิดงานที่รอ/กำลังทำทั้งหมด?')){await api('/api/jobs/clear',{});show()}};
  if(g('#wp'))g('#wp').onclick=async()=>{try{const j=await api('/api/wipe',{confirm:g('#wc').value.trim()});g('#wm').innerHTML=`<div class="ms">ล้างแล้ว ${j.dropped} ตาราง และปิดสวิตช์ทั้งหมด</div>`}catch(e){g('#wm').innerHTML=`<div class="er">${E(e.message)}</div>`}};

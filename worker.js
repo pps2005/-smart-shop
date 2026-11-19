@@ -1,6 +1,6 @@
 // Xiress Studio bot v2 — เริ่มใหม่ ว่างเปล่า · ใช้ตัวเชื่อมเดิม
 // เชื่อมของเดิม: Secrets (PASSWORD, KAGGLE_USERNAME, KAGGLE_KEY, GH_*, TG_*), D1 "DB", ตาราง settings / fluxkeys / helpers / voices / sfx_real
-const VER = 'v2-0';
+const VER = 'v2-1';
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type,x-key', 'access-control-max-age': '86400' };
 const json = (o, st = 200) => new Response(JSON.stringify(o), { status: st, headers: { 'content-type': 'application/json', ...CORS } });
 const authOK = (req, url, env) => !env.PASSWORD || (url.searchParams.get('k') || req.headers.get('x-key')) === env.PASSWORD;
@@ -9,7 +9,8 @@ const WIPE = ["aud_cands", "casting", "char_profiles", "chars", "flipbooks", "im
 const MODELS = [ // รายการโมเดลที่น่าใช้ (ลงทะเบียนไว้ก่อน · ยังไม่มีสูตรงานเรียกใช้ · ชื่อ hf ที่ว่าง = ต้องตรวจชื่อก่อนใช้) run: cf = Workers AI, kaggle = GPU ฟรีของ Kaggle, cpu = ffmpeg
   { id: 'flux1-dev', kind: 'image', name: 'FLUX.1-dev', run: 'kaggle', hf: 'black-forest-labs/FLUX.1-dev', note: 'ภาพละเอียด ทำตามคำสั่งแม่น (ตัวเดิม)' },
   { id: 'flux-schnell', kind: 'image', name: 'FLUX.1 schnell', run: 'cf', hf: '@cf/black-forest-labs/flux-1-schnell', note: 'เร็ว ไม่ต้องรอเครื่อง Kaggle (ตัวสำรองเดิม)' },
-  { id: 'flux1-kontext', kind: 'image', name: 'FLUX.1 Kontext', run: 'kaggle', hf: 'black-forest-labs/FLUX.1-Kontext-dev', note: 'ใส่ภาพอ้างอิง ทำตัวละครให้หน้าเหมือนเดิม' },
+  { id: 'flux2-klein-4b', kind: 'image', name: 'FLUX.2 klein 4B (ภาพต้นแบบ)', run: 'kaggle', hf: 'black-forest-labs/FLUX.2-klein-4B', note: 'ใส่ภาพต้นแบบ 1–4 รูป ทำตัวละครหน้าเหมือนเดิมทุกช็อต · Apache 2.0 · บรรทัดแรกของโจทย์: ref:#เลขงาน' },
+  { id: 'flux1-kontext', kind: 'image', name: 'FLUX.1 Kontext', run: 'kaggle', hf: 'black-forest-labs/FLUX.1-Kontext-dev', note: 'ใส่ภาพอ้างอิง ทำตัวละครให้หน้าเหมือนเดิม (12B ใหญ่เกินเครื่องฟรี — ใช้ klein 4B แทน)' },
   { id: 'illustrious-xl', kind: 'image', name: 'Illustrious XL (SDXL)', run: 'kaggle', hf: '', note: 'มาตรฐานโอเพนซอร์สสายอนิเมะ มีหลายเช็กพอยต์' },
   { id: 'animagine-xl-4', kind: 'image', name: 'Animagine XL 4.0', run: 'kaggle', hf: 'cagliostrolab/animagine-xl-4.0', note: 'ตัวละครแม่น เส้นคม' },
   { id: 'wan-2-2', kind: 'video', name: 'Wan 2.2 (TI2V-5B / A14B)', run: 'kaggle', hf: 'Wan-AI/Wan2.2-TI2V-5B', note: 'ภาพนิ่ง→วิดีโอ สัญญาอนุญาต Apache 2.0' },
@@ -47,7 +48,7 @@ const MODELS = [ // รายการโมเดลที่น่าใช้
   { id: 'qwen3-asr', kind: 'subs', name: 'Qwen3-ASR', run: 'kaggle', hf: '', note: '52 ภาษา มีเวลากำกับคำ' },
   { id: 'ffmpeg', kind: 'edit', name: 'ffmpeg', run: 'cpu', hf: '', note: 'ตัดต่อ ต่อคลิป ใส่เสียงและซับ (ไม่ใช่โมเดล)' }
 ];
-const RUN = ['animagine-xl-4', 'flux1-dev', 'typhoon-whisper-large', 'typhoon-whisper-turbo', 'whisper-v3-turbo'], BIG = ['magi-2', 'minimax-h3']; // RUN = เครื่องรัน Kaggle (kaggle-runner.py) รองรับแล้ว · BIG = ใหญ่เกินเครื่องฟรี
+const RUN = ['animagine-xl-4', 'flux1-dev', 'flux2-klein-4b', 'typhoon-whisper-large', 'typhoon-whisper-turbo', 'whisper-v3-turbo'], BIG = ['magi-2', 'minimax-h3']; // RUN = เครื่องรัน Kaggle (kaggle-runner.py) รองรับแล้ว · BIG = ใหญ่เกินเครื่องฟรี
 MODELS.forEach(m => { m.fit = BIG.includes(m.id) ? 'big' : RUN.includes(m.id) ? 'ok' : m.run === 'cf' ? 'cf' : 'reg'; });
 const RECIPES = {}; // สูตรงานแต่ละประเภท: RECIPES.ชื่อ = async (env, job) => {...}  (ยังว่าง — รอกำหนดประเภทงาน)
 const allSet = async env => { const r = await env.DB.prepare('SELECT key,value FROM settings').all(), o = {}; for (const x of r.results) o[x.key] = x.value; return o; };
@@ -134,6 +135,17 @@ async function handle(req, env) {
     return json({ ok: true });
   }
   if (p === '/api/img') { const s = await allSet(env), r = await supa(s, 'GET', 'n_img_' + (+url.searchParams.get('id') || 0) + '.jpg'); if (!r || !r.ok) return json({ error: 'ไม่พบภาพ' }, 404); return new Response(r.body, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=86400', ...CORS } }); }
+  if (p === '/api/ref') { // อัปโหลดภาพต้นแบบ (jpg เป็น base64) → เก็บเป็นงาน kind=ref ที่เสร็จแล้ว แล้วอ้างด้วย ref:#เลขงาน · ต้องตั้ง Supabase ไว้แล้ว
+    const s = await allSet(env), d = String(b.b64 || '').replace(/^data:[^,]*,/, '');
+    if (!d) return json({ error: 'ไม่พบไฟล์ภาพ' }, 400);
+    if (d.length > 6e6) return json({ error: 'ภาพใหญ่เกินไป (ไม่เกินราว 4 MB)' }, 400);
+    let bin; try { bin = atob(d); } catch (e) { return json({ error: 'ไฟล์ภาพไม่ถูกต้อง' }, 400); }
+    const by = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
+    const ins = await env.DB.prepare("INSERT INTO n_jobs (kind,input,status,out,created,updated) VALUES ('ref',?1,'done','img',?2,?2)").bind(String(b.name || 'ref').slice(0, 80), now).run(), id = ins.meta.last_row_id;
+    const r = await supa(s, 'POST', 'n_img_' + id + '.jpg', by);
+    if (!r || !r.ok) { await env.DB.prepare('DELETE FROM n_jobs WHERE id=?1').bind(id).run(); return json({ error: 'บันทึกภาพลง Supabase ไม่สำเร็จ (ตั้ง supa_url / supa_key / supa_dir แล้วหรือยัง)' }, 500); }
+    return json({ ok: true, id });
+  }
   if (p === '/api/k/next') { // เครื่อง Kaggle ดึงงาน: ?models=a,b
     const ms = (url.searchParams.get('models') || '').split(',').filter(Boolean); if (!ms.length) return json({ job: null });
     const j = await env.DB.prepare("SELECT id,kind,input FROM n_jobs WHERE status='kwait' AND substr(kind,1,2)='k:' ORDER BY id LIMIT 20").all(), x = j.results.find(r => ms.includes(r.kind.slice(2)));
