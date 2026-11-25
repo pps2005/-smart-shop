@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Xiress Trade</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{--bg:#131722;--pn:#1e222d;--bd:#2a2e39;--tx:#d1d4dc;--mu:#787b86;--up:#26a69a;--dn:#ef5350;--ac:#2962ff}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.4 system-ui,"Noto Sans Thai",sans-serif;font-variant-numeric:tabular-nums}
+body{height:100dvh;display:grid;grid-template-rows:44px minmax(0,1fr) 210px;padding-bottom:env(safe-area-inset-bottom,0)}
+button,select,input{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+#top{display:flex;align-items:center;gap:6px;padding:0 8px;background:var(--pn);border-bottom:1px solid var(--bd);overflow-x:auto;white-space:nowrap}
+#top a{color:var(--mu);text-decoration:none;padding:4px 6px}
+select,input{background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:5px 7px}
+input{width:100%}
+.tb{padding:4px 8px;border-radius:4px;color:var(--mu)}
+.tb:hover{background:var(--bd);color:var(--tx)}
+.tb.on{color:#5b8cff;background:#2962ff22}
+.sep{width:1px;height:20px;background:var(--bd);margin:0 4px;flex:none}
+#src{margin-left:auto;font-size:11px;color:var(--mu);padding-right:6px}
+#main{display:grid;grid-template-columns:44px minmax(0,1fr) 290px;min-height:0}
+#tools{background:var(--pn);border-right:1px solid var(--bd);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:4px}
+#tools .tb{width:34px;height:34px;font-size:16px;padding:0}
+#cw{position:relative;min-height:0}
+#chart,#ov{position:absolute;inset:0;width:100%;height:100%}
+#ov{z-index:3;pointer-events:none}
+#leg{position:absolute;left:8px;top:6px;z-index:4;pointer-events:none;font-size:12px}
+#right{background:var(--pn);border-left:1px solid var(--bd);display:flex;flex-direction:column;min-height:0}
+#wl{flex:1;overflow:auto;min-height:80px}
+.gh{padding:6px 12px 2px;color:var(--mu);font-size:11px}
+.row{display:grid;grid-template-columns:1fr auto 64px;gap:8px;padding:5px 12px;cursor:pointer}
+.row:hover{background:#ffffff0a}.row.on{background:#2962ff22}
+.row i{font-style:normal;text-align:right}
+#ord{border-top:1px solid var(--bd);padding:10px 12px;display:grid;gap:8px}
+#ord label{display:grid;gap:3px;color:var(--mu);font-size:11px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bs button{color:#fff;padding:8px;border-radius:4px;font-weight:600}
+.bs b{display:block;font-size:15px;font-weight:600}
+.sell{background:var(--dn)}.buy{background:var(--ac)}
+#term{display:flex;flex-direction:column;min-height:0;background:var(--pn);border-top:1px solid var(--bd)}
+#tabs{display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid var(--bd);overflow-x:auto;white-space:nowrap}
+#acc{margin-left:auto;color:var(--mu);padding-left:12px}#acc b{color:var(--tx);font-weight:500;margin-right:10px}
+#tbl{flex:1;overflow:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+th{color:var(--mu);font-weight:400;text-align:left;padding:4px 10px;position:sticky;top:0;background:var(--pn)}
+td{padding:4px 10px;border-top:1px solid var(--bd)}
+.x{color:var(--mu);padding:0 6px}.x:hover{color:var(--dn)}
+.u{color:var(--up)}.d{color:var(--dn)}.b{color:#5b8cff}.s{color:var(--dn)}
+.em{padding:16px;color:var(--mu)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#000c;border:1px solid var(--bd);padding:8px 14px;border-radius:6px;z-index:9;display:none}
+@media(max-width:860px){
+body{height:auto;display:block}
+#main{display:flex;flex-direction:column}
+#tools{flex-direction:row;border-right:0;border-bottom:1px solid var(--bd);padding:4px 8px}
+#cw{height:58vh}
+#right{border-left:0;border-top:1px solid var(--bd)}
+#wl{max-height:220px}
+#term{height:240px}}
+</style></head><body>
+<header id="top">
+ <a href="index.html" title="กลับหน้าหลัก">←</a>
+ <select id="sym" aria-label="สินทรัพย์"></select>
+ <span class="sep"></span><span id="tfs"></span><span class="sep"></span>
+ <button class="tb on" data-i="ma">MA20</button><button class="tb" data-i="ema">EMA50</button><button class="tb" data-i="bb">BB</button><button class="tb on" data-i="vol">Vol</button>
+ <span id="src"></span>
+ <button class="tb" id="rst">รีเซ็ตบัญชี</button>
+</header>
+<div id="main">
+ <aside id="tools">
+  <button class="tb on" data-t="c" title="เคอร์เซอร์">✛</button>
+  <button class="tb" data-t="l" title="เทรนด์ไลน์ (คลิก 2 จุด)">╱</button>
+  <button class="tb" data-t="h" title="เส้นแนวนอน">─</button>
+  <button class="tb" id="clr" title="ลบเส้นที่วาด">🗑</button>
+ </aside>
+ <section id="cw"><div id="chart"></div><canvas id="ov"></canvas><div id="leg"></div></section>
+ <aside id="right">
+  <div id="wl"></div>
+  <div id="ord">
+   <label>ขนาดออเดอร์ (lot)<input id="vol" type="number" step="0.01" min="0.01" value="0.1"></label>
+   <div class="f2"><label>Stop Loss<input id="sl" type="number" step="any" placeholder="ราคา"></label><label>Take Profit<input id="tp" type="number" step="any" placeholder="ราคา"></label></div>
+   <div class="bs"><button class="sell" id="bs">SELL<b id="pb">-</b></button><button class="buy" id="bb">BUY<b id="pa">-</b></button></div>
+  </div>
+ </aside>
+</div>
+<footer id="term">
+ <div id="tabs"><button class="tb on" data-p="pos">ออเดอร์ที่เปิด</button><button class="tb" data-p="his">ประวัติ</button><span id="acc"></span></div>
+ <div id="tbl"></div>
+</footer>
+<div id="toast"></div>
+<script>
+(()=>{
+const $=id=>document.getElementById(id),LEV=100;
+if(!window.LightweightCharts){$('cw').innerHTML='<p class="em">โหลดไลบรารีกราฟไม่ได้ ต้องต่ออินเทอร์เน็ต</p>';return}
+const TF=[['M1',60,'1m'],['M5',300,'5m'],['M15',900,'15m'],['H1',3600,'1h'],['H4',14400,'4h'],['D1',86400,'1d']];
+// [ชื่อ, ตลาด, contract size, ทศนิยม, ราคาเริ่มต้น (ใช้เฉพาะข้อมูลจำลอง), live]
+const SY=[['BTCUSDT','Crypto',1,2,90000,1],['ETHUSDT','Crypto',1,2,3000,1],['SOLUSDT','Crypto',1,2,150,1],
+['EURUSD','Forex',100000,5,1.085],['GBPUSD','Forex',100000,5,1.27],['XAUUSD','ทอง',100,2,2650],
+['AAPL','หุ้น',1,2,230],['NVDA','หุ้น',1,2,140]].map(a=>({s:a[0],m:a[1],cs:a[2],dp:a[3],p0:a[4],live:!!a[5],sp:a[4]*1e-4}));
+let st={bal:10000,pos:[],hist:[],D:{}};
+try{Object.assign(st,JSON.parse(localStorage.getItem('ss_trade')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('ss_trade',JSON.stringify(st))}catch(e){}};
+let CUR=SY[0],tfi=1,C=[],tok=0,dirty=1,tool='c',pend=null,lines=[],tab='pos',arm=0;
+const px={},base={},ind={ma:1,ema:0,bb:0,vol:1},sym=s=>SY.find(x=>x.s===s);
+SY.forEach(S=>{if(!S.live){px[S.s]=base[S.s]=S.p0}});
+const fm=v=>(v>=0?'+':'')+v.toFixed(2),f=v=>v.toFixed(CUR.dp);
+function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>e.style.display='none',2600)}
+
+// ---------- chart ----------
+const chart=LightweightCharts.createChart($('chart'),{autoSize:true,layout:{background:{color:'#131722'},textColor:'#d1d4dc'},grid:{vertLines:{color:'#1c2030'},horzLines:{color:'#1c2030'}},rightPriceScale:{borderColor:'#2a2e39'},timeScale:{borderColor:'#2a2e39',timeVisible:true,secondsVisible:false}});
+const candle=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderVisible:false,wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
+const vol=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'v',lastValueVisible:false,priceLineVisible:false});
+chart.priceScale('v').applyOptions({scaleMargins:{top:.82,bottom:0}});
+const ls=(color)=>chart.addLineSeries({color,lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+const sMA=ls('#f7c948'),sEMA=ls('#42a5f5'),sBU=ls('#ab47bc'),sBL=ls('#ab47bc');
+const sma=n=>C.map((c,i)=>i<n-1?null:{time:c.time,value:C.slice(i-n+1,i+1).reduce((a,x)=>a+x.close,0)/n}).filter(Boolean);
+function ema(n){const k=2/(n+1);let e=null;return C.map(c=>{e=e===null?c.close:c.close*k+e*(1-k);return{time:c.time,value:e}})}
+function bb(){const a=[],b=[];C.forEach((c,i)=>{if(i<19)return;const w=C.slice(i-19,i+1).map(x=>x.close),m=w.reduce((x,y)=>x+y)/20,sd=Math.sqrt(w.reduce((x,y)=>x+(y-m)**2,0)/20);a.push({time:c.time,value:m+2*sd});b.push({time:c.time,value:m-2*sd})});return[a,b]}
+function drawInd(){
+ sMA.applyOptions({visible:!!ind.ma});sEMA.applyOptions({visible:!!ind.ema});sBU.applyOptions({visible:!!ind.bb});sBL.applyOptions({visible:!!ind.bb});vol.applyOptions({visible:!!ind.vol});
+ if(ind.ma)sMA.setData(sma(20));if(ind.ema)sEMA.setData(ema(50));if(ind.bb){const[a,b]=bb();sBU.setData(a);sBL.setData(b)}}
+const vcol=c=>c.close>=c.open?'#26a69a55':'#ef535055';
+
+// ---------- data ----------
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function gen(S,s){
+ const r=rng([...S.s+s].reduce((h,c)=>h*31+c.charCodeAt(0)|0,7)),sg=.0006*Math.sqrt(s/60),b=Math.floor(Date.now()/1000/s)*s,a=[];let p=S.p0;
+ for(let i=0;i<500;i++){const o=p,c=o*(1+sg*(r()-.5)*2),h=Math.max(o,c)*(1+sg*r()*.4),l=Math.min(o,c)*(1-sg*r()*.4);a.push({time:b-(499-i)*s,open:o,high:h,low:l,close:c,v:Math.floor(100+r()*900)});p=c}
+ const k=(px[S.s]||p)/p;a.forEach(x=>{x.open*=k;x.high*=k;x.low*=k;x.close*=k});px[S.s]=px[S.s]||p;base[S.s]=base[S.s]||px[S.s];return a}
+async function load(){
+ const my=++tok,S=CUR,t=TF[tfi];let rows=null,src='จำลอง';
+ if(S.live){try{const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${S.s}&interval=${t[2]}&limit=500`),j=await r.json();rows=j.map(k=>({time:k[0]/1000,open:+k[1],high:+k[2],low:+k[3],close:+k[4],v:+k[5]}));S.ok=true;src='LIVE · Binance'}catch(e){S.ok=false;src='จำลอง (ต่อ Binance ไม่ได้)'}}
+ if(my!==tok)return;
+ if(!rows)rows=gen(S,t[1]);else{px[S.s]=rows[rows.length-1].close;base[S.s]=base[S.s]||px[S.s]}
+ C=rows;candle.applyOptions({priceFormat:{type:'price',precision:S.dp,minMove:Math.pow(10,-S.dp)}});
+ candle.setData(C);vol.setData(C.map(c=>({time:c.time,value:c.v,color:vcol(c)})));drawInd();ln();chart.timeScale().fitContent();
+ $('src').textContent=src;dirty=1}
+function tick(s,p){
+ px[s]=p;base[s]=base[s]||p;
+ if(s===CUR.s&&C.length){const L=C[C.length-1],w=TF[tfi][1],b=Math.floor(Date.now()/1000/w)*w;
+  if(b>L.time)C.push({time:b,open:p,high:p,low:p,close:p,v:0});else{L.close=p;L.high=Math.max(L.high,p);L.low=Math.min(L.low,p)}}
+ dirty=1}
+function ws(){try{const w=new WebSocket('wss://stream.binance.com:9443/stream?streams='+SY.filter(x=>x.live).map(x=>x.s.toLowerCase()+'@miniTicker').join('/'));
+ w.onmessage=e=>{const d=JSON.parse(e.data).data;if(!d)return;const S=sym(d.s);if(!S||S.ok===false)return;base[S.s]=+d.o;tick(S.s,+d.c)};
+ w.onclose=()=>setTimeout(ws,3000)}catch(e){}}
+setInterval(()=>SY.forEach(S=>{if(S.live&&S.ok!==false)return;const p=px[S.s]||S.p0;tick(S.s,p*(1+.0002*(Math.random()-.5)*2))}),1000);
+
+// ---------- account ----------
+const pl=p=>{const S=sym(p.s),q=px[p.s];if(!q)return 0;return(p.side==='buy'?q-p.open:p.open-(q+S.sp))*p.v*S.cs};
+const mg=p=>p.open*p.v*sym(p.s).cs/LEV;
+function acct(){let g=0,m=0;st.pos.forEach(p=>{g+=pl(p);m+=mg(p)});const eq=st.bal+g;return{g,m,eq,fr:eq-m}}
+function order(side){
+ const S=CUR,v=+$('vol').value,sl=+$('sl').value||0,tp=+$('tp').value||0,q=px[S.s];
+ if(!q)return toast('ยังไม่มีราคา รอสักครู่');if(!(v>0))return toast('ใส่ขนาดออเดอร์ (lot)');
+ const open=side==='buy'?q+S.sp:q;
+ if(sl&&(side==='buy'?sl>=open:sl<=open))return toast('Stop Loss ต้องอยู่ฝั่งขาดทุนของราคาเข้า');
+ if(tp&&(side==='buy'?tp<=open:tp>=open))return toast('Take Profit ต้องอยู่ฝั่งกำไรของราคาเข้า');
+ const p={id:Date.now(),s:S.s,side,v,open,sl,tp};if(mg(p)>acct().fr)return toast('มาร์จิ้นไม่พอ ลดขนาดออเดอร์');
+ st.pos.push(p);save();ln();tbl();toast(`เปิด ${side.toUpperCase()} ${S.s} ${v} lot`)}
+function cl(id){
+ const i=st.pos.findIndex(p=>p.id===id);if(i<0)return;const p=st.pos[i],S=sym(p.s),g=pl(p);
+ st.bal+=g;st.hist.unshift({s:p.s,side:p.side,v:p.v,open:p.open,close:p.side==='buy'?px[p.s]:px[p.s]+S.sp,pnl:g,t:Date.now()});st.hist=st.hist.slice(0,100);
+ st.pos.splice(i,1);save();ln();tbl()}
+function chk(){st.pos.slice().forEach(p=>{const S=sym(p.s),q=px[p.s];if(!q)return;const m=p.side==='buy'?q:q+S.sp,b=p.side==='buy';
+ if(p.sl&&(b?m<=p.sl:m>=p.sl))cl(p.id);else if(p.tp&&(b?m>=p.tp:m<=p.tp))cl(p.id)})}
+function ln(){
+ lines.forEach(l=>candle.removePriceLine(l));lines=[];
+ st.pos.filter(p=>p.s===CUR.s).forEach(p=>{
+  lines.push(candle.createPriceLine({price:p.open,color:'#2962ff',lineStyle:2,axisLabelVisible:true,title:`${p.side.toUpperCase()} ${p.v}`}));
+  if(p.sl)lines.push(candle.createPriceLine({price:p.sl,color:'#ef5350',lineStyle:1,title:'SL'}));
+  if(p.tp)lines.push(candle.createPriceLine({price:p.tp,color:'#26a69a',lineStyle:1,title:'TP'}))})}
+
+// ---------- ui ----------
+function tbl(){
+ if(tab==='pos')$('tbl').innerHTML=st.pos.length?'<table><tr><th>สินทรัพย์<th>ประเภท<th>lot<th>ราคาเข้า<th>SL<th>TP<th>ราคาปิดตอนนี้<th>กำไร/ขาดทุน<th></tr>'+st.pos.map(p=>{const S=sym(p.s);return`<tr><td>${p.s}<td class="${p.side==='buy'?'b':'s'}">${p.side}<td>${p.v}<td>${p.open.toFixed(S.dp)}<td>${p.sl||''}<td>${p.tp||''}<td id="cp${p.id}"><td id="pl${p.id}"><td><button class="x" data-id="${p.id}" title="ปิดออเดอร์">✕</button></tr>`}).join('')+'</table>':'<p class="em">ยังไม่มีออเดอร์ที่เปิดอยู่ กด BUY หรือ SELL ที่แผงด้านขวา</p>';
+ else $('tbl').innerHTML=st.hist.length?'<table><tr><th>สินทรัพย์<th>ประเภท<th>lot<th>เข้า<th>ออก<th>กำไร/ขาดทุน<th>เวลา</tr>'+st.hist.map(h=>{const S=sym(h.s);return`<tr><td>${h.s}<td class="${h.side==='buy'?'b':'s'}">${h.side}<td>${h.v}<td>${h.open.toFixed(S.dp)}<td>${h.close.toFixed(S.dp)}<td class="${h.pnl>=0?'u':'d'}">${fm(h.pnl)}<td>${new Date(h.t).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</tr>`}).join('')+'</table>':'<p class="em">ยังไม่มีประวัติการเทรด</p>';
+ upd()}
+function upd(){
+ st.pos.forEach(p=>{const v=pl(p),e=$('pl'+p.id);if(!e)return;e.textContent=fm(v);e.className=v>=0?'u':'d';const S=sym(p.s);$('cp'+p.id).textContent=((p.side==='buy'?px[p.s]:px[p.s]+S.sp)||0).toFixed(S.dp)});
+ const a=acct();$('acc').innerHTML=`ยอดเงิน <b>${st.bal.toFixed(2)}</b>อีควิตี้ <b>${a.eq.toFixed(2)}</b>มาร์จิ้น <b>${a.m.toFixed(2)}</b>ว่าง <b>${a.fr.toFixed(2)}</b>กำไร/ขาดทุน <b class="${a.g>=0?'u':'d'}">${fm(a.g)}</b>`;
+ const q=px[CUR.s];$('pb').textContent=q?f(q):'-';$('pa').textContent=q?f(q+CUR.sp):'-';
+ SY.forEach(S=>{const p=px[S.s],b=base[S.s],c=p&&b?(p-b)/b*100:0;$('p_'+S.s).textContent=p?p.toFixed(S.dp):'-';const e=$('c_'+S.s);e.textContent=(c>=0?'+':'')+c.toFixed(2)+'%';e.className=c>=0?'u':'d'})}
+function pick(s){CUR=sym(s);$('sym').value=s;pend=null;document.querySelectorAll('.row').forEach(r=>r.classList.toggle('on',r.dataset.s===s));load()}
+function setTool(t){tool=t;pend=null;$('ov').style.pointerEvents=t==='c'?'none':'auto';$('ov').style.cursor='crosshair';document.querySelectorAll('#tools [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t))}
+
+// build static ui
+let h='',g='',o='';
+SY.forEach(S=>{if(S.m!==g){if(g)o+='</optgroup>';g=S.m;h+=`<div class="gh">${g}</div>`;o+=`<optgroup label="${g}">`}h+=`<div class="row" data-s="${S.s}"><b>${S.s}</b><span id="p_${S.s}">-</span><i id="c_${S.s}">0.00%</i></div>`;o+=`<option>${S.s}</option>`});
+$('wl').innerHTML=h;$('sym').innerHTML=o+'</optgroup>';
+$('tfs').innerHTML=TF.map((t,i)=>`<button class="tb${i===tfi?' on':''}" data-f="${i}">${t[0]}</button>`).join('');
+$('wl').onclick=e=>{const r=e.target.closest('.row');if(r)pick(r.dataset.s)};
+$('sym').onchange=e=>pick(e.target.value);
+$('tfs').onclick=e=>{const b=e.target.closest('[data-f]');if(!b)return;tfi=+b.dataset.f;document.querySelectorAll('#tfs .tb').forEach(x=>x.classList.toggle('on',x===b));load()};
+$('top').onclick=e=>{const b=e.target.closest('[data-i]');if(!b)return;const k=b.dataset.i;ind[k]=ind[k]?0:1;b.classList.toggle('on',!!ind[k]);drawInd()};
+$('tools').onclick=e=>{const b=e.target.closest('[data-t]');if(b)setTool(b.dataset.t)};
+$('clr').onclick=()=>{st.D[CUR.s]=[];pend=null;save()};
+$('tabs').onclick=e=>{const b=e.target.closest('[data-p]');if(!b)return;tab=b.dataset.p;document.querySelectorAll('#tabs [data-p]').forEach(x=>x.classList.toggle('on',x===b));tbl()};
+$('tbl').onclick=e=>{const b=e.target.closest('.x');if(b)cl(+b.dataset.id)};
+$('bs').onclick=()=>order('sell');$('bb').onclick=()=>order('buy');
+$('rst').onclick=()=>{
+ if(!arm){arm=1;$('rst').textContent='กดอีกครั้งเพื่อยืนยัน';setTimeout(()=>{arm=0;$('rst').textContent='รีเซ็ตบัญชี'},3000);return}
+ st={bal:10000,pos:[],hist:[],D:{}};save();arm=0;$('rst').textContent='รีเซ็ตบัญชี';ln();tbl()};
+
+// crosshair legend
+chart.subscribeCrosshairMove(p=>{
+ const d=(p.seriesData&&p.seriesData.get(candle))||C[C.length-1];if(!d){$('leg').textContent='';return}
+ const c=d.close>=d.open?'u':'d';
+ $('leg').innerHTML=`<b>${CUR.s}</b> ${TF[tfi][0]} &nbsp;O <span class="${c}">${f(d.open)}</span> H <span class="${c}">${f(d.high)}</span> L <span class="${c}">${f(d.low)}</span> C <span class="${c}">${f(d.close)}</span>`});
+
+// drawing overlay
+const ov=$('ov'),cx=ov.getContext('2d');
+function pt(a){return[chart.timeScale().timeToCoordinate(a.time),candle.priceToCoordinate(a.price)]}
+function dot(x,y){cx.beginPath();cx.arc(x,y,3,0,7);cx.fill()}
+function draw(){
+ const W=ov.clientWidth,H=ov.clientHeight,r=devicePixelRatio||1;
+ if(ov.width!==Math.round(W*r)||ov.height!==Math.round(H*r)){ov.width=Math.round(W*r);ov.height=Math.round(H*r)}
+ cx.setTransform(r,0,0,r,0,0);cx.clearRect(0,0,W,H);cx.lineWidth=1.5;cx.font='11px system-ui';
+ (st.D[CUR.s]||[]).forEach(d=>{
+  if(d.t==='h'){const y=candle.priceToCoordinate(d.p);if(y==null)return;cx.strokeStyle=cx.fillStyle='#f7c948';cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();cx.fillText(d.p.toFixed(CUR.dp),8,y-4)}
+  else{const[x1,y1]=pt(d.a),[x2,y2]=pt(d.b);if([x1,y1,x2,y2].includes(null))return;cx.strokeStyle=cx.fillStyle='#2962ff';cx.beginPath();cx.moveTo(x1,y1);cx.lineTo(x2,y2);cx.stroke();dot(x1,y1);dot(x2,y2)}});
+ if(pend){const[x,y]=pt(pend);if(x!=null&&y!=null){cx.fillStyle='#2962ff';dot(x,y)}}}
+ov.addEventListener('pointerdown',e=>{
+ const r=ov.getBoundingClientRect(),price=candle.coordinateToPrice(e.clientY-r.top);if(price==null||!C.length)return;
+ const t=chart.timeScale().coordinateToTime(e.clientX-r.left)??C[C.length-1].time,D=st.D[CUR.s]=st.D[CUR.s]||[];
+ if(tool==='h'){D.push({t:'h',p:price});setTool('c')}
+ else if(tool==='l'){if(!pend)pend={time:t,price};else{D.push({t:'l',a:pend,b:{time:t,price}});setTool('c')}}
+ save()});
+
+// loop
+function frame(){
+ if(dirty&&C.length){dirty=0;const L=C[C.length-1];candle.update(L);vol.update({time:L.time,value:L.v,color:vcol(L)});drawInd();chk();upd()}
+ draw();requestAnimationFrame(frame)}
+$('sym').value=CUR.s;document.querySelector('.row').classList.add('on');
+tbl();load();ws();requestAnimationFrame(frame);setInterval(upd,500);
+})();
+</script></body></html>
